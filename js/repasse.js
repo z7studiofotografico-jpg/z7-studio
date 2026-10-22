@@ -38,7 +38,7 @@ function ofertaTxt(it){
   const P = C.P;
   if (segDe(it) === "lf") {
     const pix = P.lfPix || P.kitPreco; if (!pix) return "Tudo por [valor do kit]";
-    return `${C.money(pix)} no Pix` + (P.lfCartao ? ` ou ${C.money(P.lfCartao)} no cartão${P.parcelas ? ` (até ${P.parcelas}x)` : ""}` : "");
+    return `${C.money(pix)} no Pix` + (P.lfCartao ? ` ou ${C.money(P.lfCartao)} no cartão${parcDe(it) ? ` (até ${parcDe(it)}x)` : ""}` : "");
   }
   const pix = P.kitPromo || P.kitPreco;
   if (!pix) return "Tudo por [valor do kit]";
@@ -47,6 +47,8 @@ function ofertaTxt(it){
   return t;
 }
 // Prazo da última oferta: a próxima sexta que esteja a pelo menos 3 dias de hoje.
+// Parcelas no cartão: a Linha de Frente tem o seu próprio número.
+function parcDe(it){ return (it && segDe(it) === "lf" && C.P.lfParcelas) ? C.P.lfParcelas : C.P.parcelas; }
 function sextaTxt(){ const d = new Date(); let add = (5 - d.getDay() + 7) % 7; if (add < 3) add += 7; d.setDate(d.getDate() + add); return C.pad(d.getDate()) + "/" + C.pad(d.getMonth() + 1); }
 function entregaTxt(){ return C.P.entrega || "em casa ou para retirada no estúdio"; }
 function status(it){
@@ -376,7 +378,8 @@ function card(it){
     const link = ultima ? C.P.linkCartaoFinal : (segDe(it) === "lf" ? (C.P.linkCartaoLF || C.P.linkCartao) : C.P.linkCartao);
     const valCartao = ultima ? C.P.kitFinal : (segDe(it) === "lf" ? C.P.lfCartao : C.P.kitCartao);
     if (it.etapa === "INTERESSADO" && link && d) {
-      const lm = `Para pagar no cartão${valCartao ? ` (${C.money(valCartao)}` + (C.P.parcelas ? `, em até ${C.P.parcelas}x sem juros)` : ")") : C.P.parcelas ? ` (em até ${C.P.parcelas}x sem juros)` : ""}, é só usar este link seguro da InfinitePay:\n${link}\nDepois me manda o comprovante por aqui 😊${C.P.pix ? ` No Pix${ultima ? ` (${C.money(C.P.kitFinal)})` : ""}, a chave é ${C.P.pix}.` : ""}`;
+      const pc = parcDe(it);
+      const lm = `Para pagar no cartão${valCartao ? ` (${C.money(valCartao)}` + (pc ? `, em até ${pc}x sem juros)` : ")") : pc ? ` (em até ${pc}x sem juros)` : ""}, é só usar este link seguro da InfinitePay:\n${link}\nDepois me manda o comprovante por aqui 😊${C.P.pix ? ` No Pix${ultima ? ` (${C.money(C.P.kitFinal)})` : ""}, a chave é ${C.P.pix}.` : ""}`;
       const a2 = el("a", "btn btn-sm", ultima ? "💳 Link da última oferta" : "💳 Mandar link de pagamento"); a2.href = "https://wa.me/" + d + "?text=" + encodeURIComponent(lm); a2.target = "_blank"; a2.rel = "noopener"; row.append(a2);
     }
     if (ns.then) row.append(C.mkBtn("Enviei ✓", "btn-ok", () => {

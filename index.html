@@ -343,6 +343,9 @@ details.guide summary{cursor:pointer;font-family:var(--f-display);font-weight:70
       <div class="field"><label for="pLfCartao">Preço no cartão (R$)</label><input id="pLfCartao" inputmode="decimal" placeholder="377"></div>
     </div>
     <div class="row2">
+      <div class="field"><label for="pLfParc">Parcelas no cartão · Linha de Frente (até)</label><input id="pLfParc" inputmode="numeric" placeholder="5"></div>
+    </div>
+    <div class="row2">
       <div class="field"><label for="pLfLote">Contatos novos por pessoa, por dia</label><input id="pLfLote" inputmode="numeric" placeholder="20"></div>
       <div class="field"><label for="pLfNum">WhatsApp usado</label><input id="pLfNum" maxlength="30" placeholder="(21) 9xxxx-xxxx"></div>
     </div>
@@ -364,7 +367,7 @@ details.guide summary{cursor:pointer;font-family:var(--f-display);font-weight:70
     </div>
     <div class="row2">
       <div class="field"><label for="pPix">Chave Pix</label><input id="pPix" maxlength="80" placeholder="CNPJ, e-mail ou telefone"></div>
-      <div class="field"><label for="pParc">Parcelas no cartão (até)</label><input id="pParc" inputmode="numeric" placeholder="3"></div>
+      <div class="field"><label for="pParc">Parcelas no cartão · Repasse (até)</label><input id="pParc" inputmode="numeric" placeholder="3"></div>
     </div>
     <div class="field"><label for="pLink">Link do cartão · Repasse (valor do "Preço no cartão")</label><input id="pLink" type="url" maxlength="300" placeholder="https://..."></div>
     <div class="field"><label for="pLinkFinal">Link do cartão · Última oferta (mesmo valor da última oferta)</label><input id="pLinkFinal" type="url" maxlength="300" placeholder="https://..."></div>
@@ -705,8 +708,8 @@ $("form").addEventListener("submit", async e => {
 $("btnPrices").onclick = () => {
   $("pInd").value = P.individual || ""; $("pSinal").value = P.sinal || ""; $("pG36").value = P.g36 || ""; $("pG7").value = P.g7 || "";
   $("pFotos").value = P.fotos || ""; $("pPrazo").value = P.prazo || "";
-  $("pLfLote").value = P.lfLoteDia || ""; $("pLfNum").value = P.lfNumero || ""; $("pRepNum").value = P.repNumero || ""; $("pLfPix").value = P.lfPix || ""; $("pLfCartao").value = P.lfCartao || ""; $("pKit").value = P.kitPreco || ""; $("pKitPromo").value = P.kitPromo || ""; $("pKitCartao").value = P.kitCartao || ""; $("pKitFinal").value = P.kitFinal || ""; $("pLote").value = P.loteDia || ""; $("pEntrega").value = P.entrega || ""; $("pPix").value = P.pix || ""; $("pParc").value = P.parcelas || ""; $("pLink").value = P.linkCartao || ""; $("pLinkFinal").value = P.linkCartaoFinal || ""; $("pLinkLF").value = P.linkCartaoLF || "";
-  ["pInd","pSinal","pG36","pG7","pFotos","pPrazo","pLfLote","pLfNum","pRepNum","pLfPix","pLfCartao","pKit","pKitPromo","pKitCartao","pKitFinal","pLote","pEntrega","pPix","pParc","pLink","pLinkFinal","pLinkLF"].forEach(id => $(id).disabled = !isAdmin);
+  $("pLfLote").value = P.lfLoteDia || ""; $("pLfNum").value = P.lfNumero || ""; $("pRepNum").value = P.repNumero || ""; $("pLfParc").value = P.lfParcelas || ""; $("pLfPix").value = P.lfPix || ""; $("pLfCartao").value = P.lfCartao || ""; $("pKit").value = P.kitPreco || ""; $("pKitPromo").value = P.kitPromo || ""; $("pKitCartao").value = P.kitCartao || ""; $("pKitFinal").value = P.kitFinal || ""; $("pLote").value = P.loteDia || ""; $("pEntrega").value = P.entrega || ""; $("pPix").value = P.pix || ""; $("pParc").value = P.parcelas || ""; $("pLink").value = P.linkCartao || ""; $("pLinkFinal").value = P.linkCartaoFinal || ""; $("pLinkLF").value = P.linkCartaoLF || "";
+  ["pInd","pSinal","pG36","pG7","pFotos","pPrazo","pLfLote","pLfNum","pRepNum","pLfParc","pLfPix","pLfCartao","pKit","pKitPromo","pKitCartao","pKitFinal","pLote","pEntrega","pPix","pParc","pLink","pLinkFinal","pLinkLF"].forEach(id => $(id).disabled = !isAdmin);
   $("pSave").hidden = !isAdmin;
   $("pricesHint").textContent = isAdmin ? "Os valores entram automaticamente nas mensagens prontas." : "Só administradores mudam os preços.";
   renderPushState(); $("sheetPrices").hidden = false;
@@ -719,7 +722,7 @@ $("formPrices").addEventListener("submit", async e => {
   if (!isAdmin) return;
   const body = { individual: num($("pInd").value), sinal: num($("pSinal").value), g36: num($("pG36").value), g7: num($("pG7").value),
     fotos: num($("pFotos").value) || 30, prazo: num($("pPrazo").value) || 15,
-    lfLoteDia: num($("pLfLote").value) || 20, lfNumero: $("pLfNum").value.trim(), repNumero: $("pRepNum").value.trim(), lfPix: num($("pLfPix").value), lfCartao: num($("pLfCartao").value), kitPreco: num($("pKit").value), kitPromo: num($("pKitPromo").value), kitCartao: num($("pKitCartao").value), kitFinal: num($("pKitFinal").value), loteDia: num($("pLote").value) || 20, entrega: $("pEntrega").value.trim(),
+    lfLoteDia: num($("pLfLote").value) || 20, lfNumero: $("pLfNum").value.trim(), repNumero: $("pRepNum").value.trim(), lfParcelas: num($("pLfParc").value), lfPix: num($("pLfPix").value), lfCartao: num($("pLfCartao").value), kitPreco: num($("pKit").value), kitPromo: num($("pKitPromo").value), kitCartao: num($("pKitCartao").value), kitFinal: num($("pKitFinal").value), loteDia: num($("pLote").value) || 20, entrega: $("pEntrega").value.trim(),
     pix: $("pPix").value.trim(), parcelas: num($("pParc").value), linkCartao: $("pLink").value.trim(), linkCartaoFinal: $("pLinkFinal").value.trim(), linkCartaoLF: $("pLinkLF").value.trim() };
   try {
     await setDoc(doc(db, "config", "app"), body, { merge: true });
