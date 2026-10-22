@@ -165,7 +165,7 @@ function mount(){
     <li>Cada cartão mostra <b>para quem mandar</b> (mãe, pai ou formando) e a mensagem pronta. O 1º contato só pede permissão para mandar a prévia.</li>
     <li>Respondeu que quer ver? Toque em <b>Quer ver a prévia</b>, depois em <b>🖼️ Prévia</b>: arraste a foto do formando e o app monta o kit pronto para enviar.</li>
     <li><b>Pagou?</b> Toque em <b>Pagou</b>. O cartão pede para <b>confirmar o endereço</b> (ou agendar a retirada no estúdio) e vai para <b>Entregas</b>, separado por cidade e bairro para montar a rota.</li>
-    <li>Use o <b>número do PR</b> (o fixo da empresa no WhatsApp Business), não o número do funil.</li></ol>`;
+    <li>Cada frente tem o <b>seu próprio número de WhatsApp</b> e o seu limite de contatos por dia (em ⚙️ Ajustes). Nunca use o número do funil.</li></ol>`;
   v.append(g);
 
   const st = el("section", "stats");
@@ -176,7 +176,7 @@ function mount(){
   v.append(st);
 
   const lote = el("div", "lote"); lote.id = "rLote";
-  lote.innerHTML = `<div><b>Seu lote de hoje</b><span id="rLoteTxt">…</span></div>
+  lote.innerHTML = `<div><b>Seu lote de hoje</b><span id="rLoteTxt">…</span><small class="lnum" id="rLoteNum" hidden></small></div>
     <div class="quick"><select id="rLoteEscola" aria-label="Escola do lote"><option value="">Turmas mais recentes primeiro</option></select>
     <button class="btn btn-primary btn-sm" id="rLoteBtn" type="button">Separar contatos</button></div>`;
   v.append(lote);
@@ -363,7 +363,7 @@ function card(it){
 
   const act = el("div", "actions");
   if (it.etapa === "INCOMPLETO" || C.isAdmin) act.append(C.mkBtn(it.etapa === "INCOMPLETO" ? "Completar dados" : "Editar dados", it.etapa === "INCOMPLETO" ? "btn-primary" : "", () => openDados(it)));
-  if (it.etapa === "NA FILA") act.append(C.mkBtn("Separar para mim", "btn-primary", () => save(it, { etapa: "SEPARADO", resp: C.me, separadoEm: C.todayStr(), followup: C.todayStr() }, "Separado para hoje")));
+  if (it.etapa === "NA FILA") act.append(C.mkBtn("Separar para mim", "btn-primary", () => save(it, { etapa: "SEPARADO", resp: C.me, separadoEm: C.todayStr(), separadoSeg: segDe(it) || seg, followup: C.todayStr() }, "Separado para hoje")));
   if (ABERTAS.includes(it.etapa) && !li) act.append(C.mkBtn("✋ Estou respondendo", "", () => claim(it)));
   if (it.etapa === "SEPARADO" || it.etapa === "CONTATADO") act.append(C.mkBtn("Quer ver a prévia ✓", "btn-ok", () => save(it, { etapa: "INTERESSADO", followup: C.todayStr(), tentInteresse: 0 }, "Ótimo! Agora mande a prévia")));
   if (ABERTAS.includes(it.etapa)) {
@@ -516,14 +516,17 @@ function anosRepasse(){
   const de = conhecidos.length ? Math.min(...conhecidos) : ANO_MIN;
   const out = []; for (let a = Y - 1; a >= de; a--) out.push(a); return out;
 }
+const limiteSeg = () => (seg === "lf" ? C.P.lfLoteDia : C.P.loteDia) || 20;
+const numeroSeg = () => (seg === "lf" ? C.P.lfNumero : C.P.repNumero) || "";
 async function refreshLote(){
-  const lim = C.P.loteDia || 20;
+  const lim = limiteSeg();
   try {
-    const c = await FS.getCountFromServer(FS.query(col, FS.where("resp", "==", C.me), FS.where("separadoEm", "==", C.todayStr())));
+    const c = await FS.getCountFromServer(FS.query(col, FS.where("resp", "==", C.me), FS.where("separadoEm", "==", C.todayStr()), FS.where("separadoSeg", "==", seg)));
     const n = c.data().count, falta = Math.max(0, lim - n);
     $("rLoteTxt").textContent = n ? ` ${n} de ${lim} separados hoje.` + (falta ? ` Ainda pode separar ${falta}.` : " Lote completo ✓") : ` Separe até ${lim} contatos novos hoje.`;
     $("rLoteBtn").disabled = !falta; $("rLoteBtn").textContent = falta ? `Separar ${falta} contato${falta > 1 ? "s" : ""}` : "Lote completo";
     $("rLoteBtn").dataset.falta = falta;
+    const n0 = numeroSeg(); $("rLoteNum").textContent = n0 ? `📱 Use o WhatsApp ${n0}` : ""; $("rLoteNum").hidden = !n0;
   } catch (e) { console.warn(e); $("rLoteTxt").textContent = " Não foi possível contar agora."; }
 }
 async function separarLote(){
@@ -541,7 +544,7 @@ async function separarLote(){
     }
     if (!pegos.length) { C.toast(esc ? "Essa escola não tem mais ninguém na fila." : "A fila acabou! 🎉"); return; }
     const b = FS.writeBatch(db), hoje = C.todayStr();
-    pegos.forEach(d => b.update(d.ref, { etapa: "SEPARADO", resp: C.me, separadoEm: hoje, followup: hoje, atualizadoEm: new Date().toISOString() }));
+    pegos.forEach(d => b.update(d.ref, { etapa: "SEPARADO", resp: C.me, separadoEm: hoje, separadoSeg: seg, followup: hoje, atualizadoEm: new Date().toISOString() }));
     await b.commit();
     C.toast(`${pegos.length} contato${pegos.length > 1 ? "s" : ""} separado${pegos.length > 1 ? "s" : ""} para você hoje`);
     refreshLote(); refreshStats(); if (tab !== "hoje") openTab("hoje");

@@ -158,7 +158,7 @@ export function openMockup({ nome = "", escola = "", preco = "", modo = "kit" } 
   function setModo(m){
     st.modo = m; bKit.setAttribute("aria-pressed", String(m === "kit")); bEsc.setAttribute("aria-pressed", String(m !== "kit"));
     slotsBox.hidden = m !== "kit"; fPreco.hidden = m !== "kit"; bCopy.hidden = m === "kit";
-    dica.textContent = m === "kit" ? "Escolha qual foto vai em cada lugar. Use a mesma foto que está impressa no kit; trocar a foto do quadro significa imprimir de novo." : "Mande esta imagem e depois a mensagem pedindo para o formando responder com os números.";
+    dica.textContent = m === "kit" ? "Escolha qual foto vai em cada lugar: a que o cliente pediu, ou a que já está impressa no kit." : "Mande esta imagem e depois a mensagem pedindo para o formando responder com os números.";
     redraw();
   }
   bKit.onclick = () => setModo("kit"); bEsc.onclick = () => setModo("escolha");
