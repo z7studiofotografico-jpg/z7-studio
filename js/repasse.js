@@ -374,13 +374,22 @@ function card(it){
     if (it.etapa === "INTERESSADO") row.append(C.mkBtn("📷 Fotos para escolher", "", () => openMockup({ nome: title(it.nome), escola: title(it.escola), preco: precoTxt(it), modo: "escolha" })));
     if (it.etapa === "INTERESSADO" && d) { const a3 = el("a", "btn btn-sm", "✍️ Pedir a escolha"); a3.href = "https://wa.me/" + d + "?text=" + encodeURIComponent(textoEscolha(F0)); a3.target = "_blank"; a3.rel = "noopener"; row.append(a3); }
     // Depois que a última oferta foi enviada (Repasse), o link do cartão passa a ser o da última oferta.
-    const ultima = segDe(it) === "rep" && C.P.kitFinal && C.P.linkCartaoFinal && (it.tentInteresse || 0) >= 2;
+    const ultimaOferta = segDe(it) === "rep" && C.P.kitFinal && (it.tentInteresse || 0) >= 2;
+    const ultima = ultimaOferta && C.P.linkCartaoFinal;
+    // Pix Copia e Cola com o valor certo para o momento da conversa
+    const pixCod = segDe(it) === "lf" ? C.P.pixLF : ultimaOferta ? C.P.pixFinal : C.P.pixRep;
+    const pixVal = segDe(it) === "lf" ? (C.P.lfPix || C.P.kitPreco) : ultimaOferta ? C.P.kitFinal : (C.P.kitPromo || C.P.kitPreco);
     const link = ultima ? C.P.linkCartaoFinal : (segDe(it) === "lf" ? (C.P.linkCartaoLF || C.P.linkCartao) : C.P.linkCartao);
     const valCartao = ultima ? C.P.kitFinal : (segDe(it) === "lf" ? C.P.lfCartao : C.P.kitCartao);
     if (it.etapa === "INTERESSADO" && link && d) {
       const pc = parcDe(it);
-      const lm = `Para pagar no cartão${valCartao ? ` (${C.money(valCartao)}` + (pc ? `, em até ${pc}x sem juros)` : ")") : pc ? ` (em até ${pc}x sem juros)` : ""}, é só usar este link seguro da InfinitePay:\n${link}\nDepois me manda o comprovante por aqui 😊${C.P.pix ? ` No Pix${ultima ? ` (${C.money(C.P.kitFinal)})` : ""}, a chave é ${C.P.pix}.` : ""}`;
+      const lm = `Para pagar no cartão${valCartao ? ` (${C.money(valCartao)}` + (pc ? `, em até ${pc}x sem juros)` : ")") : pc ? ` (em até ${pc}x sem juros)` : ""}, é só usar este link seguro da InfinitePay:\n${link}\nDepois me manda o comprovante por aqui 😊${pixCod ? " Se preferir Pix, é só me avisar que te mando o código." : C.P.pix ? ` No Pix${pixVal ? ` (${C.money(pixVal)})` : ""}, a chave é ${C.P.pix}.` : ""}`;
       const a2 = el("a", "btn btn-sm", ultima ? "💳 Link da última oferta" : "💳 Mandar link de pagamento"); a2.href = "https://wa.me/" + d + "?text=" + encodeURIComponent(lm); a2.target = "_blank"; a2.rel = "noopener"; row.append(a2);
+    }
+    if (it.etapa === "INTERESSADO" && pixCod && d) {
+      const pm = `Para pagar no Pix${pixVal ? ` (${C.money(pixVal)})` : ""}: abra o app do seu banco, escolha *Pix Copia e Cola* e cole o código que vou mandar na próxima mensagem 👇 Depois me manda o comprovante por aqui 😊`;
+      const a4 = el("a", "btn btn-sm", `💠 Pix ${pixVal ? C.money(pixVal) : ""}`.trim()); a4.href = "https://wa.me/" + d + "?text=" + encodeURIComponent(pm); a4.target = "_blank"; a4.rel = "noopener"; row.append(a4);
+      const a5 = el("a", "btn btn-sm", "📋 Código Pix"); a5.title = "Manda só o código, para o cliente copiar fácil"; a5.href = "https://wa.me/" + d + "?text=" + encodeURIComponent(pixCod); a5.target = "_blank"; a5.rel = "noopener"; row.append(a5);
     }
     if (ns.then) row.append(C.mkBtn("Enviei ✓", "btn-ok", () => {
       const p = { etapa: ns.then.etapa, followup: ns.then.days < 0 ? null : C.addDays(ns.then.days), atendendo: null, ultimo: { por: C.me || "—", em: new Date().toISOString(), para: escolhido ? escolhido.tipo : "" } };
