@@ -1,10 +1,19 @@
-// Módulo Repasse: venda do Kit Recordação (quadro 30x40 + 2 porta-retratos) para quem já fotografou.
+// Módulo PR: venda do Kit Recordação (quadro 30x40 + 2 porta-retratos + fotos digitais) para quem fez o ensaio.
+// Duas frentes, separadas pelo ano do ensaio e calculadas na hora (viram sozinhas em 1º de janeiro):
+//   • Linha de Frente: ensaios do ano atual
+//   • Repasse: ensaios dos anos anteriores
 // Trabalha com milhares de contatos, então nunca carrega a coleção inteira:
 // cada aba busca só o que precisa (hoje, interessados, pagos, busca).
-import { openMockup } from "./mockup.js";
+import { openMockup, textoEscolha } from "./mockup.js";
 
 let C, FS, db, col;
-let tab = "hoje", items = [], unsubList = null, mounted = false, meta = { escolas: {} };
+let tab = "hoje", seg = "lf", items = [], unsubList = null, mounted = false, meta = { escolas: {}, anos: {} };
+const ANO = () => new Date().getFullYear();
+const ANO_MIN = 2015;
+// Em qual frente o formando está. Sem ano (incompleto) aparece nas duas.
+function segDe(it){ return !it.ano ? null : it.ano >= ANO() ? "lf" : "rep"; }
+function noSeg(it){ const s0 = segDe(it); return !s0 || s0 === seg; }
+const segNome = s0 => s0 === "lf" ? "Linha de Frente " + ANO() : "Repasse";
 const $ = (id) => document.getElementById(id);
 
 export const ETAPAS = ["INCOMPLETO", "NA FILA", "SEPARADO", "CONTATADO", "INTERESSADO", "PAGO", "ENTREGUE", "NÃO QUER", "SEM CONTATO"];
@@ -16,9 +25,18 @@ function slug(s){ return norm(s).replace(/[^A-Z0-9]+/g, "-").replace(/^-|-$/g, "
 function title(s){ return String(s || "").toLowerCase().replace(/(^|[\s(-])(\p{L})/gu, (m, a, b) => a + b.toUpperCase()).replace(/\b(Da|De|Do|Das|Dos|E)\b/g, w => w.toLowerCase()); }
 function el(tag, cls, text){ const e = document.createElement(tag); if (cls) e.className = cls; if (text != null) e.textContent = text; return e; }
 function eu(){ const f = C.first(C.me); return f ? (/a$/i.test(f) ? "a " : "o ") + f : "a equipe"; }
-function precoTxt(){ const P = C.P; if (P.kitPromo) return C.money(P.kitPromo); if (P.kitPreco) return C.money(P.kitPreco); return "[valor do kit]"; }
-function ofertaTxt(){
-  const P = C.P, pix = P.kitPromo || P.kitPreco;
+function precoTxt(it){
+  const P = C.P;
+  if (it ? segDe(it) === "lf" : seg === "lf") return P.lfPix ? C.money(P.lfPix) : P.kitPreco ? C.money(P.kitPreco) : "[valor do kit]";
+  if (P.kitPromo) return C.money(P.kitPromo); if (P.kitPreco) return C.money(P.kitPreco); return "[valor do kit]";
+}
+function ofertaTxt(it){
+  const P = C.P;
+  if (segDe(it) === "lf") {
+    const pix = P.lfPix || P.kitPreco; if (!pix) return "Tudo por [valor do kit]";
+    return `${C.money(pix)} no Pix` + (P.lfCartao ? ` ou ${C.money(P.lfCartao)} no cartão${P.parcelas ? ` (até ${P.parcelas}x)` : ""}` : "");
+  }
+  const pix = P.kitPromo || P.kitPreco;
   if (!pix) return "Tudo por [valor do kit]";
   let t = P.kitPreco && P.kitPromo && P.kitPreco > P.kitPromo ? `De ${C.money(P.kitPreco)} por apenas ${C.money(P.kitPromo)} no Pix` : `Tudo por ${C.money(pix)} no Pix`;
   if (P.kitCartao) t += ` ou ${C.money(P.kitCartao)} no cartão${P.parcelas ? ` (até ${P.parcelas}x)` : ""}`;
@@ -60,7 +78,7 @@ function passo(it, c){
   const oi = cn ? `Olá, ${cn}!` : "Olá!";
   const souEu = `Aqui é ${eu()}, do Z7 Studio Fotográfico 📸`;
   const quem = c && c.tipo === "Formando" ? "o seu ensaio de formatura" : `o ensaio de formatura de ${F}`;
-  const onde = [title(it.escola), it.ano].filter(Boolean).join(", ");
+  const onde = segDe(it) === "lf" ? title(it.escola) + ", este ano" : [title(it.escola), it.ano].filter(Boolean).join(", ");
   const t = it.tentativas || 0;
   const encerra = { title: "Encerrar com elegância", msg: `${cn || "Tudo bem"}, vou entender que agora não é o momento e não vou mais te incomodar. Se um dia quiser o quadro ${c && c.tipo === "Formando" ? "da sua formatura" : "de " + F}, é só me chamar aqui! 💛`, then: { etapa: "NÃO QUER", days: -1 } };
   switch (it.etapa) {
@@ -77,10 +95,10 @@ function passo(it, c){
       if (tI === 0) {
 
         return { title: "Mandar a prévia e o preço", mockup: true,
-          msg: `Olha como fica o Kit Recordação ${c && c.tipo === "Formando" ? "do seu ensaio" : "de " + F}! 😍\n• Quadro 30x40 com moldura preta\n• 2 porta-retratos 15x10\n• As fotos digitais do ensaio\nJá está pronto, é só combinar a entrega! ${ofertaTxt()}.\nEntregamos ${entregaTxt()}. Quer que eu separe o seu?`,
+          msg: `Olha como fica o Kit Recordação ${c && c.tipo === "Formando" ? "do seu ensaio" : "de " + F}! 😍\n• Quadro 30x40 com moldura preta\n• 2 porta-retratos 15x10\n• As fotos digitais do ensaio\nJá está pronto, é só combinar a entrega! ${ofertaTxt(it)}.\nEntregamos ${entregaTxt()}. Quer que eu separe o seu?`,
           then: { etapa: "INTERESSADO", days: 2, countI: true } };
       }
-      if (tI === 1) return C.P.kitFinal ? { title: "Última condição (só para quem já viu a prévia)",
+      if (tI === 1) return C.P.kitFinal && segDe(it) === "rep" ? { title: "Última condição (só para quem já viu a prévia)",
         msg: `Oi${cn ? ", " + cn : ""}! Estamos organizando os kits que ainda estão aqui no estúdio e consegui uma condição especial para o ${c && c.tipo === "Formando" ? "seu" : "de " + F}: ${C.money(C.P.kitFinal)} no Pix, válida até ${sextaTxt()}. Depois disso volta ao valor normal. Quer que eu separe? 😊`,
         then: { etapa: "INTERESSADO", days: 3, countI: true } } : { title: "Follow-up da prévia",
         msg: `Oi${cn ? ", " + cn : ""}! Conseguiu ver a prévia do quadro? Se quiser, separo o seu hoje e já combinamos a entrega 😊`,
@@ -121,30 +139,33 @@ function claim(it){
 }
 
 // ---------- tela ----------
-export function init(ctx){ C = ctx; FS = ctx.FS; db = ctx.db; col = FS.collection(db, "repasse"); }
+export function init(ctx){ C = ctx; FS = ctx.FS; db = ctx.db; col = FS.collection(db, "repasse"); try { seg = localStorage.getItem("z7seg") || "lf"; } catch (_) {} }
 
 export function show(){
   if (!mounted) mount();
-  loadMeta(); refreshStats(); refreshLote(); openTab(tab);
+  renderSegs();
+  loadMeta().then(refreshStats); refreshLote(); openTab(tab);
 }
 
 function mount(){
   mounted = true;
   const v = $("viewRepasse"); v.innerHTML = "";
   const head = el("div", "vhead");
-  head.append(el("h2", null, "Repasse"));
+  head.append(el("h2", null, "PR"));
   const hb = el("div", "quick");
-  hb.append(C.mkBtn("🖼️ Prévia do kit", "", () => openMockup({ preco: precoTxt() })));
+  hb.append(C.mkBtn("🖼️ Prévia e fotos", "", () => openMockup({ preco: precoTxt() })));
   const imp = C.mkBtn("Importar planilha", "", () => openImport()); imp.id = "rImport"; imp.hidden = !C.isAdmin;
   hb.append(imp); head.append(hb); v.append(head);
 
+  const segs = el("div", "segs"); segs.id = "rSegs"; segs.setAttribute("role", "tablist"); v.append(segs);
   const g = el("details", "guide"); g.id = "rGuide";
-  g.innerHTML = `<summary>Como funciona o Repasse</summary><ol>
+  g.innerHTML = `<summary>Como funciona o PR</summary><ol>
+    <li><b>Linha de Frente</b> são os ensaios deste ano; <b>Repasse</b> são os dos anos anteriores. Em 1º de janeiro tudo vira sozinho: a Linha de Frente do ano que acabou passa para o Repasse.</li>
     <li><b>Separe o seu lote do dia</b> no quadro abaixo. Começamos com poucos contatos por dia para o WhatsApp não bloquear o número.</li>
     <li>Cada cartão mostra <b>para quem mandar</b> (mãe, pai ou formando) e a mensagem pronta. O 1º contato só pede permissão para mandar a prévia.</li>
     <li>Respondeu que quer ver? Toque em <b>Quer ver a prévia</b>, depois em <b>🖼️ Prévia</b>: arraste a foto do formando e o app monta o kit pronto para enviar.</li>
     <li><b>Pagou?</b> Toque em <b>Pagou</b>. O cartão pede para <b>confirmar o endereço</b> (ou agendar a retirada no estúdio) e vai para <b>Entregas</b>, separado por cidade e bairro para montar a rota.</li>
-    <li>Use o <b>número do repasse</b> (o fixo da empresa no WhatsApp Business), não o número do funil.</li></ol>`;
+    <li>Use o <b>número do PR</b> (o fixo da empresa no WhatsApp Business), não o número do funil.</li></ol>`;
   v.append(g);
 
   const st = el("section", "stats");
@@ -175,6 +196,15 @@ function mount(){
   try { if (!localStorage.getItem("z7rguide")) g.open = true; g.addEventListener("toggle", () => { try { localStorage.setItem("z7rguide", "1"); } catch (_) {} }); } catch (_) {}
 }
 
+function renderSegs(){
+  const c = $("rSegs"); c.innerHTML = "";
+  [["lf", `Linha de Frente ${ANO()}`, "ensaios deste ano"], ["rep", "Repasse", `ensaios até ${ANO() - 1}`]].forEach(([k, t, sub]) => {
+    const b = el("button", "seg"); b.type = "button"; b.setAttribute("role", "tab"); b.setAttribute("aria-selected", String(seg === k));
+    b.append(el("b", null, t), el("small", null, sub));
+    b.onclick = () => { if (seg === k) return; seg = k; try { localStorage.setItem("z7seg", k); } catch (_) {} renderSegs(); refreshStats(); refreshLote(); renderList(); };
+    c.append(b);
+  });
+}
 function renderChips(){
   const c = $("rChips"); c.innerHTML = "";
   const tabs = [["hoje", "Para hoje"], ["interessados", "Interessados"], ["entregas", "Entregas"], ["buscar", "Buscar"]];
@@ -220,7 +250,7 @@ async function buscar(){
 function renderList(loading, emptyMsg){
   const list = $("rList"); list.innerHTML = "";
   if (loading) { const e = el("div", "empty"); e.style.gridColumn = "1/-1"; e.append(el("strong", null, "Carregando…")); list.append(e); return; }
-  let arr = items.slice();
+  let arr = tab === "buscar" ? items.slice() : items.filter(noSeg);
   if (tab === "hoje") arr = arr.filter(it => ABERTAS.includes(it.etapa) || it.etapa === "ENTREGUE");
   if (!arr.length) {
     const e = el("div", "empty"); e.style.gridColumn = "1/-1";
@@ -248,7 +278,7 @@ function card(it){
   const top = el("div", "card-top"); top.append(el("h3", "name", title(it.nome) || "Sem nome"), el("span", "stage", it.etapa)); e.append(top);
 
   const meta = el("div", "meta");
-  [[it.resp ? "👤 " + C.first(it.resp) : "", ""], [title(it.escola), "svc"], [[it.curso, it.turma].filter(Boolean).join(" · "), ""], [it.ano ? String(it.ano) : "", ""], [it.valor ? C.money(it.valor) : "", ""]]
+  [[tab === "buscar" && segDe(it) ? segNome(segDe(it)) : "", "svc"], [it.resp ? "👤 " + C.first(it.resp) : "", ""], [title(it.escola), "svc"], [[it.curso, it.turma].filter(Boolean).join(" · "), ""], [it.ano ? String(it.ano) : "", ""], [it.valor ? C.money(it.valor) : "", ""]]
     .forEach(([v, c]) => { if (v) meta.append(el("span", "tag " + c, v)); });
   e.append(meta);
 
@@ -300,6 +330,7 @@ function card(it){
   const blocked = li && !li.mine;
 
   const box = el("div", "next"); e.append(box);
+  const F0 = C.first(title(it.nome));
   function paintNext(){
     box.innerHTML = "";
     const ns = passo(it, escolhido);
@@ -312,7 +343,9 @@ function card(it){
     const d = escolhido ? C.digits(escolhido.tel) : "";
     if (d) { const a = el("a", "btn btn-sm btn-primary", "Abrir no WhatsApp"); a.href = "https://wa.me/" + d + "?text=" + encodeURIComponent(ns.msg); a.target = "_blank"; a.rel = "noopener"; a.addEventListener("click", () => claim(it)); row.append(a); }
     row.append(C.mkBtn("Copiar texto", "", async () => { claim(it); try { await navigator.clipboard.writeText(ns.msg); C.toast("Texto copiado"); } catch (_) { const r = document.createRange(); r.selectNodeContents(msg); const sel = getSelection(); sel.removeAllRanges(); sel.addRange(r); C.toast("Texto selecionado, copie com o dedo"); } }));
-    if (ns.mockup || it.etapa === "INTERESSADO") row.append(C.mkBtn("🖼️ Prévia", "", () => openMockup({ nome: title(it.nome), escola: title(it.escola), preco: precoTxt() })));
+    if (ns.mockup || it.etapa === "INTERESSADO") row.append(C.mkBtn("🖼️ Prévia", "", () => openMockup({ nome: title(it.nome), escola: title(it.escola), preco: precoTxt(it) })));
+    if (it.etapa === "INTERESSADO") row.append(C.mkBtn("📷 Fotos para escolher", "", () => openMockup({ nome: title(it.nome), escola: title(it.escola), preco: precoTxt(it), modo: "escolha" })));
+    if (it.etapa === "INTERESSADO" && d) { const a3 = el("a", "btn btn-sm", "✍️ Pedir a escolha"); a3.href = "https://wa.me/" + d + "?text=" + encodeURIComponent(textoEscolha(F0)); a3.target = "_blank"; a3.rel = "noopener"; row.append(a3); }
     if (it.etapa === "INTERESSADO" && C.P.linkCartao && d) {
       const lm = `Para pagar no cartão (em até ${C.P.parcelas || "algumas"} vezes), é só usar este link seguro da InfinityPay:\n${C.P.linkCartao}\nDepois me manda o comprovante por aqui 😊 No Pix, a chave é ${C.P.pix || "[chave Pix]"}.`;
       const a2 = el("a", "btn btn-sm", "💳 Mandar link de pagamento"); a2.href = "https://wa.me/" + d + "?text=" + encodeURIComponent(lm); a2.target = "_blank"; a2.rel = "noopener"; row.append(a2);
@@ -364,7 +397,7 @@ function actions(close, okTxt){ const a = el("div", "panel-actions"); a.append(e
 function openPago(it){
   sheet("Registrar venda", (p, close) => {
     p.append(el("p", "hint", title(it.nome) + " · " + title(it.escola)));
-    const v = el("input"); v.inputMode = "decimal"; v.value = it.valor || (it.tentInteresse >= 2 && C.P.kitFinal) || C.P.kitPromo || C.P.kitPreco || "";
+    const v = el("input"); v.inputMode = "decimal"; v.value = it.valor || (segDe(it) === "lf" ? (C.P.lfPix || C.P.kitPreco) : ((it.tentInteresse >= 2 && C.P.kitFinal) || C.P.kitPromo || C.P.kitPreco)) || "";
     const fp = el("select"); ["Pix", "Cartão (link InfinityPay)", "Dinheiro", "Outro"].forEach(x => { const o = el("option", null, x); o.value = x; fp.append(o); });
     const r = el("div", "row2"); r.append(field("Valor (R$)", v), field("Pagamento", fp)); p.append(r);
     p.append(entregaCampos(p, it));
@@ -460,18 +493,28 @@ function openNotas(it){
 
 // ---------- números do topo e lote ----------
 async function refreshStats(){
-  const today = C.todayStr(), mes = today.slice(0, 8) + "01";
+  const today = C.todayStr(), mes = today.slice(0, 8) + "01", Y = ANO();
   const set = (id, v) => { const x = $(id); if (x) x.textContent = v; };
   try {
-    const [h, f, i] = await Promise.all([
-      FS.getCountFromServer(FS.query(col, FS.where("followup", "<=", today))),
-      FS.getCountFromServer(FS.query(col, FS.where("etapa", "==", "NA FILA"))),
-      FS.getCountFromServer(FS.query(col, FS.where("etapa", "==", "INTERESSADO")))
+    const [h, i, m] = await Promise.all([
+      FS.getDocs(FS.query(col, FS.where("followup", "<=", today), FS.limit(300))),
+      FS.getDocs(FS.query(col, FS.where("etapa", "==", "INTERESSADO"), FS.limit(300))),
+      FS.getDocs(FS.query(col, FS.where("pagoEm", ">=", mes), FS.limit(500)))
     ]);
-    set("rsHoje", h.data().count); set("rsFila", f.data().count); set("rsInt", i.data().count);
-    const m = await FS.getAggregateFromServer(FS.query(col, FS.where("pagoEm", ">=", mes)), { total: FS.sum("valor") });
-    set("rsMes", C.money(m.data().total || 0));
+    const docs = s0 => s0.docs.map(d => d.data()).filter(noSeg);
+    set("rsHoje", docs(h).filter(x => ABERTAS.includes(x.etapa)).length);
+    set("rsInt", docs(i).length);
+    set("rsMes", C.money(docs(m).reduce((a, x) => a + (Number(x.valor) || 0), 0)));
+    // Fila: conta por ano (só filtros de igualdade, não precisa de índice extra no Firebase)
+    const anos = seg === "lf" ? [Y, Y + 1] : anosRepasse();
+    const cs = await Promise.all(anos.map(a => FS.getCountFromServer(FS.query(col, FS.where("etapa", "==", "NA FILA"), FS.where("ano", "==", a)))));
+    set("rsFila", cs.reduce((a, c) => a + c.data().count, 0));
   } catch (e) { console.warn(e); }
+}
+function anosRepasse(){
+  const Y = ANO(), conhecidos = Object.keys(meta.anos || {}).map(Number).filter(a => a && a < Y);
+  const de = conhecidos.length ? Math.min(...conhecidos) : ANO_MIN;
+  const out = []; for (let a = Y - 1; a >= de; a--) out.push(a); return out;
 }
 async function refreshLote(){
   const lim = C.P.loteDia || 20;
@@ -484,24 +527,30 @@ async function refreshLote(){
   } catch (e) { console.warn(e); $("rLoteTxt").textContent = " Não foi possível contar agora."; }
 }
 async function separarLote(){
-  const falta = Number($("rLoteBtn").dataset.falta || 0); if (!falta || !C.me) return;
+  let falta = Number($("rLoteBtn").dataset.falta || 0); if (!falta || !C.me) return;
   const esc = $("rLoteEscola").value;
-  const filtros = [FS.where("etapa", "==", "NA FILA")]; if (esc) filtros.push(FS.where("escola", "==", esc));
+  const anos = seg === "lf" ? [ANO(), ANO() + 1] : anosRepasse(); // Repasse: do ano mais recente para o mais antigo
   $("rLoteBtn").disabled = true;
   try {
-    const s = await FS.getDocs(FS.query(col, ...filtros, FS.orderBy(FS.documentId()), FS.limit(falta)));
-    if (s.empty) { C.toast(esc ? "Essa escola não tem mais ninguém na fila." : "A fila acabou! 🎉"); return; }
+    const pegos = [];
+    for (const a of anos) {
+      if (falta <= 0) break;
+      const filtros = [FS.where("etapa", "==", "NA FILA"), FS.where("ano", "==", a)]; if (esc) filtros.push(FS.where("escola", "==", esc));
+      const s0 = await FS.getDocs(FS.query(col, ...filtros, FS.orderBy(FS.documentId()), FS.limit(falta)));
+      s0.docs.forEach(d => pegos.push(d)); falta -= s0.size;
+    }
+    if (!pegos.length) { C.toast(esc ? "Essa escola não tem mais ninguém na fila." : "A fila acabou! 🎉"); return; }
     const b = FS.writeBatch(db), hoje = C.todayStr();
-    s.docs.forEach(d => b.update(d.ref, { etapa: "SEPARADO", resp: C.me, separadoEm: hoje, followup: hoje, atualizadoEm: new Date().toISOString() }));
+    pegos.forEach(d => b.update(d.ref, { etapa: "SEPARADO", resp: C.me, separadoEm: hoje, followup: hoje, atualizadoEm: new Date().toISOString() }));
     await b.commit();
-    C.toast(`${s.size} contato${s.size > 1 ? "s" : ""} separado${s.size > 1 ? "s" : ""} para você hoje`);
+    C.toast(`${pegos.length} contato${pegos.length > 1 ? "s" : ""} separado${pegos.length > 1 ? "s" : ""} para você hoje`);
     refreshLote(); refreshStats(); if (tab !== "hoje") openTab("hoje");
   } catch (e) { C.handleErr(e); } finally { $("rLoteBtn").disabled = false; }
 }
 async function loadMeta(){
   try {
     const s = await FS.getDoc(FS.doc(db, "config", "repasse_meta"));
-    meta = s.exists() ? s.data() : { escolas: {} };
+    meta = s.exists() ? Object.assign({ escolas: {}, anos: {} }, s.data()) : { escolas: {}, anos: {} };
     const names = Object.keys(meta.escolas || {}).sort((a, b) => a.localeCompare(b, "pt-BR"));
     ["rLoteEscola", "rEscola"].forEach(id => {
       const sel = $(id); const cur = sel.value; const first0 = sel.options[0];
@@ -610,11 +659,11 @@ function openImport(){
         const cnt = await FS.getCountFromServer(col);
         if (cnt.data().count) { prog.textContent = "Conferindo quem já está no app…"; (await FS.getDocs(col)).docs.forEach(d => exist.add(d.id)); }
         const ids = new Set(); const agora = new Date().toISOString(); let novos = 0, atual = 0;
-        const escolas = Object.assign({}, meta.escolas || {});
+        const escolas = Object.assign({}, meta.escolas || {}), anos = Object.assign({}, meta.anos || {});
         const ops = sel.map((d, i) => {
           let id = docId(d, i); while (ids.has(id)) id += "-" + i; ids.add(id);
           if (exist.has(id)) { atual++; return [id, Object.assign({}, d, { atualizadoEm: agora }), true]; }
-          novos++; if (d.escola) escolas[d.escola] = (escolas[d.escola] || 0) + 1;
+          novos++; if (d.escola) escolas[d.escola] = (escolas[d.escola] || 0) + 1; if (d.ano) anos[d.ano] = (anos[d.ano] || 0) + 1;
           return [id, Object.assign({}, d, { etapa: faltando(d).length ? "INCOMPLETO" : "NA FILA", followup: null, tentativas: 0, tentInteresse: 0, resp: "", importadoEm: agora, atualizadoEm: agora }), false];
         });
         for (let i = 0; i < ops.length; i += 400) {
@@ -623,7 +672,7 @@ function openImport(){
           await b.commit();
           prog.textContent = `Importando… ${Math.min(i + 400, ops.length)} de ${ops.length}`;
         }
-        await FS.setDoc(FS.doc(db, "config", "repasse_meta"), { escolas, importadoEm: agora }, { merge: true });
+        await FS.setDoc(FS.doc(db, "config", "repasse_meta"), { escolas, anos, importadoEm: agora }, { merge: true });
         const nInc = ops.filter(([, d, m]) => !m && d.etapa === "INCOMPLETO").length;
         prog.textContent = `Pronto! ${novos - nInc} novos na fila${nInc ? `, ${nInc} na aba Incompletos` : ""}${atual ? ` e ${atual} atualizados` : ""}.`;
         C.toast("Planilha importada ✅");

@@ -54,6 +54,12 @@ body{background:var(--bg);color:var(--fg);font-family:var(--f-body);font-size:15
 .tile-n{margin-top:auto;padding-top:10px;font-weight:700;font-size:.9rem;color:var(--accent)}
 .tile.soon{opacity:.7}
 .tile.soon .tile-n{color:var(--muted)}
+.segs{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.seg{display:flex;flex-direction:column;gap:2px;align-items:flex-start;text-align:left;border:1px solid var(--line);background:var(--surface);color:var(--fg);border-radius:12px;padding:12px 14px}
+.seg b{font-family:var(--f-display);text-transform:uppercase;letter-spacing:.03em;font-size:1.2rem;line-height:1.1}
+.seg small{color:var(--muted);font-size:.82rem}
+.seg[aria-selected="true"]{background:var(--fg);color:var(--bg);border-color:var(--fg)}
+.seg[aria-selected="true"] small{color:inherit;opacity:.75}
 .lote{display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;background:var(--surface);border:1px solid var(--line);border-left:4px solid var(--accent);border-radius:var(--r);padding:12px 14px}
 .lote b{display:block}
 .lote span{color:var(--muted);font-size:.9rem}
@@ -209,10 +215,10 @@ details.guide summary{cursor:pointer;font-family:var(--f-display);font-weight:70
           <small>Leads novos do WhatsApp, propostas e follow-ups</small>
           <span class="tile-n" id="tFunil"></span>
         </a>
-        <a class="tile" href="#repasse">
+        <a class="tile" href="#pr">
           <span class="tile-ico" aria-hidden="true">🖼️</span>
-          <b>Repasse</b>
-          <small>Kit quadro + porta-retratos para quem já fotografou</small>
+          <b>PR</b>
+          <small>Linha de Frente e Repasse: kits prontos de quem fez o ensaio</small>
           <span class="tile-n" id="tRepasse"></span>
         </a>
         <a class="tile soon" href="#agenda">
@@ -268,7 +274,7 @@ details.guide summary{cursor:pointer;font-family:var(--f-display);font-weight:70
 
     <!-- Repasse (montado por js/repasse.js) -->
     <section id="viewRepasse" class="view" hidden>
-      <div class="empty"><strong>Carregando o Repasse…</strong></div>
+      <div class="empty"><strong>Carregando o PR…</strong></div>
     </section>
   </div>
 </div>
@@ -330,7 +336,12 @@ details.guide summary{cursor:pointer;font-family:var(--f-display);font-weight:70
       <div class="field"><label for="pFotos">Fotos tratadas</label><input id="pFotos" inputmode="numeric"></div>
       <div class="field"><label for="pPrazo">Prazo de entrega (dias)</label><input id="pPrazo" inputmode="numeric"></div>
     </div>
-    <h3>Repasse (Kit Recordação)</h3>
+    <h3>PR · Linha de Frente (ensaios deste ano)</h3>
+    <div class="row2">
+      <div class="field"><label for="pLfPix">Preço no Pix (R$)</label><input id="pLfPix" inputmode="decimal" placeholder="350"></div>
+      <div class="field"><label for="pLfCartao">Preço no cartão (R$)</label><input id="pLfCartao" inputmode="decimal" placeholder="377"></div>
+    </div>
+    <h3>PR · Repasse (anos anteriores)</h3>
     <div class="row2">
       <div class="field"><label for="pKit">Preço normal (R$)</label><input id="pKit" inputmode="decimal" placeholder="350"></div>
       <div class="field"><label for="pKitPromo">Preço no Pix (R$)</label><input id="pKitPromo" inputmode="decimal" placeholder="297"></div>
@@ -674,8 +685,8 @@ $("form").addEventListener("submit", async e => {
 $("btnPrices").onclick = () => {
   $("pInd").value = P.individual || ""; $("pSinal").value = P.sinal || ""; $("pG36").value = P.g36 || ""; $("pG7").value = P.g7 || "";
   $("pFotos").value = P.fotos || ""; $("pPrazo").value = P.prazo || "";
-  $("pKit").value = P.kitPreco || ""; $("pKitPromo").value = P.kitPromo || ""; $("pKitCartao").value = P.kitCartao || ""; $("pKitFinal").value = P.kitFinal || ""; $("pLote").value = P.loteDia || ""; $("pEntrega").value = P.entrega || ""; $("pPix").value = P.pix || ""; $("pParc").value = P.parcelas || ""; $("pLink").value = P.linkCartao || "";
-  ["pInd","pSinal","pG36","pG7","pFotos","pPrazo","pKit","pKitPromo","pKitCartao","pKitFinal","pLote","pEntrega","pPix","pParc","pLink"].forEach(id => $(id).disabled = !isAdmin);
+  $("pLfPix").value = P.lfPix || ""; $("pLfCartao").value = P.lfCartao || ""; $("pKit").value = P.kitPreco || ""; $("pKitPromo").value = P.kitPromo || ""; $("pKitCartao").value = P.kitCartao || ""; $("pKitFinal").value = P.kitFinal || ""; $("pLote").value = P.loteDia || ""; $("pEntrega").value = P.entrega || ""; $("pPix").value = P.pix || ""; $("pParc").value = P.parcelas || ""; $("pLink").value = P.linkCartao || "";
+  ["pInd","pSinal","pG36","pG7","pFotos","pPrazo","pLfPix","pLfCartao","pKit","pKitPromo","pKitCartao","pKitFinal","pLote","pEntrega","pPix","pParc","pLink"].forEach(id => $(id).disabled = !isAdmin);
   $("pSave").hidden = !isAdmin;
   $("pricesHint").textContent = isAdmin ? "Os valores entram automaticamente nas mensagens prontas." : "Só administradores mudam os preços.";
   renderPushState(); $("sheetPrices").hidden = false;
@@ -688,7 +699,7 @@ $("formPrices").addEventListener("submit", async e => {
   if (!isAdmin) return;
   const body = { individual: num($("pInd").value), sinal: num($("pSinal").value), g36: num($("pG36").value), g7: num($("pG7").value),
     fotos: num($("pFotos").value) || 30, prazo: num($("pPrazo").value) || 15,
-    kitPreco: num($("pKit").value), kitPromo: num($("pKitPromo").value), kitCartao: num($("pKitCartao").value), kitFinal: num($("pKitFinal").value), loteDia: num($("pLote").value) || 20, entrega: $("pEntrega").value.trim(),
+    lfPix: num($("pLfPix").value), lfCartao: num($("pLfCartao").value), kitPreco: num($("pKit").value), kitPromo: num($("pKitPromo").value), kitCartao: num($("pKitCartao").value), kitFinal: num($("pKitFinal").value), loteDia: num($("pLote").value) || 20, entrega: $("pEntrega").value.trim(),
     pix: $("pPix").value.trim(), parcelas: num($("pParc").value), linkCartao: $("pLink").value.trim() };
   try {
     await setDoc(doc(db, "config", "app"), body, { merge: true });
@@ -727,7 +738,7 @@ function refreshPushToken(){ if (pushSupported() && Notification.permission === 
 $("btnPush").onclick = () => enablePush(true);
 
 // ---------- navegação entre módulos ----------
-const VIEWS = { home: "viewHome", funil: "viewFunil", repasse: "viewRepasse", agenda: "viewSoon", colegios: "viewSoon" };
+const VIEWS = { home: "viewHome", funil: "viewFunil", pr: "viewRepasse", repasse: "viewRepasse", agenda: "viewSoon", colegios: "viewSoon" };
 let repasseMod = null, curView = "home";
 const ctx = {
   db, FS, $, toast, mkBtn, money, num, digits, first, todayStr, addDays, fmtDate, hhmm, ds, pad, showNotice, handleErr,
@@ -744,11 +755,11 @@ async function route(){
   $("btnBack").hidden = key === "home";
   if (key === "agenda" || key === "colegios") $("soonTitle").textContent = key === "agenda" ? "Agendamento: em breve" : "Colégios: em breve";
   if (key === "home") renderHome();
-  if (key === "repasse") {
+  if (key === "pr" || key === "repasse") {
     try {
       if (!repasseMod) { repasseMod = await import("./js/repasse.js"); repasseMod.init(ctx); }
       repasseMod.show();
-    } catch (e) { console.warn(e); $("viewRepasse").innerHTML = '<div class="empty"><strong>Não foi possível abrir o Repasse</strong><span>Verifique a internet e tente de novo.</span></div>'; }
+    } catch (e) { console.warn(e); $("viewRepasse").innerHTML = '<div class="empty"><strong>Não foi possível abrir o PR</strong><span>Verifique a internet e tente de novo.</span></div>'; }
   }
   window.scrollTo(0, 0);
 }
