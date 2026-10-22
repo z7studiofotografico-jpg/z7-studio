@@ -17,6 +17,14 @@ function title(s){ return String(s || "").toLowerCase().replace(/(^|[\s(-])(\p{L
 function el(tag, cls, text){ const e = document.createElement(tag); if (cls) e.className = cls; if (text != null) e.textContent = text; return e; }
 function eu(){ const f = C.first(C.me); return f ? (/a$/i.test(f) ? "a " : "o ") + f : "a equipe"; }
 function precoTxt(){ const P = C.P; if (P.kitPromo) return C.money(P.kitPromo); if (P.kitPreco) return C.money(P.kitPreco); return "[valor do kit]"; }
+function ofertaTxt(){
+  const P = C.P, pix = P.kitPromo || P.kitPreco;
+  if (!pix) return "Tudo por [valor do kit]";
+  let t = P.kitPreco && P.kitPromo && P.kitPreco > P.kitPromo ? `De ${C.money(P.kitPreco)} por apenas ${C.money(P.kitPromo)} no Pix` : `Tudo por ${C.money(pix)} no Pix`;
+  if (P.kitCartao) t += ` ou ${C.money(P.kitCartao)} no cartão${P.parcelas ? ` (até ${P.parcelas}x)` : ""}`;
+  return t;
+}
+function sextaTxt(){ const d = new Date(); const add = (5 - d.getDay() + 7) % 7 || 7; d.setDate(d.getDate() + add); return C.pad(d.getDate()) + "/" + C.pad(d.getMonth() + 1); }
 function entregaTxt(){ return C.P.entrega || "em casa ou para retirada no estúdio"; }
 function status(it){
   if (it.etapa === "PAGO" || it.etapa === "ENTREGUE") return "won";
@@ -57,7 +65,7 @@ function passo(it, c){
   const encerra = { title: "Encerrar com elegância", msg: `${cn || "Tudo bem"}, vou entender que agora não é o momento e não vou mais te incomodar. Se um dia quiser o quadro ${c && c.tipo === "Formando" ? "da sua formatura" : "de " + F}, é só me chamar aqui! 💛`, then: { etapa: "NÃO QUER", days: -1 } };
   switch (it.etapa) {
     case "SEPARADO": return { title: "1º contato: pedir para mandar a prévia",
-      msg: `${oi} Tudo bem? ${souEu}\nNós fizemos ${quem} no colégio${onde ? " (" + onde + ")" : ""}, e as fotos ficaram lindas!\nMontamos o Kit Recordação com essas fotos: um quadro 30x40 com moldura preta, 2 porta-retratos e as fotos digitais. Posso te mandar uma prévia de como fica? 😊`,
+      msg: `${oi} Tudo bem? ${souEu}\nNós fizemos ${quem} no colégio${onde ? " (" + onde + ")" : ""}, e as fotos ficaram lindas!\nO Kit Recordação ${c && c.tipo === "Formando" ? "com as suas fotos" : "de " + F} já está pronto aqui no estúdio: quadro 30x40 com moldura preta, 2 porta-retratos e as fotos digitais. Posso te mandar uma foto de como ficou? 😊`,
       then: { etapa: "CONTATADO", days: 2, count: true } };
     case "CONTATADO":
       if (t <= 1) return { title: "2º contato: lembrar com carinho",
@@ -67,12 +75,14 @@ function passo(it, c){
     case "INTERESSADO": {
       const tI = it.tentInteresse || 0;
       if (tI === 0) {
-        const P = C.P, valor = P.kitPromo && P.kitPreco ? `De ${C.money(P.kitPreco)} por apenas ${C.money(P.kitPromo)}` : `Tudo por ${precoTxt()}`;
+
         return { title: "Mandar a prévia e o preço", mockup: true,
-          msg: `Olha como fica o Kit Recordação ${c && c.tipo === "Formando" ? "do seu ensaio" : "de " + F}! 😍\n• Quadro 30x40 com moldura preta\n• 2 porta-retratos 15x10\n• As fotos digitais do ensaio\n${valor}, no Pix ou no cartão.\nEntregamos ${entregaTxt()}. Quer que eu separe o seu?`,
+          msg: `Olha como fica o Kit Recordação ${c && c.tipo === "Formando" ? "do seu ensaio" : "de " + F}! 😍\n• Quadro 30x40 com moldura preta\n• 2 porta-retratos 15x10\n• As fotos digitais do ensaio\nJá está pronto, é só combinar a entrega! ${ofertaTxt()}.\nEntregamos ${entregaTxt()}. Quer que eu separe o seu?`,
           then: { etapa: "INTERESSADO", days: 2, countI: true } };
       }
-      if (tI === 1) return { title: "Follow-up da prévia",
+      if (tI === 1) return C.P.kitFinal ? { title: "Última condição (só para quem já viu a prévia)",
+        msg: `Oi${cn ? ", " + cn : ""}! Estamos organizando os kits que ainda estão aqui no estúdio e consegui uma condição especial para o ${c && c.tipo === "Formando" ? "seu" : "de " + F}: ${C.money(C.P.kitFinal)} no Pix, válida até ${sextaTxt()}. Depois disso volta ao valor normal. Quer que eu separe? 😊`,
+        then: { etapa: "INTERESSADO", days: 3, countI: true } } : { title: "Follow-up da prévia",
         msg: `Oi${cn ? ", " + cn : ""}! Conseguiu ver a prévia do quadro? Se quiser, separo o seu hoje e já combinamos a entrega 😊`,
         then: { etapa: "INTERESSADO", days: 3, countI: true } };
       return encerra;
@@ -351,7 +361,7 @@ function actions(close, okTxt){ const a = el("div", "panel-actions"); a.append(e
 function openPago(it){
   sheet("Registrar venda", (p, close) => {
     p.append(el("p", "hint", title(it.nome) + " · " + title(it.escola)));
-    const v = el("input"); v.inputMode = "decimal"; v.value = it.valor || C.P.kitPromo || C.P.kitPreco || "";
+    const v = el("input"); v.inputMode = "decimal"; v.value = it.valor || (it.tentInteresse >= 2 && C.P.kitFinal) || C.P.kitPromo || C.P.kitPreco || "";
     const fp = el("select"); ["Pix", "Cartão (link InfinityPay)", "Dinheiro", "Outro"].forEach(x => { const o = el("option", null, x); o.value = x; fp.append(o); });
     const r = el("div", "row2"); r.append(field("Valor (R$)", v), field("Pagamento", fp)); p.append(r);
     p.append(entregaCampos(p, it));
@@ -573,10 +583,11 @@ function openImport(){
           out.append(el("p", "hint", "Os incompletos não entram na fila: ficam na aba Incompletos para vocês completarem. Falta " + Object.entries(cont).map(([f, n]) => `${f} em ${n}`).join(", ") + "."));
         }
         const porStatus = {}; rows.forEach(r => { const k = r.statusOrig || "(vazio)"; porStatus[k] = (porStatus[k] || 0) + 1; });
-        out.append(el("p", "hint", "Quais STATUS entram no Repasse? Desmarque quem não deve receber a oferta (por exemplo, quem já comprou o kit)."));
+        out.append(el("p", "hint", "Quais STATUS entram no Repasse? Deixe marcado só quem NÃO comprou (CAÍDO). Quem está como VENDIDO já tem o kit."));
         const box = el("div", "quick");
+        const temCaido = Object.keys(porStatus).some(k => /CA[IÍ]D/i.test(norm(k)));
         Object.entries(porStatus).sort((a, b) => b[1] - a[1]).forEach(([k, n]) => {
-          const l = el("label", "chk"); const c = el("input"); c.type = "checkbox"; c.checked = true; c.value = k; l.append(c, document.createTextNode(` ${k} (${n})`)); box.append(l);
+          const l = el("label", "chk"); const c = el("input"); c.type = "checkbox"; c.checked = temCaido ? /CAID/.test(norm(k)) : true; c.value = k; l.append(c, document.createTextNode(` ${k} (${n})`)); box.append(l);
         });
         out.append(box);
         const porAno = {}; rows.forEach(r => { const k = r.ano || "sem data"; porAno[k] = (porAno[k] || 0) + 1; });

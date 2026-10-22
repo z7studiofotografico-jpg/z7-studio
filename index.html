@@ -332,8 +332,12 @@ details.guide summary{cursor:pointer;font-family:var(--f-display);font-weight:70
     </div>
     <h3>Repasse (Kit Recordação)</h3>
     <div class="row2">
-      <div class="field"><label for="pKit">Preço do kit (R$)</label><input id="pKit" inputmode="decimal" placeholder="200"></div>
-      <div class="field"><label for="pKitPromo">Preço promocional (R$)</label><input id="pKitPromo" inputmode="decimal" placeholder="opcional"></div>
+      <div class="field"><label for="pKit">Preço normal (R$)</label><input id="pKit" inputmode="decimal" placeholder="350"></div>
+      <div class="field"><label for="pKitPromo">Preço no Pix (R$)</label><input id="pKitPromo" inputmode="decimal" placeholder="297"></div>
+    </div>
+    <div class="row2">
+      <div class="field"><label for="pKitCartao">Preço no cartão (R$)</label><input id="pKitCartao" inputmode="decimal" placeholder="320"></div>
+      <div class="field"><label for="pKitFinal">Última oferta, no Pix (R$)</label><input id="pKitFinal" inputmode="decimal" placeholder="250"></div>
     </div>
     <div class="row2">
       <div class="field"><label for="pLote">Contatos novos por pessoa, por dia</label><input id="pLote" inputmode="numeric" placeholder="20"></div>
@@ -670,8 +674,8 @@ $("form").addEventListener("submit", async e => {
 $("btnPrices").onclick = () => {
   $("pInd").value = P.individual || ""; $("pSinal").value = P.sinal || ""; $("pG36").value = P.g36 || ""; $("pG7").value = P.g7 || "";
   $("pFotos").value = P.fotos || ""; $("pPrazo").value = P.prazo || "";
-  $("pKit").value = P.kitPreco || ""; $("pKitPromo").value = P.kitPromo || ""; $("pLote").value = P.loteDia || ""; $("pEntrega").value = P.entrega || ""; $("pPix").value = P.pix || ""; $("pParc").value = P.parcelas || ""; $("pLink").value = P.linkCartao || "";
-  ["pInd","pSinal","pG36","pG7","pFotos","pPrazo","pKit","pKitPromo","pLote","pEntrega","pPix","pParc","pLink"].forEach(id => $(id).disabled = !isAdmin);
+  $("pKit").value = P.kitPreco || ""; $("pKitPromo").value = P.kitPromo || ""; $("pKitCartao").value = P.kitCartao || ""; $("pKitFinal").value = P.kitFinal || ""; $("pLote").value = P.loteDia || ""; $("pEntrega").value = P.entrega || ""; $("pPix").value = P.pix || ""; $("pParc").value = P.parcelas || ""; $("pLink").value = P.linkCartao || "";
+  ["pInd","pSinal","pG36","pG7","pFotos","pPrazo","pKit","pKitPromo","pKitCartao","pKitFinal","pLote","pEntrega","pPix","pParc","pLink"].forEach(id => $(id).disabled = !isAdmin);
   $("pSave").hidden = !isAdmin;
   $("pricesHint").textContent = isAdmin ? "Os valores entram automaticamente nas mensagens prontas." : "Só administradores mudam os preços.";
   renderPushState(); $("sheetPrices").hidden = false;
@@ -684,7 +688,7 @@ $("formPrices").addEventListener("submit", async e => {
   if (!isAdmin) return;
   const body = { individual: num($("pInd").value), sinal: num($("pSinal").value), g36: num($("pG36").value), g7: num($("pG7").value),
     fotos: num($("pFotos").value) || 30, prazo: num($("pPrazo").value) || 15,
-    kitPreco: num($("pKit").value), kitPromo: num($("pKitPromo").value), loteDia: num($("pLote").value) || 20, entrega: $("pEntrega").value.trim(),
+    kitPreco: num($("pKit").value), kitPromo: num($("pKitPromo").value), kitCartao: num($("pKitCartao").value), kitFinal: num($("pKitFinal").value), loteDia: num($("pLote").value) || 20, entrega: $("pEntrega").value.trim(),
     pix: $("pPix").value.trim(), parcelas: num($("pParc").value), linkCartao: $("pLink").value.trim() };
   try {
     await setDoc(doc(db, "config", "app"), body, { merge: true });
