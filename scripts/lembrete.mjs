@@ -51,6 +51,7 @@ for (const t of tokensSnap.docs) {
     await messaging.send({
       token: t.id,
       webpush: {
+        headers: { Urgency: "high", TTL: "86400" },
         notification: { title, body, icon: APP_URL + "icons/icon-192.png", badge: APP_URL + "icons/icon-192.png", tag: "z7-lembrete", renotify: true },
         fcmOptions: APP_URL ? { link: APP_URL } : undefined,
       },
