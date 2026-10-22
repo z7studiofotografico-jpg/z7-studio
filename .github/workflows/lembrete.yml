@@ -1,0 +1,32 @@
+name: Lembrete das 9h
+
+on:
+  schedule:
+    # 12:00 UTC = 9h em Brasília. Segunda a sábado.
+    - cron: "0 12 * * 1-6"
+  workflow_dispatch:
+    inputs:
+      teste:
+        description: "Enviar uma notificação de teste para todos os aparelhos"
+        type: boolean
+        default: true
+
+jobs:
+  lembrete:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - name: Instalar
+        working-directory: scripts
+        run: npm install --no-audit --no-fund
+      - name: Enviar lembrete
+        working-directory: scripts
+        run: node lembrete.mjs
+        env:
+          FIREBASE_SERVICE_ACCOUNT: ${{ secrets.FIREBASE_SERVICE_ACCOUNT }}
+          APP_URL: ${{ vars.APP_URL }}
+          TESTE: ${{ inputs.teste }}

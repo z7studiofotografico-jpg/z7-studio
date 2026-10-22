@@ -1,0 +1,29 @@
+rules_version = '2';
+// Regras do app Z7: só entra quem está cadastrado e ativo em "usuarios".
+// A dona do app é sempre administradora (é ela quem cadastra os outros).
+// Cole este texto em Firebase → Firestore Database → Regras → Publicar.
+service cloud.firestore {
+  match /databases/{database}/documents {
+    function logado() { return request.auth != null && request.auth.token.email != null; }
+    function email() { return request.auth.token.email.lower(); }
+    function dono() { return logado() && email() in ['z7studiofotografico@gmail.com', 'lucianafanjos@gmail.com']; }
+    function perfilPath() { return /databases/$(database)/documents/usuarios/$(email()); }
+    function membro() { return dono() || (logado() && exists(perfilPath()) && get(perfilPath()).data.ativo == true); }
+    function admin() { return dono() || (membro() && get(perfilPath()).data.papel == 'admin'); }
+
+    // Pessoas que usam o app (id do documento = e-mail em minúsculas)
+    match /usuarios/{em} {
+      allow read: if membro();
+      allow write: if admin();
+    }
+    // Funil de vendas
+    match /leads/{id} { allow read, write: if membro(); }
+    // Preços e ajustes gerais: todos leem, só administradores mudam
+    match /config/{id} {
+      allow read: if membro();
+      allow write: if admin();
+    }
+    // Aparelhos que recebem notificação
+    match /tokens/{token} { allow read, write: if membro(); }
+  }
+}

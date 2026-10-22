@@ -1,0 +1,727 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Z7 Funil</title>
+<meta name="theme-color" content="#141315">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Z7 Funil">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="icons/icon-192.png">
+<link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@500;600;700&family=Source+Sans+3:wght@400;600;700&display=swap">
+<style>
+:root{
+  --bg:#f3f2f1; --surface:#ffffff; --fg:#1c1b1d; --muted:#6b6670; --line:#dedadb;
+  --accent:#b3202a; --accent-fg:#ffffff; --accent-soft:#f6e3e4;
+  --ok:#1f7a4d; --ok-soft:#e1f1e8; --warn:#9a5b00; --warn-soft:#fbeed6; --late:#b3202a; --late-soft:#f8e1e2;
+  --chip:#ebe8e9; --next:#f7f5f2; --bar:#141315; --bar-fg:#f0eef0;
+  --f-display:"Barlow Condensed","Arial Narrow",Arial,sans-serif;
+  --f-body:"Source Sans 3","Segoe UI",Roboto,Arial,sans-serif;
+  --r:10px; color-scheme:light;
+}
+@media (prefers-color-scheme: dark){:root{
+  --bg:#141315; --surface:#1e1d20; --fg:#f0eef0; --muted:#a39fa6; --line:#34313a;
+  --accent:#e0525b; --accent-fg:#160709; --accent-soft:#3a1d20;
+  --ok:#5fc492; --ok-soft:#17301f; --warn:#e8b25a; --warn-soft:#352812; --late:#ff7a82; --late-soft:#3b1b1e;
+  --chip:#2a282e; --next:#252328; color-scheme:dark}}
+*{box-sizing:border-box}
+html,body{margin:0}
+body{background:var(--bg);color:var(--fg);font-family:var(--f-body);font-size:15px;line-height:1.45;-webkit-tap-highlight-color:transparent}
+.topbar{position:sticky;top:0;z-index:10;background:var(--bar);color:var(--bar-fg);padding-top:env(safe-area-inset-top,0px)}
+.topbar-in{max-width:1100px;margin:0 auto;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));padding-block:10px;display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+.brand{font-family:var(--f-display);font-weight:700;font-size:1.6rem;letter-spacing:.03em;text-transform:uppercase;margin:0;line-height:1;flex:1;min-width:0}
+.brand span{color:#e0525b}
+.brand img{width:30px;height:30px;border-radius:7px;vertical-align:middle;margin-right:8px}
+.who{font-size:.85rem;opacity:.85;white-space:nowrap}
+.ulist{display:flex;flex-direction:column;gap:8px}
+.urow{display:flex;gap:8px;align-items:center;justify-content:space-between;flex-wrap:wrap;border:1px solid var(--line);border-radius:8px;padding:8px 10px}
+.urow .u{min-width:0;overflow-wrap:anywhere}
+.urow .u b{display:block}
+.urow .u small{color:var(--muted)}
+.urow.off{opacity:.55}
+.pill{font-size:.72rem;font-weight:700;text-transform:uppercase;letter-spacing:.05em;padding:1px 7px;border-radius:4px;background:var(--chip);color:var(--muted)}
+.pill.admin{background:var(--accent-soft);color:var(--accent)}
+.topbar .btn{background:transparent;color:var(--bar-fg);border-color:#4a464f}
+.topbar .btn-primary{background:#e0525b;border-color:#e0525b;color:#160709}
+.wrap{max-width:1100px;margin:0 auto;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));padding-block:16px calc(48px + env(safe-area-inset-bottom,0px));display:flex;flex-direction:column;gap:16px}
+button{font:inherit;cursor:pointer}
+.btn{border:1px solid var(--line);background:var(--surface);color:var(--fg);border-radius:8px;padding:8px 12px;font-weight:600;text-decoration:none;display:inline-flex;align-items:center;gap:4px;min-height:38px}
+.btn:hover{border-color:var(--muted)}
+.btn-primary{background:var(--accent);border-color:var(--accent);color:var(--accent-fg)}
+.btn-sm{padding:5px 9px;font-size:.85rem;min-height:32px}
+.btn-danger{color:var(--late);border-color:var(--late)}
+.btn-ok{color:var(--ok);border-color:var(--ok)}
+.btn[disabled]{opacity:.5;cursor:default}
+:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+
+details.guide{background:var(--surface);border:1px solid var(--line);border-radius:var(--r);padding:12px 14px}
+details.guide summary{cursor:pointer;font-family:var(--f-display);font-weight:700;text-transform:uppercase;letter-spacing:.05em;font-size:1.1rem}
+.guide ol{margin:10px 0 4px;padding-left:22px;display:flex;flex-direction:column;gap:8px;max-width:70ch}
+.stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:10px}
+.stat{background:var(--surface);border:1px solid var(--line);border-radius:var(--r);padding:10px 12px;display:flex;flex-direction:column;gap:2px}
+.stat b{font-family:var(--f-display);font-size:1.7rem;line-height:1;font-variant-numeric:tabular-nums}
+.stat small{color:var(--muted);text-transform:uppercase;letter-spacing:.06em;font-size:.72rem;font-weight:600}
+.stat.late b{color:var(--late)} .stat.today b{color:var(--warn)} .stat.won b{color:var(--ok)}
+.chips{display:flex;gap:6px;overflow-x:auto;padding-bottom:4px;scrollbar-width:thin}
+.chip{flex:none;border:1px solid transparent;background:var(--chip);color:var(--fg);border-radius:999px;padding:6px 12px;font-family:var(--f-display);font-weight:600;letter-spacing:.05em;font-size:.95rem;text-transform:uppercase}
+.chip[aria-pressed="true"]{background:var(--fg);color:var(--bg)}
+.chip .n{font-variant-numeric:tabular-nums;opacity:.7;margin-left:4px}
+.search{width:100%;padding:9px 12px;border-radius:8px;border:1px solid var(--line);background:var(--surface);color:var(--fg);font:inherit}
+.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(320px,1fr));gap:12px}
+@media (max-width:420px){.grid{grid-template-columns:1fr}}
+.card{background:var(--surface);border:1px solid var(--line);border-radius:var(--r);padding:12px 14px;display:flex;flex-direction:column;gap:8px;min-width:0;border-left:4px solid var(--line)}
+.card.late{border-left-color:var(--late)} .card.today{border-left-color:var(--warn)} .card.won{border-left-color:var(--ok)}
+.card-top{display:flex;justify-content:space-between;gap:8px;align-items:flex-start}
+.name{font-weight:700;font-size:1.05rem;margin:0;overflow-wrap:anywhere}
+.stage{flex:none;font-family:var(--f-display);font-weight:600;letter-spacing:.05em;font-size:.8rem;text-transform:uppercase;padding:2px 8px;border-radius:4px;background:var(--chip)}
+.meta{display:flex;flex-wrap:wrap;gap:6px;font-size:.82rem}
+.tag{background:var(--chip);border-radius:4px;padding:1px 7px;color:var(--muted)}
+.tag.svc{background:var(--accent-soft);color:var(--accent)}
+.phone{font-variant-numeric:tabular-nums;font-size:.9rem}
+.fu{font-size:.88rem;font-weight:600;font-variant-numeric:tabular-nums}
+.fu.late{color:var(--late)} .fu.today{color:var(--warn)} .fu.none{color:var(--muted);font-weight:400}
+.notes{font-size:.88rem;color:var(--muted);margin:0;white-space:pre-wrap;overflow-wrap:anywhere}
+.last{font-size:.82rem;color:var(--muted)}
+.next{background:var(--next);border:1px solid var(--line);border-radius:8px;padding:10px;display:flex;flex-direction:column;gap:6px}
+.next small{font-size:.72rem;text-transform:uppercase;letter-spacing:.06em;font-weight:700;color:var(--accent)}
+.next p{margin:0;font-size:.9rem;white-space:pre-wrap;overflow-wrap:anywhere}
+.next .row{display:flex;gap:6px;flex-wrap:wrap}
+.wait{font-size:.88rem;color:var(--warn);font-weight:600;margin:0}
+.lock{border-radius:8px;padding:8px 10px;font-size:.88rem;font-weight:600;display:flex;gap:8px;align-items:center;flex-wrap:wrap;justify-content:space-between}
+.lock.other{background:var(--warn-soft);color:var(--warn)}
+.lock.mine{background:var(--ok-soft);color:var(--ok)}
+.actions{display:flex;flex-wrap:wrap;gap:6px;border-top:1px solid var(--line);padding-top:8px}
+.empty{background:var(--surface);border:1px dashed var(--line);border-radius:var(--r);padding:28px 20px;text-align:center;color:var(--muted);display:flex;flex-direction:column;gap:10px;align-items:center}
+.empty strong{color:var(--fg);font-size:1.05rem}
+.notice{background:var(--warn-soft);color:var(--warn);border-radius:8px;padding:10px 12px;font-size:.9rem;display:flex;gap:8px;align-items:center;justify-content:space-between;flex-wrap:wrap}
+
+.login{min-height:100vh;min-height:100dvh;display:flex;align-items:center;justify-content:center;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));padding-block:calc(24px + env(safe-area-inset-top,0px)) calc(24px + env(safe-area-inset-bottom,0px))}
+.login form{width:100%;max-width:380px;background:var(--surface);border:1px solid var(--line);border-radius:14px;padding:22px;display:flex;flex-direction:column;gap:12px}
+.login img{width:72px;height:72px;border-radius:16px;align-self:center}
+.login h1{font-family:var(--f-display);text-transform:uppercase;letter-spacing:.04em;margin:0;text-align:center;font-size:1.8rem}
+.login p{margin:0;text-align:center;color:var(--muted);font-size:.9rem}
+.err{color:var(--late);font-size:.9rem;font-weight:600;text-align:center;margin:0}
+
+.sheet{position:fixed;inset:0;background:rgba(10,8,10,.55);display:flex;align-items:flex-end;justify-content:center;z-index:20;padding:env(safe-area-inset-top,0px) env(safe-area-inset-right,0px) 0 env(safe-area-inset-left,0px)}
+.panel{background:var(--surface);color:var(--fg);width:100%;max-width:560px;max-height:92%;overflow:auto;border-radius:14px 14px 0 0;padding:18px 18px calc(18px + env(safe-area-inset-bottom,0px));display:flex;flex-direction:column;gap:12px}
+@media (min-width:700px){.sheet{align-items:center}.panel{border-radius:14px}}
+.panel h2{font-family:var(--f-display);text-transform:uppercase;letter-spacing:.04em;margin:0;font-size:1.4rem}
+.panel h3{font-family:var(--f-display);text-transform:uppercase;letter-spacing:.04em;margin:6px 0 0;font-size:1.05rem;color:var(--muted)}
+.hint{margin:0;color:var(--muted);font-size:.88rem}
+.field{display:flex;flex-direction:column;gap:4px;min-width:0}
+.field label{font-size:.78rem;text-transform:uppercase;letter-spacing:.06em;font-weight:600;color:var(--muted)}
+.field input,.field select,.field textarea{font:inherit;font-size:16px;padding:9px 10px;border-radius:8px;border:1px solid var(--line);background:var(--bg);color:var(--fg);width:100%}
+.row2{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+@media (max-width:420px){.row2{grid-template-columns:1fr}}
+.quick{display:flex;gap:6px;flex-wrap:wrap}
+.panel-actions{display:flex;justify-content:space-between;gap:8px;flex-wrap:wrap}
+.confirm{background:var(--late-soft);color:var(--late);border-radius:8px;padding:10px;display:flex;gap:8px;align-items:center;flex-wrap:wrap;font-size:.9rem}
+.me-btns{display:flex;gap:10px;flex-wrap:wrap}
+.me-btns .btn{font-size:1.05rem;padding:12px 18px}
+.toast{position:fixed;left:50%;transform:translateX(-50%);bottom:calc(16px + env(safe-area-inset-bottom,0px));background:var(--fg);color:var(--bg);padding:8px 14px;border-radius:8px;font-weight:600;z-index:30;max-width:90%;text-align:center}
+@media (prefers-reduced-motion:no-preference){.card{transition:border-color .2s}}
+</style>
+</head>
+<body>
+
+<!-- Tela de login -->
+<section class="login" id="viewLogin" hidden>
+  <form id="formLogin" autocomplete="on">
+    <img src="icons/icon-192.png" alt="">
+    <h1>Z7 Funil</h1>
+    <p>Entre com o e-mail e a senha criados para você.</p>
+    <div class="field"><label for="lEmail">E-mail</label><input id="lEmail" type="email" autocomplete="username" required></div>
+    <div class="field"><label for="lSenha">Senha</label><input id="lSenha" type="password" autocomplete="current-password" required></div>
+    <p class="err" id="lErr" hidden></p>
+    <button class="btn btn-primary" type="submit" id="lBtn" style="justify-content:center">Entrar</button>
+    <button class="btn" type="button" id="lReset" style="justify-content:center">Esqueci a senha</button>
+  </form>
+</section>
+
+<!-- App -->
+<div id="viewApp" hidden>
+  <div class="topbar"><div class="topbar-in">
+    <p class="brand"><img src="icons/icon-192.png" alt="">Z7 <span>Funil</span></p>
+    <span class="who" id="btnMe"></span>
+    <button class="btn" id="btnTeam" type="button" hidden>Equipe</button>
+    <button class="btn" id="btnPrices" type="button" aria-label="Ajustes">⚙️</button>
+    <button class="btn btn-primary" id="btnNew" type="button">+ Novo lead</button>
+  </div></div>
+
+  <div class="wrap">
+    <div id="notice" class="notice" hidden></div>
+    <div id="pushBanner" class="notice" hidden>
+      <span>Ative as notificações para receber o lembrete das 9h com os contatos do dia.</span>
+      <button class="btn btn-sm btn-primary" id="btnPush" type="button">Ativar</button>
+    </div>
+
+    <details class="guide" id="guide">
+      <summary>Como usar (2 minutos por dia)</summary>
+      <ol>
+        <li><b>Chegou alguém novo no WhatsApp pedindo orçamento?</b> Toque em <b>+ Novo lead</b>, coloque nome, telefone, serviço e origem.</li>
+        <li><b>Cada cartão mostra o "Próximo passo"</b> com a mensagem já escrita. Toque em <b>Abrir no WhatsApp</b>, revise e envie.</li>
+        <li><b>Depois de enviar, toque em "Enviei ✓"</b>. O app avança a etapa e agenda sozinho o próximo contato.</li>
+        <li><b>Vão responder um cliente?</b> Ao abrir o WhatsApp pelo app (ou tocar em <b>Estou respondendo</b>), o outro celular vê "Fulano está respondendo". O aviso some ao tocar em <b>Enviei</b>, em <b>Liberar</b>, ou sozinho em 30 minutos.</li>
+        <li><b>Todo dia às 9h chega a notificação</b> com os contatos do dia. Os cartões vermelhos (atrasados) e laranja (hoje) aparecem primeiro.</li>
+        <li><b>Fechou?</b> Toque em <b>Fechou</b> e coloque o valor. <b>Não respondeu depois do 3º follow-up?</b> O "Enviei" já move para <b>Perdido</b>.</li>
+      </ol>
+    </details>
+
+    <section class="stats" aria-label="Resumo">
+      <div class="stat late"><b id="sLate">0</b><small>Atrasados</small></div>
+      <div class="stat today"><b id="sToday">0</b><small>Para hoje</small></div>
+      <div class="stat"><b id="sOpen">0</b><small>Em negociação</small></div>
+      <div class="stat won"><b id="sWon">R$ 0</b><small>Fechado no mês</small></div>
+    </section>
+
+    <div class="chips" id="chips" role="toolbar" aria-label="Filtrar por etapa"></div>
+    <input class="search" id="q" type="search" placeholder="Buscar por nome, telefone ou nota" aria-label="Buscar">
+
+    <section id="list" class="grid" aria-live="polite">
+      <div class="empty" style="grid-column:1/-1"><strong>Carregando seus leads…</strong></div>
+    </section>
+  </div>
+</div>
+
+<!-- Formulário de lead -->
+<div class="sheet" id="sheet" hidden>
+  <form class="panel" id="form" autocomplete="off">
+    <h2 id="formTitle">Novo lead</h2>
+    <div class="field"><label for="fNome">Nome</label><input id="fNome" required maxlength="80"></div>
+    <div class="row2">
+      <div class="field"><label for="fTel">WhatsApp</label><input id="fTel" inputmode="tel" placeholder="21 99999-9999" maxlength="25"></div>
+      <div class="field"><label for="fValor">Valor orçado (R$)</label><input id="fValor" inputmode="decimal" placeholder="330"></div>
+    </div>
+    <div class="row2">
+      <div class="field"><label for="fServ">Serviço</label><select id="fServ"></select></div>
+      <div class="field"><label for="fOrig">Origem</label><select id="fOrig"></select></div>
+    </div>
+    <div class="row2">
+      <div class="field"><label for="fEtapa">Etapa</label><select id="fEtapa"></select></div>
+      <div class="field"><label for="fFu">Próximo contato</label><input id="fFu" type="date"></div>
+    </div>
+    <div class="field"><label for="fResp">Responsável</label><select id="fResp"></select></div>
+    <div class="quick" aria-label="Agendar próximo contato">
+      <button type="button" class="btn btn-sm" data-add="0">Hoje</button>
+      <button type="button" class="btn btn-sm" data-add="1">Amanhã</button>
+      <button type="button" class="btn btn-sm" data-add="3">+3 dias</button>
+      <button type="button" class="btn btn-sm" data-add="7">+7 dias</button>
+      <button type="button" class="btn btn-sm" data-add="-1">Sem data</button>
+    </div>
+    <div class="field"><label for="fNotas">Notas</label><textarea id="fNotas" rows="3" maxlength="1500" placeholder="Curso, instituição, data da colação, objeções…"></textarea></div>
+    <div id="confirmDel" class="confirm" hidden>Apagar este lead de vez?
+      <button type="button" class="btn btn-sm btn-danger" id="delYes">Apagar</button>
+      <button type="button" class="btn btn-sm" id="delNo">Cancelar</button>
+    </div>
+    <div class="panel-actions">
+      <button type="button" class="btn btn-danger" id="btnDel" hidden>Apagar</button>
+      <span style="flex:1"></span>
+      <button type="button" class="btn" id="btnCancel">Cancelar</button>
+      <button type="submit" class="btn btn-primary" id="btnSave">Salvar</button>
+    </div>
+  </form>
+</div>
+
+<!-- Ajustes -->
+<div class="sheet" id="sheetPrices" hidden>
+  <form class="panel" id="formPrices" autocomplete="off">
+    <h2>Ajustes</h2>
+    <h3>Tabela de preços</h3>
+    <p class="hint" id="pricesHint">Os valores entram automaticamente nas mensagens prontas.</p>
+    <div class="row2">
+      <div class="field"><label for="pInd">Sozinha (R$)</label><input id="pInd" inputmode="decimal"></div>
+      <div class="field"><label for="pSinal">Sinal via Pix (R$)</label><input id="pSinal" inputmode="decimal"></div>
+    </div>
+    <div class="row2">
+      <div class="field"><label for="pG36">3 a 6 formandos, cada (R$)</label><input id="pG36" inputmode="decimal"></div>
+      <div class="field"><label for="pG7">Mais de 6, cada (R$)</label><input id="pG7" inputmode="decimal"></div>
+    </div>
+    <div class="row2">
+      <div class="field"><label for="pFotos">Fotos tratadas</label><input id="pFotos" inputmode="numeric"></div>
+      <div class="field"><label for="pPrazo">Prazo de entrega (dias)</label><input id="pPrazo" inputmode="numeric"></div>
+    </div>
+    <h3>Este aparelho</h3>
+    <p class="hint" id="pushState"></p>
+    <div class="quick">
+      <button type="button" class="btn btn-sm" id="pPush">Ativar notificações</button>
+      <button type="button" class="btn btn-sm btn-danger" id="pSair">Sair da conta</button>
+    </div>
+    <div class="panel-actions">
+      <span style="flex:1"></span>
+      <button type="button" class="btn" id="pCancel">Cancelar</button>
+      <button type="submit" class="btn btn-primary" id="pSave">Salvar</button>
+    </div>
+  </form>
+</div>
+
+<!-- Equipe (só administradores) -->
+<div class="sheet" id="sheetTeam" hidden>
+  <div class="panel">
+    <h2>Equipe</h2>
+    <p class="hint">Quem pode entrar no app. A pessoa recebe um e-mail para criar a própria senha; você nunca precisa saber a senha de ninguém.</p>
+    <div class="ulist" id="uList"></div>
+    <form id="formUser" autocomplete="off" style="display:flex;flex-direction:column;gap:10px">
+      <h3>Cadastrar pessoa</h3>
+      <div class="field"><label for="uNome">Nome completo</label><input id="uNome" required maxlength="60"></div>
+      <div class="row2">
+        <div class="field"><label for="uEmail">E-mail</label><input id="uEmail" type="email" required maxlength="120"></div>
+        <div class="field"><label for="uPapel">Permissão</label>
+          <select id="uPapel"><option value="equipe">Equipe (usa o app)</option><option value="admin">Administrador (também cadastra pessoas e muda preços)</option></select>
+        </div>
+      </div>
+      <p class="err" id="uErr" hidden></p>
+      <div class="panel-actions">
+        <span style="flex:1"></span>
+        <button type="button" class="btn" id="uClose">Fechar</button>
+        <button type="submit" class="btn btn-primary" id="uSave">Cadastrar e enviar convite</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<div class="toast" id="toast" hidden></div>
+
+<script src="config.js"></script>
+<script type="module">
+import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
+import { getAuth, initializeAuth, onAuthStateChanged, signInWithEmailAndPassword, createUserWithEmailAndPassword, sendPasswordResetEmail, signOut, setPersistence, indexedDBLocalPersistence, inMemoryPersistence } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
+import { initializeFirestore, persistentLocalCache, persistentMultipleTabManager, collection, doc, onSnapshot, addDoc, updateDoc, setDoc, deleteDoc } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
+import { getMessaging, getToken, onMessage, isSupported } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-messaging.js";
+
+const $ = (id) => document.getElementById(id);
+const CFG = self.Z7_CONFIG || {};
+if (!CFG.firebase || !CFG.firebase.apiKey) {
+  document.body.innerHTML = '<div class="login"><div class="empty"><strong>App ainda não configurado</strong><span>Falta preencher o arquivo config.js com os dados do Firebase.</span></div></div>';
+  throw new Error("config.js vazio");
+}
+
+const STAGES = ["NOVO LEAD","QUALIFICADO","PROPOSTA ENVIADA","FOLLOW-UP","FECHADO","PERDIDO"];
+const OPEN = ["NOVO LEAD","QUALIFICADO","PROPOSTA ENVIADA","FOLLOW-UP"];
+const SERVS = ["Formatura individual (estúdio)","Formatura individual (externo)","Turma","Corporativo","Retrato","Outro"];
+const ORIGS = ["Meta Ads","Instagram","WhatsApp","Indicação","Google","Ex-cliente","Instituição/Coordenação","Outro"];
+
+const app = initializeApp(CFG.firebase);
+const auth = getAuth(app);
+setPersistence(auth, indexedDBLocalPersistence).catch(() => {});
+const db = initializeFirestore(app, { localCache: persistentLocalCache({ tabManager: persistentMultipleTabManager() }) });
+
+let leads = [], filter = "ABERTOS", editing = null, user = null, unsub = [];
+let P = { individual: 0, sinal: 0, g36: 0, g7: 0, fotos: 30, prazo: 15 };
+let USERS = {};            // e-mail -> { nome, papel, ativo }
+let me = "", isAdmin = false;
+let swReg = null;
+const DONOS = {}; (CFG.donos || []).forEach(d => { if (d && d.email) DONOS[d.email.toLowerCase()] = d.nome || ""; });
+const isDono = em => Object.prototype.hasOwnProperty.call(DONOS, (em || "").toLowerCase());
+// Segunda conexão, só para cadastrar pessoas sem deslogar quem está usando o app.
+let secAuth = null;
+function cadastroAuth(){ if (!secAuth) secAuth = initializeAuth(initializeApp(CFG.firebase, "cadastro"), { persistence: inMemoryPersistence }); return secAuth; }
+
+// ---------- utilidades ----------
+function fill(sel, arr){ sel.innerHTML = ""; arr.forEach(v => { const o = document.createElement("option"); o.value = v; o.textContent = v; sel.appendChild(o); }); }
+fill($("fServ"), SERVS); fill($("fOrig"), ORIGS); fill($("fEtapa"), STAGES);
+const pad = n => String(n).padStart(2, "0");
+const ds = d => d.getFullYear() + "-" + pad(d.getMonth() + 1) + "-" + pad(d.getDate());
+const todayStr = () => ds(new Date());
+function addDays(n){ const d = new Date(); d.setDate(d.getDate() + n); return ds(d); }
+function fmtDate(s){ if (!s) return ""; const [, m, d] = s.split("-"); return d + "/" + m; }
+function hhmm(iso){ const d = new Date(iso); return pad(d.getHours()) + ":" + pad(d.getMinutes()); }
+function money(n){ return "R$ " + (Number(n) || 0).toLocaleString("pt-BR", { maximumFractionDigits: 2 }); }
+function num(v){ return Number(String(v || "").replace(/\./g, "").replace(",", ".")) || 0; }
+function digits(t){ let d = (t || "").replace(/\D/g, ""); if (d.length === 10 || d.length === 11) d = "55" + d; return d; }
+function first(n){ return (n || "").trim().split(/\s+/)[0] || ""; }
+const pv = v => v ? money(v) : "[valor]";
+const team = () => Object.values(USERS).filter(u => u.ativo !== false && u.nome).map(u => u.nome).sort((a, b) => a.localeCompare(b, "pt-BR"));
+function status(l){ if (l.etapa === "FECHADO") return "won"; if (!OPEN.includes(l.etapa) || !l.followup) return "none"; const t = todayStr(); return l.followup < t ? "late" : l.followup === t ? "today" : "later"; }
+function toast(msg){ const t = $("toast"); t.textContent = msg; t.hidden = false; clearTimeout(toast._t); toast._t = setTimeout(() => t.hidden = true, 2400); }
+function showNotice(t){ const n = $("notice"); n.textContent = t; n.hidden = !t; }
+function lockInfo(l){ const a = l.atendendo; if (!a || !a.por || !a.desde) return null; const mins = (Date.now() - Date.parse(a.desde)) / 60000; if (!(mins >= 0 && mins <= 30)) return null; return { por: a.por, desde: a.desde, mine: a.por === me }; }
+
+// ---------- quem está usando (vem do login) ----------
+function renderMe(){
+  $("btnMe").textContent = me ? "👤 " + first(me) : "";
+  $("btnTeam").hidden = !isAdmin;
+  const sel = $("fResp"), cur = sel.value; sel.innerHTML = "";
+  const o0 = document.createElement("option"); o0.value = ""; o0.textContent = "Ninguém"; sel.appendChild(o0);
+  const names = team(); if (cur && !names.includes(cur)) names.push(cur);
+  names.forEach(n => { const o = document.createElement("option"); o.value = n; o.textContent = n; sel.appendChild(o); });
+  sel.value = cur;
+}
+function applyProfile(){
+  const em = (user && user.email || "").toLowerCase();
+  const p = USERS[em];
+  const prev = me;
+  me = p && p.nome ? p.nome : (isDono(em) ? DONOS[em] : "");
+  isAdmin = isDono(em) || !!(p && p.papel === "admin" && p.ativo !== false);
+  renderMe();
+  if (me !== prev) refreshPushToken();
+}
+
+// ---------- mensagens prontas ----------
+function nextStep(l){
+  const n = first(l.nome), turma = l.servico === "Turma", corp = l.servico === "Corporativo";
+  const valor = l.valor ? money(l.valor) : pv(P.individual);
+  const t = l.tentativas || 0;
+  switch (l.etapa) {
+    case "NOVO LEAD": return { title: "Qualificar: descobrir o que a pessoa precisa",
+      msg: `Olá, ${n}! Que bom ter você aqui 😊 Sou ${first(me) ? (/a$/i.test(first(me)) ? "a " : "o ") + first(me) : "do time"}, do Z7 Studio.\nO orçamento é só para você ou para a sua turma? E qual a data da sua colação?`,
+      then: { etapa: "QUALIFICADO", days: 1 } };
+    case "QUALIFICADO":
+      if (turma) return { title: "Coletar dados da turma",
+        msg: `Perfeito, ${n}! Para montar o orçamento da turma, me diga:\n• Instituição\n• Curso\n• Quantidade de alunos\n• Mês previsto para as fotos`,
+        then: { etapa: "PROPOSTA ENVIADA", days: 1 } };
+      if (corp) return { title: "Entender o trabalho corporativo",
+        msg: `Perfeito, ${n}! Para te passar o orçamento: quantas pessoas serão fotografadas, as fotos são para site/LinkedIn ou evento, e qual a data ideal?`,
+        then: { etapa: "PROPOSTA ENVIADA", days: 1 } };
+      return { title: "Enviar o valor em texto (sem PDF)",
+        msg: `${n}, o ensaio de formatura no estúdio fica ${valor}, com cerca de ${P.fotos || 30} fotos tratadas entregues em até ${P.prazo || 15} dias.\nJá estão inclusos: beca, cadeira, 2 fundos, acessórios, fotos com família (até 4 pessoas) e pet.\nPara reservar a data, o sinal é de ${pv(P.sinal)} via Pix. Qual dia fica melhor para você?`,
+        then: { etapa: "PROPOSTA ENVIADA", days: 1 } };
+    case "PROPOSTA ENVIADA": return { title: "1º follow-up (tirar dúvida)",
+      msg: `Oi, ${n}! Conseguiu ver o orçamento? Ficou alguma dúvida que eu possa te ajudar a resolver?`,
+      then: { etapa: "FOLLOW-UP", days: 2, count: true } };
+    case "FOLLOW-UP":
+      if (t <= 1) return { title: "2º follow-up (oferecer data)",
+        msg: `${n}, separei algumas datas livres para o seu ensaio. Quer que eu te mostre? Se vier com colegas no mesmo dia, cada um paga ${pv(P.g36)} (de 3 a 6 formandos).`,
+        then: { etapa: "FOLLOW-UP", days: 4, count: true } };
+      return { title: "3º follow-up (encerrar com elegância)",
+        msg: `${n}, vou entender que agora não é o momento e não vou mais te incomodar. Quando quiser, é só me chamar! 😊`,
+        then: { etapa: "PERDIDO", days: -1, count: true } };
+    case "FECHADO": return { title: "Pós-venda: pedir depoimento e indicação",
+      msg: `${n}, que bom que você gostou das fotos! 💛 Pode me mandar um áudio ou texto curto contando como foi a experiência? E se algum colega também vai se formar, me indica? Vou adorar fotografar.`,
+      then: null };
+    default: return null;
+  }
+}
+
+// ---------- gravação ----------
+async function save(id, patch, msg){
+  try { patch.atualizadoEm = new Date().toISOString(); await updateDoc(doc(db, "leads", id), patch); toast(msg || "Salvo"); }
+  catch (e) { handleErr(e); }
+}
+function handleErr(e){
+  if (e && e.code === "permission-denied") showNotice("Este e-mail não tem permissão para alterar o funil.");
+  else toast("Não salvou. Verifique a internet e tente de novo.");
+}
+function claim(l){
+  if (!me) return;
+  const li = lockInfo(l); if (li && li.mine) return;
+  save(l.id, { atendendo: { por: me, desde: new Date().toISOString() } }, "O outro aparelho vai ver: " + me + " está respondendo");
+}
+
+// ---------- desenho da tela ----------
+function mkBtn(text, cls, fn){ const b = document.createElement("button"); b.type = "button"; b.className = "btn btn-sm " + (cls || ""); b.textContent = text; b.onclick = fn; return b; }
+
+function renderChips(){
+  const c = $("chips"); c.innerHTML = "";
+  const counts = { ABERTOS: leads.filter(l => OPEN.includes(l.etapa)).length, TODOS: leads.length, MEUS: leads.filter(l => me && l.resp === me && OPEN.includes(l.etapa)).length };
+  STAGES.forEach(s => counts[s] = leads.filter(l => l.etapa === s).length);
+  ["ABERTOS","MEUS",...STAGES,"TODOS"].forEach(k => {
+    const b = document.createElement("button"); b.type = "button"; b.className = "chip"; b.setAttribute("aria-pressed", String(filter === k));
+    b.textContent = k === "ABERTOS" ? "Em aberto" : k === "TODOS" ? "Todos" : k === "MEUS" ? "Só os meus" : k;
+    const n = document.createElement("span"); n.className = "n"; n.textContent = counts[k]; b.appendChild(n);
+    b.onclick = () => { filter = k; render(); }; c.appendChild(b);
+  });
+}
+function renderStats(){
+  const st = leads.map(status);
+  const late = st.filter(s => s === "late").length, today = st.filter(s => s === "today").length;
+  $("sLate").textContent = late; $("sToday").textContent = today;
+  $("sOpen").textContent = leads.filter(l => OPEN.includes(l.etapa)).length;
+  const ym = todayStr().slice(0, 7);
+  $("sWon").textContent = money(leads.filter(l => l.etapa === "FECHADO" && (l.fechadoEm || "").slice(0, 7) === ym).reduce((a, l) => a + (Number(l.valor) || 0), 0));
+  try { if ("setAppBadge" in navigator) { (late + today) ? navigator.setAppBadge(late + today) : navigator.clearAppBadge(); } } catch (_) {}
+}
+
+function card(l){
+  const s = status(l);
+  const el = document.createElement("article"); el.className = "card " + (["late","today","won"].includes(s) ? s : "");
+  const top = document.createElement("div"); top.className = "card-top";
+  const h = document.createElement("h3"); h.className = "name"; h.textContent = l.nome || "Sem nome";
+  const sg = document.createElement("span"); sg.className = "stage"; sg.textContent = l.etapa;
+  top.append(h, sg); el.appendChild(top);
+
+  const meta = document.createElement("div"); meta.className = "meta";
+  [[l.resp ? "👤 " + first(l.resp) : "", ""], [l.servico, "svc"], [l.origem, ""], [l.valor ? money(l.valor) : "", ""], [l.tentativas ? l.tentativas + "º follow-up feito" : "", ""]]
+    .forEach(([v, c]) => { if (v) { const t = document.createElement("span"); t.className = "tag " + c; t.textContent = v; meta.appendChild(t); } });
+  el.appendChild(meta);
+  if (l.telefone) { const p = document.createElement("div"); p.className = "phone"; p.textContent = l.telefone; el.appendChild(p); }
+
+  const fu = document.createElement("div"); fu.className = "fu " + (s === "late" ? "late" : s === "today" ? "today" : l.followup ? "" : "none");
+  if (OPEN.includes(l.etapa)) fu.textContent = l.followup ? (s === "late" ? "Atrasado desde " + fmtDate(l.followup) : s === "today" ? "Contato para hoje" : "Próximo contato: " + fmtDate(l.followup)) : "Sem data de contato";
+  else fu.textContent = l.etapa === "FECHADO" ? "Fechado" + (l.fechadoEm ? " em " + fmtDate(l.fechadoEm) : "") : "Encerrado";
+  el.appendChild(fu);
+  if (l.notas) { const n = document.createElement("p"); n.className = "notes"; n.textContent = l.notas; el.appendChild(n); }
+  if (l.ultimo && l.ultimo.em) { const u = document.createElement("div"); u.className = "last"; u.textContent = "Último contato: " + (first(l.ultimo.por) || "—") + " · " + fmtDate(ds(new Date(l.ultimo.em))) + " às " + hhmm(l.ultimo.em); el.appendChild(u); }
+
+  const li = lockInfo(l);
+  if (li) {
+    const lk = document.createElement("div"); lk.className = "lock " + (li.mine ? "mine" : "other");
+    const t = document.createElement("span"); t.textContent = li.mine ? "✋ Você está respondendo (desde " + hhmm(li.desde) + ")" : "⚠️ " + first(li.por) + " está respondendo desde " + hhmm(li.desde);
+    lk.appendChild(t);
+    if (li.mine) lk.appendChild(mkBtn("Liberar", "", () => save(l.id, { atendendo: null }, "Cartão liberado")));
+    else lk.appendChild(mkBtn("Assumir mesmo assim", "", () => { if (!me) return; save(l.id, { atendendo: { por: me, desde: new Date().toISOString() } }, "Agora você está respondendo"); }));
+    el.appendChild(lk);
+  }
+  const blocked = li && !li.mine;
+
+  const ns = nextStep(l);
+  if (ns) {
+    const box = document.createElement("div"); box.className = "next";
+    const sm = document.createElement("small"); sm.textContent = "Próximo passo: " + ns.title;
+    const msg = document.createElement("p"); msg.textContent = ns.msg;
+    if (blocked) {
+      const w = document.createElement("p"); w.className = "wait"; w.textContent = "Espere " + first(li.por) + " terminar, ou toque em “Assumir mesmo assim”.";
+      box.append(sm, msg, w);
+    } else {
+      const row = document.createElement("div"); row.className = "row";
+      const d = digits(l.telefone);
+      if (d) { const a = document.createElement("a"); a.className = "btn btn-sm btn-primary"; a.href = "https://wa.me/" + d + "?text=" + encodeURIComponent(ns.msg); a.target = "_blank"; a.rel = "noopener"; a.textContent = "Abrir no WhatsApp"; a.addEventListener("click", () => claim(l)); row.appendChild(a); }
+      row.appendChild(mkBtn("Copiar texto", "", async () => {
+        claim(l);
+        try { await navigator.clipboard.writeText(ns.msg); toast("Texto copiado"); }
+        catch (_) { const r = document.createRange(); r.selectNodeContents(msg); const sel = getSelection(); sel.removeAllRanges(); sel.addRange(r); toast("Texto selecionado, copie com o dedo"); }
+      }));
+      if (ns.then) row.appendChild(mkBtn("Enviei ✓", "btn-ok", () => {
+        const p = { etapa: ns.then.etapa, followup: ns.then.days < 0 ? "" : addDays(ns.then.days), atendendo: null, ultimo: { por: me || "—", em: new Date().toISOString() } };
+        if (ns.then.count) p.tentativas = (l.tentativas || 0) + 1;
+        if (!l.resp && me) p.resp = me;
+        save(l.id, p, p.etapa === "PERDIDO" ? "Lead encerrado" : "Próximo contato em " + fmtDate(p.followup));
+      }));
+      box.append(sm, msg, row);
+    }
+    el.appendChild(box);
+  }
+
+  const act = document.createElement("div"); act.className = "actions";
+  if (OPEN.includes(l.etapa) && !li) act.appendChild(mkBtn("✋ Estou respondendo", "", () => claim(l)));
+  if (OPEN.includes(l.etapa)) {
+    act.appendChild(mkBtn("Fechou", "btn-ok", () => openForm(l, { etapa: "FECHADO" })));
+    act.appendChild(mkBtn("Remarcar +1d", "", () => save(l.id, { followup: addDays(1) }, "Remarcado para " + fmtDate(addDays(1)))));
+    act.appendChild(mkBtn("Perdido", "", () => save(l.id, { etapa: "PERDIDO", followup: "", atendendo: null }, "Lead encerrado")));
+  } else if (l.etapa === "PERDIDO") {
+    act.appendChild(mkBtn("Reabrir", "", () => save(l.id, { etapa: "FOLLOW-UP", followup: todayStr(), tentativas: 0 }, "Lead reaberto")));
+  }
+  act.appendChild(mkBtn("Editar", "", () => openForm(l)));
+  el.appendChild(act);
+  return el;
+}
+
+function render(){
+  renderChips(); renderStats();
+  const q = $("q").value.trim().toLowerCase();
+  let arr = leads.filter(l => filter === "TODOS" ? true : filter === "ABERTOS" ? OPEN.includes(l.etapa) : filter === "MEUS" ? (me && l.resp === me && OPEN.includes(l.etapa)) : l.etapa === filter);
+  if (q) arr = arr.filter(l => [l.nome, l.telefone, l.notas, l.servico, l.origem, l.resp].join(" ").toLowerCase().includes(q));
+  const rank = { late: 0, today: 1, later: 2, none: 3, won: 4 };
+  arr.sort((a, b) => (rank[status(a)] - rank[status(b)]) || ((a.followup || "9") < (b.followup || "9") ? -1 : (a.followup || "9") > (b.followup || "9") ? 1 : 0) || ((b.criadoEm || "") > (a.criadoEm || "") ? 1 : -1));
+  const list = $("list"); list.innerHTML = "";
+  if (!arr.length) {
+    const e = document.createElement("div"); e.className = "empty"; e.style.gridColumn = "1/-1";
+    const s = document.createElement("strong"); s.textContent = leads.length ? "Nada nesta etapa" : "Nenhum lead ainda";
+    const p = document.createElement("span"); p.textContent = leads.length ? "Troque o filtro acima ou cadastre um contato novo." : "Toque em “+ Novo lead” quando alguém chamar no WhatsApp pedindo orçamento.";
+    e.append(s, p); list.appendChild(e); return;
+  }
+  arr.forEach(l => list.appendChild(card(l)));
+}
+
+// ---------- formulário de lead ----------
+function openForm(l, preset){
+  editing = l || null; preset = preset || {};
+  $("formTitle").textContent = preset.etapa === "FECHADO" ? "Registrar venda" : l ? "Editar lead" : "Novo lead";
+  $("fNome").value = l?.nome || ""; $("fTel").value = l?.telefone || ""; $("fValor").value = l?.valor || "";
+  $("fServ").value = l?.servico || SERVS[0]; $("fOrig").value = l?.origem || "WhatsApp";
+  $("fEtapa").value = preset.etapa || l?.etapa || "NOVO LEAD"; $("fFu").value = l ? l.followup || "" : todayStr();
+  $("fNotas").value = l?.notas || "";
+  renderMe(); $("fResp").value = l ? (l.resp || "") : (me || "");
+  $("btnDel").hidden = !l; $("confirmDel").hidden = true;
+  $("sheet").hidden = false; setTimeout(() => (preset.etapa === "FECHADO" ? $("fValor") : $("fNome")).focus(), 30);
+}
+function closeForm(){ $("sheet").hidden = true; editing = null; }
+
+$("btnNew").onclick = () => openForm(null);
+$("btnCancel").onclick = closeForm;
+$("sheet").addEventListener("click", e => { if (e.target === $("sheet")) closeForm(); });
+$("sheetPrices").addEventListener("click", e => { if (e.target === $("sheetPrices")) $("sheetPrices").hidden = true; });
+document.addEventListener("keydown", e => { if (e.key === "Escape") { closeForm(); $("sheetPrices").hidden = true; $("sheetTeam").hidden = true; } });
+document.querySelectorAll("[data-add]").forEach(b => b.onclick = () => { const n = +b.dataset.add; $("fFu").value = n < 0 ? "" : addDays(n); });
+$("btnDel").onclick = () => { $("confirmDel").hidden = false; };
+$("delNo").onclick = () => { $("confirmDel").hidden = true; };
+$("delYes").onclick = async () => { if (!editing) return; try { await deleteDoc(doc(db, "leads", editing.id)); toast("Lead apagado"); closeForm(); } catch (e) { handleErr(e); } };
+$("q").addEventListener("input", render);
+
+$("form").addEventListener("submit", async e => {
+  e.preventDefault();
+  const nome = $("fNome").value.trim(); if (!nome) { $("fNome").focus(); return; }
+  const etapa = $("fEtapa").value;
+  const body = { nome, telefone: $("fTel").value.trim(), valor: num($("fValor").value), servico: $("fServ").value, origem: $("fOrig").value,
+    etapa, followup: OPEN.includes(etapa) ? $("fFu").value : "", notas: $("fNotas").value.trim(), resp: $("fResp").value, atualizadoEm: new Date().toISOString() };
+  $("btnSave").disabled = true;
+  try {
+    if (editing) { if (etapa === "FECHADO") { body.fechadoEm = editing.fechadoEm || todayStr(); body.atendendo = null; } await updateDoc(doc(db, "leads", editing.id), body); }
+    else { body.criadoEm = new Date().toISOString(); body.tentativas = 0; if (etapa === "FECHADO") body.fechadoEm = todayStr(); await addDoc(collection(db, "leads"), body); }
+    toast(etapa === "FECHADO" ? "Venda registrada 🎉" : "Lead salvo"); closeForm();
+  } catch (err) { handleErr(err); } finally { $("btnSave").disabled = false; }
+});
+
+// ---------- ajustes ----------
+$("btnPrices").onclick = () => {
+  $("pInd").value = P.individual || ""; $("pSinal").value = P.sinal || ""; $("pG36").value = P.g36 || ""; $("pG7").value = P.g7 || "";
+  $("pFotos").value = P.fotos || ""; $("pPrazo").value = P.prazo || "";
+  ["pInd","pSinal","pG36","pG7","pFotos","pPrazo"].forEach(id => $(id).disabled = !isAdmin);
+  $("pSave").hidden = !isAdmin;
+  $("pricesHint").textContent = isAdmin ? "Os valores entram automaticamente nas mensagens prontas." : "Só administradores mudam os preços.";
+  renderPushState(); $("sheetPrices").hidden = false;
+};
+$("pCancel").onclick = () => { $("sheetPrices").hidden = true; };
+$("pSair").onclick = async () => { $("sheetPrices").hidden = true; await signOut(auth); };
+$("pPush").onclick = () => enablePush(true);
+$("formPrices").addEventListener("submit", async e => {
+  e.preventDefault();
+  if (!isAdmin) return;
+  const body = { individual: num($("pInd").value), sinal: num($("pSinal").value), g36: num($("pG36").value), g7: num($("pG7").value),
+    fotos: num($("pFotos").value) || 30, prazo: num($("pPrazo").value) || 15 };
+  try {
+    await setDoc(doc(db, "config", "app"), body, { merge: true });
+    $("sheetPrices").hidden = true; toast("Preços salvos");
+  } catch (err) { handleErr(err); }
+});
+
+// ---------- notificações ----------
+const isIOS = /iphone|ipad|ipod/i.test(navigator.userAgent);
+const standalone = matchMedia("(display-mode: standalone)").matches || navigator.standalone === true;
+function pushSupported(){ return "Notification" in window && "serviceWorker" in navigator && "PushManager" in window; }
+function renderPushState(){
+  const el = $("pushState");
+  if (isIOS && !standalone) { el.textContent = "No iPhone, primeiro adicione o app à Tela de Início e abra por lá. Só assim as notificações funcionam."; $("pPush").hidden = true; return; }
+  if (!pushSupported()) { el.textContent = "Este navegador não recebe notificações."; $("pPush").hidden = true; return; }
+  const p = Notification.permission;
+  el.textContent = p === "granted" ? "Notificações ativadas neste aparelho." : p === "denied" ? "As notificações foram bloqueadas. Libere nas configurações do navegador ou do celular." : "Notificações desativadas neste aparelho.";
+  $("pPush").hidden = p === "granted" || p === "denied";
+}
+function renderPushBanner(){ $("pushBanner").hidden = !(pushSupported() && Notification.permission === "default" && (!isIOS || standalone)); }
+async function enablePush(fromClick){
+  if (!pushSupported() || !swReg) return;
+  try {
+    if (!(await isSupported())) { if (fromClick) toast("Este aparelho não recebe notificações."); return; }
+    const perm = Notification.permission === "default" ? await Notification.requestPermission() : Notification.permission;
+    renderPushBanner(); renderPushState();
+    if (perm !== "granted") { if (fromClick) toast("Notificações não autorizadas"); return; }
+    const token = await getToken(getMessaging(app), { vapidKey: CFG.vapidKey, serviceWorkerRegistration: swReg });
+    if (!token) return;
+    await setDoc(doc(db, "tokens", token), { nome: me || "", email: user?.email || "", aparelho: navigator.userAgent.slice(0, 160), atualizadoEm: new Date().toISOString() });
+    try { localStorage.setItem("z7token", token); } catch (_) {}
+    if (fromClick) toast("Notificações ativadas ✅");
+  } catch (e) { if (fromClick) toast("Não foi possível ativar as notificações."); console.warn(e); }
+}
+function refreshPushToken(){ if (pushSupported() && Notification.permission === "granted") enablePush(false); }
+$("btnPush").onclick = () => enablePush(true);
+
+// ---------- login ----------
+$("formLogin").addEventListener("submit", async e => {
+  e.preventDefault(); $("lErr").hidden = true; $("lBtn").disabled = true;
+  try { await signInWithEmailAndPassword(auth, $("lEmail").value.trim(), $("lSenha").value); }
+  catch (err) { $("lErr").textContent = "E-mail ou senha incorretos."; $("lErr").hidden = false; }
+  finally { $("lBtn").disabled = false; }
+});
+$("lReset").onclick = async () => {
+  const em = $("lEmail").value.trim();
+  if (!em) { $("lErr").textContent = "Digite o seu e-mail acima e toque de novo."; $("lErr").hidden = false; return; }
+  try { await sendPasswordResetEmail(auth, em); $("lErr").textContent = "Enviamos um link para criar uma nova senha no seu e-mail."; $("lErr").hidden = false; }
+  catch (_) { $("lErr").textContent = "Não foi possível enviar. Confira o e-mail."; $("lErr").hidden = false; }
+};
+
+// ---------- equipe ----------
+function renderTeam(){
+  const box = $("uList"); box.innerHTML = "";
+  const rows = Object.entries(USERS).sort((a, b) => (a[1].nome || "").localeCompare(b[1].nome || "", "pt-BR"));
+  if (!rows.length) { const p = document.createElement("p"); p.className = "hint"; p.textContent = "Ninguém cadastrado ainda."; box.appendChild(p); }
+  rows.forEach(([em, u]) => {
+    const r = document.createElement("div"); r.className = "urow" + (u.ativo === false ? " off" : "");
+    const info = document.createElement("div"); info.className = "u";
+    const b = document.createElement("b"); b.textContent = u.nome || em;
+    const s = document.createElement("small"); s.textContent = em;
+    info.append(b, s);
+    const pill = document.createElement("span"); pill.className = "pill" + (u.papel === "admin" ? " admin" : ""); pill.textContent = u.ativo === false ? "Desativado" : u.papel === "admin" ? "Administrador" : "Equipe";
+    const acts = document.createElement("div"); acts.className = "quick";
+    if (isDono(em)) pill.textContent = "Dono";
+    if (!isDono(em) && em !== (user.email || "").toLowerCase()) {
+      acts.appendChild(mkBtn(u.papel === "admin" ? "Tornar equipe" : "Tornar admin", "", () => updUser(em, { papel: u.papel === "admin" ? "equipe" : "admin" })));
+      acts.appendChild(mkBtn(u.ativo === false ? "Reativar" : "Desativar", u.ativo === false ? "btn-ok" : "btn-danger", () => updUser(em, { ativo: u.ativo === false })));
+    }
+    if (u.ativo !== false) acts.appendChild(mkBtn("Reenviar convite", "", async () => { try { await sendPasswordResetEmail(auth, em); toast("Convite enviado para " + em); } catch (_) { toast("Não foi possível enviar o e-mail."); } }));
+    const head = document.createElement("div"); head.style.cssText = "display:flex;gap:8px;align-items:center;min-width:0"; head.append(info, pill);
+    r.append(head, acts); box.appendChild(r);
+  });
+}
+async function updUser(em, patch){ try { await updateDoc(doc(db, "usuarios", em), patch); toast("Equipe atualizada"); } catch (e) { handleErr(e); } }
+$("btnTeam").onclick = () => { renderTeam(); $("uErr").hidden = true; $("sheetTeam").hidden = false; };
+$("uClose").onclick = () => { $("sheetTeam").hidden = true; };
+$("sheetTeam").addEventListener("click", e => { if (e.target === $("sheetTeam")) $("sheetTeam").hidden = true; });
+$("formUser").addEventListener("submit", async e => {
+  e.preventDefault(); if (!isAdmin) return;
+  const nome = $("uNome").value.trim(), em = $("uEmail").value.trim().toLowerCase(), papel = $("uPapel").value;
+  const err = $("uErr"); err.hidden = true;
+  if (!nome || !/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(em)) { err.textContent = "Preencha o nome e um e-mail válido."; err.hidden = false; return; }
+  $("uSave").disabled = true;
+  try {
+    // 1) cria o login (com uma senha aleatória que ninguém conhece)
+    try {
+      const rnd = crypto.getRandomValues(new Uint32Array(4)).join("-") + "Aa!";
+      const a = cadastroAuth(); await createUserWithEmailAndPassword(a, em, rnd); await signOut(a);
+    } catch (ce) { if (ce.code !== "auth/email-already-in-use") throw ce; }
+    // 2) dá acesso ao app
+    await setDoc(doc(db, "usuarios", em), { nome, papel, ativo: true, criadoEm: new Date().toISOString(), criadoPor: user.email || "" });
+    // 3) manda o e-mail para a pessoa criar a própria senha
+    await sendPasswordResetEmail(auth, em);
+    $("uNome").value = ""; $("uEmail").value = ""; $("uPapel").value = "equipe";
+    toast("Pronto! " + first(nome) + " vai receber um e-mail para criar a senha.");
+  } catch (ex) {
+    err.textContent = ex.code === "permission-denied" ? "Só administradores cadastram pessoas." : ex.code === "auth/invalid-email" ? "E-mail inválido." : "Não foi possível cadastrar. Tente de novo.";
+    err.hidden = false; console.warn(ex);
+  } finally { $("uSave").disabled = false; }
+});
+
+function startData(){
+  unsub.forEach(f => f()); unsub = [];
+  const em = (user.email || "").toLowerCase();
+  let bootstrapped = false;
+  unsub.push(onSnapshot(collection(db, "usuarios"), snap => {
+    USERS = {}; snap.docs.forEach(d => USERS[d.id] = d.data());
+    // Primeiro acesso de um dono: cria o cadastro dele automaticamente.
+    if (isDono(em) && !USERS[em] && !bootstrapped) {
+      bootstrapped = true;
+      setDoc(doc(db, "usuarios", em), { nome: DONOS[em] || em, papel: "admin", ativo: true, criadoEm: new Date().toISOString() }).catch(() => {});
+    }
+    applyProfile(); render();
+    if (!$("sheetTeam").hidden) renderTeam();
+  }, err => { if (err.code === "permission-denied") showNotice("Este e-mail não tem acesso ao app. Peça para um administrador cadastrar você."); }));
+  unsub.push(onSnapshot(doc(db, "config", "app"), s => {
+    if (s.exists()) P = Object.assign({}, P, s.data());
+    render();
+  }, () => {}));
+  unsub.push(onSnapshot(collection(db, "leads"), snap => {
+    leads = snap.docs.map(d => Object.assign({ id: d.id }, d.data())); render();
+  }, err => showNotice(err.code === "permission-denied" ? "Este e-mail não tem acesso ao funil. Fale com o Adriano." : "A conexão caiu. Feche e abra o app de novo.")));
+}
+
+onAuthStateChanged(auth, u => {
+  user = u;
+  $("viewLogin").hidden = !!u; $("viewApp").hidden = !u;
+  if (u) { startData(); renderPushBanner(); refreshPushToken(); }
+  else { unsub.forEach(f => f()); unsub = []; leads = []; }
+});
+
+// ---------- service worker e atualizações ----------
+if ("serviceWorker" in navigator) {
+  navigator.serviceWorker.register("./sw.js").then(r => { swReg = r; if (user) refreshPushToken(); }).catch(() => {});
+}
+try { onMessage(getMessaging(app), p => { const n = p.notification || {}; toast((n.title || "") + (n.body ? " · " + n.body : "")); }); } catch (_) {}
+try { if (!localStorage.getItem("z7guide")) $("guide").open = true; $("guide").addEventListener("toggle", () => { try { localStorage.setItem("z7guide", "1"); } catch (_) {} }); } catch (_) {}
+setInterval(() => { if ($("sheet").hidden && $("sheetPrices").hidden) render(); }, 60000);
+document.addEventListener("visibilitychange", () => { if (!document.hidden) render(); });
+</script>
+</body>
+</html>
