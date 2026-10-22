@@ -1,6 +1,7 @@
 rules_version = '2';
-// Regras do app Z7: só entra quem está cadastrado e ativo em "usuarios".
-// A dona do app é sempre administradora (é ela quem cadastra os outros).
+// Regras do app Z7 Studio. Só entra quem está cadastrado e ativo em "usuarios".
+// Donos e administradores veem tudo. A equipe vê só os módulos liberados no cadastro
+// (campo "modulos": funil, lf, rep, agenda, colegios).
 // Cole este texto em Firebase → Firestore Database → Regras → Publicar.
 service cloud.firestore {
   match /databases/{database}/documents {
@@ -8,24 +9,21 @@ service cloud.firestore {
     function email() { return request.auth.token.email.lower(); }
     function dono() { return logado() && email() in ['z7studiofotografico@gmail.com', 'lucianafanjos@gmail.com']; }
     function perfilPath() { return /databases/$(database)/documents/usuarios/$(email()); }
-    function membro() { return dono() || (logado() && exists(perfilPath()) && get(perfilPath()).data.ativo == true); }
-    function admin() { return dono() || (membro() && get(perfilPath()).data.papel == 'admin'); }
+    function perfil() { return get(perfilPath()).data; }
+    function membro() { return dono() || (logado() && exists(perfilPath()) && perfil().ativo == true); }
+    function admin() { return dono() || (membro() && perfil().papel == 'admin'); }
+    function pode(m) { return admin() || (membro() && (!('modulos' in perfil()) || m in perfil().modulos)); }
+    // Linha de Frente = ensaios do ano atual
+    function anoAtual(d) { return d.ano >= request.time.year(); }
 
-    // Pessoas que usam o app (id do documento = e-mail em minúsculas)
-    match /usuarios/{em} {
-      allow read: if membro();
-      allow write: if admin();
-    }
-    // Funil de vendas
-    match /leads/{id} { allow read, write: if membro(); }
-    // Preços e ajustes gerais: todos leem, só administradores mudam
-    match /config/{id} {
-      allow read: if membro();
-      allow write: if admin();
-    }
-    // Repasse (Kit Recordação)
-    match /repasse/{id} { allow read, write: if membro(); }
-    // Aparelhos que recebem notificação
+    match /usuarios/{em} { allow read: if membro(); allow write: if admin(); }
+    match /config/{id} { allow read: if membro(); allow write: if admin(); }
     match /tokens/{token} { allow read, write: if membro(); }
+    match /leads/{id} { allow read, write: if pode('funil'); }
+    match /repasse/{id} {
+      allow read: if pode('rep') || (pode('lf') && anoAtual(resource.data));
+      allow update: if pode('rep') || (pode('lf') && anoAtual(resource.data) && anoAtual(request.resource.data));
+      allow create, delete: if pode('rep') || admin();
+    }
   }
 }

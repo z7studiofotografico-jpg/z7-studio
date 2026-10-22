@@ -39,7 +39,9 @@ for (const t of tokensSnap.docs) {
   const nome = t.get("nome") || "";
   const perfil = usuarios.get(String(t.get("email") || "").toLowerCase());
   if (perfil && perfil.ativo === false) continue;
-  const meus = vencidos.filter((l) => !l.resp || !nome || l.resp === nome);
+  // Quem tem módulos limitados só recebe lembrete do que pode ver.
+  const mods = perfil && Array.isArray(perfil.modulos) && perfil.papel !== "admin" ? perfil.modulos : null;
+  const meus = mods && !mods.includes("funil") ? [] : vencidos.filter((l) => !l.resp || !nome || l.resp === nome);
   const meusRep = repVencidos.filter((r) => !r.resp || !nome || r.resp === nome);
   let title, body;
   if (TESTE) {

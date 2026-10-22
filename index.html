@@ -210,25 +210,25 @@ details.guide summary{cursor:pointer;font-family:var(--f-display);font-weight:70
     <section id="viewHome" class="view" hidden>
       <h1 class="hello" id="hello">Bom dia!</h1>
       <div class="tiles">
-        <a class="tile" href="#funil">
+        <a class="tile" href="#funil" data-mod="funil">
           <span class="tile-ico" aria-hidden="true">🎯</span>
           <b>Funil de vendas</b>
           <small>Leads novos do WhatsApp, propostas e follow-ups</small>
           <span class="tile-n" id="tFunil"></span>
         </a>
-        <a class="tile" href="#pr">
+        <a class="tile" href="#pr" data-mod="pr">
           <span class="tile-ico" aria-hidden="true">🖼️</span>
           <b>PR</b>
           <small>Linha de Frente e Repasse: kits prontos de quem fez o ensaio</small>
           <span class="tile-n" id="tRepasse"></span>
         </a>
-        <a class="tile soon" href="#agenda">
+        <a class="tile soon" href="#agenda" data-mod="agenda">
           <span class="tile-ico" aria-hidden="true">📅</span>
           <b>Agendamento</b>
           <small>Ensaios, formaturas e visitas do ano</small>
           <span class="tile-n">Em breve</span>
         </a>
-        <a class="tile soon" href="#colegios">
+        <a class="tile soon" href="#colegios" data-mod="colegios">
           <span class="tile-ico" aria-hidden="true">🏫</span>
           <b>Colégios</b>
           <small>Visitas, motivo de não fechar e quando retornar</small>
@@ -396,6 +396,7 @@ details.guide summary{cursor:pointer;font-family:var(--f-display);font-weight:70
           <select id="uPapel"><option value="equipe">Equipe (usa o app)</option><option value="admin">Administrador (também cadastra pessoas e muda preços)</option></select>
         </div>
       </div>
+      <div class="field" id="uModsBox"><label>O que essa pessoa pode ver</label><div class="quick" id="uMods"></div></div>
       <p class="err" id="uErr" hidden></p>
       <div class="panel-actions">
         <span style="flex:1"></span>
@@ -473,6 +474,15 @@ function renderMe(){
   const names = team(); if (cur && !names.includes(cur)) names.push(cur);
   names.forEach(n => { const o = document.createElement("option"); o.value = n; o.textContent = n; sel.appendChild(o); });
   sel.value = cur;
+}
+// Módulos do app. Administradores e donos veem tudo; a equipe vê só o que foi liberado no cadastro.
+const MODULOS = [["funil", "Funil de vendas"], ["lf", "PR · Linha de Frente"], ["rep", "PR · Repasse"], ["agenda", "Agendamento"], ["colegios", "Colégios"]];
+function pode(m){
+  if (isAdmin) return true;
+  const p = USERS[(user && user.email || "").toLowerCase()];
+  if (!p || !Array.isArray(p.modulos)) return !!p;
+  if (m === "pr") return p.modulos.includes("lf") || p.modulos.includes("rep");
+  return p.modulos.includes(m);
 }
 function applyProfile(){
   const em = (user && user.email || "").toLowerCase();
@@ -750,13 +760,16 @@ const VIEWS = { home: "viewHome", funil: "viewFunil", pr: "viewRepasse", repasse
 let repasseMod = null, curView = "home";
 const ctx = {
   db, FS, $, toast, mkBtn, money, num, digits, first, todayStr, addDays, fmtDate, hhmm, ds, pad, showNotice, handleErr,
-  get me(){ return me; }, get isAdmin(){ return isAdmin; }, get user(){ return user; }, get P(){ return P; }, team,
+  get me(){ return me; }, get isAdmin(){ return isAdmin; }, get user(){ return user; }, get P(){ return P; }, team, pode,
   goHome(){ location.hash = "#home"; }
 };
+let usersLoaded = false;
 async function route(){
-  if (!user) return;
+  if (!user || !usersLoaded) return;
   const r = (location.hash || "").slice(1);
-  const key = VIEWS[r] ? r : "home";
+  let key = VIEWS[r] ? r : "home";
+  const modDe = { funil: "funil", pr: "pr", repasse: "pr", agenda: "agenda", colegios: "colegios" };
+  if (modDe[key] && !pode(modDe[key])) { key = "home"; if (r) history.replaceState(null, "", "#home"); }
   curView = key;
   new Set(Object.values(VIEWS)).forEach(id => { $(id).hidden = true; });
   $(VIEWS[key]).hidden = false;
@@ -779,11 +792,14 @@ function renderHome(){
   const h = new Date().getHours();
   $("hello").textContent = (h < 12 ? "Bom dia" : h < 18 ? "Boa tarde" : "Boa noite") + (me ? ", " + first(me) : "") + "!";
   const st = leads.map(status), late = st.filter(s => s === "late").length, today = st.filter(s => s === "today").length;
+  document.querySelectorAll(".tile[data-mod]").forEach(t => { t.hidden = !pode(t.dataset.mod); });
   $("tFunil").textContent = (late + today) ? `${late + today} para hoje` + (late ? ` · ${late} atrasado${late > 1 ? "s" : ""}` : "") : "Nada pendente hoje ✓";
   if (Date.now() - repCount.at > 5 * 60000) {
     repCount.at = Date.now();
-    getCountFromServer(query(collection(db, "repasse"), where("followup", "<=", todayStr())))
+    if (pode("rep")) getCountFromServer(query(collection(db, "repasse"), where("followup", "<=", todayStr())))
       .then(c => { repCount.n = c.data().count; paintRep(); }).catch(() => {});
+    else if (pode("lf")) FS.getDocs(query(collection(db, "repasse"), where("ano", "==", new Date().getFullYear()), where("etapa", "in", ["SEPARADO", "CONTATADO", "INTERESSADO"]), FS.limit(300)))
+      .then(s => { repCount.n = s.docs.filter(d => (d.data().followup || "9") <= todayStr() && (!d.data().resp || d.data().resp === me)).length; paintRep(); }).catch(() => {});
   }
   paintRep();
 }
@@ -823,11 +839,30 @@ function renderTeam(){
     }
     if (u.ativo !== false) acts.appendChild(mkBtn("Reenviar convite", "", async () => { try { await sendPasswordResetEmail(auth, em); toast("Convite enviado para " + em); } catch (_) { toast("Não foi possível enviar o e-mail."); } }));
     const head = document.createElement("div"); head.style.cssText = "display:flex;gap:8px;align-items:center;min-width:0"; head.append(info, pill);
-    r.append(head, acts); box.appendChild(r);
+    r.append(head);
+    if (!isDono(em) && u.papel !== "admin" && u.ativo !== false) {
+      const mods = document.createElement("div"); mods.className = "quick";
+      const atuais = Array.isArray(u.modulos) ? u.modulos : MODULOS.map(m => m[0]);
+      MODULOS.forEach(([k, lbl]) => {
+        const l = document.createElement("label"); l.className = "chk"; const c = document.createElement("input"); c.type = "checkbox"; c.checked = atuais.includes(k);
+        c.onchange = () => { const novo = MODULOS.map(m => m[0]).filter(x => x === k ? c.checked : atuais.includes(x)); updUser(em, { modulos: novo }); };
+        l.append(c, document.createTextNode(" " + lbl)); mods.append(l);
+      });
+      r.append(mods);
+    }
+    r.append(acts); box.appendChild(r);
   });
 }
 async function updUser(em, patch){ try { await updateDoc(doc(db, "usuarios", em), patch); toast("Equipe atualizada"); } catch (e) { handleErr(e); } }
-$("btnTeam").onclick = () => { renderTeam(); $("uErr").hidden = true; $("sheetTeam").hidden = false; };
+function paintModsForm(){
+  const box = $("uMods"); if (!box.childElementCount) MODULOS.forEach(([k, lbl]) => {
+    const l = document.createElement("label"); l.className = "chk"; const c = document.createElement("input"); c.type = "checkbox"; c.value = k; c.checked = k !== "rep" && k !== "funil";
+    l.append(c, document.createTextNode(" " + lbl)); box.append(l);
+  });
+  $("uModsBox").hidden = $("uPapel").value !== "equipe";
+}
+$("uPapel").addEventListener("change", paintModsForm);
+$("btnTeam").onclick = () => { renderTeam(); paintModsForm(); $("uErr").hidden = true; $("sheetTeam").hidden = false; };
 $("uClose").onclick = () => { $("sheetTeam").hidden = true; };
 $("sheetTeam").addEventListener("click", e => { if (e.target === $("sheetTeam")) $("sheetTeam").hidden = true; });
 $("formUser").addEventListener("submit", async e => {
@@ -843,7 +878,9 @@ $("formUser").addEventListener("submit", async e => {
       const a = cadastroAuth(); await createUserWithEmailAndPassword(a, em, rnd); await signOut(a);
     } catch (ce) { if (ce.code !== "auth/email-already-in-use") throw ce; }
     // 2) dá acesso ao app
-    await setDoc(doc(db, "usuarios", em), { nome, papel, ativo: true, criadoEm: new Date().toISOString(), criadoPor: user.email || "" });
+    const dados = { nome, papel, ativo: true, criadoEm: new Date().toISOString(), criadoPor: user.email || "" };
+    if (papel === "equipe") dados.modulos = [...$("uMods").querySelectorAll("input:checked")].map(c => c.value);
+    await setDoc(doc(db, "usuarios", em), dados);
     // 3) manda o e-mail para a pessoa criar a própria senha
     await sendPasswordResetEmail(auth, em);
     $("uNome").value = ""; $("uEmail").value = ""; $("uPapel").value = "equipe";
@@ -865,23 +902,32 @@ function startData(){
       bootstrapped = true;
       setDoc(doc(db, "usuarios", em), { nome: DONOS[em] || em, papel: "admin", ativo: true, criadoEm: new Date().toISOString() }).catch(() => {});
     }
-    applyProfile(); render(); if (curView === "home") renderHome();
+    applyProfile(); syncLeads(); render();
+    if (!usersLoaded) { usersLoaded = true; route(); }
+    else if (curView === "home") renderHome();
+    else { const md = { funil: "funil", pr: "pr", repasse: "pr", agenda: "agenda", colegios: "colegios" }[curView]; if (md && !pode(md)) route(); }
     if (!$("sheetTeam").hidden) renderTeam();
   }, err => { if (err.code === "permission-denied") showNotice("Este e-mail não tem acesso ao app. Peça para um administrador cadastrar você."); }));
   unsub.push(onSnapshot(doc(db, "config", "app"), s => {
     if (s.exists()) P = Object.assign({}, P, s.data());
     render();
   }, () => {}));
-  unsub.push(onSnapshot(collection(db, "leads"), snap => {
+}
+// O funil só é carregado para quem tem permissão.
+let unsubLeads = null;
+function syncLeads(){
+  const ok = pode("funil");
+  if (ok && !unsubLeads) unsubLeads = onSnapshot(collection(db, "leads"), snap => {
     leads = snap.docs.map(d => Object.assign({ id: d.id }, d.data())); render(); if (curView === "home") renderHome();
-  }, err => showNotice(err.code === "permission-denied" ? "Este e-mail não tem acesso ao funil. Fale com o Adriano." : "A conexão caiu. Feche e abra o app de novo.")));
+  }, err => { if (err.code !== "permission-denied") showNotice("A conexão caiu. Feche e abra o app de novo."); });
+  if (!ok && unsubLeads) { unsubLeads(); unsubLeads = null; leads = []; render(); }
 }
 
 onAuthStateChanged(auth, u => {
   user = u;
   $("viewLogin").hidden = !!u; $("viewApp").hidden = !u;
   if (u) { startData(); renderPushBanner(); refreshPushToken(); route(); }
-  else { unsub.forEach(f => f()); unsub = []; leads = []; }
+  else { usersLoaded = false; unsub.forEach(f => f()); unsub = []; if (unsubLeads) { unsubLeads(); unsubLeads = null; } leads = []; USERS = {}; }
 });
 
 // ---------- service worker e atualizações ----------

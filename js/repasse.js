@@ -14,6 +14,10 @@ const ANO_MIN = 2015;
 function segDe(it){ return !it.ano ? null : it.ano >= ANO() ? "lf" : "rep"; }
 function noSeg(it){ const s0 = segDe(it); return !s0 || s0 === seg; }
 const segNome = s0 => s0 === "lf" ? "Linha de Frente " + ANO() : "Repasse";
+// Quem só tem a Linha de Frente só pode ler ensaios do ano atual (as regras do Firebase também exigem isso),
+// então as buscas da Linha de Frente sempre filtram pelo ano.
+const segsPermitidas = () => ["lf", "rep"].filter(k => C.pode(k));
+const baseLF = () => [FS.where("ano", "==", ANO())];
 const $ = (id) => document.getElementById(id);
 
 export const ETAPAS = ["INCOMPLETO", "NA FILA", "SEPARADO", "CONTATADO", "INTERESSADO", "PAGO", "ENTREGUE", "NÃO QUER", "SEM CONTATO"];
@@ -143,6 +147,7 @@ export function init(ctx){ C = ctx; FS = ctx.FS; db = ctx.db; col = FS.collectio
 
 export function show(){
   if (!mounted) mount();
+  const ok = segsPermitidas(); if (!ok.includes(seg)) seg = ok[0] || "lf";
   renderSegs();
   loadMeta().then(refreshStats); refreshLote(); openTab(tab);
 }
@@ -198,10 +203,10 @@ function mount(){
 
 function renderSegs(){
   const c = $("rSegs"); c.innerHTML = "";
-  [["lf", `Linha de Frente ${ANO()}`, "ensaios deste ano"], ["rep", "Repasse", `ensaios até ${ANO() - 1}`]].forEach(([k, t, sub]) => {
+  [["lf", `Linha de Frente ${ANO()}`, "ensaios deste ano"], ["rep", "Repasse", `ensaios até ${ANO() - 1}`]].filter(([k]) => C.pode(k)).forEach(([k, t, sub]) => {
     const b = el("button", "seg"); b.type = "button"; b.setAttribute("role", "tab"); b.setAttribute("aria-selected", String(seg === k));
     b.append(el("b", null, t), el("small", null, sub));
-    b.onclick = () => { if (seg === k) return; seg = k; try { localStorage.setItem("z7seg", k); } catch (_) {} renderSegs(); refreshStats(); refreshLote(); renderList(); };
+    b.onclick = () => { if (seg === k) return; seg = k; try { localStorage.setItem("z7seg", k); } catch (_) {} renderSegs(); refreshStats(); refreshLote(); openTab(tab); };
     c.append(b);
   });
 }
@@ -222,18 +227,37 @@ function openTab(k){
   items = []; renderList(true);
   const today = C.todayStr();
   let q = null;
-  if (k === "hoje") q = FS.query(col, FS.where("followup", "<=", today), FS.orderBy("followup"), FS.limit(150));
-  if (k === "interessados") q = FS.query(col, FS.where("etapa", "==", "INTERESSADO"), FS.limit(200));
-  if (k === "entregas") q = FS.query(col, FS.where("etapa", "==", "PAGO"), FS.limit(300));
+  if (seg === "lf") {
+    if (k === "hoje") q = FS.query(col, ...baseLF(), FS.where("etapa", "in", [...ABERTAS, "ENTREGUE"]), FS.limit(300));
+    if (k === "interessados") q = FS.query(col, ...baseLF(), FS.where("etapa", "==", "INTERESSADO"), FS.limit(200));
+    if (k === "entregas") q = FS.query(col, ...baseLF(), FS.where("etapa", "==", "PAGO"), FS.limit(300));
+  } else {
+    if (k === "hoje") q = FS.query(col, FS.where("followup", "<=", today), FS.orderBy("followup"), FS.limit(150));
+    if (k === "interessados") q = FS.query(col, FS.where("etapa", "==", "INTERESSADO"), FS.limit(200));
+    if (k === "entregas") q = FS.query(col, FS.where("etapa", "==", "PAGO"), FS.limit(300));
+  }
   if (k === "incompletos") q = FS.query(col, FS.where("etapa", "==", "INCOMPLETO"), FS.limit(200));
   if (q) unsubList = FS.onSnapshot(q, snap => { items = snap.docs.map(d => Object.assign({ id: d.id }, d.data())); renderList(); },
     err => { console.warn(err); C.showNotice("Não foi possível carregar o Repasse. Verifique a internet."); });
   if (k === "buscar") { $("rQ").focus(); buscar(); }
 }
 
+let cacheLF = { at: 0, docs: [] };
 async function buscar(){
   if (tab !== "buscar") return;
   const txt = $("rQ").value.trim(), esc = $("rEscola").value;
+  if (!C.pode("rep")) {
+    // Só Linha de Frente: carrega os ensaios do ano (uma vez a cada 10 min) e filtra aqui.
+    if (!txt && !esc) { items = []; renderList(false, "Digite pelo menos 2 letras do nome, um telefone, ou escolha uma escola."); return; }
+    try {
+      if (Date.now() - cacheLF.at > 600000) { const s0 = await FS.getDocs(FS.query(col, ...baseLF(), FS.limit(3000))); cacheLF = { at: Date.now(), docs: s0.docs.map(d => Object.assign({ id: d.id }, d.data())) }; }
+      const n = norm(txt), dg = txt.replace(/\D/g, "");
+      items = cacheLF.docs.filter(it => (!esc || it.escola === esc) && (!txt || (dg.length >= 8 ? (it.telefones || []).some(t => t.includes(dg.slice(-8))) : (it.nomeBusca || "").includes(n))))
+        .slice(0, 100).sort((a, b) => (a.nome || "").localeCompare(b.nome || "", "pt-BR"));
+      renderList();
+    } catch (e) { console.warn(e); C.toast("Não foi possível buscar agora."); }
+    return;
+  }
   let q = null;
   const dg = txt.replace(/\D/g, "");
   if (dg.length >= 8) q = FS.query(col, FS.where("telefones", "array-contains", dg.replace(/^55(?=\d{10,11}$)/, "")), FS.limit(30));
@@ -251,7 +275,7 @@ function renderList(loading, emptyMsg){
   const list = $("rList"); list.innerHTML = "";
   if (loading) { const e = el("div", "empty"); e.style.gridColumn = "1/-1"; e.append(el("strong", null, "Carregando…")); list.append(e); return; }
   let arr = tab === "buscar" ? items.slice() : items.filter(noSeg);
-  if (tab === "hoje") arr = arr.filter(it => ABERTAS.includes(it.etapa) || it.etapa === "ENTREGUE");
+  if (tab === "hoje") { const t0 = C.todayStr(); arr = arr.filter(it => (ABERTAS.includes(it.etapa) || it.etapa === "ENTREGUE") && it.followup && it.followup <= t0); }
   if (!arr.length) {
     const e = el("div", "empty"); e.style.gridColumn = "1/-1";
     const msgs = { hoje: ["Nada para hoje", "Separe o seu lote do dia no quadro acima para começar."], interessados: ["Nenhum interessado ainda", "Quem responder que quer ver a prévia aparece aqui."], entregas: ["Nenhuma entrega pendente", "Os kits pagos aparecem aqui, separados por cidade e bairro."], incompletos: ["Nenhum cadastro incompleto", "Quem não tiver colégio, ano, nome do aluno, responsável ou telefone aparece aqui para completar."], buscar: ["Nada encontrado", emptyMsg || "Tente outro nome ou telefone."] };
@@ -496,17 +520,22 @@ async function refreshStats(){
   const today = C.todayStr(), mes = today.slice(0, 8) + "01", Y = ANO();
   const set = (id, v) => { const x = $(id); if (x) x.textContent = v; };
   try {
-    const [h, i, m] = await Promise.all([
+    const lf = seg === "lf";
+    const [h, i, m] = await Promise.all(lf ? [
+      FS.getDocs(FS.query(col, ...baseLF(), FS.where("etapa", "in", ABERTAS), FS.limit(300))),
+      FS.getDocs(FS.query(col, ...baseLF(), FS.where("etapa", "==", "INTERESSADO"), FS.limit(300))),
+      FS.getDocs(FS.query(col, ...baseLF(), FS.where("etapa", "in", ["PAGO", "ENTREGUE"]), FS.limit(1000)))
+    ] : [
       FS.getDocs(FS.query(col, FS.where("followup", "<=", today), FS.limit(300))),
       FS.getDocs(FS.query(col, FS.where("etapa", "==", "INTERESSADO"), FS.limit(300))),
       FS.getDocs(FS.query(col, FS.where("pagoEm", ">=", mes), FS.limit(500)))
     ]);
     const docs = s0 => s0.docs.map(d => d.data()).filter(noSeg);
-    set("rsHoje", docs(h).filter(x => ABERTAS.includes(x.etapa)).length);
+    set("rsHoje", docs(h).filter(x => ABERTAS.includes(x.etapa) && x.followup && x.followup <= today).length);
     set("rsInt", docs(i).length);
-    set("rsMes", C.money(docs(m).reduce((a, x) => a + (Number(x.valor) || 0), 0)));
+    set("rsMes", C.money(docs(m).filter(x => (x.pagoEm || "") >= mes).reduce((a, x) => a + (Number(x.valor) || 0), 0)));
     // Fila: conta por ano (só filtros de igualdade, não precisa de índice extra no Firebase)
-    const anos = seg === "lf" ? [Y, Y + 1] : anosRepasse();
+    const anos = seg === "lf" ? [Y] : anosRepasse();
     const cs = await Promise.all(anos.map(a => FS.getCountFromServer(FS.query(col, FS.where("etapa", "==", "NA FILA"), FS.where("ano", "==", a)))));
     set("rsFila", cs.reduce((a, c) => a + c.data().count, 0));
   } catch (e) { console.warn(e); }
@@ -521,7 +550,7 @@ const numeroSeg = () => (seg === "lf" ? C.P.lfNumero : C.P.repNumero) || "";
 async function refreshLote(){
   const lim = limiteSeg();
   try {
-    const c = await FS.getCountFromServer(FS.query(col, FS.where("resp", "==", C.me), FS.where("separadoEm", "==", C.todayStr()), FS.where("separadoSeg", "==", seg)));
+    const c = await FS.getCountFromServer(FS.query(col, FS.where("resp", "==", C.me), FS.where("separadoEm", "==", C.todayStr()), FS.where("separadoSeg", "==", seg), ...(seg === "lf" ? baseLF() : [])));
     const n = c.data().count, falta = Math.max(0, lim - n);
     $("rLoteTxt").textContent = n ? ` ${n} de ${lim} separados hoje.` + (falta ? ` Ainda pode separar ${falta}.` : " Lote completo ✓") : ` Separe até ${lim} contatos novos hoje.`;
     $("rLoteBtn").disabled = !falta; $("rLoteBtn").textContent = falta ? `Separar ${falta} contato${falta > 1 ? "s" : ""}` : "Lote completo";
@@ -532,7 +561,7 @@ async function refreshLote(){
 async function separarLote(){
   let falta = Number($("rLoteBtn").dataset.falta || 0); if (!falta || !C.me) return;
   const esc = $("rLoteEscola").value;
-  const anos = seg === "lf" ? [ANO(), ANO() + 1] : anosRepasse(); // Repasse: do ano mais recente para o mais antigo
+  const anos = seg === "lf" ? [ANO()] : anosRepasse(); // Repasse: do ano mais recente para o mais antigo
   $("rLoteBtn").disabled = true;
   try {
     const pegos = [];
