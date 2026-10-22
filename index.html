@@ -39,6 +39,42 @@ body{background:var(--bg);color:var(--fg);font-family:var(--f-body);font-size:15
 .brand span{color:#e0525b}
 .brand img{width:30px;height:30px;border-radius:7px;vertical-align:middle;margin-right:8px}
 .who{font-size:.85rem;opacity:.85;white-space:nowrap}
+.topbar .back{padding-inline:10px}
+.view{display:flex;flex-direction:column;gap:16px}
+.vhead{display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap}
+.vhead h2{font-family:var(--f-display);text-transform:uppercase;letter-spacing:.03em;margin:0;font-size:1.7rem;line-height:1}
+.hello{font-family:var(--f-display);font-weight:700;text-transform:uppercase;letter-spacing:.02em;margin:4px 0 0;font-size:2rem;line-height:1.05;text-wrap:balance}
+.tiles{display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:12px}
+.tile{position:relative;display:flex;flex-direction:column;gap:4px;background:var(--surface);border:1px solid var(--line);border-radius:14px;padding:16px 16px 14px;color:var(--fg);text-decoration:none;min-height:150px;transition:border-color .15s,transform .15s}
+.tile:hover{border-color:var(--accent)}
+.tile:active{transform:scale(.99)}
+.tile-ico{font-size:1.8rem;line-height:1}
+.tile b{font-family:var(--f-display);font-size:1.45rem;text-transform:uppercase;letter-spacing:.03em;margin-top:6px}
+.tile small{color:var(--muted);font-size:.9rem}
+.tile-n{margin-top:auto;padding-top:10px;font-weight:700;font-size:.9rem;color:var(--accent)}
+.tile.soon{opacity:.7}
+.tile.soon .tile-n{color:var(--muted)}
+.lote{display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;background:var(--surface);border:1px solid var(--line);border-left:4px solid var(--accent);border-radius:var(--r);padding:12px 14px}
+.lote b{display:block}
+.lote span{color:var(--muted);font-size:.9rem}
+.lote select,.rbusca select{font:inherit;font-size:15px;padding:7px 8px;border-radius:8px;border:1px solid var(--line);background:var(--bg);color:var(--fg);max-width:100%}
+.rbusca{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+@media (max-width:520px){.rbusca{grid-template-columns:1fr}}
+.grp{font-family:var(--f-display);text-transform:uppercase;letter-spacing:.04em;font-size:1.1rem;margin:8px 0 0;color:var(--muted)}
+.quem{display:flex;gap:6px;flex-wrap:wrap;align-items:center}
+.quem small{color:var(--muted);font-size:.8rem;font-weight:600}
+.chip-sm{padding:3px 9px;font-size:.82rem}
+.chk{display:inline-flex;gap:6px;align-items:center;font-size:.9rem;background:var(--chip);border-radius:6px;padding:5px 9px;cursor:pointer}
+.imp{display:flex;flex-direction:column;gap:8px}
+.panel.mock{max-width:720px}
+.drop{display:flex;flex-direction:column;gap:4px;align-items:center;text-align:center;border:2px dashed var(--line);border-radius:12px;padding:18px;cursor:pointer;color:var(--muted)}
+.drop b{color:var(--fg)}
+.drop.on{border-color:var(--accent);background:var(--accent-soft)}
+.thumbs{display:flex;gap:8px;flex-wrap:wrap}
+.thumb{border:1px solid var(--line);background:var(--surface);color:var(--fg);border-radius:8px;padding:4px;display:flex;flex-direction:column;align-items:center;gap:2px}
+.thumb canvas{width:64px;height:64px;border-radius:4px}
+.thumb small{font-size:.7rem;color:var(--muted)}
+.mock-cv{width:100%;max-width:100%;height:auto;border-radius:8px;border:1px solid var(--line);background:var(--chip)}
 .ulist{display:flex;flex-direction:column;gap:8px}
 .urow{display:flex;gap:8px;align-items:center;justify-content:space-between;flex-wrap:wrap;border:1px solid var(--line);border-radius:8px;padding:8px 10px}
 .urow .u{min-width:0;overflow-wrap:anywhere}
@@ -147,11 +183,11 @@ details.guide summary{cursor:pointer;font-family:var(--f-display);font-weight:70
 <!-- App -->
 <div id="viewApp" hidden>
   <div class="topbar"><div class="topbar-in">
+    <button class="btn back" id="btnBack" type="button" hidden aria-label="Voltar para o início">‹ Início</button>
     <p class="brand"><img src="icons/icon-192.png" alt="">Z7 <span>Studio</span></p>
     <span class="who" id="btnMe"></span>
     <button class="btn" id="btnTeam" type="button" hidden>Equipe</button>
     <button class="btn" id="btnPrices" type="button" aria-label="Ajustes">⚙️</button>
-    <button class="btn btn-primary" id="btnNew" type="button">+ Novo lead</button>
   </div></div>
 
   <div class="wrap">
@@ -161,30 +197,76 @@ details.guide summary{cursor:pointer;font-family:var(--f-display);font-weight:70
       <button class="btn btn-sm btn-primary" id="btnPush" type="button">Ativar</button>
     </div>
 
-    <details class="guide" id="guide">
-      <summary>Como usar (2 minutos por dia)</summary>
-      <ol>
-        <li><b>Chegou alguém novo no WhatsApp pedindo orçamento?</b> Toque em <b>+ Novo lead</b>, coloque nome, telefone, serviço e origem.</li>
-        <li><b>Cada cartão mostra o "Próximo passo"</b> com a mensagem já escrita. Toque em <b>Abrir no WhatsApp</b>, revise e envie.</li>
-        <li><b>Depois de enviar, toque em "Enviei ✓"</b>. O app avança a etapa e agenda sozinho o próximo contato.</li>
-        <li><b>Vão responder um cliente?</b> Ao abrir o WhatsApp pelo app (ou tocar em <b>Estou respondendo</b>), o outro celular vê "Fulano está respondendo". O aviso some ao tocar em <b>Enviei</b>, em <b>Liberar</b>, ou sozinho em 30 minutos.</li>
-        <li><b>Todo dia às 9h chega a notificação</b> com os contatos do dia. Os cartões vermelhos (atrasados) e laranja (hoje) aparecem primeiro.</li>
-        <li><b>Fechou?</b> Toque em <b>Fechou</b> e coloque o valor. <b>Não respondeu depois do 3º follow-up?</b> O "Enviei" já move para <b>Perdido</b>.</li>
-      </ol>
-    </details>
-
-    <section class="stats" aria-label="Resumo">
-      <div class="stat late"><b id="sLate">0</b><small>Atrasados</small></div>
-      <div class="stat today"><b id="sToday">0</b><small>Para hoje</small></div>
-      <div class="stat"><b id="sOpen">0</b><small>Em negociação</small></div>
-      <div class="stat won"><b id="sWon">R$ 0</b><small>Fechado no mês</small></div>
+    <!-- Início -->
+    <section id="viewHome" class="view" hidden>
+      <h1 class="hello" id="hello">Bom dia!</h1>
+      <div class="tiles">
+        <a class="tile" href="#funil">
+          <span class="tile-ico" aria-hidden="true">🎯</span>
+          <b>Funil de vendas</b>
+          <small>Leads novos do WhatsApp, propostas e follow-ups</small>
+          <span class="tile-n" id="tFunil"></span>
+        </a>
+        <a class="tile" href="#repasse">
+          <span class="tile-ico" aria-hidden="true">🖼️</span>
+          <b>Repasse</b>
+          <small>Kit quadro + porta-retratos para quem já fotografou</small>
+          <span class="tile-n" id="tRepasse"></span>
+        </a>
+        <a class="tile soon" href="#agenda">
+          <span class="tile-ico" aria-hidden="true">📅</span>
+          <b>Agendamento</b>
+          <small>Ensaios, formaturas e visitas do ano</small>
+          <span class="tile-n">Em breve</span>
+        </a>
+        <a class="tile soon" href="#colegios">
+          <span class="tile-ico" aria-hidden="true">🏫</span>
+          <b>Colégios</b>
+          <small>Visitas, motivo de não fechar e quando retornar</small>
+          <span class="tile-n">Em breve</span>
+        </a>
+      </div>
     </section>
 
-    <div class="chips" id="chips" role="toolbar" aria-label="Filtrar por etapa"></div>
-    <input class="search" id="q" type="search" placeholder="Buscar por nome, telefone ou nota" aria-label="Buscar">
+    <!-- Em breve -->
+    <section id="viewSoon" class="view" hidden>
+      <div class="empty"><strong id="soonTitle">Em breve</strong><span>Esse módulo é o próximo da fila. Vamos construir juntos.</span></div>
+    </section>
 
-    <section id="list" class="grid" aria-live="polite">
-      <div class="empty" style="grid-column:1/-1"><strong>Carregando seus leads…</strong></div>
+    <!-- Funil de vendas -->
+    <section id="viewFunil" class="view" hidden>
+      <div class="vhead"><h2>Funil de vendas</h2><button class="btn btn-primary" id="btnNew" type="button">+ Novo lead</button></div>
+
+      <details class="guide" id="guide">
+        <summary>Como usar (2 minutos por dia)</summary>
+        <ol>
+          <li><b>Chegou alguém novo no WhatsApp pedindo orçamento?</b> Toque em <b>+ Novo lead</b>, coloque nome, telefone, serviço e origem.</li>
+          <li><b>Cada cartão mostra o "Próximo passo"</b> com a mensagem já escrita. Toque em <b>Abrir no WhatsApp</b>, revise e envie.</li>
+          <li><b>Depois de enviar, toque em "Enviei ✓"</b>. O app avança a etapa e agenda sozinho o próximo contato.</li>
+          <li><b>Vão responder um cliente?</b> Ao abrir o WhatsApp pelo app (ou tocar em <b>Estou respondendo</b>), o outro aparelho vê "Fulano está respondendo". O aviso some ao tocar em <b>Enviei</b>, em <b>Liberar</b>, ou sozinho em 30 minutos.</li>
+          <li><b>Todo dia às 9h chega a notificação</b> com os contatos do dia. Os cartões vermelhos (atrasados) e laranja (hoje) aparecem primeiro.</li>
+          <li><b>Fechou?</b> Toque em <b>Fechou</b> e coloque o valor. <b>Não respondeu depois do 3º follow-up?</b> O "Enviei" já move para <b>Perdido</b>.</li>
+        </ol>
+      </details>
+
+      <section class="stats" aria-label="Resumo">
+        <div class="stat late"><b id="sLate">0</b><small>Atrasados</small></div>
+        <div class="stat today"><b id="sToday">0</b><small>Para hoje</small></div>
+        <div class="stat"><b id="sOpen">0</b><small>Em negociação</small></div>
+        <div class="stat won"><b id="sWon">R$ 0</b><small>Fechado no mês</small></div>
+      </section>
+
+      <div class="chips" id="chips" role="toolbar" aria-label="Filtrar por etapa"></div>
+      <input class="search" id="q" type="search" placeholder="Buscar por nome, telefone ou nota" aria-label="Buscar">
+
+      <section id="list" class="grid" aria-live="polite">
+        <div class="empty" style="grid-column:1/-1"><strong>Carregando seus leads…</strong></div>
+      </section>
+    </section>
+
+    <!-- Repasse (montado por js/repasse.js) -->
+    <section id="viewRepasse" class="view" hidden>
+      <div class="empty"><strong>Carregando o Repasse…</strong></div>
     </section>
   </div>
 </div>
@@ -246,6 +328,20 @@ details.guide summary{cursor:pointer;font-family:var(--f-display);font-weight:70
       <div class="field"><label for="pFotos">Fotos tratadas</label><input id="pFotos" inputmode="numeric"></div>
       <div class="field"><label for="pPrazo">Prazo de entrega (dias)</label><input id="pPrazo" inputmode="numeric"></div>
     </div>
+    <h3>Repasse (Kit Recordação)</h3>
+    <div class="row2">
+      <div class="field"><label for="pKit">Preço do kit (R$)</label><input id="pKit" inputmode="decimal" placeholder="200"></div>
+      <div class="field"><label for="pKitPromo">Preço promocional (R$)</label><input id="pKitPromo" inputmode="decimal" placeholder="opcional"></div>
+    </div>
+    <div class="row2">
+      <div class="field"><label for="pLote">Contatos novos por pessoa, por dia</label><input id="pLote" inputmode="numeric" placeholder="20"></div>
+      <div class="field"><label for="pEntrega">Como entregam</label><input id="pEntrega" maxlength="120" placeholder="em casa, na sua região, ou retirada no estúdio"></div>
+    </div>
+    <div class="row2">
+      <div class="field"><label for="pPix">Chave Pix</label><input id="pPix" maxlength="80" placeholder="CNPJ, e-mail ou telefone"></div>
+      <div class="field"><label for="pParc">Parcelas no cartão (até)</label><input id="pParc" inputmode="numeric" placeholder="3"></div>
+    </div>
+    <div class="field"><label for="pLink">Link de pagamento do cartão (InfinityPay)</label><input id="pLink" type="url" maxlength="300" placeholder="https://..."></div>
     <h3>Este aparelho</h3>
     <p class="hint" id="pushState"></p>
     <div class="quick">
@@ -291,7 +387,8 @@ details.guide summary{cursor:pointer;font-family:var(--f-display);font-weight:70
 <script type="module">
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
 import { getAuth, initializeAuth, onAuthStateChanged, signInWithEmailAndPassword, createUserWithEmailAndPassword, sendPasswordResetEmail, signOut, setPersistence, indexedDBLocalPersistence, inMemoryPersistence } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
-import { initializeFirestore, persistentLocalCache, persistentMultipleTabManager, collection, doc, onSnapshot, addDoc, updateDoc, setDoc, deleteDoc } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
+import { initializeFirestore, persistentLocalCache, persistentMultipleTabManager, collection, doc, onSnapshot, addDoc, updateDoc, setDoc, deleteDoc, query, where, getCountFromServer } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
+import * as FS from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
 import { getMessaging, getToken, onMessage, isSupported } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-messaging.js";
 
 const $ = (id) => document.getElementById(id);
@@ -571,7 +668,8 @@ $("form").addEventListener("submit", async e => {
 $("btnPrices").onclick = () => {
   $("pInd").value = P.individual || ""; $("pSinal").value = P.sinal || ""; $("pG36").value = P.g36 || ""; $("pG7").value = P.g7 || "";
   $("pFotos").value = P.fotos || ""; $("pPrazo").value = P.prazo || "";
-  ["pInd","pSinal","pG36","pG7","pFotos","pPrazo"].forEach(id => $(id).disabled = !isAdmin);
+  $("pKit").value = P.kitPreco || ""; $("pKitPromo").value = P.kitPromo || ""; $("pLote").value = P.loteDia || ""; $("pEntrega").value = P.entrega || ""; $("pPix").value = P.pix || ""; $("pParc").value = P.parcelas || ""; $("pLink").value = P.linkCartao || "";
+  ["pInd","pSinal","pG36","pG7","pFotos","pPrazo","pKit","pKitPromo","pLote","pEntrega","pPix","pParc","pLink"].forEach(id => $(id).disabled = !isAdmin);
   $("pSave").hidden = !isAdmin;
   $("pricesHint").textContent = isAdmin ? "Os valores entram automaticamente nas mensagens prontas." : "Só administradores mudam os preços.";
   renderPushState(); $("sheetPrices").hidden = false;
@@ -583,7 +681,9 @@ $("formPrices").addEventListener("submit", async e => {
   e.preventDefault();
   if (!isAdmin) return;
   const body = { individual: num($("pInd").value), sinal: num($("pSinal").value), g36: num($("pG36").value), g7: num($("pG7").value),
-    fotos: num($("pFotos").value) || 30, prazo: num($("pPrazo").value) || 15 };
+    fotos: num($("pFotos").value) || 30, prazo: num($("pPrazo").value) || 15,
+    kitPreco: num($("pKit").value), kitPromo: num($("pKitPromo").value), loteDia: num($("pLote").value) || 20, entrega: $("pEntrega").value.trim(),
+    pix: $("pPix").value.trim(), parcelas: num($("pParc").value), linkCartao: $("pLink").value.trim() };
   try {
     await setDoc(doc(db, "config", "app"), body, { merge: true });
     $("sheetPrices").hidden = true; toast("Preços salvos");
@@ -619,6 +719,50 @@ async function enablePush(fromClick){
 }
 function refreshPushToken(){ if (pushSupported() && Notification.permission === "granted") enablePush(false); }
 $("btnPush").onclick = () => enablePush(true);
+
+// ---------- navegação entre módulos ----------
+const VIEWS = { home: "viewHome", funil: "viewFunil", repasse: "viewRepasse", agenda: "viewSoon", colegios: "viewSoon" };
+let repasseMod = null, curView = "home";
+const ctx = {
+  db, FS, $, toast, mkBtn, money, num, digits, first, todayStr, addDays, fmtDate, hhmm, ds, pad, showNotice, handleErr,
+  get me(){ return me; }, get isAdmin(){ return isAdmin; }, get user(){ return user; }, get P(){ return P; }, team,
+  goHome(){ location.hash = "#home"; }
+};
+async function route(){
+  if (!user) return;
+  const r = (location.hash || "").slice(1);
+  const key = VIEWS[r] ? r : "home";
+  curView = key;
+  new Set(Object.values(VIEWS)).forEach(id => { $(id).hidden = true; });
+  $(VIEWS[key]).hidden = false;
+  $("btnBack").hidden = key === "home";
+  if (key === "agenda" || key === "colegios") $("soonTitle").textContent = key === "agenda" ? "Agendamento: em breve" : "Colégios: em breve";
+  if (key === "home") renderHome();
+  if (key === "repasse") {
+    try {
+      if (!repasseMod) { repasseMod = await import("./js/repasse.js"); repasseMod.init(ctx); }
+      repasseMod.show();
+    } catch (e) { console.warn(e); $("viewRepasse").innerHTML = '<div class="empty"><strong>Não foi possível abrir o Repasse</strong><span>Verifique a internet e tente de novo.</span></div>'; }
+  }
+  window.scrollTo(0, 0);
+}
+addEventListener("hashchange", route);
+$("btnBack").onclick = () => { location.hash = "#home"; };
+
+let repCount = { at: 0, n: null };
+function renderHome(){
+  const h = new Date().getHours();
+  $("hello").textContent = (h < 12 ? "Bom dia" : h < 18 ? "Boa tarde" : "Boa noite") + (me ? ", " + first(me) : "") + "!";
+  const st = leads.map(status), late = st.filter(s => s === "late").length, today = st.filter(s => s === "today").length;
+  $("tFunil").textContent = (late + today) ? `${late + today} para hoje` + (late ? ` · ${late} atrasado${late > 1 ? "s" : ""}` : "") : "Nada pendente hoje ✓";
+  if (Date.now() - repCount.at > 5 * 60000) {
+    repCount.at = Date.now();
+    getCountFromServer(query(collection(db, "repasse"), where("followup", "<=", todayStr())))
+      .then(c => { repCount.n = c.data().count; paintRep(); }).catch(() => {});
+  }
+  paintRep();
+}
+function paintRep(){ $("tRepasse").textContent = repCount.n == null ? "" : repCount.n ? `${repCount.n} para hoje` : "Nada pendente hoje ✓"; }
 
 // ---------- login ----------
 $("formLogin").addEventListener("submit", async e => {
@@ -696,7 +840,7 @@ function startData(){
       bootstrapped = true;
       setDoc(doc(db, "usuarios", em), { nome: DONOS[em] || em, papel: "admin", ativo: true, criadoEm: new Date().toISOString() }).catch(() => {});
     }
-    applyProfile(); render();
+    applyProfile(); render(); if (curView === "home") renderHome();
     if (!$("sheetTeam").hidden) renderTeam();
   }, err => { if (err.code === "permission-denied") showNotice("Este e-mail não tem acesso ao app. Peça para um administrador cadastrar você."); }));
   unsub.push(onSnapshot(doc(db, "config", "app"), s => {
@@ -704,14 +848,14 @@ function startData(){
     render();
   }, () => {}));
   unsub.push(onSnapshot(collection(db, "leads"), snap => {
-    leads = snap.docs.map(d => Object.assign({ id: d.id }, d.data())); render();
+    leads = snap.docs.map(d => Object.assign({ id: d.id }, d.data())); render(); if (curView === "home") renderHome();
   }, err => showNotice(err.code === "permission-denied" ? "Este e-mail não tem acesso ao funil. Fale com o Adriano." : "A conexão caiu. Feche e abra o app de novo.")));
 }
 
 onAuthStateChanged(auth, u => {
   user = u;
   $("viewLogin").hidden = !!u; $("viewApp").hidden = !u;
-  if (u) { startData(); renderPushBanner(); refreshPushToken(); }
+  if (u) { startData(); renderPushBanner(); refreshPushToken(); route(); }
   else { unsub.forEach(f => f()); unsub = []; leads = []; }
 });
 

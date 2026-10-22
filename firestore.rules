@@ -23,6 +23,8 @@ service cloud.firestore {
       allow read: if membro();
       allow write: if admin();
     }
+    // Repasse (Kit Recordação)
+    match /repasse/{id} { allow read, write: if membro(); }
     // Aparelhos que recebem notificação
     match /tokens/{token} { allow read, write: if membro(); }
   }

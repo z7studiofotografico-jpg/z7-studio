@@ -22,6 +22,10 @@ const hoje = new Intl.DateTimeFormat("en-CA", { timeZone: "America/Sao_Paulo" })
 
 const leadsSnap = await db.collection("leads").where("etapa", "in", OPEN).get();
 const vencidos = leadsSnap.docs.map((d) => d.data()).filter((l) => l.followup && l.followup <= hoje);
+// Repasse: contatos com data vencida (só as etapas em andamento).
+const REP_ABERTAS = ["SEPARADO", "CONTATADO", "INTERESSADO"];
+const repSnap = await db.collection("repasse").where("followup", "<=", hoje).get();
+const repVencidos = repSnap.docs.map((d) => d.data()).filter((r) => REP_ABERTAS.includes(r.etapa));
 const tokensSnap = await db.collection("tokens").get();
 console.log(`Hoje ${hoje}: ${vencidos.length} lead(s) com contato vencido, ${tokensSnap.size} aparelho(s).`);
 
@@ -36,16 +40,20 @@ for (const t of tokensSnap.docs) {
   const perfil = usuarios.get(String(t.get("email") || "").toLowerCase());
   if (perfil && perfil.ativo === false) continue;
   const meus = vencidos.filter((l) => !l.resp || !nome || l.resp === nome);
+  const meusRep = repVencidos.filter((r) => !r.resp || !nome || r.resp === nome);
   let title, body;
   if (TESTE) {
     title = "Z7 Studio: notificação de teste ✅";
     body = `Funcionando neste aparelho${nome ? " de " + nome : ""}. ${meus.length} contato(s) para hoje.`;
   } else {
-    if (!meus.length) continue;
-    const atrasados = meus.filter((l) => l.followup < hoje).length;
-    const nomes = meus.slice(0, 4).map((l) => primeiro(l.nome)).join(", ") + (meus.length > 4 ? ` e mais ${meus.length - 4}` : "");
-    title = `Bom dia${nome ? ", " + nome : ""}! ${meus.length} contato${meus.length > 1 ? "s" : ""} para hoje`;
-    body = nomes + (atrasados ? ` · ${atrasados} atrasado${atrasados > 1 ? "s" : ""}` : "");
+    if (!meus.length && !meusRep.length) continue;
+    const total = meus.length + meusRep.length;
+    const atrasados = meus.filter((l) => l.followup < hoje).length + meusRep.filter((r) => r.followup < hoje).length;
+    const partes = [];
+    if (meus.length) partes.push(`Funil: ${meus.slice(0, 3).map((l) => primeiro(l.nome)).join(", ")}${meus.length > 3 ? ` e mais ${meus.length - 3}` : ""}`);
+    if (meusRep.length) partes.push(`Repasse: ${meusRep.length}`);
+    title = `Bom dia${nome ? ", " + primeiro(nome) : ""}! ${total} contato${total > 1 ? "s" : ""} para hoje`;
+    body = partes.join(" · ") + (atrasados ? ` · ${atrasados} atrasado${atrasados > 1 ? "s" : ""}` : "");
   }
   try {
     await messaging.send({
