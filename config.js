@@ -1,4 +1,4 @@
-// Configuração do Firebase do Z7 Funil.
+// Configuração do Firebase do Z7 Studio.
 // Estes valores NÃO são secretos: o acesso aos dados é protegido pelas regras do Firestore
 // e pelo login de e-mail e senha.
 self.Z7_CONFIG = {

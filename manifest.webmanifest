@@ -1,7 +1,7 @@
 {
-  "name": "Z7 Funil",
-  "short_name": "Z7 Funil",
-  "description": "Funil de vendas do Z7 Studio: leads, follow-ups e mensagens prontas para o WhatsApp.",
+  "name": "Z7 Studio",
+  "short_name": "Z7 Studio",
+  "description": "App do Z7 Studio: funil de vendas, follow-ups e mensagens prontas para o WhatsApp.",
   "lang": "pt-BR",
   "start_url": "./",
   "scope": "./",

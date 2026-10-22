@@ -1,4 +1,4 @@
-// Lembrete diário do Z7 Funil.
+// Lembrete diário do Z7 Studio.
 // Roda no GitHub Actions às 9h (horário de Brasília): lê os leads com contato vencido
 // e manda uma notificação para cada aparelho cadastrado, com os leads daquela pessoa.
 import { initializeApp, cert } from "firebase-admin/app";
@@ -38,7 +38,7 @@ for (const t of tokensSnap.docs) {
   const meus = vencidos.filter((l) => !l.resp || !nome || l.resp === nome);
   let title, body;
   if (TESTE) {
-    title = "Z7 Funil: notificação de teste ✅";
+    title = "Z7 Studio: notificação de teste ✅";
     body = `Funcionando neste aparelho${nome ? " de " + nome : ""}. ${meus.length} contato(s) para hoje.`;
   } else {
     if (!meus.length) continue;
