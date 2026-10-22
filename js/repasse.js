@@ -46,7 +46,8 @@ function ofertaTxt(it){
   if (P.kitCartao) t += ` ou ${C.money(P.kitCartao)} no cartão${P.parcelas ? ` (até ${P.parcelas}x)` : ""}`;
   return t;
 }
-function sextaTxt(){ const d = new Date(); const add = (5 - d.getDay() + 7) % 7 || 7; d.setDate(d.getDate() + add); return C.pad(d.getDate()) + "/" + C.pad(d.getMonth() + 1); }
+// Prazo da última oferta: a próxima sexta que esteja a pelo menos 3 dias de hoje.
+function sextaTxt(){ const d = new Date(); let add = (5 - d.getDay() + 7) % 7; if (add < 3) add += 7; d.setDate(d.getDate() + add); return C.pad(d.getDate()) + "/" + C.pad(d.getMonth() + 1); }
 function entregaTxt(){ return C.P.entrega || "em casa ou para retirada no estúdio"; }
 function status(it){
   if (it.etapa === "PAGO" || it.etapa === "ENTREGUE") return "won";
@@ -103,7 +104,7 @@ function passo(it, c){
           then: { etapa: "INTERESSADO", days: 2, countI: true } };
       }
       if (tI === 1) return C.P.kitFinal && segDe(it) === "rep" ? { title: "Última condição (só para quem já viu a prévia)",
-        msg: `Oi${cn ? ", " + cn : ""}! Estamos organizando os kits que ainda estão aqui no estúdio e consegui uma condição especial para o ${c && c.tipo === "Formando" ? "seu" : "de " + F}: ${C.money(C.P.kitFinal)} no Pix, válida até ${sextaTxt()}. Depois disso volta ao valor normal. Quer que eu separe? 😊`,
+        msg: `Oi${cn ? ", " + cn : ""}! Estamos organizando os kits que ainda estão aqui no estúdio e consegui uma condição especial para o ${c && c.tipo === "Formando" ? "seu kit" : "kit de " + F}: ${C.money(C.P.kitFinal)} no Pix${C.P.linkCartaoFinal ? ` ou no cartão${C.P.parcelas ? ` (até ${C.P.parcelas}x)` : ""}` : ""}, válida até ${sextaTxt()}. Depois disso volta ao valor normal. Quer que eu separe? 😊`,
         then: { etapa: "INTERESSADO", days: 3, countI: true } } : { title: "Follow-up da prévia",
         msg: `Oi${cn ? ", " + cn : ""}! Conseguiu ver a prévia do quadro? Se quiser, separo o seu hoje e já combinamos a entrega 😊`,
         then: { etapa: "INTERESSADO", days: 3, countI: true } };
@@ -370,9 +371,13 @@ function card(it){
     if (ns.mockup || it.etapa === "INTERESSADO") row.append(C.mkBtn("🖼️ Prévia", "", () => openMockup({ nome: title(it.nome), escola: title(it.escola), preco: precoTxt(it) })));
     if (it.etapa === "INTERESSADO") row.append(C.mkBtn("📷 Fotos para escolher", "", () => openMockup({ nome: title(it.nome), escola: title(it.escola), preco: precoTxt(it), modo: "escolha" })));
     if (it.etapa === "INTERESSADO" && d) { const a3 = el("a", "btn btn-sm", "✍️ Pedir a escolha"); a3.href = "https://wa.me/" + d + "?text=" + encodeURIComponent(textoEscolha(F0)); a3.target = "_blank"; a3.rel = "noopener"; row.append(a3); }
-    if (it.etapa === "INTERESSADO" && C.P.linkCartao && d) {
-      const lm = `Para pagar no cartão (em até ${C.P.parcelas || "algumas"} vezes), é só usar este link seguro da InfinityPay:\n${C.P.linkCartao}\nDepois me manda o comprovante por aqui 😊 No Pix, a chave é ${C.P.pix || "[chave Pix]"}.`;
-      const a2 = el("a", "btn btn-sm", "💳 Mandar link de pagamento"); a2.href = "https://wa.me/" + d + "?text=" + encodeURIComponent(lm); a2.target = "_blank"; a2.rel = "noopener"; row.append(a2);
+    // Depois que a última oferta foi enviada (Repasse), o link do cartão passa a ser o da última oferta.
+    const ultima = segDe(it) === "rep" && C.P.kitFinal && C.P.linkCartaoFinal && (it.tentInteresse || 0) >= 2;
+    const link = ultima ? C.P.linkCartaoFinal : (segDe(it) === "lf" ? (C.P.linkCartaoLF || C.P.linkCartao) : C.P.linkCartao);
+    const valCartao = ultima ? C.P.kitFinal : (segDe(it) === "lf" ? C.P.lfCartao : C.P.kitCartao);
+    if (it.etapa === "INTERESSADO" && link && d) {
+      const lm = `Para pagar no cartão${valCartao ? ` (${C.money(valCartao)}` + (C.P.parcelas ? `, em até ${C.P.parcelas}x sem juros)` : ")") : C.P.parcelas ? ` (em até ${C.P.parcelas}x sem juros)` : ""}, é só usar este link seguro da InfinitePay:\n${link}\nDepois me manda o comprovante por aqui 😊${C.P.pix ? ` No Pix${ultima ? ` (${C.money(C.P.kitFinal)})` : ""}, a chave é ${C.P.pix}.` : ""}`;
+      const a2 = el("a", "btn btn-sm", ultima ? "💳 Link da última oferta" : "💳 Mandar link de pagamento"); a2.href = "https://wa.me/" + d + "?text=" + encodeURIComponent(lm); a2.target = "_blank"; a2.rel = "noopener"; row.append(a2);
     }
     if (ns.then) row.append(C.mkBtn("Enviei ✓", "btn-ok", () => {
       const p = { etapa: ns.then.etapa, followup: ns.then.days < 0 ? null : C.addDays(ns.then.days), atendendo: null, ultimo: { por: C.me || "—", em: new Date().toISOString(), para: escolhido ? escolhido.tipo : "" } };
