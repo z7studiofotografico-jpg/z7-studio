@@ -7,7 +7,7 @@ let C, FS, db, col;
 let tab = "hoje", items = [], unsubList = null, mounted = false, meta = { escolas: {} };
 const $ = (id) => document.getElementById(id);
 
-export const ETAPAS = ["NA FILA", "SEPARADO", "CONTATADO", "INTERESSADO", "PAGO", "ENTREGUE", "NÃO QUER", "SEM CONTATO"];
+export const ETAPAS = ["INCOMPLETO", "NA FILA", "SEPARADO", "CONTATADO", "INTERESSADO", "PAGO", "ENTREGUE", "NÃO QUER", "SEM CONTATO"];
 const ABERTAS = ["SEPARADO", "CONTATADO", "INTERESSADO"];
 
 // ---------- utilidades ----------
@@ -31,6 +31,18 @@ function lockInfo(it){
 function contatoPadrao(it){
   const cs = it.contatos || [];
   return cs.find(c => c.tipo === "Mãe") || cs.find(c => c.tipo === "Pai") || cs.find(c => c.tipo === "Formando") || cs[0] || null;
+}
+
+// O que não pode faltar para entrar na fila: colégio, ano, aluno, nome de um responsável e 1 telefone.
+function faltando(d){
+  const f = [];
+  if (!String(d.escola || "").trim()) f.push("colégio");
+  if (!d.ano) f.push("ano");
+  if (!String(d.nome || "").trim()) f.push("nome do aluno");
+  const cs = d.contatos || [];
+  if (!cs.some(c => c.tipo !== "Formando" && String(c.nome || "").trim()) && !String(d.responsavel || "").trim()) f.push("responsável");
+  if (!cs.length) f.push("telefone");
+  return f;
 }
 
 // ---------- mensagens prontas ----------
@@ -153,7 +165,9 @@ function mount(){
 
 function renderChips(){
   const c = $("rChips"); c.innerHTML = "";
-  [["hoje", "Para hoje"], ["interessados", "Interessados"], ["entregas", "Entregas"], ["buscar", "Buscar"]].forEach(([k, t]) => {
+  const tabs = [["hoje", "Para hoje"], ["interessados", "Interessados"], ["entregas", "Entregas"], ["buscar", "Buscar"]];
+  if (C.isAdmin) tabs.push(["incompletos", "Incompletos"]);
+  tabs.forEach(([k, t]) => {
     const b = el("button", "chip", t); b.type = "button"; b.setAttribute("aria-pressed", String(tab === k));
     b.onclick = () => openTab(k); c.append(b);
   });
@@ -169,6 +183,7 @@ function openTab(k){
   if (k === "hoje") q = FS.query(col, FS.where("followup", "<=", today), FS.orderBy("followup"), FS.limit(150));
   if (k === "interessados") q = FS.query(col, FS.where("etapa", "==", "INTERESSADO"), FS.limit(200));
   if (k === "entregas") q = FS.query(col, FS.where("etapa", "==", "PAGO"), FS.limit(300));
+  if (k === "incompletos") q = FS.query(col, FS.where("etapa", "==", "INCOMPLETO"), FS.limit(200));
   if (q) unsubList = FS.onSnapshot(q, snap => { items = snap.docs.map(d => Object.assign({ id: d.id }, d.data())); renderList(); },
     err => { console.warn(err); C.showNotice("Não foi possível carregar o Repasse. Verifique a internet."); });
   if (k === "buscar") { $("rQ").focus(); buscar(); }
@@ -197,7 +212,7 @@ function renderList(loading, emptyMsg){
   if (tab === "hoje") arr = arr.filter(it => ABERTAS.includes(it.etapa) || it.etapa === "ENTREGUE");
   if (!arr.length) {
     const e = el("div", "empty"); e.style.gridColumn = "1/-1";
-    const msgs = { hoje: ["Nada para hoje", "Separe o seu lote do dia no quadro acima para começar."], interessados: ["Nenhum interessado ainda", "Quem responder que quer ver a prévia aparece aqui."], entregas: ["Nenhuma entrega pendente", "Os kits pagos aparecem aqui, separados por cidade e bairro."], buscar: ["Nada encontrado", emptyMsg || "Tente outro nome ou telefone."] };
+    const msgs = { hoje: ["Nada para hoje", "Separe o seu lote do dia no quadro acima para começar."], interessados: ["Nenhum interessado ainda", "Quem responder que quer ver a prévia aparece aqui."], entregas: ["Nenhuma entrega pendente", "Os kits pagos aparecem aqui, separados por cidade e bairro."], incompletos: ["Nenhum cadastro incompleto", "Quem não tiver colégio, ano, nome do aluno, responsável ou telefone aparece aqui para completar."], buscar: ["Nada encontrado", emptyMsg || "Tente outro nome ou telefone."] };
     const [a, b] = msgs[tab] || ["Nada aqui", ""]; e.append(el("strong", null, a), el("span", null, emptyMsg || b)); list.append(e); return;
   }
   if (tab === "hoje") { const rank = { late: 0, today: 1, later: 2, none: 3, won: 4 }; arr.sort((a, b) => rank[status(a)] - rank[status(b)] || (a.followup || "").localeCompare(b.followup || "")); }
@@ -242,6 +257,7 @@ function card(it){
   }
   const tels = el("div", "phone"); tels.textContent = cs.map(c => `${c.tipo}: ${c.tel}`).join(" · ") || "Sem telefone"; e.append(tels);
 
+  if (it.etapa === "INCOMPLETO") e.append(el("p", "wait", "Falta: " + (faltando(it).join(", ") || "conferir dados")));
   const fu = el("div", "fu " + (s === "late" ? "late" : s === "today" ? "today" : it.followup ? "" : "none"));
   if (ABERTAS.includes(it.etapa)) fu.textContent = it.followup ? (s === "late" ? "Atrasado desde " + C.fmtDate(it.followup) : s === "today" ? "Contato para hoje" : "Próximo contato: " + C.fmtDate(it.followup)) : "Sem data de contato";
   else if (it.etapa === "PAGO") {
@@ -249,7 +265,7 @@ function card(it){
     fu.textContent = "Pago" + (it.pagoEm ? " em " + C.fmtDate(it.pagoEm) : "") + (ret ? " · retirada no estúdio" : " · entrega em casa") + (it.entregaData ? " em " + C.fmtDate(it.entregaData) : " · data a combinar") + (!ret && !it.enderecoConfirmado ? " · ⚠️ endereço não confirmado" : "");
   }
   else if (it.etapa === "ENTREGUE") fu.textContent = "Entregue" + (it.entregueEm ? " em " + C.fmtDate(it.entregueEm) : "");
-  else fu.textContent = it.etapa === "NA FILA" ? "Ainda na fila" : "Encerrado";
+  else fu.textContent = it.etapa === "NA FILA" ? "Ainda na fila" : it.etapa === "INCOMPLETO" ? "Fora da fila até completar" : "Encerrado";
   e.append(fu);
 
   if (it.etapa === "PAGO" && !(it.entregaTipo || "").startsWith("Retirada")) {
@@ -300,6 +316,7 @@ function card(it){
   paintNext();
 
   const act = el("div", "actions");
+  if (it.etapa === "INCOMPLETO" || C.isAdmin) act.append(C.mkBtn(it.etapa === "INCOMPLETO" ? "Completar dados" : "Editar dados", it.etapa === "INCOMPLETO" ? "btn-primary" : "", () => openDados(it)));
   if (it.etapa === "NA FILA") act.append(C.mkBtn("Separar para mim", "btn-primary", () => save(it, { etapa: "SEPARADO", resp: C.me, separadoEm: C.todayStr(), followup: C.todayStr() }, "Separado para hoje")));
   if (ABERTAS.includes(it.etapa) && !li) act.append(C.mkBtn("✋ Estou respondendo", "", () => claim(it)));
   if (it.etapa === "SEPARADO" || it.etapa === "CONTATADO") act.append(C.mkBtn("Quer ver a prévia ✓", "btn-ok", () => save(it, { etapa: "INTERESSADO", followup: C.todayStr(), tentInteresse: 0 }, "Ótimo! Agora mande a prévia")));
@@ -377,6 +394,40 @@ function entregaCampos(p, it){
     return o;
   };
   return box;
+}
+function openDados(it){
+  sheet("Dados do formando", (p, close) => {
+    const mk = (v, ph) => { const i = el("input"); i.value = v || ""; i.placeholder = ph || ""; i.maxLength = 120; return i; };
+    const nome = mk(title(it.nome)), escola = mk(title(it.escola)), ano = mk(it.ano || "", "2025"); ano.inputMode = "numeric";
+    const r1 = el("div", "row2"); r1.append(field("Colégio", escola), field("Ano", ano));
+    p.append(field("Nome do aluno", nome), r1);
+    p.append(el("h3", null, "Contatos"));
+    const linhas = [];
+    const lista = el("div", "imp"); p.append(lista);
+    const addLinha = (c = { tipo: "Mãe", nome: "", tel: "" }) => {
+      const tp = el("select"); ["Mãe", "Pai", "Responsável", "Formando", "Telefone", "Outro"].forEach(x => { const o = el("option", null, x); o.value = x; tp.append(o); }); tp.value = c.tipo || "Outro";
+      const nm = mk(title(c.nome), "nome"); const tl = mk(c.tel, "21 99999-9999"); tl.inputMode = "tel";
+      const row = el("div", "row3"); row.append(field("Quem", tp), field("Nome", nm), field("WhatsApp", tl));
+      lista.append(row); linhas.push({ tp, nm, tl });
+    };
+    (it.contatos && it.contatos.length ? it.contatos : [{}]).forEach(addLinha);
+    const add = C.mkBtn("+ Adicionar contato", "", () => addLinha()); p.append(add);
+    const erro = el("p", "err"); erro.hidden = true; p.append(erro);
+    p.append(actions(close, "Salvar"));
+    p.addEventListener("submit", ev => {
+      ev.preventDefault();
+      const cs = []; const vistos = new Set();
+      linhas.forEach(({ tp, nm, tl }) => {
+        const d = tl.value.replace(/\D/g, "").replace(/^55(?=\d{10,11}$)/, "");
+        if (d.length >= 10 && d.length <= 11 && !vistos.has(d)) { vistos.add(d); cs.push({ tipo: tp.value, nome: nm.value.trim(), tel: d }); }
+      });
+      const patch = { nome: nome.value.trim(), nomeBusca: norm(nome.value), escola: escola.value.trim(), ano: Number(ano.value) || null, contatos: cs, telefones: cs.map(c => c.tel) };
+      const falta = faltando(patch);
+      if (it.etapa === "INCOMPLETO" || it.etapa === "NA FILA") patch.etapa = falta.length ? "INCOMPLETO" : "NA FILA";
+      close();
+      save(it, patch, falta.length ? "Salvo. Ainda falta: " + falta.join(", ") : (it.etapa === "INCOMPLETO" ? "Completo! Entrou na fila ✅" : "Dados salvos"));
+    });
+  });
 }
 function openNotas(it){
   sheet("Notas", (p, close) => {
@@ -515,8 +566,12 @@ function openImport(){
           rows.push(linhaParaDoc(o, X));
         }
         out.innerHTML = "";
-        const semTel = rows.filter(r => !r.contatos.length).length;
-        out.append(el("p", null, `${rows.length} formandos encontrados${semTel ? ` (${semTel} sem telefone válido)` : ""}.`));
+        const incompletos = rows.filter(r => faltando(r).length);
+        out.append(el("p", null, `${rows.length} formandos encontrados: ${rows.length - incompletos.length} completos e ${incompletos.length} incompletos.`));
+        if (incompletos.length) {
+          const cont = {}; incompletos.forEach(r => faltando(r).forEach(f => { cont[f] = (cont[f] || 0) + 1; }));
+          out.append(el("p", "hint", "Os incompletos não entram na fila: ficam na aba Incompletos para vocês completarem. Falta " + Object.entries(cont).map(([f, n]) => `${f} em ${n}`).join(", ") + "."));
+        }
         const porStatus = {}; rows.forEach(r => { const k = r.statusOrig || "(vazio)"; porStatus[k] = (porStatus[k] || 0) + 1; });
         out.append(el("p", "hint", "Quais STATUS entram no Repasse? Desmarque quem não deve receber a oferta (por exemplo, quem já comprou o kit)."));
         const box = el("div", "quick");
@@ -546,7 +601,7 @@ function openImport(){
           let id = docId(d, i); while (ids.has(id)) id += "-" + i; ids.add(id);
           if (exist.has(id)) { atual++; return [id, Object.assign({}, d, { atualizadoEm: agora }), true]; }
           novos++; if (d.escola) escolas[d.escola] = (escolas[d.escola] || 0) + 1;
-          return [id, Object.assign({}, d, { etapa: d.contatos.length ? "NA FILA" : "SEM CONTATO", followup: null, tentativas: 0, tentInteresse: 0, resp: "", importadoEm: agora, atualizadoEm: agora }), false];
+          return [id, Object.assign({}, d, { etapa: faltando(d).length ? "INCOMPLETO" : "NA FILA", followup: null, tentativas: 0, tentInteresse: 0, resp: "", importadoEm: agora, atualizadoEm: agora }), false];
         });
         for (let i = 0; i < ops.length; i += 400) {
           const b = FS.writeBatch(db);
@@ -555,7 +610,8 @@ function openImport(){
           prog.textContent = `Importando… ${Math.min(i + 400, ops.length)} de ${ops.length}`;
         }
         await FS.setDoc(FS.doc(db, "config", "repasse_meta"), { escolas, importadoEm: agora }, { merge: true });
-        prog.textContent = `Pronto! ${novos} novos na fila${atual ? ` e ${atual} atualizados` : ""}.`;
+        const nInc = ops.filter(([, d, m]) => !m && d.etapa === "INCOMPLETO").length;
+        prog.textContent = `Pronto! ${novos - nInc} novos na fila${nInc ? `, ${nInc} na aba Incompletos` : ""}${atual ? ` e ${atual} atualizados` : ""}.`;
         C.toast("Planilha importada ✅");
         loadMeta(); refreshStats();
         const fechar = C.mkBtn("Fechar", "btn-primary", close); out.append(fechar);
