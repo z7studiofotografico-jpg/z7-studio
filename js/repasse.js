@@ -88,6 +88,8 @@ function passo(it, c){
       return encerra;
     }
     case "PAGO":
+      if (!it.entregaTipo || it.entregaTipo.startsWith("A combinar")) return { title: "Perguntar como prefere receber",
+        msg: `${cn || "Oi"}, pagamento confirmado, muito obrigado! 💛 Como você prefere receber o kit ${c && c.tipo === "Formando" ? "" : "de " + F + " "}?\n1️⃣ Entregamos na sua casa (me confirma o endereço completo)\n2️⃣ Você retira aqui no estúdio, no dia e horário que for melhor (Estrada Dr. Rufino Gonçalves Ferreira, 290, Centro, Nilópolis, seg. a sáb., das 9h às 19h)`, then: null };
       if ((it.entregaTipo || "").startsWith("Retirada")) {
         if (it.entregaData) return null;
         return { title: "Agendar a retirada no estúdio",
@@ -227,7 +229,7 @@ function renderList(loading, emptyMsg){
   }
   if (tab === "hoje") { const rank = { late: 0, today: 1, later: 2, none: 3, won: 4 }; arr.sort((a, b) => rank[status(a)] - rank[status(b)] || (a.followup || "").localeCompare(b.followup || "")); }
   if (tab === "entregas") {
-    const grpOf = it => (it.entregaTipo || "").startsWith("Retirada") ? "0 Retirada no estúdio" : "1 " + [title(it.endereco?.cidade || "Sem cidade"), title(it.endereco?.bairro || "Sem bairro")].join(" · ");
+    const grpOf = it => (!it.entregaTipo || it.entregaTipo.startsWith("A combinar")) ? "0 Falta combinar com o cliente" : it.entregaTipo.startsWith("Retirada") ? "1 Retirada no estúdio" : "2 " + [title(it.endereco?.cidade || "Sem cidade"), title(it.endereco?.bairro || "Sem bairro")].join(" · ");
     arr.sort((a, b) => grpOf(a).localeCompare(grpOf(b)) || (a.entregaData || "9").localeCompare(b.entregaData || "9"));
     let last = null;
     arr.forEach(it => {
@@ -271,14 +273,15 @@ function card(it){
   const fu = el("div", "fu " + (s === "late" ? "late" : s === "today" ? "today" : it.followup ? "" : "none"));
   if (ABERTAS.includes(it.etapa)) fu.textContent = it.followup ? (s === "late" ? "Atrasado desde " + C.fmtDate(it.followup) : s === "today" ? "Contato para hoje" : "Próximo contato: " + C.fmtDate(it.followup)) : "Sem data de contato";
   else if (it.etapa === "PAGO") {
-    const ret = (it.entregaTipo || "").startsWith("Retirada");
+    const ret = (it.entregaTipo || "").startsWith("Retirada"), comb = !it.entregaTipo || it.entregaTipo.startsWith("A combinar");
+    if (comb) fu.textContent = "Pago" + (it.pagoEm ? " em " + C.fmtDate(it.pagoEm) : "") + " · ⚠️ falta combinar entrega ou retirada"; else
     fu.textContent = "Pago" + (it.pagoEm ? " em " + C.fmtDate(it.pagoEm) : "") + (ret ? " · retirada no estúdio" : " · entrega em casa") + (it.entregaData ? " em " + C.fmtDate(it.entregaData) : " · data a combinar") + (!ret && !it.enderecoConfirmado ? " · ⚠️ endereço não confirmado" : "");
   }
   else if (it.etapa === "ENTREGUE") fu.textContent = "Entregue" + (it.entregueEm ? " em " + C.fmtDate(it.entregueEm) : "");
   else fu.textContent = it.etapa === "NA FILA" ? "Ainda na fila" : it.etapa === "INCOMPLETO" ? "Fora da fila até completar" : "Encerrado";
   e.append(fu);
 
-  if (it.etapa === "PAGO" && !(it.entregaTipo || "").startsWith("Retirada")) {
+  if (it.etapa === "PAGO" && (it.entregaTipo || "").startsWith("Entrega")) {
     const a = it.endereco || {};
     const end = [a.rua && (title(a.rua) + (a.numero ? ", " + a.numero : "")), a.complemento && title(a.complemento), title(a.bairro), title(a.cidade)].filter(Boolean).join(" · ");
     if (end) e.append(el("p", "notes", "📍 " + end));
@@ -382,8 +385,8 @@ function openEntrega(it){
 // Campos de entrega: tipo, data agendada e endereço (vem da planilha, mas precisa ser confirmado com o cliente).
 function entregaCampos(p, it){
   const box = el("div", "imp");
-  const en = el("select"); ["Entrega em casa", "Retirada no estúdio (agendada)"].forEach(x => { const o = el("option", null, x); o.value = x; en.append(o); });
-  if (it.entregaTipo) en.value = it.entregaTipo.startsWith("Retirada") ? "Retirada no estúdio (agendada)" : "Entrega em casa";
+  const en = el("select"); ["A combinar com o cliente", "Entrega em casa", "Retirada no estúdio (agendada)"].forEach(x => { const o = el("option", null, x); o.value = x; en.append(o); });
+  if (it.entregaTipo) en.value = it.entregaTipo.startsWith("Retirada") ? "Retirada no estúdio (agendada)" : it.entregaTipo.startsWith("A combinar") ? "A combinar com o cliente" : "Entrega em casa";
   const dt = el("input"); dt.type = "date"; dt.value = it.entregaData || "";
   const r1 = el("div", "row2"); r1.append(field("Entrega", en), field("Data combinada (se já tiver)", dt)); box.append(r1);
   const a = it.endereco || {};
