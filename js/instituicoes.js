@@ -338,7 +338,8 @@ function openEvento(it, kind){
       const a = el("div", "panel-actions"); const ok = el("button", "btn btn-primary", "Fechar"); ok.type = "button"; ok.onclick = close; a.append(ok); p.append(a); return;
     }
     const dBox = comFotos ? camposEvento("fotos", fot) : null;
-    if (dBox) { p.append(el("p", "hint", "A formatura precisa de 2 dias: primeiro medir beca e fazer o ensaio de estúdio no colégio, depois a formatura.")); p.append(dBox); }
+    if (dBox) { p.append(el("p", "hint", "Lembrete: a formatura costuma ter 2 dias. Primeiro medir beca e fazer o ensaio de estúdio no colégio, depois a formatura. Se ainda não combinou o dia das fotos, pode deixar em branco.")); p.append(dBox); }
+    let avisado = false;
     const box = camposEvento(kind, ev); p.append(box);
     if (ev && ev.data && ev.status !== "recusado") {
       const lib = el("button", "btn btn-danger btn-sm", comFotos ? "Desmarcar formatura e dia de fotos (libera os dias)" : "Desmarcar (libera o dia)"); lib.type = "button";
@@ -350,18 +351,19 @@ function openEvento(it, kind){
     p.addEventListener("submit", async evt => {
       evt.preventDefault();
       const f = box.valor(), fd = dBox ? dBox.valor() : null;
-      if (dBox && !fd.data) { dBox.erro("Escolha o dia de medir beca e fazer o ensaio."); return; }
       if (!f.data) { box.erro("Escolha o dia."); return; }
+      // Sugestão (não obrigatório): lembra o vendedor do dia de medir beca + ensaio
+      if (dBox && !fd.data && !avisado) { avisado = true; dBox.erro("Não esqueça do dia de medir beca e fazer o ensaio! Se ainda não combinou, toque de novo para salvar só a formatura."); p.querySelector("button[type=submit]").textContent = "Salvar só a formatura"; return; }
       try {
-        if (fd && fd.data >= f.data) { const e = new Error("ordem"); e.code = "ordem"; throw e; }
-        const pares = fd ? [["fotos", fd], [kind, f]] : [[kind, f]];
+        if (fd && fd.data && fd.data >= f.data) { const e = new Error("ordem"); e.code = "ordem"; throw e; }
+        const pares = fd && fd.data ? [["fotos", fd], [kind, f]] : [[kind, f]];
         const r = await reservarVarios(it, pares);
         const patch = { [K.campo]: Object.assign(f, { status: r.status, grupo: r.grupo, pedidoPor: C.me || "" }), atualizadoEm: new Date().toISOString() };
-        if (fd) patch.diaFotos = Object.assign(fd, { status: r.status, grupo: r.grupo, pedidoPor: C.me || "" });
+        if (fd && fd.data) patch.diaFotos = Object.assign(fd, { status: r.status, grupo: r.grupo, pedidoPor: C.me || "" });
         await FS.updateDoc(FS.doc(db, "instituicoes", it.id), patch);
         if (r.status === "confirmado") await avisarColegioPorEmail(it.id);
         C.toast(r.status === "confirmado" ? "Datas confirmadas" : "Dias segurados. Aguardando a Luciana aprovar."); close();
-      } catch (e) { (e.code === "ocupado" && dBox && e.ocupado && e.ocupado.data === fd.data ? dBox : box).erro(msgErroData(e)); if (!e.code) console.warn(e); }
+      } catch (e) { (e.code === "ocupado" && dBox && e.ocupado && fd && e.ocupado.data === fd.data ? dBox : box).erro(msgErroData(e)); if (!e.code) console.warn(e); }
     });
   });
 }
@@ -462,8 +464,8 @@ function openVisita(it){
       // Formatura com data: reserva o dia antes de salvar (bloqueia se já estiver ocupado)
       let formatura = null, diaFotos = null;
       const fv = !fBox.hidden ? fBox.valor() : null, dv = dfC.checked ? dBox.valor() : null;
-      if (fv && fv.data && !(dv && dv.data)) { dBox.hidden = false; dfC.checked = true; dBox.erro("A formatura precisa do dia de medir beca e fazer o ensaio."); return; }
-      if (fv && fv.data && dv.data >= fv.data) { dBox.erro(msgErroData({ code: "ordem" })); return; }
+      if (fv && fv.data && !(dv && dv.data) && !p._avisado) { p._avisado = true; dBox.hidden = false; dfC.checked = true; dBox.erro("Não esqueça do dia de medir beca e fazer o ensaio! Se ainda não combinou, toque em salvar de novo."); return; }
+      if (fv && fv.data && dv && dv.data && dv.data >= fv.data) { dBox.erro(msgErroData({ code: "ordem" })); return; }
       const pares = [dv && dv.data ? ["fotos", dv] : null, fv && fv.data ? ["formatura", fv] : null].filter(Boolean);
       if (pares.length) {
         try {
