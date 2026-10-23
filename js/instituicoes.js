@@ -195,7 +195,7 @@ export function show(t){
   const head = el("div", "vhead"); head.append(el("h2", null, T.ico + " " + T.nome));
   const hb = el("div", "quick");
   hb.append(C.mkBtn("+ Nova instituição", "btn-primary", () => openForm(null)));
-  if (C.isAdmin) hb.append(C.mkBtn("Preços dos kits", "", () => openPrecos()));
+  if (C.isAdmin) hb.append(C.mkBtn("Preços mínimos", "", () => openPrecos()));
   if (C.isAdmin) hb.append(C.mkBtn("Importar planilha", "", () => openImport()));
   head.append(hb); v.append(head);
 
@@ -267,9 +267,10 @@ function card(it){
   const e = el("article", "card " + (["late", "today", "won"].includes(s) ? s : ""));
   const top = el("div", "card-top"); top.append(el("h3", "name", title(it.nome)), el("span", "stage", it.etapa)); e.append(top);
   const meta = el("div", "meta");
-  const segs = SEGMENTOS.filter(([k]) => (it.segmentos || {})[k] || (k === "pre" && (it.segmentos || {}).infantil)).map(([, t]) => t);
+  const ps = it.alunosPorSerie || {};
+  const segs = SEGMENTOS.filter(([k]) => (it.segmentos || {})[k] || (k === "pre" && (it.segmentos || {}).infantil)).map(([k, t]) => ps[k] ? `${t}: ${ps[k]}` : t);
   [[it.resp ? "👤 " + C.first(it.resp) : "", ""], [[title(it.endereco?.bairro), title(it.endereco?.cidade)].filter(Boolean).join(" · "), "svc"],
-   [segs.join(", "), ""], [it.mediaAlunos ? `~${it.mediaAlunos} alunos` : "", ""], [it.fotografoHoje || "", ""], [it.motivo ? "Motivo: " + it.motivo : "", ""]]
+   [segs.join(", "), ""], [it.mediaAlunos ? `Total: ${it.mediaAlunos} alunos` : "", ""], [it.fotografoHoje || "", ""], [it.motivo ? "Motivo: " + it.motivo : "", ""]]
     .forEach(([v, c]) => { if (v) meta.append(el("span", "tag " + c, v)); });
   e.append(meta);
   const cs = it.contatos || [];
@@ -393,14 +394,16 @@ function openEvento(it, kind){
   });
 }
 function openPrecos(){
-  sheet("Preços dos kits · " + TIPOS[tipo].nome, (p, close) => {
-    p.append(el("p", "hint", `Preços só para ${TIPOS[tipo].nome.toLowerCase()}. Eles aparecem prontos na hora de registrar a visita (dá para mudar na hora).`));
+  sheet("Preços mínimos · " + TIPOS[tipo].nome, (p, close) => {
+    p.append(el("p", "hint", `Valor mínimo de cada kit para ${TIPOS[tipo].nome.toLowerCase()}. Na visita, o vendedor pode colocar um valor mais alto, mas não mais baixo.`));
     const atual = precosDo(tipo);
     const ins = PRODUTOS_PADRAO.map(x => { const i = inp(atual[x.nome] || "", "R$", 10); i.inputMode = "decimal"; p.append(field(x.nome, i)); return [x.nome, i]; });
     p.append(actions(close, "Salvar preços"));
     p.addEventListener("submit", async ev => {
       ev.preventDefault();
-      try { await FS.setDoc(FS.doc(db, "config", "app"), { precosInst: { [tipo]: Object.fromEntries(ins.map(([n, i]) => [n, C.num(i.value)])) } }, { merge: true }); C.toast("Preços salvos para " + TIPOS[tipo].nome.toLowerCase()); close(); }
+      try { const novos = Object.fromEntries(ins.map(([n, i]) => [n, C.num(i.value)]));
+        await FS.setDoc(FS.doc(db, "config", "app"), { precosInst: { [tipo]: novos } }, { merge: true });
+        C.P.precosInst = Object.assign({}, C.P.precosInst, { [tipo]: novos }); C.toast("Preços mínimos salvos para " + TIPOS[tipo].nome.toLowerCase()); close(); }
       catch (e) { C.handleErr(e); }
     });
   });
@@ -415,12 +418,26 @@ function openForm(it){
     const r1 = el("div", "row2"); r1.append(field("Endereço", rua), field("Número", num));
     const r2 = el("div", "row2"); r2.append(field("Bairro", bai), field("Cidade", cid));
     p.append(r1, r2);
-    const media = inp(it ? it.mediaAlunos : "", "ex.: 120", 10); media.inputMode = "numeric";
-    const fot = sel(FOTOGRAFO, it && it.fotografoHoje, "—");
-    const r3 = el("div", "row2"); r3.append(field("Média de alunos", media), field("Fotógrafo hoje", fot)); p.append(r3);
-    const segBox = el("div", "quick");
-    const segChk = SEGMENTOS.map(([k, t]) => { const l = el("label", "chk"); const c = el("input"); c.type = "checkbox"; c.checked = !!(it && it.segmentos && (it.segmentos[k] || (k === "pre" && it.segmentos.infantil))); l.append(c, document.createTextNode(" " + t)); segBox.append(l); return [k, c]; });
-    if (tipo !== "faculdade") { const f = el("div", "field"); f.append(el("label", null, "Segmentos"), segBox); p.append(f); }
+    const fot = sel(FOTOGRAFO, it && it.fotografoHoje, "—"); p.append(field("Fotógrafo hoje", fot));
+    // Alunos por série (as séries que formam) e total
+    const porSerie = (it && it.alunosPorSerie) || {};
+    const segBox = el("div", "series");
+    const totTxt = el("p", "hint");
+    const segChk = SEGMENTOS.map(([k, t]) => {
+      const r = el("div", "prow"); const l = el("label", "chk"); const c = el("input"); c.type = "checkbox";
+      c.checked = !!(it && it.segmentos && (it.segmentos[k] || (k === "pre" && it.segmentos.infantil)));
+      l.append(c, document.createTextNode(" " + t));
+      const q = inp(porSerie[k] || "", "alunos", 5); q.inputMode = "numeric"; q.className = "preco"; q.setAttribute("aria-label", "Alunos no " + t);
+      q.addEventListener("input", () => { c.checked = !!Number(q.value); somar(); }); c.addEventListener("change", somar);
+      r.append(l, q); segBox.append(r); return [k, c, q];
+    });
+    const extraQ = inp(it && it.alunosOutros ? it.alunosOutros : "", "outros", 6); extraQ.inputMode = "numeric"; extraQ.className = "preco";
+    const rx = el("div", "prow"); rx.append(el("span", null, tipo === "faculdade" || tipo === "profissionalizante" ? "Alunos formando (total)" : "Outras séries / total sem série"), extraQ); segBox.append(rx);
+    extraQ.addEventListener("input", somar);
+    function somar(){ const t = segChk.reduce((a, [, c, q]) => a + (c.checked ? Number(q.value) || 0 : 0), 0) + (Number(extraQ.value) || 0); totTxt.textContent = t ? `Total: ${t} alunos` : "Coloque quantos alunos tem em cada série."; return t; }
+    somar();
+    { const f = el("div", "field"); f.append(el("label", null, tipo === "faculdade" || tipo === "profissionalizante" ? "Alunos" : "Séries e alunos"), segBox, totTxt); p.append(f); }
+    if (tipo === "faculdade" || tipo === "profissionalizante") segChk.forEach(([, , q]) => { q.closest(".prow").hidden = true; });
     p.append(el("h3", null, "Contatos"));
     const lista = el("div", "imp"); p.append(lista); const linhas = [];
     const addC = (c = {}) => { const nm = inp(title(c.nome), "nome"), cg = sel(CARGOS, c.cargo, "cargo"), tl = inp(c.tel, "21 99999-9999", 20), em = inp(c.email, "e-mail (recebe as datas)"); tl.inputMode = "tel"; em.type = "email";
@@ -439,7 +456,8 @@ function openForm(it){
       const tipoK = it ? it.tipo : tipo;
       const contatos = linhas.map(({ nm, cg, tl, em }) => ({ nome: nm.value.trim(), cargo: cg.value, tel: parseTel(tl.value) || tl.value.trim(), email: em.value.trim().toLowerCase() })).filter(c => c.nome || c.tel || c.email);
       const body = { nome: nome.value.trim(), nomeBusca: norm(nome.value), tipo: tipoK, endereco: { rua: rua.value.trim(), numero: num.value.trim(), bairro: bai.value.trim(), cidade: cid.value.trim() },
-        mediaAlunos: Number(media.value) || null, fotografoHoje: fot.value, segmentos: Object.fromEntries(segChk.map(([k, c]) => [k, c.checked])),
+        mediaAlunos: somar() || null, alunosPorSerie: Object.fromEntries(segChk.map(([k, c, q]) => [k, c.checked ? Number(q.value) || 0 : 0])), alunosOutros: Number(extraQ.value) || 0,
+        fotografoHoje: fot.value, segmentos: Object.fromEntries(segChk.map(([k, c]) => [k, c.checked])),
         contatos, email: email.value.trim(), horario: hor.value.trim(), notas: nota.value.trim(), atualizadoEm: new Date().toISOString() };
       try {
         if (it) await FS.updateDoc(FS.doc(db, "instituicoes", it.id), body);
@@ -462,14 +480,16 @@ function openVisita(it){
     const r1 = el("div", "row3"); r1.append(field("Com quem falou", falou), field("Cargo", cargo), field("Telefone novo", tel)); p.append(r1);
     const fot = sel(FOTOGRAFO, it.fotografoHoje, "—"); p.append(field("Fotógrafo hoje", fot));
     // O que foi apresentado: toca no produto, o preço vem pronto e dá para mudar
-    p.append(el("h3", null, "O que apresentou"));
+    p.append(el("h3", null, "O que apresentou"), el("p", "hint", "O valor que aparece é o mínimo. Pode colocar mais alto; mais baixo, não."));
     const prodBox = el("div", "imp"); const prods = [];
     produtos().forEach(pr => {
       const r = el("div", "prow"); const l = el("label", "chk"); const c = el("input"); c.type = "checkbox"; l.append(c, document.createTextNode(" " + pr.nome));
-      const v = inp(pr.preco, "R$", 10); v.inputMode = "decimal"; v.className = "preco"; v.setAttribute("aria-label", "Preço de " + pr.nome);
-      r.append(l, v); prodBox.append(r); prods.push({ nome: pr.nome, c, v, formatura: pr.formatura });
+      const v = inp(pr.preco, pr.preco ? "mín. " + pr.preco : "R$", 10); v.inputMode = "decimal"; v.className = "preco"; v.setAttribute("aria-label", "Preço de " + pr.nome);
+      v.addEventListener("input", () => { if (v.value) c.checked = true; });
+      r.append(l, v); prodBox.append(r); prods.push({ nome: pr.nome, c, v, formatura: pr.formatura, min: Number(pr.preco) || 0 });
     });
-    p.append(prodBox);
+    const errProd = el("p", "err"); errProd.hidden = true;
+    p.append(prodBox, errProd);
     const fBox = camposEvento("formatura", it.formatura, it.nome); fBox.hidden = true; p.append(fBox);
     // Dia de fotos no colégio (medir beca + ensaio)
     const dfL = el("label", "chk"); const dfC = el("input"); dfC.type = "checkbox"; dfL.append(dfC, document.createTextNode(" 📸 Já combinou o dia de fotos no colégio (medir beca + ensaio)"));
@@ -486,6 +506,10 @@ function openVisita(it){
     p.append(actions(close, "Salvar visita"));
     p.addEventListener("submit", async ev => {
       ev.preventDefault(); if (!res.value) return;
+      // Preço mínimo: o vendedor pode subir o valor, mas não baixar
+      const abaixo = prods.filter(x => x.c.checked && x.min && C.num(x.v.value) < x.min);
+      if (abaixo.length) { errProd.textContent = "Abaixo do valor mínimo: " + abaixo.map(x => `${x.nome} (mín. ${C.money(x.min)})`).join(", "); errProd.hidden = false; errProd.scrollIntoView({ block: "center" }); return; }
+      errProd.hidden = true;
       const etapa = (RESULTADOS.find(r => r[0] === res.value) || [])[1] || it.etapa;
       // Formatura com data: reserva o dia antes de salvar (bloqueia se já estiver ocupado)
       let formatura = null, diaFotos = null;
@@ -589,6 +613,7 @@ function openImport(){
           const etapa = /FECH/.test(st) ? "FECHADO" : /NAO|PERD|SEM INTERESSE/.test(st) ? "NÃO FECHOU" : dv || s(r.obs) ? "VISITADO" : "A VISITAR";
           const base = { nome: s(r.nome), nomeBusca: norm(r.nome), tipo,
             segmentos: { pre: sim(r.infantil) || sim(r.pre), ano5: sim(r.ano5), ano9: sim(r.ano9), medio: sim(r.medio) },
+            alunosPorSerie: { pre: Number(s(r.infantil) || s(r.pre)) || 0, ano5: Number(s(r.ano5)) || 0, ano9: Number(s(r.ano9)) || 0, medio: Number(s(r.medio)) || 0 },
             segmentosOrig: { infantil: s(r.infantil), fund1: s(r.fund1), ano5: s(r.ano5), fund2: s(r.fund2), ano9: s(r.ano9), medio: s(r.medio) },
             contatos, email: s(r.email).toLowerCase(), endereco: { rua: s(r.rua), numero: s(r.numero), bairro: s(r.bairro), cidade: s(r.cidade) },
             statusOrig: s(r.status), mediaAlunos: Number(String(r.media).replace(/\D/g, "")) || null, temFotosOrig: s(r.temFotos), dataFoto: dataISO(r.dataFoto, X), atualizadoEm: agora };
