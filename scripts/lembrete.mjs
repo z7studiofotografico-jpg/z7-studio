@@ -26,6 +26,9 @@ const vencidos = leadsSnap.docs.map((d) => d.data()).filter((l) => l.followup &&
 const REP_ABERTAS = ["SEPARADO", "CONTATADO", "INTERESSADO"];
 const repSnap = await db.collection("repasse").where("followup", "<=", hoje).get();
 const repVencidos = repSnap.docs.map((d) => d.data()).filter((r) => REP_ABERTAS.includes(r.etapa));
+// Instituições: retornos vencidos (colégios, cursos e faculdades)
+const instSnap = await db.collection("instituicoes").where("followup", "<=", hoje).get();
+const instVencidos = instSnap.docs.map((d) => d.data()).filter((x) => x.etapa !== "FECHADO");
 const tokensSnap = await db.collection("tokens").get();
 console.log(`Hoje ${hoje}: ${vencidos.length} lead(s) com contato vencido, ${tokensSnap.size} aparelho(s).`);
 
@@ -42,18 +45,20 @@ for (const t of tokensSnap.docs) {
   // Quem tem módulos limitados só recebe lembrete do que pode ver.
   const mods = perfil && Array.isArray(perfil.modulos) && perfil.papel !== "admin" ? perfil.modulos : null;
   const meus = mods && !mods.includes("funil") ? [] : vencidos.filter((l) => !l.resp || !nome || l.resp === nome);
-  const meusRep = repVencidos.filter((r) => !r.resp || !nome || r.resp === nome);
+  const meusRep = mods && !mods.includes("rep") && !mods.includes("lf") ? [] : repVencidos.filter((r) => !r.resp || !nome || r.resp === nome);
+  const meusInst = mods && !mods.includes("colegios") ? [] : instVencidos.filter((x) => !x.resp || !nome || x.resp === nome);
   let title, body;
   if (TESTE) {
     title = "Z7 Studio: notificação de teste ✅";
     body = `Funcionando neste aparelho${nome ? " de " + nome : ""}. ${meus.length} contato(s) para hoje.`;
   } else {
-    if (!meus.length && !meusRep.length) continue;
-    const total = meus.length + meusRep.length;
-    const atrasados = meus.filter((l) => l.followup < hoje).length + meusRep.filter((r) => r.followup < hoje).length;
+    if (!meus.length && !meusRep.length && !meusInst.length) continue;
+    const total = meus.length + meusRep.length + meusInst.length;
+    const atrasados = meus.filter((l) => l.followup < hoje).length + meusRep.filter((r) => r.followup < hoje).length + meusInst.filter((x) => x.followup < hoje).length;
     const partes = [];
     if (meus.length) partes.push(`Funil: ${meus.slice(0, 3).map((l) => primeiro(l.nome)).join(", ")}${meus.length > 3 ? ` e mais ${meus.length - 3}` : ""}`);
-    if (meusRep.length) partes.push(`Repasse: ${meusRep.length}`);
+    if (meusRep.length) partes.push(`PR: ${meusRep.length}`);
+    if (meusInst.length) partes.push(`Instituições: ${meusInst.slice(0, 2).map((x) => primeiro(x.nome)).join(", ")}${meusInst.length > 2 ? ` e mais ${meusInst.length - 2}` : ""}`);
     title = `Bom dia${nome ? ", " + primeiro(nome) : ""}! ${total} contato${total > 1 ? "s" : ""} para hoje`;
     body = partes.join(" · ") + (atrasados ? ` · ${atrasados} atrasado${atrasados > 1 ? "s" : ""}` : "");
   }

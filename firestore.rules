@@ -20,6 +20,10 @@ service cloud.firestore {
     match /config/{id} { allow read: if membro(); allow write: if admin(); }
     match /tokens/{token} { allow read, write: if membro(); }
     match /leads/{id} { allow read, write: if pode('funil'); }
+    match /instituicoes/{id} {
+      allow read, create, update: if pode('colegios');
+      allow delete: if admin();
+    }
     match /repasse/{id} {
       allow read: if pode('rep') || (pode('lf') && anoAtual(resource.data));
       allow update: if pode('rep') || (pode('lf') && anoAtual(resource.data) && anoAtual(request.resource.data));

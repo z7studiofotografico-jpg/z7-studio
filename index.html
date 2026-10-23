@@ -60,6 +60,9 @@ body{background:var(--bg);color:var(--fg);font-family:var(--f-body);font-size:15
 .seg small{color:var(--muted);font-size:.82rem}
 .seg[aria-selected="true"]{background:var(--fg);color:var(--bg);border-color:var(--fg)}
 .seg[aria-selected="true"] small{color:inherit;opacity:.75}
+.prow{display:flex;align-items:center;justify-content:space-between;gap:8px}
+.prow .preco{width:90px;font:inherit;font-size:16px;padding:6px 8px;border-radius:8px;border:1px solid var(--line);background:var(--bg);color:var(--fg);text-align:right}
+details.hist summary{cursor:pointer;font-size:.85rem;color:var(--accent);font-weight:600}
 .lote{display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;background:var(--surface);border:1px solid var(--line);border-left:4px solid var(--accent);border-radius:var(--r);padding:12px 14px}
 .lote b{display:block}
 .lote .lnum{display:block;margin-top:4px;font-weight:700;color:var(--accent)}
@@ -241,12 +244,15 @@ details.guide summary{cursor:pointer;font-family:var(--f-display);font-weight:70
     <section id="viewInst" class="view" hidden>
       <div class="vhead"><h2>Instituições</h2></div>
       <div class="tiles">
-        <a class="tile" href="#inst-particular"><span class="tile-ico" aria-hidden="true">🏫</span><b>Colégio particular</b><small>Direção e coordenação decidem</small><span class="tile-n">Em construção</span></a>
-        <a class="tile" href="#inst-publico"><span class="tile-ico" aria-hidden="true">🏛️</span><b>Colégio público</b><small>Direção decide, às vezes com autorização</small><span class="tile-n">Em construção</span></a>
-        <a class="tile" href="#inst-profissionalizante"><span class="tile-ico" aria-hidden="true">🛠️</span><b>Colégio profissionalizante</b><small>Cursos técnicos e profissionalizantes</small><span class="tile-n">Em construção</span></a>
-        <a class="tile" href="#inst-faculdade"><span class="tile-ico" aria-hidden="true">🎓</span><b>Faculdade</b><small>Comissão de formatura decide</small><span class="tile-n">Em construção</span></a>
+        <a class="tile" href="#inst-particular" data-inst="particular"><span class="tile-ico" aria-hidden="true">🏫</span><b>Colégio particular</b><small>Direção e coordenação decidem</small><span class="tile-n"></span></a>
+        <a class="tile" href="#inst-publico" data-inst="publico"><span class="tile-ico" aria-hidden="true">🏛️</span><b>Colégio público</b><small>Direção decide, às vezes com autorização</small><span class="tile-n"></span></a>
+        <a class="tile" href="#inst-profissionalizante" data-inst="profissionalizante"><span class="tile-ico" aria-hidden="true">🛠️</span><b>Colégio profissionalizante</b><small>Cursos técnicos e profissionalizantes</small><span class="tile-n"></span></a>
+        <a class="tile" href="#inst-faculdade" data-inst="faculdade"><span class="tile-ico" aria-hidden="true">🎓</span><b>Faculdade</b><small>Comissão de formatura decide</small><span class="tile-n"></span></a>
       </div>
     </section>
+
+    <!-- Lista de um tipo de instituição (montada por js/instituicoes.js) -->
+    <section id="viewInstTipo" class="view" hidden></section>
 
     <!-- Em breve -->
     <section id="viewSoon" class="view" hidden>
@@ -786,9 +792,9 @@ $("btnPush").onclick = () => enablePush(true);
 // ---------- navegação entre módulos ----------
 const VIEWS = { home: "viewHome", funil: "viewFunil", pr: "viewRepasse", repasse: "viewRepasse", agenda: "viewSoon",
   instituicoes: "viewInst", colegios: "viewInst",
-  "inst-particular": "viewSoon", "inst-publico": "viewSoon", "inst-profissionalizante": "viewSoon", "inst-faculdade": "viewSoon" };
+  "inst-particular": "viewInstTipo", "inst-publico": "viewInstTipo", "inst-profissionalizante": "viewInstTipo", "inst-faculdade": "viewInstTipo" };
 const INST_NOMES = { "inst-particular": "Colégio particular", "inst-publico": "Colégio público", "inst-profissionalizante": "Colégio profissionalizante", "inst-faculdade": "Faculdade" };
-let repasseMod = null, curView = "home";
+let repasseMod = null, instMod = null, curView = "home";
 const ctx = {
   db, FS, $, toast, mkBtn, money, num, digits, first, todayStr, addDays, fmtDate, hhmm, ds, pad, showNotice, handleErr,
   get me(){ return me; }, get isAdmin(){ return isAdmin; }, get user(){ return user; }, get P(){ return P; }, team, pode,
@@ -808,7 +814,14 @@ async function route(){
   $("btnBack").hidden = key === "home";
   $("btnBack").textContent = INST_NOMES[key] ? "‹ Instituições" : "‹ Início";
   if (key === "agenda") $("soonTitle").textContent = "Agendamento: em breve";
-  if (INST_NOMES[key]) $("soonTitle").textContent = INST_NOMES[key] + ": em construção";
+  if (instMod && !INST_NOMES[key]) instMod.hide();
+  if (key === "instituicoes" || key === "colegios") contarInst();
+  if (INST_NOMES[key]) {
+    try {
+      if (!instMod) { instMod = await import("./js/instituicoes.js"); instMod.init(ctx); }
+      instMod.show(key.slice(5));
+    } catch (e) { console.warn(e); $("viewInstTipo").innerHTML = '<div class="empty"><strong>Não foi possível abrir</strong><span>Verifique a internet e tente de novo.</span></div>'; }
+  }
   if (key === "home") renderHome();
   if (key === "pr" || key === "repasse") {
     try {
@@ -835,7 +848,24 @@ function renderHome(){
     else if (pode("lf")) FS.getDocs(query(collection(db, "repasse"), where("ano", "==", new Date().getFullYear()), where("etapa", "in", ["SEPARADO", "CONTATADO", "INTERESSADO"]), FS.limit(300)))
       .then(s => { repCount.n = s.docs.filter(d => (d.data().followup || "9") <= todayStr() && (!d.data().resp || d.data().resp === me)).length; paintRep(); }).catch(() => {});
   }
-  paintRep();
+  paintRep(); contarInst();
+}
+// Retornos de hoje por tipo de instituição (cartões da tela Instituições e da tela inicial)
+let instCount = { at: 0, por: null };
+function contarInst(force){
+  if (!pode("colegios")) return;
+  if (!force && Date.now() - instCount.at < 120000 && instCount.por) return paintInst();
+  instCount.at = Date.now();
+  FS.getDocs(query(collection(db, "instituicoes"), where("followup", "<=", todayStr()), FS.limit(500))).then(s => {
+    const por = {}; s.docs.forEach(d => { const x = d.data(); if (x.etapa !== "FECHADO") por[x.tipo] = (por[x.tipo] || 0) + 1; });
+    instCount.por = por; paintInst();
+  }).catch(() => {});
+}
+function paintInst(){
+  const por = instCount.por || {};
+  document.querySelectorAll(".tile[data-inst]").forEach(t => { const n = por[t.dataset.inst] || 0; t.querySelector(".tile-n").textContent = n ? `${n} retorno${n > 1 ? "s" : ""} para hoje` : "Nada pendente hoje ✓"; });
+  const tot = Object.values(por).reduce((a, b) => a + b, 0), tile = document.querySelector('.tile[data-mod="colegios"] .tile-n');
+  if (tile) tile.textContent = instCount.por ? (tot ? `${tot} retorno${tot > 1 ? "s" : ""} para hoje` : "Nada pendente hoje ✓") : "Abrir";
 }
 function paintRep(){ $("tRepasse").textContent = repCount.n == null ? "" : repCount.n ? `${repCount.n} para hoje` : "Nada pendente hoje ✓"; }
 
