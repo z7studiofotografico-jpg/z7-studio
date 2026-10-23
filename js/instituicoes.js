@@ -193,7 +193,7 @@ export function show(t){
 
   const st = el("section", "stats");
   st.innerHTML = `<div class="stat late"><b id="iAtr">–</b><small>Retornos atrasados</small></div>
-    <div class="stat today"><b id="iHoje">–</b><small>Retornos hoje</small></div>
+    <div class="stat today"><b id="iHoje">–</b><small>Para hoje (retornos e pendências)</small></div>
     <div class="stat"><b id="iAbertas">–</b><small>Em andamento</small></div>
     <div class="stat won"><b id="iFech">–</b><small>Fechadas</small></div>`;
   v.append(st);
@@ -210,17 +210,29 @@ export function show(t){
 }
 export function hide(){ if (unsub) { unsub(); unsub = null; } }
 
+// Pendência: formatura marcada sem o dia de medir beca + ensaio
+function pendFotos(it){
+  const f = it.formatura, d = it.diaFotos;
+  return !!(f && f.data && f.status !== "recusado" && !(d && d.data && d.status !== "recusado"));
+}
+function filtra(i, k){
+  if (k === "hoje") return ["late", "today"].includes(status(i)) || pendFotos(i);
+  if (k === "pend") return pendFotos(i);
+  if (k === "meus") return i.resp === C.me && (ABERTAS.includes(i.etapa) || pendFotos(i));
+  if (k === "todos") return true;
+  return i.etapa === k;
+}
 function renderStats(){
   const st = items.map(status);
   $("iAtr").textContent = st.filter(s => s === "late").length;
-  $("iHoje").textContent = st.filter(s => s === "today").length;
+  $("iHoje").textContent = st.filter(s => s === "today").length + items.filter(i => pendFotos(i) && status(i) !== "today" && status(i) !== "late").length;
   $("iAbertas").textContent = items.filter(i => ABERTAS.includes(i.etapa)).length;
   $("iFech").textContent = items.filter(i => i.etapa === "FECHADO").length;
 }
 function renderChips(){
   const c = $("iChips"); if (!c) return; c.innerHTML = "";
-  const n = k => items.filter(i => k === "hoje" ? ["late", "today"].includes(status(i)) : k === "meus" ? i.resp === C.me && ABERTAS.includes(i.etapa) : k === "todos" ? true : i.etapa === k).length;
-  [["hoje", "Para hoje"], ["meus", "Só os meus"], ...ETAPAS.map(e => [e, e]), ["todos", "Todas"]].forEach(([k, t]) => {
+  const n = k => items.filter(i => filtra(i, k)).length;
+  [["hoje", "Para hoje"], ["pend", "⚠️ Pendências"], ["meus", "Só os meus"], ...ETAPAS.map(e => [e, e]), ["todos", "Todas"]].forEach(([k, t]) => {
     const b = el("button", "chip", t); b.type = "button"; b.setAttribute("aria-pressed", String(tab === k));
     const s = el("span", "n", String(n(k))); b.append(s);
     b.onclick = () => { tab = k; renderChips(); renderList(); }; c.append(b);
@@ -229,7 +241,7 @@ function renderChips(){
 function renderList(){
   const list = $("iList"); if (!list) return; list.innerHTML = "";
   const q = norm($("iQ").value);
-  let arr = items.filter(i => tab === "hoje" ? ["late", "today"].includes(status(i)) : tab === "meus" ? i.resp === C.me && ABERTAS.includes(i.etapa) : tab === "todos" ? true : i.etapa === tab);
+  let arr = items.filter(i => filtra(i, tab));
   if (q) arr = arr.filter(i => norm([i.nome, i.endereco?.bairro, i.endereco?.cidade, ...(i.contatos || []).map(c => c.nome)].join(" ")).includes(q));
   const rank = { late: 0, today: 1, later: 2, none: 3, won: 4 };
   arr.sort((a, b) => rank[status(a)] - rank[status(b)] || (a.followup || "9").localeCompare(b.followup || "9") || (a.nome || "").localeCompare(b.nome || "", "pt-BR"));
@@ -260,6 +272,11 @@ function card(it){
     : "Sem data de retorno";
   e.append(fu);
   ["fotos", "formatura"].forEach(k => { const l = linhaEvento(it, k); if (l) e.append(l); });
+  if (pendFotos(it)) {
+    const pd = el("div", "lock other");
+    pd.append(el("span", null, "⚠️ Pendência: marcar o dia de medir beca e fazer o ensaio de estúdio"), C.mkBtn("📸 Marcar agora", "btn-primary", () => openEvento(it, "fotos")));
+    e.append(pd);
+  }
   if (it.avisoEmail && it.avisoEmail.em) e.append(el("div", "last", `📧 Datas enviadas por e-mail para ${it.avisoEmail.para.join(", ")} em ${C.fmtDate(C.ds(new Date(it.avisoEmail.em)))}`));
   const ult = (it.visitas || [])[0];
   if (ult) {

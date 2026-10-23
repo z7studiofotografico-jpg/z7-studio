@@ -29,6 +29,11 @@ const repVencidos = repSnap.docs.map((d) => d.data()).filter((r) => REP_ABERTAS.
 // Instituições: retornos vencidos (colégios, cursos e faculdades)
 const instSnap = await db.collection("instituicoes").where("followup", "<=", hoje).get();
 const instVencidos = instSnap.docs.map((d) => d.data()).filter((x) => x.etapa !== "FECHADO");
+// Pendência: formatura marcada sem o dia de medir beca + ensaio
+const comFormatura = await db.collection("instituicoes").where("formatura.status", "in", ["pendente", "confirmado"]).get();
+const nomesVenc = new Set(instVencidos.map((x) => x.nome));
+comFormatura.docs.map((d) => d.data()).filter((x) => !(x.diaFotos && x.diaFotos.data && x.diaFotos.status !== "recusado") && !nomesVenc.has(x.nome))
+  .forEach((x) => instVencidos.push(Object.assign({}, x, { followup: hoje })));
 // Agenda: datas esperando aprovação (só para quem aprova)
 const APROVADORES = ["lucianafanjos@gmail.com"];
 const pendAgenda = (await db.collection("agenda").where("status", "==", "pendente").get()).size;

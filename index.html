@@ -875,16 +875,22 @@ function contarInst(force){
   if (!pode("colegios")) return;
   if (!force && Date.now() - instCount.at < 120000 && instCount.por) return paintInst();
   instCount.at = Date.now();
-  FS.getDocs(query(collection(db, "instituicoes"), where("followup", "<=", todayStr()), FS.limit(500))).then(s => {
-    const por = {}; s.docs.forEach(d => { const x = d.data(); if (x.etapa !== "FECHADO") por[x.tipo] = (por[x.tipo] || 0) + 1; });
+  Promise.all([
+    FS.getDocs(query(collection(db, "instituicoes"), where("followup", "<=", todayStr()), FS.limit(500))),
+    FS.getDocs(query(collection(db, "instituicoes"), where("formatura.status", "in", ["pendente", "confirmado"]), FS.limit(500)))
+  ]).then(([s1, s2]) => {
+    const por = {}, vistos = new Set();
+    s1.docs.forEach(d => { const x = d.data(); if (x.etapa !== "FECHADO") { por[x.tipo] = (por[x.tipo] || 0) + 1; vistos.add(d.id); } });
+    // pendência: formatura sem o dia de medir beca + ensaio
+    s2.docs.forEach(d => { const x = d.data(); const df = x.diaFotos; if (!vistos.has(d.id) && !(df && df.data && df.status !== "recusado")) por[x.tipo] = (por[x.tipo] || 0) + 1; });
     instCount.por = por; paintInst();
   }).catch(() => {});
 }
 function paintInst(){
   const por = instCount.por || {};
-  document.querySelectorAll(".tile[data-inst]").forEach(t => { const n = por[t.dataset.inst] || 0; t.querySelector(".tile-n").textContent = n ? `${n} retorno${n > 1 ? "s" : ""} para hoje` : "Nada pendente hoje ✓"; });
+  document.querySelectorAll(".tile[data-inst]").forEach(t => { const n = por[t.dataset.inst] || 0; t.querySelector(".tile-n").textContent = n ? `${n} para hoje` : "Nada pendente hoje ✓"; });
   const tot = Object.values(por).reduce((a, b) => a + b, 0), tile = document.querySelector('.tile[data-mod="colegios"] .tile-n');
-  if (tile) tile.textContent = instCount.por ? (tot ? `${tot} retorno${tot > 1 ? "s" : ""} para hoje` : "Nada pendente hoje ✓") : "Abrir";
+  if (tile) tile.textContent = instCount.por ? (tot ? `${tot} para hoje` : "Nada pendente hoje ✓") : "Abrir";
 }
 function paintRep(){ $("tRepasse").textContent = repCount.n == null ? "" : repCount.n ? `${repCount.n} para hoje` : "Nada pendente hoje ✓"; }
 
