@@ -133,6 +133,13 @@ details.guide summary{cursor:pointer;font-family:var(--f-display);font-weight:70
 .meta{display:flex;flex-wrap:wrap;gap:6px;font-size:.82rem}
 .tag{background:var(--chip);border-radius:4px;padding:1px 7px;color:var(--muted)}
 .tag.svc{background:var(--accent-soft);color:var(--accent)}
+.tag.ok{background:var(--ok-soft);color:var(--ok)}
+.agrow{display:flex;gap:8px;align-items:center;justify-content:space-between;padding:9px 0;border-top:1px solid var(--line)}
+.agrow:first-of-type{border-top:0}
+.agtxt{display:flex;flex-direction:column;gap:2px;min-width:0;font-size:.92rem}
+.agtxt span{color:var(--muted);font-size:.86rem}
+.agtxt .wait{color:var(--warn)}
+.agact{display:flex;gap:6px;flex-wrap:wrap;justify-content:flex-end;flex:none}
 .phone{font-variant-numeric:tabular-nums;font-size:.9rem}
 .fu{font-size:.88rem;font-weight:600;font-variant-numeric:tabular-nums}
 .fu.late{color:var(--late)} .fu.today{color:var(--warn)} .fu.none{color:var(--muted);font-weight:400}
@@ -865,10 +872,16 @@ let agCount = { at: 0 };
 function contarAgenda(){
   if (!pode("agenda") && !pode("colegios")) return;
   if (Date.now() - agCount.at < 60000) return; agCount.at = Date.now();
-  FS.getDocs(query(collection(db, "agenda"), where("status", "==", "pendente"), FS.limit(200))).then(s => {
-    const n = s.size, eu = ctx.aprovador;
-    $("tAgenda").textContent = n ? (eu ? `${n} data${n > 1 ? "s" : ""} para aprovar` : `${n} aguardando a Luciana`) : "Abrir";
-  }).catch(() => {});
+  const eu = ctx.aprovador;
+  const ens = isAdmin ? FS.getDocs(query(collection(db, "ensaios"), where("data", "==", addDays(1)), FS.limit(100))).then(s => s.docs.map(d => d.data())).catch(() => []) : Promise.resolve([]);
+  const ana = isAdmin && eu ? FS.getDocs(query(collection(db, "ensaios"), where("status", "==", "analisar"), FS.limit(100))).then(s => s.size).catch(() => 0) : Promise.resolve(0);
+  Promise.all([FS.getDocs(query(collection(db, "agenda"), where("status", "==", "pendente"), FS.limit(200))).then(s => s.size).catch(() => 0), ana, ens]).then(([n, a, amanha]) => {
+    const p = [];
+    if (eu && n + a) p.push(`${n + a} para analisar`); else if (n) p.push(`${n} aguardando a Luciana`);
+    const lem = amanha.filter(e => e.status !== "remarcar" && !e.lembrado && e.tel).length;
+    if (lem) p.push(`${lem} lembrete${lem > 1 ? "s" : ""} para amanhã`);
+    $("tAgenda").textContent = p.join(" · ") || "Abrir";
+  });
 }
 // Retornos de hoje por tipo de instituição (cartões da tela Instituições e da tela inicial)
 let instCount = { at: 0, por: null };

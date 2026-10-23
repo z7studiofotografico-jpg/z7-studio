@@ -24,7 +24,6 @@ service cloud.firestore {
       allow read, create, update: if pode('colegios');
       allow delete: if admin();
     }
-    // Agenda: um documento por dia (AAAA-MM-DD). Cada dia só tem uma formatura.
     // Agenda: um documento por dia (AAAA-MM-DD), um compromisso por dia.
     // Qualquer um com acesso sugere a data (pendente); só quem aprova confirma.
     function aprovador() { return logado() && email() in ['lucianafanjos@gmail.com']; }
@@ -35,6 +34,8 @@ service cloud.firestore {
       allow update: if usaAgenda() && resource.data.status != 'confirmado' && request.resource.data.status == 'pendente' || aprovador();
       allow delete: if aprovador() || admin() || (usaAgenda() && resource.data.status != 'confirmado');
     }
+    // Ensaios no estúdio: só os donos (e administradores) marcam e veem
+    match /ensaios/{id} { allow read, write: if admin(); }
     // Fila de e-mails para os colégios (enviados pelo GitHub com o Gmail do estúdio)
     match /emails/{id} {
       allow create: if aprovador() || admin();

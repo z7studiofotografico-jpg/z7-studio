@@ -501,7 +501,9 @@ function openVisita(it){
     const motivoBox = el("div"); const motivo = inp("", "ex.: já gastaram com outros eventos este ano"); motivoBox.append(field("Motivo de não fechar", motivo)); motivoBox.hidden = true; p.append(motivoBox);
     res.onchange = () => { const et = (RESULTADOS.find(r => r[0] === res.value) || [])[1]; motivoBox.hidden = et !== "NÃO FECHOU"; };
     const passo = sel(PASSOS, "", "próximo passo"); const quando = el("input"); quando.type = "date";
-    const r2 = el("div", "row2"); r2.append(field("Próximo passo", passo), field("Quando", quando)); p.append(r2, quandoBtns(quando));
+    const qHora = el("input"); qHora.type = "time"; qHora.step = 900;
+    const r2 = el("div", "row3"); r2.append(field("Próximo passo", passo), field("Quando", quando), field("Horário (opcional)", qHora)); p.append(r2, quandoBtns(quando));
+    p.append(el("p", "hint", "Visita marcada (“Voltar para visita”) aparece no Agendamento, sem bloquear o dia."));
     const obs = el("textarea"); obs.rows = 3; obs.maxLength = 2000; obs.placeholder = "Ex.: pediu retorno dia 16; tem interesse em aluguel de beca"; p.append(field("Observação", obs));
     p.append(actions(close, "Salvar visita"));
     p.addEventListener("submit", async ev => {
@@ -527,7 +529,7 @@ function openVisita(it){
       }
       const visita = { data: data.value, como: como.value, por: C.me || "", falouCom: [falou.value.trim(), cargo.value].filter(Boolean).join(" · "), resultado: res.value,
         apresentou: prods.filter(x => x.c.checked).map(x => ({ nome: x.nome, preco: C.num(x.v.value) })), passo: passo.value, quando: quando.value, obs: obs.value.trim(), em: new Date().toISOString() };
-      const patch = { etapa, visitas: [visita, ...(it.visitas || [])].slice(0, 50), fotografoHoje: fot.value || it.fotografoHoje || "", proximoPasso: passo.value, followup: etapa === "FECHADO" ? null : (quando.value || null),
+      const patch = { etapa, visitas: [visita, ...(it.visitas || [])].slice(0, 50), fotografoHoje: fot.value || it.fotografoHoje || "", proximoPasso: passo.value, followup: etapa === "FECHADO" ? null : (quando.value || null), followupHora: etapa === "FECHADO" || !quando.value ? "" : qHora.value,
         atendendo: null, ultimo: { por: C.me || "—", em: new Date().toISOString() }, resp: it.resp || C.me };
       if (etapa === "FECHADO") patch.fechadoEm = C.todayStr();
       if (formatura) patch.formatura = formatura;
