@@ -35,6 +35,11 @@ service cloud.firestore {
       allow update: if usaAgenda() && resource.data.status != 'confirmado' && request.resource.data.status == 'pendente' || aprovador();
       allow delete: if aprovador() || admin() || (usaAgenda() && resource.data.status != 'confirmado');
     }
+    // Fila de e-mails para os colégios (enviados pelo GitHub com o Gmail do estúdio)
+    match /emails/{id} {
+      allow create: if aprovador() || admin();
+      allow read: if aprovador() || admin();
+    }
     match /repasse/{id} {
       allow read: if pode('rep') || (pode('lf') && anoAtual(resource.data));
       allow update: if pode('rep') || (pode('lf') && anoAtual(resource.data) && anoAtual(request.resource.data));

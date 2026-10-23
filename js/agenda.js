@@ -1,6 +1,7 @@
 // Módulo Agendamento (primeira parte): compromissos marcados nas Instituições
 // (formaturas e dias de fotos no colégio) e a aprovação da Luciana.
 // Cada dia tem um documento agenda/AAAA-MM-DD; só quem aprova pode confirmar.
+import { avisarColegioPorEmail } from "./instituicoes.js";
 let C, FS, db, col, unsub = null, items = [];
 const $ = (id) => document.getElementById(id);
 const CAMPO = { formatura: "formatura", fotos: "diaFotos" };
@@ -33,8 +34,11 @@ function render(){
   pend.innerHTML = ""; prox.innerHTML = "";
   const pendentes = items.filter(x => x.status === "pendente");
   if (pendentes.length) {
-    pend.append(el("h3", "grp", `Para aprovar (${pendentes.length})`));
-    const g = el("div", "grid"); pendentes.forEach(x => g.append(card(x))); pend.append(g);
+    // As datas de um mesmo pedido (dia de fotos + formatura) são aprovadas juntas
+    const grupos = {}; pendentes.forEach(x => { const k = x.grupo || x.id; (grupos[k] = grupos[k] || []).push(x); });
+    const lista = Object.values(grupos);
+    pend.append(el("h3", "grp", `Para aprovar (${lista.length} pedido${lista.length > 1 ? "s" : ""})`));
+    const g = el("div", "grid"); lista.forEach(gr => g.append(cardPedido(gr))); pend.append(g);
   }
   prox.append(el("h3", "grp", "Próximos compromissos"));
   if (!items.length) { const e = el("div", "empty"); e.append(el("strong", null, "Nada marcado ainda"), el("span", null, "As formaturas e os dias de fotos marcados nas Instituições aparecem aqui.")); prox.append(e); return; }
@@ -67,6 +71,33 @@ function card(x){
   return e;
 }
 
+function cardPedido(gr){
+  gr.sort((a, b) => a.data.localeCompare(b.data));
+  const x0 = gr[0];
+  const e = el("article", "card today");
+  const top = el("div", "card-top"); top.append(el("h3", "name", title(x0.instNome)), el("span", "stage", "AGUARDANDO")); e.append(top);
+  gr.forEach(x => e.append(el("div", "fu today", `${ICO[x.kind] || "📌"} ${x.tipo}: ${diaTxt(x.data)}/${x.data.slice(0, 4)}${x.hora ? " às " + x.hora : ""}${x.onde ? " · " + x.onde : ""}${x.local ? " (" + x.local + ")" : ""}`)));
+  const det = [gr.map(x => x.obs).filter(Boolean)[0], x0.pedidoPor && "Pedido por " + C.first(x0.pedidoPor)].filter(Boolean).join("\n");
+  if (det) e.append(el("p", "notes", det));
+  if (C.aprovador) {
+    const act = el("div", "actions");
+    act.append(C.mkBtn(gr.length > 1 ? "✅ Aprovar as " + gr.length + " datas" : "✅ Aprovar", "btn-ok", () => aprovarGrupo(gr)));
+    act.append(C.mkBtn("❌ Recusar", "btn-danger", () => recusar(gr)));
+    e.append(act);
+  } else e.append(el("p", "wait", "⏳ Aguardando a Luciana aprovar"));
+  return e;
+}
+async function aprovarGrupo(gr){
+  try {
+    const agora = new Date().toISOString();
+    for (const x of gr) {
+      await FS.updateDoc(FS.doc(db, "agenda", x.id), { status: "confirmado", aprovadoPor: C.me || "", aprovadoEm: agora });
+      if (x.instId && CAMPO[x.kind]) await FS.updateDoc(FS.doc(db, "instituicoes", x.instId), { [CAMPO[x.kind] + ".status"]: "confirmado", atualizadoEm: agora }).catch(() => {});
+    }
+    let n = 0; try { n = await avisarColegioPorEmail(gr[0].instId, C); } catch (e) { console.warn(e); }
+    C.toast(`Aprovado ✅${n ? ` · e-mail com as datas vai para ${n} contato${n > 1 ? "s" : ""}` : " · o colégio não tem e-mail cadastrado"}`);
+  } catch (e) { C.handleErr(e); }
+}
 async function aprovar(x){
   try {
     const agora = new Date().toISOString();
@@ -76,26 +107,29 @@ async function aprovar(x){
   } catch (e) { C.handleErr(e); }
 }
 
-function recusar(x){
+function recusar(arg){
+  const gr = Array.isArray(arg) ? arg : [arg], x = gr[0];
   const sh = el("div", "sheet"); const p = el("form", "panel"); sh.append(p);
   const close = () => sh.remove(); sh.addEventListener("click", ev => { if (ev.target === sh) close(); });
-  p.append(el("h2", null, "Recusar data"), el("p", "hint", `${x.tipo} · ${title(x.instNome)} · ${diaTxt(x.data)}. O dia fica livre de novo.`));
+  p.append(el("h2", null, gr.length > 1 ? "Recusar as datas" : "Recusar data"), el("p", "hint", `${title(x.instNome)} · ${gr.map(g => g.tipo + " " + diaTxt(g.data)).join(" + ")}. ${gr.length > 1 ? "Os dias ficam" : "O dia fica"} livre${gr.length > 1 ? "s" : ""} de novo.`));
   const mot = el("input"); mot.id = "agMot"; mot.maxLength = 200; mot.placeholder = "ex.: já tenho ensaio nesse dia";
   const sug = el("input"); sug.id = "agSug"; sug.type = "date"; sug.min = C.todayStr();
   const f1 = el("div", "field"); const l1 = el("label", null, "Motivo"); l1.htmlFor = "agMot"; f1.append(l1, mot);
-  const f2 = el("div", "field"); const l2 = el("label", null, "Sugerir outro dia (opcional)"); l2.htmlFor = "agSug"; f2.append(l2, sug);
+  const f2 = el("div", "field"); const l2 = el("label", null, gr.length > 1 ? "Sugerir outro dia para a formatura (opcional)" : "Sugerir outro dia (opcional)"); l2.htmlFor = "agSug"; f2.append(l2, sug);
   const a = el("div", "panel-actions"); const sp = el("span"); sp.style.flex = "1"; const c = el("button", "btn", "Cancelar"); c.type = "button"; c.onclick = close;
   const ok = el("button", "btn btn-danger", "Recusar e liberar o dia"); ok.type = "submit"; a.append(sp, c, ok);
   p.append(f1, f2, a); document.body.append(sh); setTimeout(() => mot.focus(), 30);
   p.addEventListener("submit", async ev => {
     ev.preventDefault(); close();
     try {
-      await FS.deleteDoc(FS.doc(db, "agenda", x.id));
-      if (x.instId && CAMPO[x.kind]) {
-        const k = CAMPO[x.kind];
-        await FS.updateDoc(FS.doc(db, "instituicoes", x.instId), { [k + ".status"]: "recusado", [k + ".motivoRecusa"]: mot.value.trim(), [k + ".sugestao"]: sug.value || "", atualizadoEm: new Date().toISOString() }).catch(() => {});
+      for (const y of gr) {
+        await FS.deleteDoc(FS.doc(db, "agenda", y.id));
+        if (y.instId && CAMPO[y.kind]) {
+          const k = CAMPO[y.kind];
+          await FS.updateDoc(FS.doc(db, "instituicoes", y.instId), { [k + ".status"]: "recusado", [k + ".motivoRecusa"]: mot.value.trim(), [k + ".sugestao"]: y.kind === "formatura" || gr.length === 1 ? (sug.value || "") : "", atualizadoEm: new Date().toISOString() }).catch(() => {});
+        }
       }
-      C.toast("Data recusada. O dia ficou livre.");
+      C.toast(gr.length > 1 ? "Datas recusadas. Os dias ficaram livres." : "Data recusada. O dia ficou livre.");
     } catch (e) { C.handleErr(e); }
   });
 }

@@ -1,0 +1,31 @@
+name: E-mails para os colégios
+
+on:
+  schedule:
+    # a cada 15 minutos
+    - cron: "*/15 * * * *"
+  workflow_dispatch:
+
+concurrency:
+  group: emails
+  cancel-in-progress: false
+
+jobs:
+  enviar:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - name: Instalar
+        working-directory: scripts
+        run: npm install --no-audit --no-fund
+      - name: Enviar e-mails da fila
+        working-directory: scripts
+        run: node emails.mjs
+        env:
+          FIREBASE_SERVICE_ACCOUNT: ${{ secrets.FIREBASE_SERVICE_ACCOUNT }}
+          GMAIL_USER: ${{ secrets.GMAIL_USER }}
+          GMAIL_APP_PASSWORD: ${{ secrets.GMAIL_APP_PASSWORD }}
