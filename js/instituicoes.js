@@ -27,6 +27,9 @@ const PRODUTOS_PADRAO = [
   { nome: "Kit Copa", preco: 80 }, { nome: "Aluguel de beca", preco: 35 }, { nome: "Foto na formatura (por aluno)", preco: 160 }
 ];
 
+// Segmentos que interessam para formatura
+const SEGMENTOS = [["pre", "Pré"], ["ano5", "5º ano"], ["ano9", "9º ano"], ["medio", "Ensino médio"]];
+
 // ---------- utilidades ----------
 function norm(s){ return String(s || "").normalize("NFD").replace(/[̀-ͯ]/g, "").toUpperCase().replace(/\s+/g, " ").trim(); }
 function slug(s){ return norm(s).replace(/[^A-Z0-9]+/g, "-").replace(/^-|-$/g, "").toLowerCase(); }
@@ -144,7 +147,7 @@ function card(it){
   const e = el("article", "card " + (["late", "today", "won"].includes(s) ? s : ""));
   const top = el("div", "card-top"); top.append(el("h3", "name", title(it.nome)), el("span", "stage", it.etapa)); e.append(top);
   const meta = el("div", "meta");
-  const segs = Object.entries(it.segmentos || {}).filter(([, v]) => v).map(([k]) => ({ infantil: "Infantil", fund1: "Fund. I", ano5: "5º ano", fund2: "Fund. II", ano9: "9º ano", medio: "Ensino médio" }[k] || k));
+  const segs = SEGMENTOS.filter(([k]) => (it.segmentos || {})[k] || (k === "pre" && (it.segmentos || {}).infantil)).map(([, t]) => t);
   [[it.resp ? "👤 " + C.first(it.resp) : "", ""], [[title(it.endereco?.bairro), title(it.endereco?.cidade)].filter(Boolean).join(" · "), "svc"],
    [segs.join(", "), ""], [it.mediaAlunos ? `~${it.mediaAlunos} alunos` : "", ""], [it.fotografoHoje || "", ""], [it.motivo ? "Motivo: " + it.motivo : "", ""]]
     .forEach(([v, c]) => { if (v) meta.append(el("span", "tag " + c, v)); });
@@ -234,8 +237,7 @@ function openForm(it){
     const fot = sel(FOTOGRAFO, it && it.fotografoHoje, "—");
     const r3 = el("div", "row2"); r3.append(field("Média de alunos", media), field("Fotógrafo hoje", fot)); p.append(r3);
     const segBox = el("div", "quick");
-    const SEGS = [["infantil", "Infantil"], ["fund1", "Fund. I"], ["ano5", "5º ano"], ["fund2", "Fund. II"], ["ano9", "9º ano"], ["medio", "Ensino médio"]];
-    const segChk = SEGS.map(([k, t]) => { const l = el("label", "chk"); const c = el("input"); c.type = "checkbox"; c.checked = !!(it && it.segmentos && it.segmentos[k]); l.append(c, document.createTextNode(" " + t)); segBox.append(l); return [k, c]; });
+    const segChk = SEGMENTOS.map(([k, t]) => { const l = el("label", "chk"); const c = el("input"); c.type = "checkbox"; c.checked = !!(it && it.segmentos && (it.segmentos[k] || (k === "pre" && it.segmentos.infantil))); l.append(c, document.createTextNode(" " + t)); segBox.append(l); return [k, c]; });
     if (tipo !== "faculdade") { const f = el("div", "field"); f.append(el("label", null, "Segmentos"), segBox); p.append(f); }
     p.append(el("h3", null, "Contatos"));
     const lista = el("div", "imp"); p.append(lista); const linhas = [];
@@ -316,7 +318,7 @@ function openVisita(it){
 }
 
 // ---------- importar planilha ----------
-const MAPA = { INSTITUICAO: "nome", ESCOLA: "nome", COLEGIO: "nome", INFANTIL: "infantil", FUNDAMENTALI: "fund1", "5ANO": "ano5", FUNDAMENTALII: "fund2", "9ANO": "ano9",
+const MAPA = { PRE: "pre", PREESCOLA: "pre", INSTITUICAO: "nome", ESCOLA: "nome", COLEGIO: "nome", INFANTIL: "infantil", FUNDAMENTALI: "fund1", "5ANO": "ano5", FUNDAMENTALII: "fund2", "9ANO": "ano9",
   ENSINOMEDIO: "medio", TELEFONE1: "t1", TELEFONE2: "t2", TELEFONE3: "t3", EMAIL: "email", ENDERECO: "rua", N: "numero", NO: "numero", NUMERO: "numero",
   BAIRRO: "bairro", CIDADE: "cidade", DATADAVISITA: "dataVisita", STATUS: "status", MEDIADEALUNOS: "media", RESPONSAVEL: "responsavel",
   TEMFOTOSDEFORMATURA: "temFotos", DATADAFOTO: "dataFoto", OBSERVACAO: "obs", OBSERVACOES: "obs", OBS: "obs" };
@@ -380,7 +382,7 @@ function openImport(){
           const dv = dataISO(r.dataVisita, X), st = norm(r.status);
           const etapa = /FECH/.test(st) ? "FECHADO" : /NAO|PERD|SEM INTERESSE/.test(st) ? "NÃO FECHOU" : dv || s(r.obs) ? "VISITADO" : "A VISITAR";
           const base = { nome: s(r.nome), nomeBusca: norm(r.nome), tipo,
-            segmentos: { infantil: sim(r.infantil), fund1: sim(r.fund1), ano5: sim(r.ano5), fund2: sim(r.fund2), ano9: sim(r.ano9), medio: sim(r.medio) },
+            segmentos: { pre: sim(r.infantil) || sim(r.pre), ano5: sim(r.ano5), ano9: sim(r.ano9), medio: sim(r.medio) },
             segmentosOrig: { infantil: s(r.infantil), fund1: s(r.fund1), ano5: s(r.ano5), fund2: s(r.fund2), ano9: s(r.ano9), medio: s(r.medio) },
             contatos, email: s(r.email).toLowerCase(), endereco: { rua: s(r.rua), numero: s(r.numero), bairro: s(r.bairro), cidade: s(r.cidade) },
             statusOrig: s(r.status), mediaAlunos: Number(String(r.media).replace(/\D/g, "")) || null, temFotosOrig: s(r.temFotos), dataFoto: dataISO(r.dataFoto, X), atualizadoEm: agora };
