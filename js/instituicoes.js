@@ -48,7 +48,9 @@ function lockInfo(it){
   return { por: a.por, desde: a.desde, mine: a.por === C.me };
 }
 function anoQueVem(){ return (new Date().getFullYear() + 1) + "-02-02"; }
-function produtos(){ const pr = C.P.precosInst || {}; return PRODUTOS_PADRAO.map(x => Object.assign({}, x, { preco: pr[x.nome] || "" })); }
+// Preços por tipo de instituição (colégio particular e público têm preços diferentes)
+function precosDo(t){ const all = C.P.precosInst || {}; const meu = all[t]; return (meu && typeof meu === "object") ? meu : {}; }
+function produtos(){ const pr = precosDo(tipo); return PRODUTOS_PADRAO.map(x => Object.assign({}, x, { preco: pr[x.nome] || "" })); }
 
 // ---------- compromissos na agenda (formatura e dia de fotos) ----------
 // Cada dia só tem UM compromisso: o documento agenda/AAAA-MM-DD guarda quem ocupou o dia.
@@ -391,13 +393,14 @@ function openEvento(it, kind){
   });
 }
 function openPrecos(){
-  sheet("Preços dos kits", (p, close) => {
-    p.append(el("p", "hint", "Esses valores aparecem prontos na hora de registrar a visita (dá para mudar na hora)."));
-    const ins = PRODUTOS_PADRAO.map(x => { const i = inp((C.P.precosInst || {})[x.nome] || "", "R$", 10); i.inputMode = "decimal"; p.append(field(x.nome, i)); return [x.nome, i]; });
+  sheet("Preços dos kits · " + TIPOS[tipo].nome, (p, close) => {
+    p.append(el("p", "hint", `Preços só para ${TIPOS[tipo].nome.toLowerCase()}. Eles aparecem prontos na hora de registrar a visita (dá para mudar na hora).`));
+    const atual = precosDo(tipo);
+    const ins = PRODUTOS_PADRAO.map(x => { const i = inp(atual[x.nome] || "", "R$", 10); i.inputMode = "decimal"; p.append(field(x.nome, i)); return [x.nome, i]; });
     p.append(actions(close, "Salvar preços"));
     p.addEventListener("submit", async ev => {
       ev.preventDefault();
-      try { await FS.setDoc(FS.doc(db, "config", "app"), { precosInst: Object.fromEntries(ins.map(([n, i]) => [n, C.num(i.value)])) }, { merge: true }); C.toast("Preços salvos"); close(); }
+      try { await FS.setDoc(FS.doc(db, "config", "app"), { precosInst: { [tipo]: Object.fromEntries(ins.map(([n, i]) => [n, C.num(i.value)])) } }, { merge: true }); C.toast("Preços salvos para " + TIPOS[tipo].nome.toLowerCase()); close(); }
       catch (e) { C.handleErr(e); }
     });
   });
