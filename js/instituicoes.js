@@ -226,8 +226,8 @@ function quandoBtns(target){
 function openForm(it){
   sheet(it ? "Editar instituição" : "Nova instituição · " + TIPOS[tipo].nome, (p, close) => {
     const nome = inp(it ? title(it.nome) : "", "Nome da instituição"); nome.required = true;
-    const tp = sel(Object.keys(TIPOS).map(k => TIPOS[k].nome), TIPOS[it ? it.tipo : tipo].nome);
-    p.append(field("Nome", nome), field("Tipo", tp));
+    // O tipo vem do cartão que foi aberto: não precisa escolher.
+    p.append(field("Nome", nome));
     const a = (it && it.endereco) || {};
     const rua = inp(title(a.rua)), num = inp(a.numero, "", 20), bai = inp(title(a.bairro)), cid = inp(title(a.cidade));
     const r1 = el("div", "row2"); r1.append(field("Endereço", rua), field("Número", num));
@@ -253,7 +253,7 @@ function openForm(it){
     p.append(actions(close, "Salvar"));
     p.addEventListener("submit", async ev => {
       ev.preventDefault(); if (!nome.value.trim()) return;
-      const tipoK = Object.keys(TIPOS).find(k => TIPOS[k].nome === tp.value) || tipo;
+      const tipoK = it ? it.tipo : tipo;
       const contatos = linhas.map(({ nm, cg, tl }) => ({ nome: nm.value.trim(), cargo: cg.value, tel: parseTel(tl.value) || tl.value.trim() })).filter(c => c.nome || c.tel);
       const body = { nome: nome.value.trim(), nomeBusca: norm(nome.value), tipo: tipoK, endereco: { rua: rua.value.trim(), numero: num.value.trim(), bairro: bai.value.trim(), cidade: cid.value.trim() },
         mediaAlunos: Number(media.value) || null, fotografoHoje: fot.value, segmentos: Object.fromEntries(segChk.map(([k, c]) => [k, c.checked])),
