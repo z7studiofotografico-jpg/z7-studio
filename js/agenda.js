@@ -1,7 +1,7 @@
 // Módulo Agendamento (primeira parte): compromissos marcados nas Instituições
 // (formaturas e dias de fotos no colégio) e a aprovação da Luciana.
 // Cada dia tem um documento agenda/AAAA-MM-DD; só quem aprova pode confirmar.
-import { avisarColegioPorEmail } from "./instituicoes.js";
+import { avisarColegioPorEmail, nomeEvento } from "./instituicoes.js";
 let C, FS, db, col, unsub = null, items = [];
 const $ = (id) => document.getElementById(id);
 const CAMPO = { formatura: "formatura", fotos: "diaFotos" };
@@ -59,7 +59,7 @@ function card(x){
   top.append(el("h3", "name", `${diaTxt(x.data)}${x.hora ? " · " + x.hora : ""}`), el("span", "stage", x.status === "confirmado" ? "CONFIRMADO" : "AGUARDANDO"));
   e.append(top);
   e.append(el("div", "meta", ""));
-  e.lastChild.append(el("span", "tag svc", `${ICO[x.kind] || "📌"} ${x.tipo || ""}`), el("span", "tag", title(x.instNome)));
+  e.lastChild.append(el("span", "tag svc", `${ICO[x.kind] || "📌"} ${nomeEvento(x.kind, x.instNome)}`));
   const det = [x.onde && x.onde + (x.local ? " · " + x.local : ""), x.obs, x.pedidoPor && "Pedido por " + C.first(x.pedidoPor), x.aprovadoPor && "Aprovado por " + C.first(x.aprovadoPor)].filter(Boolean).join("\n");
   if (det) e.append(el("p", "notes", det));
   if (x.status === "pendente" && C.aprovador) {
@@ -76,7 +76,7 @@ function cardPedido(gr){
   const x0 = gr[0];
   const e = el("article", "card today");
   const top = el("div", "card-top"); top.append(el("h3", "name", title(x0.instNome)), el("span", "stage", "AGUARDANDO")); e.append(top);
-  gr.forEach(x => e.append(el("div", "fu today", `${ICO[x.kind] || "📌"} ${x.tipo}: ${diaTxt(x.data)}/${x.data.slice(0, 4)}${x.hora ? " às " + x.hora : ""}${x.onde ? " · " + x.onde : ""}${x.local ? " (" + x.local + ")" : ""}`)));
+  gr.forEach(x => e.append(el("div", "fu today", `${ICO[x.kind] || "📌"} ${nomeEvento(x.kind, x.instNome)}: ${diaTxt(x.data)}/${x.data.slice(0, 4)}${x.hora ? " às " + x.hora : ""}${x.onde ? " · " + x.onde : ""}${x.local ? " (" + x.local + ")" : ""}`)));
   const det = [gr.map(x => x.obs).filter(Boolean)[0], x0.pedidoPor && "Pedido por " + C.first(x0.pedidoPor)].filter(Boolean).join("\n");
   if (det) e.append(el("p", "notes", det));
   if (C.aprovador) {
@@ -103,7 +103,7 @@ async function aprovar(x){
     const agora = new Date().toISOString();
     await FS.updateDoc(FS.doc(db, "agenda", x.id), { status: "confirmado", aprovadoPor: C.me || "", aprovadoEm: agora });
     if (x.instId && CAMPO[x.kind]) await FS.updateDoc(FS.doc(db, "instituicoes", x.instId), { [CAMPO[x.kind] + ".status"]: "confirmado", atualizadoEm: agora }).catch(() => {});
-    C.toast(`Aprovado: ${x.tipo} em ${C.fmtDate(x.data)}`);
+    C.toast(`Aprovado: ${nomeEvento(x.kind, x.instNome)} em ${C.fmtDate(x.data)}`);
   } catch (e) { C.handleErr(e); }
 }
 
@@ -111,7 +111,7 @@ function recusar(arg){
   const gr = Array.isArray(arg) ? arg : [arg], x = gr[0];
   const sh = el("div", "sheet"); const p = el("form", "panel"); sh.append(p);
   const close = () => sh.remove(); sh.addEventListener("click", ev => { if (ev.target === sh) close(); });
-  p.append(el("h2", null, gr.length > 1 ? "Recusar as datas" : "Recusar data"), el("p", "hint", `${title(x.instNome)} · ${gr.map(g => g.tipo + " " + diaTxt(g.data)).join(" + ")}. ${gr.length > 1 ? "Os dias ficam" : "O dia fica"} livre${gr.length > 1 ? "s" : ""} de novo.`));
+  p.append(el("h2", null, gr.length > 1 ? "Recusar as datas" : "Recusar data"), el("p", "hint", `${title(x.instNome)} · ${gr.map(g => nomeEvento(g.kind, g.instNome) + " " + diaTxt(g.data)).join(" + ")}. ${gr.length > 1 ? "Os dias ficam" : "O dia fica"} livre${gr.length > 1 ? "s" : ""} de novo.`));
   const mot = el("input"); mot.id = "agMot"; mot.maxLength = 200; mot.placeholder = "ex.: já tenho ensaio nesse dia";
   const sug = el("input"); sug.id = "agSug"; sug.type = "date"; sug.min = C.todayStr();
   const f1 = el("div", "field"); const l1 = el("label", null, "Motivo"); l1.htmlFor = "agMot"; f1.append(l1, mot);

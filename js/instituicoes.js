@@ -55,8 +55,14 @@ function produtos(){ const pr = C.P.precosInst || {}; return PRODUTOS_PADRAO.map
 // O vendedor sugere a data (fica "pendente", o dia já fica segurado) e só a Luciana confirma.
 export const KINDS = {
   formatura: { campo: "formatura", nome: "Formatura", ico: "🎓" },
-  fotos: { campo: "diaFotos", nome: "Dia de fotos no colégio", ico: "📸" }
+  fotos: { campo: "diaFotos", nome: "Dia de fotos", ico: "📸" }
 };
+// Nome do compromisso com o nome da instituição: "Dia de fotos no Colégio Alfa", "Formatura do Colégio Alfa"
+export function nomeEvento(kind, instNome){
+  const n = title(instNome || "");
+  if (!n) return KINDS[kind] ? KINDS[kind].nome : "Compromisso";
+  return kind === "fotos" ? `Dia de fotos no ${n}` : `Formatura do ${n}`;
+}
 const STATUS_TXT = { pendente: "⏳ aguardando a Luciana", confirmado: "✅ confirmado", recusado: "❌ recusado" };
 // Reserva um ou mais dias de uma vez (ex.: dia de fotos + formatura). Tudo ou nada.
 async function reservarVarios(it, pares){
@@ -75,7 +81,7 @@ async function reservarVarios(it, pares){
     for (const x of leit) if (x.s0.exists() && !(x.s0.data().instId === it.id && x.s0.data().kind === x.kind)) { const e = new Error("ocupado"); e.code = "ocupado"; e.ocupado = x.s0.data(); throw e; }
     for (const x of leit) {
       if (x.s1 && x.s1.exists() && x.s1.data().instId === it.id && x.s1.data().kind === x.kind) tx.delete(x.antigo);
-      tx.set(x.novo, { data: x.f.data, hora: x.f.hora || "", kind: x.kind, tipo: KINDS[x.kind].nome, local: x.f.local || "", onde: x.f.onde || "", obs: x.f.obs || "", status, grupo,
+      tx.set(x.novo, { data: x.f.data, hora: x.f.hora || "", kind: x.kind, tipo: nomeEvento(x.kind, it.nome), local: x.f.local || "", onde: x.f.onde || "", obs: x.f.obs || "", status, grupo,
         instId: it.id, instNome: it.nome, instTipo: it.tipo, pedidoPor: C.me || "", em: agora,
         ...(status === "confirmado" ? { aprovadoPor: C.me || "", aprovadoEm: agora } : {}) });
     }
@@ -95,13 +101,13 @@ function msgErroData(e){
   if (e.code === "ordem") return "O dia de medir beca e fazer o ensaio precisa ser ANTES da formatura.";
   return "Não foi possível reservar o dia.";
 }
-function msgOcupado(e){ const o = e.ocupado || {}; return `O dia ${C.fmtDate(o.data)}/${String(o.data || "").slice(0, 4)} já está ocupado: ${o.tipo || "compromisso"} de ${title(o.instNome)}${o.hora ? " às " + o.hora : ""} (${o.status === "confirmado" ? "confirmado" : "aguardando a Luciana"}). Escolha outra data.`; }
-function camposEvento(kind, f){
+function msgOcupado(e){ const o = e.ocupado || {}; return `O dia ${C.fmtDate(o.data)}/${String(o.data || "").slice(0, 4)} já está ocupado: ${nomeEvento(o.kind, o.instNome)}${o.hora ? " às " + o.hora : ""} (${o.status === "confirmado" ? "confirmado" : "aguardando a Luciana"}). Escolha outra data.`; }
+function camposEvento(kind, f, instNome){
   const K = KINDS[kind], box = el("div", "imp");
   const data = el("input"); data.type = "date"; data.value = (f && f.status !== "recusado" && f.data) || ""; data.min = C.todayStr();
   const hora = el("input"); hora.type = "time"; hora.value = (f && f.hora) || "";
   const r1 = el("div", "row2"); r1.append(field(kind === "formatura" ? "Dia da formatura" : "Dia das fotos", data), field("Horário", hora));
-  box.append(el("h3", null, K.ico + " " + K.nome), el("p", "hint", (C.aprovador ? "Você confirma direto." : "A data fica segurada e vai para a Luciana aprovar.") + " Cada dia só pode ter um compromisso."), r1);
+  box.append(el("h3", null, K.ico + " " + (instNome ? nomeEvento(kind, instNome) : K.nome)), el("p", "hint", (C.aprovador ? "Você confirma direto." : "A data fica segurada e vai para a Luciana aprovar.") + " Cada dia só pode ter um compromisso."), r1);
   let onde = null, local = null, obs = null;
   if (kind === "formatura") {
     onde = sel(["Colégio", "Salão"], (f && f.onde) || "Colégio"); local = inp(f && f.local, "nome do salão ou endereço");
@@ -127,8 +133,8 @@ export async function avisarColegioPorEmail(instId, ctx){
   const sem = ["domingo", "segunda-feira", "terça-feira", "quarta-feira", "quinta-feira", "sexta-feira", "sábado"];
   const dia = d => { const [y, m, dd] = d.split("-").map(Number); return `${sem[new Date(y, m - 1, dd).getDay()]}, ${String(dd).padStart(2, "0")}/${String(m).padStart(2, "0")}/${y}`; };
   const lin = [];
-  if (it.diaFotos && it.diaFotos.status === "confirmado") lin.push(`📸 Medição de beca e ensaio de estúdio no colégio: ${dia(it.diaFotos.data)}${it.diaFotos.hora ? " às " + it.diaFotos.hora : ""}`);
-  if (it.formatura && it.formatura.status === "confirmado") lin.push(`🎓 Formatura: ${dia(it.formatura.data)}${it.formatura.hora ? " às " + it.formatura.hora : ""}${it.formatura.onde ? " · " + (it.formatura.onde === "Salão" ? "no salão" : "no colégio") : ""}${it.formatura.local ? " (" + it.formatura.local + ")" : ""}`);
+  if (it.diaFotos && it.diaFotos.status === "confirmado") lin.push(`📸 Medição de beca e ensaio de estúdio no ${title(it.nome)}: ${dia(it.diaFotos.data)}${it.diaFotos.hora ? " às " + it.diaFotos.hora : ""}`);
+  if (it.formatura && it.formatura.status === "confirmado") lin.push(`🎓 Formatura do ${title(it.nome)}: ${dia(it.formatura.data)}${it.formatura.hora ? " às " + it.formatura.hora : ""}${it.formatura.onde ? " · " + (it.formatura.onde === "Salão" ? "no salão" : "no colégio") : ""}${it.formatura.local ? " (" + it.formatura.local + ")" : ""}`);
   if (!lin.length) return 0;
   const nome = title(it.nome);
   await F.addDoc(F.collection(c.db, "emails"), {
@@ -143,8 +149,8 @@ function linhaEvento(it, kind){
   const ev = it[KINDS[kind].campo]; if (!ev || !ev.data) return null;
   const K = KINDS[kind];
   const t = ev.status === "recusado"
-    ? `${K.ico} ${K.nome}: ${STATUS_TXT.recusado} o dia ${C.fmtDate(ev.data)}${ev.motivoRecusa ? " (" + ev.motivoRecusa + ")" : ""}${ev.sugestao ? " · sugeriu " + C.fmtDate(ev.sugestao) : ""}`
-    : `${K.ico} ${K.nome} ${C.fmtDate(ev.data)}/${ev.data.slice(0, 4)}${ev.hora ? " às " + ev.hora : ""}${ev.onde ? " · " + ev.onde : ""}${ev.local ? " (" + ev.local + ")" : ""} · ${STATUS_TXT[ev.status] || STATUS_TXT.pendente}`;
+    ? `${K.ico} ${nomeEvento(kind, it.nome)}: ${STATUS_TXT.recusado} o dia ${C.fmtDate(ev.data)}${ev.motivoRecusa ? " (" + ev.motivoRecusa + ")" : ""}${ev.sugestao ? " · sugeriu " + C.fmtDate(ev.sugestao) : ""}`
+    : `${K.ico} ${nomeEvento(kind, it.nome)}: ${C.fmtDate(ev.data)}/${ev.data.slice(0, 4)}${ev.hora ? " às " + ev.hora : ""}${ev.onde ? " · " + ev.onde : ""}${ev.local ? " (" + ev.local + ")" : ""} · ${STATUS_TXT[ev.status] || STATUS_TXT.pendente}`;
   return el("div", "fu " + (ev.status === "confirmado" ? "ok" : ev.status === "recusado" ? "late" : "today"), t);
 }
 function parseTel(v){ const d = String(v || "").replace(/\D/g, "").replace(/^55(?=\d{10,11}$)/, ""); return d.length >= 10 && d.length <= 11 ? d : ""; }
@@ -274,7 +280,7 @@ function card(it){
   ["fotos", "formatura"].forEach(k => { const l = linhaEvento(it, k); if (l) e.append(l); });
   if (pendFotos(it)) {
     const pd = el("div", "lock other");
-    pd.append(el("span", null, "⚠️ Pendência: marcar o dia de medir beca e fazer o ensaio de estúdio"), C.mkBtn("📸 Marcar agora", "btn-primary", () => openEvento(it, "fotos")));
+    pd.append(el("span", null, `⚠️ Pendência: marcar o dia de medir beca e fazer o ensaio de estúdio no ${title(it.nome)}`), C.mkBtn("📸 Marcar agora", "btn-primary", () => openEvento(it, "fotos")));
     e.append(pd);
   }
   if (it.avisoEmail && it.avisoEmail.em) e.append(el("div", "last", `📧 Datas enviadas por e-mail para ${it.avisoEmail.para.join(", ")} em ${C.fmtDate(C.ds(new Date(it.avisoEmail.em)))}`));
@@ -347,17 +353,17 @@ function quandoBtns(target){
 function openEvento(it, kind){
   const K = KINDS[kind], ev = it[K.campo], fot = it.diaFotos;
   const comFotos = kind === "formatura"; // formatura sempre leva junto o dia de medir beca + ensaio
-  sheet(K.nome + " · " + title(it.nome), (p, close) => {
+  sheet(nomeEvento(kind, it.nome), (p, close) => {
     const travado = !C.aprovador && ev && ev.status === "confirmado" && (!comFotos || (fot && fot.status === "confirmado"));
     if (travado) {
-      [["fotos", fot], [kind, ev]].forEach(([k, x]) => { if (x && x.data && (k === kind || comFotos)) p.append(el("p", null, `${KINDS[k].ico} ${KINDS[k].nome}: ${C.fmtDate(x.data)}/${x.data.slice(0, 4)}${x.hora ? " às " + x.hora : ""} · ✅ confirmado`)); });
+      [["fotos", fot], [kind, ev]].forEach(([k, x]) => { if (x && x.data && (k === kind || comFotos)) p.append(el("p", null, `${KINDS[k].ico} ${nomeEvento(k, it.nome)}: ${C.fmtDate(x.data)}/${x.data.slice(0, 4)}${x.hora ? " às " + x.hora : ""} · ✅ confirmado`)); });
       p.append(el("p", "hint", "Confirmado pela Luciana. Para mudar ou desmarcar, fale com ela."));
       const a = el("div", "panel-actions"); const ok = el("button", "btn btn-primary", "Fechar"); ok.type = "button"; ok.onclick = close; a.append(ok); p.append(a); return;
     }
-    const dBox = comFotos ? camposEvento("fotos", fot) : null;
+    const dBox = comFotos ? camposEvento("fotos", fot, it.nome) : null;
     if (dBox) { p.append(el("p", "hint", "Lembrete: a formatura costuma ter 2 dias. Primeiro medir beca e fazer o ensaio de estúdio no colégio, depois a formatura. Se ainda não combinou o dia das fotos, pode deixar em branco.")); p.append(dBox); }
     let avisado = false;
-    const box = camposEvento(kind, ev); p.append(box);
+    const box = camposEvento(kind, ev, it.nome); p.append(box);
     if (ev && ev.data && ev.status !== "recusado") {
       const lib = el("button", "btn btn-danger btn-sm", comFotos ? "Desmarcar formatura e dia de fotos (libera os dias)" : "Desmarcar (libera o dia)"); lib.type = "button";
       lib.onclick = async () => { try { await liberar(it, kind); if (comFotos) await liberar(it, "fotos");
@@ -461,10 +467,10 @@ function openVisita(it){
       r.append(l, v); prodBox.append(r); prods.push({ nome: pr.nome, c, v, formatura: pr.formatura });
     });
     p.append(prodBox);
-    const fBox = camposEvento("formatura", it.formatura); fBox.hidden = true; p.append(fBox);
+    const fBox = camposEvento("formatura", it.formatura, it.nome); fBox.hidden = true; p.append(fBox);
     // Dia de fotos no colégio (medir beca + ensaio)
     const dfL = el("label", "chk"); const dfC = el("input"); dfC.type = "checkbox"; dfL.append(dfC, document.createTextNode(" 📸 Já combinou o dia de fotos no colégio (medir beca + ensaio)"));
-    const dBox = camposEvento("fotos", it.diaFotos); dBox.hidden = true; dfC.onchange = () => { dBox.hidden = !dfC.checked; };
+    const dBox = camposEvento("fotos", it.diaFotos, it.nome); dBox.hidden = true; dfC.onchange = () => { dBox.hidden = !dfC.checked; };
     p.append(dfL, dBox);
     const syncF = () => { const fx = prods.find(x => x.formatura && x.c.checked); fBox.hidden = !fx; if (fx) { fBox.onde.value = fx.formatura; dfC.checked = true; dBox.hidden = false; } };
     prods.forEach(x => x.c.addEventListener("change", syncF));
