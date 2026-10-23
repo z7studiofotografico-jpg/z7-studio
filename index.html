@@ -228,12 +228,23 @@ details.guide summary{cursor:pointer;font-family:var(--f-display);font-weight:70
           <small>Ensaios, formaturas e visitas do ano</small>
           <span class="tile-n">Em breve</span>
         </a>
-        <a class="tile soon" href="#colegios" data-mod="colegios">
+        <a class="tile" href="#instituicoes" data-mod="colegios">
           <span class="tile-ico" aria-hidden="true">🏫</span>
-          <b>Colégios</b>
-          <small>Visitas, motivo de não fechar e quando retornar</small>
-          <span class="tile-n">Em breve</span>
+          <b>Instituições</b>
+          <small>Colégios, cursos e faculdades: visitas, propostas e retornos</small>
+          <span class="tile-n">Abrir</span>
         </a>
+      </div>
+    </section>
+
+    <!-- Instituições: um cartão para cada tipo -->
+    <section id="viewInst" class="view" hidden>
+      <div class="vhead"><h2>Instituições</h2></div>
+      <div class="tiles">
+        <a class="tile" href="#inst-particular"><span class="tile-ico" aria-hidden="true">🏫</span><b>Colégio particular</b><small>Direção e coordenação decidem</small><span class="tile-n">Em construção</span></a>
+        <a class="tile" href="#inst-publico"><span class="tile-ico" aria-hidden="true">🏛️</span><b>Colégio público</b><small>Direção decide, às vezes com autorização</small><span class="tile-n">Em construção</span></a>
+        <a class="tile" href="#inst-profissionalizante"><span class="tile-ico" aria-hidden="true">🛠️</span><b>Colégio profissionalizante</b><small>Cursos técnicos e profissionalizantes</small><span class="tile-n">Em construção</span></a>
+        <a class="tile" href="#inst-faculdade"><span class="tile-ico" aria-hidden="true">🎓</span><b>Faculdade</b><small>Comissão de formatura decide</small><span class="tile-n">Em construção</span></a>
       </div>
     </section>
 
@@ -488,7 +499,7 @@ function renderMe(){
   sel.value = cur;
 }
 // Módulos do app. Administradores e donos veem tudo; a equipe vê só o que foi liberado no cadastro.
-const MODULOS = [["funil", "Funil de vendas"], ["lf", "PR · Linha de Frente"], ["rep", "PR · Repasse"], ["agenda", "Agendamento"], ["colegios", "Colégios"]];
+const MODULOS = [["funil", "Funil de vendas"], ["lf", "PR · Linha de Frente"], ["rep", "PR · Repasse"], ["agenda", "Agendamento"], ["colegios", "Instituições"]];
 function pode(m){
   if (isAdmin) return true;
   const p = USERS[(user && user.email || "").toLowerCase()];
@@ -773,7 +784,10 @@ function refreshPushToken(){ if (pushSupported() && Notification.permission === 
 $("btnPush").onclick = () => enablePush(true);
 
 // ---------- navegação entre módulos ----------
-const VIEWS = { home: "viewHome", funil: "viewFunil", pr: "viewRepasse", repasse: "viewRepasse", agenda: "viewSoon", colegios: "viewSoon" };
+const VIEWS = { home: "viewHome", funil: "viewFunil", pr: "viewRepasse", repasse: "viewRepasse", agenda: "viewSoon",
+  instituicoes: "viewInst", colegios: "viewInst",
+  "inst-particular": "viewSoon", "inst-publico": "viewSoon", "inst-profissionalizante": "viewSoon", "inst-faculdade": "viewSoon" };
+const INST_NOMES = { "inst-particular": "Colégio particular", "inst-publico": "Colégio público", "inst-profissionalizante": "Colégio profissionalizante", "inst-faculdade": "Faculdade" };
 let repasseMod = null, curView = "home";
 const ctx = {
   db, FS, $, toast, mkBtn, money, num, digits, first, todayStr, addDays, fmtDate, hhmm, ds, pad, showNotice, handleErr,
@@ -785,13 +799,16 @@ async function route(){
   if (!user || !usersLoaded) return;
   const r = (location.hash || "").slice(1);
   let key = VIEWS[r] ? r : "home";
-  const modDe = { funil: "funil", pr: "pr", repasse: "pr", agenda: "agenda", colegios: "colegios" };
+  const modDe = { funil: "funil", pr: "pr", repasse: "pr", agenda: "agenda", colegios: "colegios", instituicoes: "colegios",
+    "inst-particular": "colegios", "inst-publico": "colegios", "inst-profissionalizante": "colegios", "inst-faculdade": "colegios" };
   if (modDe[key] && !pode(modDe[key])) { key = "home"; if (r) history.replaceState(null, "", "#home"); }
   curView = key;
   new Set(Object.values(VIEWS)).forEach(id => { $(id).hidden = true; });
   $(VIEWS[key]).hidden = false;
   $("btnBack").hidden = key === "home";
-  if (key === "agenda" || key === "colegios") $("soonTitle").textContent = key === "agenda" ? "Agendamento: em breve" : "Colégios: em breve";
+  $("btnBack").textContent = INST_NOMES[key] ? "‹ Instituições" : "‹ Início";
+  if (key === "agenda") $("soonTitle").textContent = "Agendamento: em breve";
+  if (INST_NOMES[key]) $("soonTitle").textContent = INST_NOMES[key] + ": em construção";
   if (key === "home") renderHome();
   if (key === "pr" || key === "repasse") {
     try {
@@ -802,7 +819,7 @@ async function route(){
   window.scrollTo(0, 0);
 }
 addEventListener("hashchange", route);
-$("btnBack").onclick = () => { location.hash = "#home"; };
+$("btnBack").onclick = () => { location.hash = INST_NOMES[curView] ? "#instituicoes" : "#home"; };
 
 let repCount = { at: 0, n: null };
 function renderHome(){
@@ -922,7 +939,7 @@ function startData(){
     applyProfile(); syncLeads(); render();
     if (!usersLoaded) { usersLoaded = true; route(); }
     else if (curView === "home") renderHome();
-    else { const md = { funil: "funil", pr: "pr", repasse: "pr", agenda: "agenda", colegios: "colegios" }[curView]; if (md && !pode(md)) route(); }
+    else { const md = { funil: "funil", pr: "pr", repasse: "pr", agenda: "agenda" }[curView] || (curView === "instituicoes" || curView === "colegios" || INST_NOMES[curView] ? "colegios" : null); if (md && !pode(md)) route(); }
     if (!$("sheetTeam").hidden) renderTeam();
   }, err => { if (err.code === "permission-denied") showNotice("Este e-mail não tem acesso ao app. Peça para um administrador cadastrar você."); }));
   unsub.push(onSnapshot(doc(db, "config", "app"), s => {
