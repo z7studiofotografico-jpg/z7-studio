@@ -25,7 +25,16 @@ service cloud.firestore {
       allow delete: if admin();
     }
     // Agenda: um documento por dia (AAAA-MM-DD). Cada dia só tem uma formatura.
-    match /agenda/{dia} { allow read, write: if pode('colegios') || pode('agenda'); }
+    // Agenda: um documento por dia (AAAA-MM-DD), um compromisso por dia.
+    // Qualquer um com acesso sugere a data (pendente); só quem aprova confirma.
+    function aprovador() { return logado() && email() in ['lucianafanjos@gmail.com']; }
+    function usaAgenda() { return pode('colegios') || pode('agenda'); }
+    match /agenda/{dia} {
+      allow read: if usaAgenda();
+      allow create: if usaAgenda() && (request.resource.data.status == 'pendente' || aprovador());
+      allow update: if usaAgenda() && resource.data.status != 'confirmado' && request.resource.data.status == 'pendente' || aprovador();
+      allow delete: if aprovador() || admin() || (usaAgenda() && resource.data.status != 'confirmado');
+    }
     match /repasse/{id} {
       allow read: if pode('rep') || (pode('lf') && anoAtual(resource.data));
       allow update: if pode('rep') || (pode('lf') && anoAtual(resource.data) && anoAtual(request.resource.data));

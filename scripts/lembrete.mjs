@@ -29,6 +29,9 @@ const repVencidos = repSnap.docs.map((d) => d.data()).filter((r) => REP_ABERTAS.
 // Instituições: retornos vencidos (colégios, cursos e faculdades)
 const instSnap = await db.collection("instituicoes").where("followup", "<=", hoje).get();
 const instVencidos = instSnap.docs.map((d) => d.data()).filter((x) => x.etapa !== "FECHADO");
+// Agenda: datas esperando aprovação (só para quem aprova)
+const APROVADORES = ["lucianafanjos@gmail.com"];
+const pendAgenda = (await db.collection("agenda").where("status", "==", "pendente").get()).size;
 const tokensSnap = await db.collection("tokens").get();
 console.log(`Hoje ${hoje}: ${vencidos.length} lead(s) com contato vencido, ${tokensSnap.size} aparelho(s).`);
 
@@ -52,12 +55,14 @@ for (const t of tokensSnap.docs) {
     title = "Z7 Studio: notificação de teste ✅";
     body = `Funcionando neste aparelho${nome ? " de " + nome : ""}. ${meus.length} contato(s) para hoje.`;
   } else {
-    if (!meus.length && !meusRep.length && !meusInst.length) continue;
-    const total = meus.length + meusRep.length + meusInst.length;
+    const aprova = APROVADORES.includes(String(t.get("email") || "").toLowerCase()) ? pendAgenda : 0;
+    if (!meus.length && !meusRep.length && !meusInst.length && !aprova) continue;
+    const total = meus.length + meusRep.length + meusInst.length + aprova;
     const atrasados = meus.filter((l) => l.followup < hoje).length + meusRep.filter((r) => r.followup < hoje).length + meusInst.filter((x) => x.followup < hoje).length;
     const partes = [];
     if (meus.length) partes.push(`Funil: ${meus.slice(0, 3).map((l) => primeiro(l.nome)).join(", ")}${meus.length > 3 ? ` e mais ${meus.length - 3}` : ""}`);
     if (meusRep.length) partes.push(`PR: ${meusRep.length}`);
+    if (aprova) partes.push(`Agenda: ${aprova} data${aprova > 1 ? "s" : ""} para aprovar`);
     if (meusInst.length) partes.push(`Instituições: ${meusInst.slice(0, 2).map((x) => primeiro(x.nome)).join(", ")}${meusInst.length > 2 ? ` e mais ${meusInst.length - 2}` : ""}`);
     title = `Bom dia${nome ? ", " + primeiro(nome) : ""}! ${total} contato${total > 1 ? "s" : ""} para hoje`;
     body = partes.join(" · ") + (atrasados ? ` · ${atrasados} atrasado${atrasados > 1 ? "s" : ""}` : "");

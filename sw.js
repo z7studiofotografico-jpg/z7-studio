@@ -1,8 +1,8 @@
 // Service worker do Z7 Studio: deixa o app abrir rápido (e sem internet) e recebe as notificações.
-const CACHE = "z7-funil-v14";
+const CACHE = "z7-funil-v15";
 const SHELL = ["./", "./index.html", "./config.js", "./manifest.webmanifest",
   "./icons/icon-192.png", "./icons/icon-512.png", "./icons/apple-touch-icon.png",
-  "./js/repasse.js", "./js/mockup.js", "./js/instituicoes.js"];
+  "./js/repasse.js", "./js/mockup.js", "./js/instituicoes.js", "./js/agenda.js"];
 
 importScripts("./config.js");
 importScripts(

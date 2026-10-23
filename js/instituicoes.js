@@ -50,39 +50,64 @@ function lockInfo(it){
 function anoQueVem(){ return (new Date().getFullYear() + 1) + "-02-02"; }
 function produtos(){ const pr = C.P.precosInst || {}; return PRODUTOS_PADRAO.map(x => Object.assign({}, x, { preco: pr[x.nome] || "" })); }
 
-// ---------- formatura e agenda ----------
-// Cada dia só pode ter UMA formatura: o documento agenda/AAAA-MM-DD guarda quem ocupou o dia.
-async function reservarFormatura(it, f){
+// ---------- compromissos na agenda (formatura e dia de fotos) ----------
+// Cada dia só tem UM compromisso: o documento agenda/AAAA-MM-DD guarda quem ocupou o dia.
+// O vendedor sugere a data (fica "pendente", o dia já fica segurado) e só a Luciana confirma.
+export const KINDS = {
+  formatura: { campo: "formatura", nome: "Formatura", ico: "🎓" },
+  fotos: { campo: "diaFotos", nome: "Dia de fotos no colégio", ico: "📸" }
+};
+const STATUS_TXT = { pendente: "⏳ aguardando a Luciana", confirmado: "✅ confirmado", recusado: "❌ recusado" };
+async function reservar(it, kind, f){
+  const K = KINDS[kind], atual = it[K.campo];
+  if (atual && atual.status === "confirmado" && !C.aprovador && atual.data !== f.data) { const e = new Error("confirmado"); e.code = "confirmado"; throw e; }
+  const status = C.aprovador ? "confirmado" : "pendente";
   const novo = FS.doc(db, "agenda", f.data);
-  const antigo = it.formatura && it.formatura.data && it.formatura.data !== f.data ? FS.doc(db, "agenda", it.formatura.data) : null;
+  const antigo = atual && atual.data && atual.data !== f.data && atual.status !== "recusado" ? FS.doc(db, "agenda", atual.data) : null;
   await FS.runTransaction(db, async tx => {
     const s0 = await tx.get(novo);
     const s1 = antigo ? await tx.get(antigo) : null;
-    if (s0.exists() && s0.data().instId !== it.id) { const o = s0.data(); const e = new Error("ocupado"); e.code = "ocupado"; e.ocupado = o; throw e; }
-    if (s1 && s1.exists() && s1.data().instId === it.id) tx.delete(antigo);
-    tx.set(novo, { data: f.data, hora: f.hora || "", tipo: "Formatura", local: f.local || "", onde: f.onde || "", instId: it.id, instNome: it.nome, instTipo: it.tipo, por: C.me || "", em: new Date().toISOString() });
+    if (s0.exists() && !(s0.data().instId === it.id && s0.data().kind === kind)) { const e = new Error("ocupado"); e.code = "ocupado"; e.ocupado = s0.data(); throw e; }
+    if (s1 && s1.exists() && s1.data().instId === it.id && s1.data().kind === kind) tx.delete(antigo);
+    tx.set(novo, { data: f.data, hora: f.hora || "", kind, tipo: K.nome, local: f.local || "", onde: f.onde || "", obs: f.obs || "", status,
+      instId: it.id, instNome: it.nome, instTipo: it.tipo, pedidoPor: C.me || "", em: new Date().toISOString(),
+      ...(status === "confirmado" ? { aprovadoPor: C.me || "", aprovadoEm: new Date().toISOString() } : {}) });
   });
+  return status;
 }
-async function liberarFormatura(it){
-  if (!it.formatura || !it.formatura.data) return;
-  const ref = FS.doc(db, "agenda", it.formatura.data);
-  await FS.runTransaction(db, async tx => { const s0 = await tx.get(ref); if (s0.exists() && s0.data().instId === it.id) tx.delete(ref); });
+async function liberar(it, kind){
+  const ev = it[KINDS[kind].campo]; if (!ev || !ev.data || ev.status === "recusado") return;
+  const ref = FS.doc(db, "agenda", ev.data);
+  await FS.runTransaction(db, async tx => { const s0 = await tx.get(ref); if (s0.exists() && s0.data().instId === it.id && s0.data().kind === kind) tx.delete(ref); });
 }
-function msgOcupado(e){ const o = e.ocupado || {}; return `O dia ${C.fmtDate(o.data)}/${String(o.data || "").slice(0, 4)} já está ocupado com a formatura de ${title(o.instNome)}${o.hora ? " às " + o.hora : ""}. Escolha outra data.`; }
-function camposFormatura(f){
-  const box = el("div", "imp");
-  const data = el("input"); data.type = "date"; data.value = (f && f.data) || ""; data.min = C.todayStr();
+function msgOcupado(e){ const o = e.ocupado || {}; return `O dia ${C.fmtDate(o.data)}/${String(o.data || "").slice(0, 4)} já está ocupado: ${o.tipo || "compromisso"} de ${title(o.instNome)}${o.hora ? " às " + o.hora : ""} (${o.status === "confirmado" ? "confirmado" : "aguardando a Luciana"}). Escolha outra data.`; }
+function camposEvento(kind, f){
+  const K = KINDS[kind], box = el("div", "imp");
+  const data = el("input"); data.type = "date"; data.value = (f && f.status !== "recusado" && f.data) || ""; data.min = C.todayStr();
   const hora = el("input"); hora.type = "time"; hora.value = (f && f.hora) || "";
-  const onde = sel(["Colégio", "Salão"], (f && f.onde) || "Colégio");
-  const local = inp(f && f.local, "nome do salão ou endereço");
-  const r1 = el("div", "row2"); r1.append(field("Dia da formatura", data), field("Horário", hora));
-  const r2 = el("div", "row2"); r2.append(field("Onde", onde), field("Local", local));
-  const err = el("p", "err"); err.hidden = true;
-  box.append(el("h3", null, "🎓 Formatura"), el("p", "hint", "Cada dia só pode ter uma formatura. Se a data já estiver ocupada, o app avisa."), r1, r2, err);
-  box.valor = () => ({ data: data.value, hora: hora.value, onde: onde.value, local: local.value.trim() });
+  const r1 = el("div", "row2"); r1.append(field(kind === "formatura" ? "Dia da formatura" : "Dia das fotos", data), field("Horário", hora));
+  box.append(el("h3", null, K.ico + " " + K.nome), el("p", "hint", (C.aprovador ? "Você confirma direto." : "A data fica segurada e vai para a Luciana aprovar.") + " Cada dia só pode ter um compromisso."), r1);
+  let onde = null, local = null, obs = null;
+  if (kind === "formatura") {
+    onde = sel(["Colégio", "Salão"], (f && f.onde) || "Colégio"); local = inp(f && f.local, "nome do salão ou endereço");
+    const r2 = el("div", "row2"); r2.append(field("Onde", onde), field("Local", local)); box.append(r2);
+  } else {
+    obs = inp((f && f.obs) || "Medir beca + ensaio de estúdio no colégio", "o que vai ser feito", 200); box.append(field("O que vai ser feito", obs));
+  }
+  if (f && f.status === "recusado") box.append(el("p", "wait", `A Luciana recusou o dia ${C.fmtDate(f.data)}${f.motivoRecusa ? ": " + f.motivoRecusa : ""}${f.sugestao ? ` · sugeriu ${C.fmtDate(f.sugestao)}` : ""}`));
+  const err = el("p", "err"); err.hidden = true; box.append(err);
+  box.valor = () => ({ data: data.value, hora: hora.value, onde: onde ? onde.value : "", local: local ? local.value.trim() : "", obs: obs ? obs.value.trim() : "" });
   box.erro = t => { err.textContent = t; err.hidden = !t; if (t) err.scrollIntoView({ block: "center" }); };
   box.onde = onde;
   return box;
+}
+function linhaEvento(it, kind){
+  const ev = it[KINDS[kind].campo]; if (!ev || !ev.data) return null;
+  const K = KINDS[kind];
+  const t = ev.status === "recusado"
+    ? `${K.ico} ${K.nome}: ${STATUS_TXT.recusado} o dia ${C.fmtDate(ev.data)}${ev.motivoRecusa ? " (" + ev.motivoRecusa + ")" : ""}${ev.sugestao ? " · sugeriu " + C.fmtDate(ev.sugestao) : ""}`
+    : `${K.ico} ${K.nome} ${C.fmtDate(ev.data)}/${ev.data.slice(0, 4)}${ev.hora ? " às " + ev.hora : ""}${ev.onde ? " · " + ev.onde : ""}${ev.local ? " (" + ev.local + ")" : ""} · ${STATUS_TXT[ev.status] || STATUS_TXT.pendente}`;
+  return el("div", "fu " + (ev.status === "confirmado" ? "ok" : ev.status === "recusado" ? "late" : "today"), t);
 }
 function parseTel(v){ const d = String(v || "").replace(/\D/g, "").replace(/^55(?=\d{10,11}$)/, ""); return d.length >= 10 && d.length <= 11 ? d : ""; }
 
@@ -196,7 +221,7 @@ function card(it){
     : it.followup ? (s === "late" ? "Atrasado desde " + C.fmtDate(it.followup) : s === "today" ? "Retorno hoje" : "Retorno em " + C.fmtDate(it.followup) + (it.followup.slice(0, 4) !== C.todayStr().slice(0, 4) ? "/" + it.followup.slice(0, 4) : "")) + (it.proximoPasso ? " · " + it.proximoPasso : "")
     : "Sem data de retorno";
   e.append(fu);
-  if (it.formatura && it.formatura.data) e.append(el("div", "fu today", `🎓 Formatura ${C.fmtDate(it.formatura.data)}/${it.formatura.data.slice(0, 4)}${it.formatura.hora ? " às " + it.formatura.hora : ""} · ${it.formatura.onde || ""}${it.formatura.local ? " (" + it.formatura.local + ")" : ""}`));
+  ["formatura", "fotos"].forEach(k => { const l = linhaEvento(it, k); if (l) e.append(l); });
   const ult = (it.visitas || [])[0];
   if (ult) {
     const linhas = [`${C.fmtDate(ult.data)}${ult.data && ult.data.slice(0, 4) !== C.todayStr().slice(0, 4) ? "/" + ult.data.slice(0, 4) : ""} · ${ult.por ? C.first(ult.por) : "planilha"}${ult.falouCom ? " falou com " + ult.falouCom : ""}${ult.resultado ? " · " + ult.resultado : ""}`];
@@ -232,7 +257,8 @@ function card(it){
   act.append(C.mkBtn("📝 Registrar visita / contato", "btn-primary", () => openVisita(it)));
   if (it.etapa !== "FECHADO") act.append(C.mkBtn("Remarcar +7d", "", () => save(it, { followup: C.addDays(7) }, "Retorno em " + C.fmtDate(C.addDays(7)))));
   if (!li && it.etapa !== "FECHADO") act.append(C.mkBtn("✋ Estou atendendo", "", () => claim(it)));
-  act.append(C.mkBtn(it.formatura && it.formatura.data ? "🎓 Mudar formatura" : "🎓 Marcar formatura", "", () => openFormatura(it)));
+  act.append(C.mkBtn("🎓 Formatura", "", () => openEvento(it, "formatura")));
+  act.append(C.mkBtn("📸 Dia de fotos", "", () => openEvento(it, "fotos")));
   act.append(C.mkBtn("Editar", "", () => openForm(it)));
   e.append(act);
   return e;
@@ -262,19 +288,28 @@ function quandoBtns(target){
   return q;
 }
 
-function openFormatura(it){
-  sheet("Formatura · " + title(it.nome), (p, close) => {
-    const fBox = camposFormatura(it.formatura); p.append(fBox);
-    if (it.formatura && it.formatura.data) {
-      const lib = el("button", "btn btn-danger btn-sm", "Desmarcar formatura (libera o dia)"); lib.type = "button";
-      lib.onclick = async () => { try { await liberarFormatura(it); await FS.updateDoc(FS.doc(db, "instituicoes", it.id), { formatura: null, atualizadoEm: new Date().toISOString() }); C.toast("Formatura desmarcada"); close(); } catch (e) { C.handleErr(e); } };
+function openEvento(it, kind){
+  const K = KINDS[kind], ev = it[K.campo];
+  sheet(K.nome + " · " + title(it.nome), (p, close) => {
+    const travado = ev && ev.status === "confirmado" && !C.aprovador;
+    if (travado) {
+      p.append(el("p", null, `${K.ico} ${C.fmtDate(ev.data)}/${ev.data.slice(0, 4)}${ev.hora ? " às " + ev.hora : ""} · ✅ confirmado pela Luciana.`), el("p", "hint", "Para mudar ou desmarcar, fale com a Luciana."));
+      const a = el("div", "panel-actions"); const ok = el("button", "btn btn-primary", "Fechar"); ok.type = "button"; ok.onclick = close; a.append(ok); p.append(a); return;
+    }
+    const box = camposEvento(kind, ev); p.append(box);
+    if (ev && ev.data && ev.status !== "recusado") {
+      const lib = el("button", "btn btn-danger btn-sm", "Desmarcar (libera o dia)"); lib.type = "button";
+      lib.onclick = async () => { try { await liberar(it, kind); await FS.updateDoc(FS.doc(db, "instituicoes", it.id), { [K.campo]: null, atualizadoEm: new Date().toISOString() }); C.toast(K.nome + " desmarcada"); close(); } catch (e) { C.handleErr(e); } };
       p.append(lib);
     }
-    p.append(actions(close, "Salvar formatura"));
-    p.addEventListener("submit", async ev => {
-      ev.preventDefault(); const f = fBox.valor(); if (!f.data) { fBox.erro("Escolha o dia da formatura."); return; }
-      try { await reservarFormatura(it, f); await FS.updateDoc(FS.doc(db, "instituicoes", it.id), { formatura: f, atualizadoEm: new Date().toISOString() }); C.toast("Formatura marcada para " + C.fmtDate(f.data)); close(); }
-      catch (e) { if (e.code === "ocupado") fBox.erro(msgOcupado(e)); else C.handleErr(e); }
+    p.append(actions(close, C.aprovador ? "Confirmar data" : "Mandar para a Luciana aprovar"));
+    p.addEventListener("submit", async evt => {
+      evt.preventDefault(); const f = box.valor(); if (!f.data) { box.erro("Escolha o dia."); return; }
+      try {
+        const st = await reservar(it, kind, f);
+        await FS.updateDoc(FS.doc(db, "instituicoes", it.id), { [K.campo]: Object.assign(f, { status: st, pedidoPor: C.me || "" }), atualizadoEm: new Date().toISOString() });
+        C.toast(st === "confirmado" ? `${K.nome} confirmada para ${C.fmtDate(f.data)}` : `Dia ${C.fmtDate(f.data)} segurado. Aguardando a Luciana aprovar.`); close();
+      } catch (e) { if (e.code === "ocupado") box.erro(msgOcupado(e)); else if (e.code === "confirmado") box.erro("Essa data já foi confirmada pela Luciana. Para mudar, fale com ela."); else C.handleErr(e); }
     });
   });
 }
@@ -316,7 +351,7 @@ function openForm(it){
     const hor = inp(it && it.horario, "ex.: só funciona à tarde"); p.append(field("Melhor horário para contato", hor));
     const nota = el("textarea"); nota.rows = 3; nota.maxLength = 2000; nota.value = (it && it.notas) || ""; p.append(field("Anotações gerais", nota));
     if (it && C.isAdmin) { const del = el("button", "btn btn-danger btn-sm", "Apagar instituição"); del.type = "button";
-      del.onclick = async () => { if (del.dataset.ok) { try { await liberarFormatura(it); await FS.deleteDoc(FS.doc(db, "instituicoes", it.id)); C.toast("Apagada"); close(); } catch (e) { C.handleErr(e); } } else { del.dataset.ok = 1; del.textContent = "Toque de novo para apagar de vez"; } }; p.append(del); }
+      del.onclick = async () => { if (del.dataset.ok) { try { await liberar(it, "formatura"); await liberar(it, "fotos"); await FS.deleteDoc(FS.doc(db, "instituicoes", it.id)); C.toast("Apagada"); close(); } catch (e) { C.handleErr(e); } } else { del.dataset.ok = 1; del.textContent = "Toque de novo para apagar de vez"; } }; p.append(del); }
     p.append(actions(close, "Salvar"));
     p.addEventListener("submit", async ev => {
       ev.preventDefault(); if (!nome.value.trim()) return;
@@ -354,7 +389,11 @@ function openVisita(it){
       r.append(l, v); prodBox.append(r); prods.push({ nome: pr.nome, c, v, formatura: pr.formatura });
     });
     p.append(prodBox);
-    const fBox = camposFormatura(it.formatura); fBox.hidden = true; p.append(fBox);
+    const fBox = camposEvento("formatura", it.formatura); fBox.hidden = true; p.append(fBox);
+    // Dia de fotos no colégio (medir beca + ensaio)
+    const dfL = el("label", "chk"); const dfC = el("input"); dfC.type = "checkbox"; dfL.append(dfC, document.createTextNode(" 📸 Já combinou o dia de fotos no colégio (medir beca + ensaio)"));
+    const dBox = camposEvento("fotos", it.diaFotos); dBox.hidden = true; dfC.onchange = () => { dBox.hidden = !dfC.checked; };
+    p.append(dfL, dBox);
     const syncF = () => { const fx = prods.find(x => x.formatura && x.c.checked); fBox.hidden = !fx; if (fx) fBox.onde.value = fx.formatura; };
     prods.forEach(x => x.c.addEventListener("change", syncF));
     const res = sel(RESULTADOS.map(r => r[0]), "", "escolha o resultado"); res.required = true; p.append(field("Resultado", res));
@@ -368,13 +407,12 @@ function openVisita(it){
       ev.preventDefault(); if (!res.value) return;
       const etapa = (RESULTADOS.find(r => r[0] === res.value) || [])[1] || it.etapa;
       // Formatura com data: reserva o dia antes de salvar (bloqueia se já estiver ocupado)
-      let formatura = null;
-      if (!fBox.hidden) {
-        const f = fBox.valor();
-        if (f.data) {
-          try { await reservarFormatura(it, f); formatura = f; fBox.erro(""); }
-          catch (e) { if (e.code === "ocupado") { fBox.erro(msgOcupado(e)); return; } C.handleErr(e); return; }
-        }
+      let formatura = null, diaFotos = null;
+      for (const [box, kind, on] of [[fBox, "formatura", !fBox.hidden], [dBox, "fotos", dfC.checked]]) {
+        if (!on) continue;
+        const f = box.valor(); if (!f.data) continue;
+        try { const st = await reservar(it, kind, f); box.erro(""); const v = Object.assign(f, { status: st, pedidoPor: C.me || "" }); if (kind === "formatura") formatura = v; else diaFotos = v; }
+        catch (e) { box.erro(e.code === "ocupado" ? msgOcupado(e) : e.code === "confirmado" ? "Essa data já foi confirmada pela Luciana. Para mudar, fale com ela." : "Não foi possível reservar o dia."); return; }
       }
       const visita = { data: data.value, como: como.value, por: C.me || "", falouCom: [falou.value.trim(), cargo.value].filter(Boolean).join(" · "), resultado: res.value,
         apresentou: prods.filter(x => x.c.checked).map(x => ({ nome: x.nome, preco: C.num(x.v.value) })), passo: passo.value, quando: quando.value, obs: obs.value.trim(), em: new Date().toISOString() };
@@ -382,6 +420,7 @@ function openVisita(it){
         atendendo: null, ultimo: { por: C.me || "—", em: new Date().toISOString() }, resp: it.resp || C.me };
       if (etapa === "FECHADO") patch.fechadoEm = C.todayStr();
       if (formatura) patch.formatura = formatura;
+      if (diaFotos) patch.diaFotos = diaFotos;
       if (etapa === "NÃO FECHOU") patch.motivo = motivo.value.trim() || res.value;
       if (etapa === "AGENDAR VISITA") patch.tentativas = (it.tentativas || 0) + 1;
       // guarda o contato novo, se veio

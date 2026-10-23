@@ -16,6 +16,8 @@ self.Z7_CONFIG = {
     { email: "z7studiofotografico@gmail.com", nome: "Adriano Vinicius" },
     { email: "lucianafanjos@gmail.com", nome: "Luciana Festraets" }
   ],
+  // Quem aprova as datas da agenda (formaturas e dias de fotos)
+  aprovadores: ["lucianafanjos@gmail.com"],
   // Cloud Messaging → Certificados push da Web → par de chaves
   vapidKey: "BEebSJWBdNL2gNxa5ODFAUZFixQTJH4MSV5vEQfBEbfJEKgMB_mE1tn6tPYdX5D9J4BLMY0cDQA9Jujot_TzHy8"
 };

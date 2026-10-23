@@ -60,6 +60,7 @@ body{background:var(--bg);color:var(--fg);font-family:var(--f-body);font-size:15
 .seg small{color:var(--muted);font-size:.82rem}
 .seg[aria-selected="true"]{background:var(--fg);color:var(--bg);border-color:var(--fg)}
 .seg[aria-selected="true"] small{color:inherit;opacity:.75}
+.fu.ok{color:var(--ok)}
 .prow{display:flex;align-items:center;justify-content:space-between;gap:8px}
 .prow .preco{width:90px;font:inherit;font-size:16px;padding:6px 8px;border-radius:8px;border:1px solid var(--line);background:var(--bg);color:var(--fg);text-align:right}
 details.hist summary{cursor:pointer;font-size:.85rem;color:var(--accent);font-weight:600}
@@ -225,11 +226,11 @@ details.guide summary{cursor:pointer;font-family:var(--f-display);font-weight:70
           <small>Linha de Frente e Repasse: kits prontos de quem fez o ensaio</small>
           <span class="tile-n" id="tRepasse"></span>
         </a>
-        <a class="tile soon" href="#agenda" data-mod="agenda">
+        <a class="tile" href="#agenda" data-mod="agenda">
           <span class="tile-ico" aria-hidden="true">📅</span>
           <b>Agendamento</b>
-          <small>Ensaios, formaturas e visitas do ano</small>
-          <span class="tile-n">Em breve</span>
+          <small>Formaturas e dias de fotos nos colégios, com aprovação da Luciana</small>
+          <span class="tile-n" id="tAgenda">Abrir</span>
         </a>
         <a class="tile" href="#instituicoes" data-mod="colegios">
           <span class="tile-ico" aria-hidden="true">🏫</span>
@@ -250,6 +251,9 @@ details.guide summary{cursor:pointer;font-family:var(--f-display);font-weight:70
         <a class="tile" href="#inst-faculdade" data-inst="faculdade"><span class="tile-ico" aria-hidden="true">🎓</span><b>Faculdade</b><small>Comissão de formatura decide</small><span class="tile-n"></span></a>
       </div>
     </section>
+
+    <!-- Agendamento (montado por js/agenda.js) -->
+    <section id="viewAgenda" class="view" hidden></section>
 
     <!-- Lista de um tipo de instituição (montada por js/instituicoes.js) -->
     <section id="viewInstTipo" class="view" hidden></section>
@@ -790,14 +794,15 @@ function refreshPushToken(){ if (pushSupported() && Notification.permission === 
 $("btnPush").onclick = () => enablePush(true);
 
 // ---------- navegação entre módulos ----------
-const VIEWS = { home: "viewHome", funil: "viewFunil", pr: "viewRepasse", repasse: "viewRepasse", agenda: "viewSoon",
+const VIEWS = { home: "viewHome", funil: "viewFunil", pr: "viewRepasse", repasse: "viewRepasse", agenda: "viewAgenda",
   instituicoes: "viewInst", colegios: "viewInst",
   "inst-particular": "viewInstTipo", "inst-publico": "viewInstTipo", "inst-profissionalizante": "viewInstTipo", "inst-faculdade": "viewInstTipo" };
 const INST_NOMES = { "inst-particular": "Colégio particular", "inst-publico": "Colégio público", "inst-profissionalizante": "Colégio profissionalizante", "inst-faculdade": "Faculdade" };
-let repasseMod = null, instMod = null, curView = "home";
+let repasseMod = null, instMod = null, agendaMod = null, curView = "home";
+const APROVADORES = (CFG.aprovadores || []).map(e => String(e).toLowerCase());
 const ctx = {
   db, FS, $, toast, mkBtn, money, num, digits, first, todayStr, addDays, fmtDate, hhmm, ds, pad, showNotice, handleErr,
-  get me(){ return me; }, get isAdmin(){ return isAdmin; }, get user(){ return user; }, get P(){ return P; }, team, pode,
+  get me(){ return me; }, get isAdmin(){ return isAdmin; }, get aprovador(){ return APROVADORES.includes((user && user.email || "").toLowerCase()); }, get user(){ return user; }, get P(){ return P; }, team, pode,
   goHome(){ location.hash = "#home"; }
 };
 let usersLoaded = false;
@@ -813,7 +818,11 @@ async function route(){
   $(VIEWS[key]).hidden = false;
   $("btnBack").hidden = key === "home";
   $("btnBack").textContent = INST_NOMES[key] ? "‹ Instituições" : "‹ Início";
-  if (key === "agenda") $("soonTitle").textContent = "Agendamento: em breve";
+  if (agendaMod && key !== "agenda") agendaMod.hide();
+  if (key === "agenda") {
+    try { if (!agendaMod) { agendaMod = await import("./js/agenda.js"); agendaMod.init(ctx); } agendaMod.show(); }
+    catch (e) { console.warn(e); $("viewAgenda").innerHTML = '<div class="empty"><strong>Não foi possível abrir</strong><span>Verifique a internet e tente de novo.</span></div>'; }
+  }
   if (instMod && !INST_NOMES[key]) instMod.hide();
   if (key === "instituicoes" || key === "colegios") contarInst();
   if (INST_NOMES[key]) {
@@ -848,7 +857,17 @@ function renderHome(){
     else if (pode("lf")) FS.getDocs(query(collection(db, "repasse"), where("ano", "==", new Date().getFullYear()), where("etapa", "in", ["SEPARADO", "CONTATADO", "INTERESSADO"]), FS.limit(300)))
       .then(s => { repCount.n = s.docs.filter(d => (d.data().followup || "9") <= todayStr() && (!d.data().resp || d.data().resp === me)).length; paintRep(); }).catch(() => {});
   }
-  paintRep(); contarInst();
+  paintRep(); contarInst(); contarAgenda();
+}
+// Cartão do Agendamento: para a Luciana, quantas datas esperam aprovação
+let agCount = { at: 0 };
+function contarAgenda(){
+  if (!pode("agenda") && !pode("colegios")) return;
+  if (Date.now() - agCount.at < 60000) return; agCount.at = Date.now();
+  FS.getDocs(query(collection(db, "agenda"), where("status", "==", "pendente"), FS.limit(200))).then(s => {
+    const n = s.size, eu = ctx.aprovador;
+    $("tAgenda").textContent = n ? (eu ? `${n} data${n > 1 ? "s" : ""} para aprovar` : `${n} aguardando a Luciana`) : "Abrir";
+  }).catch(() => {});
 }
 // Retornos de hoje por tipo de instituição (cartões da tela Instituições e da tela inicial)
 let instCount = { at: 0, por: null };
