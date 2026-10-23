@@ -24,6 +24,8 @@ service cloud.firestore {
       allow read, create, update: if pode('colegios');
       allow delete: if admin();
     }
+    // Agenda: um documento por dia (AAAA-MM-DD). Cada dia só tem uma formatura.
+    match /agenda/{dia} { allow read, write: if pode('colegios') || pode('agenda'); }
     match /repasse/{id} {
       allow read: if pode('rep') || (pode('lf') && anoAtual(resource.data));
       allow update: if pode('rep') || (pode('lf') && anoAtual(resource.data) && anoAtual(request.resource.data));
