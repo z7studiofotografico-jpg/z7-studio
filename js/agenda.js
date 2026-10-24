@@ -11,7 +11,7 @@
 import { avisarColegioPorEmail, nomeEvento } from "./instituicoes.js";
 import { feriado, feriadosEntre } from "./feriados.js";
 let C, FS, db, col, colE;
-let unsubs = [], items = [], ensaios = [], passados = [], comps = [], visitas = [], filtro = "tudo", modo = "lista", mesVis = "", selDia = "";
+let unsubs = [], items = [], ensaios = [], passados = [], comps = [], visitas = [], filtro = "tudo", mesVis = "", selDia = "";
 export const ETAPAS_ENTREGA = ["Ensaio feito", "Fotos escolhidas", "Em edição", "Pronto", "Entregue"];
 const $ = (id) => document.getElementById(id);
 const CAMPO = { formatura: "formatura", fotos: "diaFotos" };
@@ -39,11 +39,11 @@ export function init(ctx){ C = ctx; FS = ctx.FS; db = ctx.db; col = FS.collectio
 export function show(){
   const v = $("viewAgenda"); v.innerHTML = "";
   const head = el("div", "vhead"); head.append(el("h2", null, "Agendamento"));
-  const tg = el("div", "seg2"); [["lista", "Lista"], ["mes", "Mês"]].forEach(([k, t]) => { const b = el("button", "chip chip-sm", t); b.type = "button"; b.setAttribute("aria-pressed", String(modo === k)); b.onclick = () => { modo = k; tg.querySelectorAll("button").forEach(x => x.setAttribute("aria-pressed", String(x === b))); render(); }; tg.append(b); });
   if (marco()) { const hb = el("div", "agact"); hb.append(C.mkBtn("+ Compromisso", "btn-sm", () => openComp()), C.mkBtn("+ Marcar ensaio", "btn-primary btn-sm", () => openEnsaio())); head.append(hb); }
-  v.append(head, tg);
+  v.append(head);
   v.append(el("p", "hint", C.aprovador ? "As datas de colégio sugeridas pelo vendedor ficam seguradas até você aprovar ou recusar." : "As datas de colégio ficam seguradas até a Luciana aprovar."));
   const chips = el("div", "chips"); chips.id = "agChips"; v.append(chips);
+  const cal = el("section", "view"); cal.id = "agCal"; v.append(cal);
   const pend = el("section", "view"); pend.id = "agPend"; v.append(pend);
   const prox = el("section", "view"); prox.id = "agProx"; v.append(prox);
   prox.append(el("div", "empty", "Carregando…"));
@@ -103,7 +103,7 @@ function render(){
     if (ab.length) { const ge = el("div", "grid"); ab.forEach(x => ge.append(cardEntrega(x))); pend.append(el("h3", "grp", `Entregas de fotos (${ab.length})`), ge); }
     else if (filtro === "entrega") pend.append(el("div", "empty", "Nenhuma entrega pendente ✓"));
   }
-  if (filtro === "entrega") { prox.innerHTML = ""; return; }
+  if (filtro === "entrega") { prox.innerHTML = ""; $("agCal").innerHTML = ""; return; }
 
   // Próximos compromissos, dia a dia
   const ent = [];
@@ -112,16 +112,18 @@ function render(){
   if (filtro === "tudo" || filtro === "comp") comps.forEach(x => ent.push({ data: x.data, hora: x.diaInteiro ? "" : x.hora || "", t: "p", x }));
   if (filtro === "tudo" || filtro === "visita") visitas.forEach(x => ent.push({ data: x.followup, hora: x.followupHora || "99", t: "v", x }));
   const hoje = C.todayStr();
-  if (filtro === "tudo") feriadosEntre(hoje, modo === "mes" ? C.addDays(400) : C.addDays(60)).forEach(f => ent.push({ data: f.data, hora: "", t: "f", x: f }));
+  if (filtro === "tudo") feriadosEntre(hoje, C.addDays(400)).forEach(f => ent.push({ data: f.data, hora: "", t: "f", x: f }));
   ent.sort((a, b) => a.data.localeCompare(b.data) || a.hora.localeCompare(b.hora));
-  if (modo === "mes") { renderMes(prox, ent); return; }
+  // Calendário do mês sempre no topo; a lista vem depois (feriados só dos próximos 60 dias)
+  const calBox = $("agCal"); calBox.innerHTML = ""; renderMes(calBox, ent);
+  const ate60 = C.addDays(60); const entL = ent.filter(it => it.t !== "f" || it.data <= ate60);
   prox.append(el("h3", "grp", "Próximos compromissos"));
-  if (!ent.length) {
+  if (!entL.length) {
     const e = el("div", "empty"); e.append(el("strong", null, "Nada marcado ainda"), el("span", null, vejoEnsaios() ? "Toque em “+ Marcar ensaio”. As formaturas e os dias de fotos marcados nas Instituições também aparecem aqui." : "As formaturas e os dias de fotos marcados nas Instituições aparecem aqui."));
     prox.append(e); return;
   }
   const g = el("div", "grid"); let mes = "", dia = "", card = null;
-  ent.forEach(it => {
+  entL.forEach(it => {
     const m = it.data.slice(0, 7);
     if (m !== mes) { mes = m; const h = el("h3", "grp", `${MESES[Number(m.slice(5)) - 1]} ${m.slice(0, 4)}`); h.style.gridColumn = "1/-1"; g.append(h); }
     if (it.data !== dia) {
