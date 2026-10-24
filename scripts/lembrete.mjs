@@ -41,6 +41,15 @@ const pendAgenda = (await db.collection("agenda").where("status", "==", "pendent
 const amanha = new Intl.DateTimeFormat("en-CA", { timeZone: "America/Sao_Paulo" }).format(new Date(Date.now() + 864e5));
 const ensAmanha = (await db.collection("ensaios").where("data", "==", amanha).get()).docs.map((d) => d.data()).filter((e) => e.kind !== "pessoal" && e.status !== "remarcar" && !e.lembrado);
 const ensAnalisar = (await db.collection("ensaios").where("status", "==", "analisar").get()).size;
+// Entregas de fotos atrasadas e avaliações para pedir (ensaios dos últimos 90 dias)
+const cfg = (await db.collection("config").doc("app").get()).data() || {};
+const somaDias = (d, n) => { const [y, m, dd] = d.split("-").map(Number); const x = new Date(Date.UTC(y, m - 1, dd + n)); return x.toISOString().slice(0, 10); };
+const recentes = (await db.collection("ensaios").where("data", ">=", somaDias(hoje, -90)).get()).docs.map((d) => d.data()).filter((e) => e.kind !== "pessoal" && e.data < hoje && e.status !== "faltou" && e.status !== "remarcar");
+const entAtrasadas = recentes.filter((e) => !(e.entrega && e.entrega.etapa === "Entregue") && somaDias(e.data, Number(cfg.prazo) || 15) < hoje).length;
+const avaliacoes = cfg.linkAvaliacao ? recentes.filter((e) => e.entrega && e.entrega.etapa === "Entregue" && !e.avaliacaoPedida && e.entrega.em <= somaDias(hoje, -3)).length : 0;
+// Parcelas atrasadas das turmas
+const esperadas = (f) => { if (!f.primeiroVenc || !Number(f.parcelas)) return 0; const [y, m, d] = f.primeiroVenc.split("-").map(Number), [ty, tm, td] = hoje.split("-").map(Number); return Math.max(0, Math.min(Number(f.parcelas), (ty - y) * 12 + (tm - m) + (td > d ? 1 : 0))); };
+const parcAtrasadas = (await db.collection("formandos").get()).docs.map((d) => d.data()).filter((f) => f.status !== "desistiu" && Number(f.pagas || 0) < Number(f.parcelas || 1) && esperadas(f) > Number(f.pagas || 0)).length;
 const tokensSnap = await db.collection("tokens").get();
 console.log(`Hoje ${hoje}: ${vencidos.length} lead(s) com contato vencido, ${tokensSnap.size} aparelho(s).`);
 
@@ -68,14 +77,18 @@ for (const t of tokensSnap.docs) {
     const aprova = souAprov ? pendAgenda + ensAnalisar : 0;
     const souAdmin = ["z7studiofotografico@gmail.com", "lucianafanjos@gmail.com"].includes(String(t.get("email") || "").toLowerCase()) || (perfil && perfil.papel === "admin");
     const lembrar = souAdmin ? ensAmanha.length : 0;
-    if (!meus.length && !meusRep.length && !meusInst.length && !aprova && !lembrar) continue;
-    const total = meus.length + meusRep.length + meusInst.length + aprova + lembrar;
+    const ent = souAdmin ? entAtrasadas : 0, aval = souAdmin ? avaliacoes : 0, parc = souAdmin ? parcAtrasadas : 0;
+    if (!meus.length && !meusRep.length && !meusInst.length && !aprova && !lembrar && !ent && !aval && !parc) continue;
+    const total = meus.length + meusRep.length + meusInst.length + aprova + lembrar + ent + aval + parc;
     const atrasados = meus.filter((l) => l.followup < hoje).length + meusRep.filter((r) => r.followup < hoje).length + meusInst.filter((x) => x.followup < hoje).length;
     const partes = [];
     if (meus.length) partes.push(`Funil: ${meus.slice(0, 3).map((l) => primeiro(l.nome)).join(", ")}${meus.length > 3 ? ` e mais ${meus.length - 3}` : ""}`);
     if (meusRep.length) partes.push(`PR: ${meusRep.length}`);
     if (aprova) partes.push(`Agenda: ${aprova} para analisar`);
     if (lembrar) partes.push(`Lembrar ${lembrar} cliente${lembrar > 1 ? "s" : ""} do ensaio de amanhã`);
+    if (ent) partes.push(`⚠️ ${ent} entrega${ent > 1 ? "s" : ""} de fotos atrasada${ent > 1 ? "s" : ""}`);
+    if (aval) partes.push(`Pedir ${aval} avaliação${aval > 1 ? "ões" : ""} no Google`);
+    if (parc) partes.push(`${parc} parcela${parc > 1 ? "s" : ""} de turma atrasada${parc > 1 ? "s" : ""}`);
     if (meusInst.length) partes.push(`Instituições: ${meusInst.slice(0, 2).map((x) => primeiro(x.nome)).join(", ")}${meusInst.length > 2 ? ` e mais ${meusInst.length - 2}` : ""}`);
     title = `Bom dia${nome ? ", " + primeiro(nome) : ""}! ${total} contato${total > 1 ? "s" : ""} para hoje`;
     body = partes.join(" · ") + (atrasados ? ` · ${atrasados} atrasado${atrasados > 1 ? "s" : ""}` : "");

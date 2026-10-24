@@ -1,3 +1,4 @@
+import { feriado } from "./feriados.js";
 // Módulo Instituições: colégio particular, colégio público, colégio profissionalizante e faculdade.
 // Primeira versão comum aos 4 tipos: lista, cadastro, registro de visita, próximo passo com data
 // (aparece em "Para hoje" e no lembrete das 9h) e importação da planilha.
@@ -71,6 +72,8 @@ async function reservarVarios(it, pares){
   for (const [kind, f] of pares) { const atual = it[KINDS[kind].campo];
     if (atual && atual.status === "confirmado" && !C.aprovador && atual.data !== f.data) { const e = new Error("confirmado"); e.code = "confirmado"; throw e; } }
   const datas = pares.map(([, f]) => f.data); if (new Set(datas).size !== datas.length) { const e = new Error("mesmo dia"); e.code = "mesmodia"; throw e; }
+  // Feriado: o estúdio não trabalha
+  for (const d of datas) if (feriado(d)) { const e = new Error("feriado"); e.code = "feriado"; e.ocupado = { data: d }; e.nomeFeriado = feriado(d); throw e; }
   // Dia bloqueado por compromisso de dia inteiro (consulta médica, viagem…)
   for (const d of datas) {
     let bl = [];
@@ -104,6 +107,7 @@ async function liberar(it, kind){
 }
 function msgErroData(e){
   if (e.code === "ocupado") return msgOcupado(e);
+  if (e.code === "feriado") return `O dia ${C.fmtDate(e.ocupado.data)} é feriado (${e.nomeFeriado}) e o estúdio não trabalha. Escolha outra data.`;
   if (e.code === "bloqueado") { const x = e.bloqueio || {}; return `O dia ${C.fmtDate(e.ocupado.data)} está bloqueado: ${x.particular ? "compromisso particular" : (x.titulo || "compromisso")}${x.deQuem ? " (" + x.deQuem + ")" : ""}. Escolha outra data.`; }
   if (e.code === "confirmado") return "Essa data já foi confirmada pela Luciana. Para mudar, fale com ela.";
   if (e.code === "mesmodia") return "O dia das fotos e o dia da formatura precisam ser dias diferentes.";
@@ -326,7 +330,10 @@ function card(it){
     box.append(row); e.append(box);
   }
   const act = el("div", "actions");
-  act.append(C.mkBtn("📝 Registrar visita / contato", "btn-primary", () => openVisita(it)));
+  if (it.etapa === "FECHADO") act.append(C.mkBtn("👥 Formandos e parcelas", "btn-primary", async () => {
+    try { const T = await import("./turma.js"); T.openTurma(C, it, produtos().filter(x => !x.formatura)); } catch (e) { console.warn(e); C.toast("Não foi possível abrir. Verifique a internet."); }
+  }));
+  act.append(C.mkBtn("📝 Registrar visita / contato", it.etapa === "FECHADO" ? "" : "btn-primary", () => openVisita(it)));
   if (it.etapa !== "FECHADO") act.append(C.mkBtn("Remarcar +7d", "", () => save(it, { followup: C.addDays(7) }, "Retorno em " + C.fmtDate(C.addDays(7)))));
   if (!li && it.etapa !== "FECHADO") act.append(C.mkBtn("✋ Estou atendendo", "", () => claim(it)));
   act.append(C.mkBtn("🎓 Formatura", "", () => openEvento(it, "formatura")));

@@ -6,9 +6,13 @@
 //   "Dia inteiro" bloqueia o dia para formatura/dia de fotos. "Particular" mostra só "Ocupado" ao vendedor.
 // O vendedor vê tudo (para saber por que o dia está ocupado), mas só os donos marcam e mudam.
 // - Visitas do vendedor: vêm do "Voltar para visita" das Instituições. Só informam, não bloqueiam o dia.
+// - Feriados: o estúdio não trabalha (bloqueia ensaio e colégio).
+// - Entregas: depois do ensaio, acompanha a edição até entregar, com o prazo, e pede a avaliação no Google.
 import { avisarColegioPorEmail, nomeEvento } from "./instituicoes.js";
+import { feriado, feriadosEntre } from "./feriados.js";
 let C, FS, db, col, colE;
-let unsubs = [], items = [], ensaios = [], comps = [], visitas = [], filtro = "tudo";
+let unsubs = [], items = [], ensaios = [], passados = [], comps = [], visitas = [], filtro = "tudo", modo = "lista", mesVis = "", selDia = "";
+export const ETAPAS_ENTREGA = ["Ensaio feito", "Fotos escolhidas", "Em edição", "Pronto", "Entregue"];
 const $ = (id) => document.getElementById(id);
 const CAMPO = { formatura: "formatura", fotos: "diaFotos" };
 const ICO = { formatura: "🎓", fotos: "📸" };
@@ -35,22 +39,26 @@ export function init(ctx){ C = ctx; FS = ctx.FS; db = ctx.db; col = FS.collectio
 export function show(){
   const v = $("viewAgenda"); v.innerHTML = "";
   const head = el("div", "vhead"); head.append(el("h2", null, "Agendamento"));
+  const tg = el("div", "seg2"); [["lista", "Lista"], ["mes", "Mês"]].forEach(([k, t]) => { const b = el("button", "chip chip-sm", t); b.type = "button"; b.setAttribute("aria-pressed", String(modo === k)); b.onclick = () => { modo = k; tg.querySelectorAll("button").forEach(x => x.setAttribute("aria-pressed", String(x === b))); render(); }; tg.append(b); });
   if (marco()) { const hb = el("div", "agact"); hb.append(C.mkBtn("+ Compromisso", "btn-sm", () => openComp()), C.mkBtn("+ Marcar ensaio", "btn-primary btn-sm", () => openEnsaio())); head.append(hb); }
-  v.append(head);
+  v.append(head, tg);
   v.append(el("p", "hint", C.aprovador ? "As datas de colégio sugeridas pelo vendedor ficam seguradas até você aprovar ou recusar." : "As datas de colégio ficam seguradas até a Luciana aprovar."));
   const chips = el("div", "chips"); chips.id = "agChips"; v.append(chips);
   const pend = el("section", "view"); pend.id = "agPend"; v.append(pend);
   const prox = el("section", "view"); prox.id = "agProx"; v.append(prox);
   prox.append(el("div", "empty", "Carregando…"));
-  hide(); items = []; ensaios = []; comps = []; visitas = [];
+  hide(); items = []; ensaios = []; passados = []; comps = []; visitas = [];
+  if (!mesVis) mesVis = C.todayStr().slice(0, 7);
   const hoje = C.todayStr();
   const erro = (err, o) => { console.warn(err); if (err.code === "permission-denied") C.showNotice(o === "agenda" ? "Você não tem acesso ao Agendamento." : o === "ensaios" ? "Para ver os ensaios, cole as regras novas do Firebase." : ""); };
   unsubs.push(FS.onSnapshot(FS.query(col, FS.where("data", ">=", hoje), FS.orderBy("data"), FS.limit(400)), snap => {
     items = snap.docs.map(d => Object.assign({ id: d.id }, d.data())); render();
   }, e => erro(e, "agenda")));
-  if (vejoEnsaios()) unsubs.push(FS.onSnapshot(FS.query(colE, FS.where("data", ">=", hoje), FS.orderBy("data"), FS.limit(400)), snap => {
+  // Ensaios dos últimos 90 dias também, para acompanhar a entrega das fotos
+  if (vejoEnsaios()) unsubs.push(FS.onSnapshot(FS.query(colE, FS.where("data", ">=", C.addDays(-90)), FS.orderBy("data"), FS.limit(600)), snap => {
     const todos = snap.docs.map(d => Object.assign({ id: d.id }, d.data()));
-    ensaios = todos.filter(x => x.kind !== "pessoal"); comps = todos.filter(x => x.kind === "pessoal"); render();
+    ensaios = todos.filter(x => x.kind !== "pessoal" && x.data >= hoje); comps = todos.filter(x => x.kind === "pessoal" && x.data >= hoje);
+    passados = todos.filter(x => x.kind !== "pessoal" && x.data < hoje && x.status !== "remarcar" && x.status !== "faltou"); render();
   }, e => erro(e, "ensaios")));
   if (vejoVisitas()) unsubs.push(FS.onSnapshot(FS.query(FS.collection(db, "instituicoes"), FS.where("followup", ">=", hoje), FS.orderBy("followup"), FS.limit(400)), snap => {
     visitas = snap.docs.map(d => Object.assign({ id: d.id }, d.data()))
@@ -65,6 +73,7 @@ function renderChips(){
   const ops = [["tudo", "Tudo", items.length + ensaios.length + comps.length + visitas.length], ["colegio", "Colégios", items.length]];
   if (vejoEnsaios()) ops.push(["ensaio", "Ensaios", ensaios.length], ["comp", "Compromissos", comps.length]);
   if (vejoVisitas()) ops.push(["visita", "Visitas", visitas.length]);
+  if (marco()) ops.push(["entrega", "Entregas", entregasAbertas().length]);
   if (ops.length < 3) { c.hidden = true; return; } c.hidden = false;
   ops.forEach(([k, t, n]) => {
     const b = el("button", "chip", t); b.type = "button"; b.setAttribute("aria-pressed", String(filtro === k));
@@ -88,6 +97,13 @@ function render(){
   if (C.aprovador && (filtro === "tudo" || filtro === "ensaio")) analisar.forEach(x => grade.append(cardAnalisar(x)));
   if (marco() && (filtro === "tudo" || filtro === "ensaio")) remarcar.forEach(x => grade.append(cardRemarcar(x)));
   if (grade.children.length) { pend.append(el("h3", "grp", C.aprovador ? `Para você analisar (${grade.children.length})` : `Precisa de atenção (${grade.children.length})`), grade); }
+  // Entregas das fotos (ensaios que já aconteceram)
+  if (marco() && (filtro === "tudo" || filtro === "entrega")) {
+    const ab = entregasAbertas();
+    if (ab.length) { const ge = el("div", "grid"); ab.forEach(x => ge.append(cardEntrega(x))); pend.append(el("h3", "grp", `Entregas de fotos (${ab.length})`), ge); }
+    else if (filtro === "entrega") pend.append(el("div", "empty", "Nenhuma entrega pendente ✓"));
+  }
+  if (filtro === "entrega") { prox.innerHTML = ""; return; }
 
   // Próximos compromissos, dia a dia
   const ent = [];
@@ -95,7 +111,10 @@ function render(){
   if (filtro === "tudo" || filtro === "ensaio") ensaios.filter(x => x.status !== "remarcar" && !(C.aprovador && x.status === "analisar")).forEach(x => ent.push({ data: x.data, hora: x.hora || "", t: "e", x }));
   if (filtro === "tudo" || filtro === "comp") comps.forEach(x => ent.push({ data: x.data, hora: x.diaInteiro ? "" : x.hora || "", t: "p", x }));
   if (filtro === "tudo" || filtro === "visita") visitas.forEach(x => ent.push({ data: x.followup, hora: x.followupHora || "99", t: "v", x }));
+  const hoje = C.todayStr();
+  if (filtro === "tudo") feriadosEntre(hoje, modo === "mes" ? C.addDays(400) : C.addDays(60)).forEach(f => ent.push({ data: f.data, hora: "", t: "f", x: f }));
   ent.sort((a, b) => a.data.localeCompare(b.data) || a.hora.localeCompare(b.hora));
+  if (modo === "mes") { renderMes(prox, ent); return; }
   prox.append(el("h3", "grp", "Próximos compromissos"));
   if (!ent.length) {
     const e = el("div", "empty"); e.append(el("strong", null, "Nada marcado ainda"), el("span", null, vejoEnsaios() ? "Toque em “+ Marcar ensaio”. As formaturas e os dias de fotos marcados nas Instituições também aparecem aqui." : "As formaturas e os dias de fotos marcados nas Instituições aparecem aqui."));
@@ -111,10 +130,91 @@ function render(){
       if (quando(dia)) top.append(el("span", "stage", quando(dia).toUpperCase()));
       card.append(top); g.append(card);
     }
-    card.append(it.t === "c" ? linhaColegio(it.x) : it.t === "e" ? linhaEnsaio(it.x) : it.t === "p" ? linhaComp(it.x) : linhaVisita(it.x));
+    card.append(linha(it));
   });
   prox.append(g);
 }
+function linha(it){ return it.t === "c" ? linhaColegio(it.x) : it.t === "e" ? linhaEnsaio(it.x) : it.t === "p" ? linhaComp(it.x) : it.t === "f" ? linhaFeriado(it.x) : linhaVisita(it.x); }
+function linhaFeriado(f){ const r = el("div", "agrow"); const t = el("div", "agtxt"); t.append(el("b", null, "🚫 Feriado: " + f.nome), el("span", null, "Estúdio fechado")); r.append(t, el("span", "tag late", "Fechado")); return r; }
+const icone = it => it.t === "c" ? (ICO[it.x.kind] || "📌") : it.t === "e" ? "📷" : it.t === "p" ? (it.x.diaInteiro ? "⛔" : "📌") : it.t === "f" ? "🚫" : "🚗";
+
+// ---------- Calendário do mês ----------
+function renderMes(box, ent){
+  const hoje = C.todayStr();
+  const [y, m] = mesVis.split("-").map(Number);
+  const nav = el("div", "calnav");
+  const ant = C.mkBtn("‹", "btn-sm", () => { const d = new Date(y, m - 2, 1); mesVis = `${d.getFullYear()}-${C.pad(d.getMonth() + 1)}`; selDia = ""; render(); });
+  ant.disabled = mesVis <= hoje.slice(0, 7); ant.setAttribute("aria-label", "Mês anterior");
+  const prx = C.mkBtn("›", "btn-sm", () => { const d = new Date(y, m, 1); mesVis = `${d.getFullYear()}-${C.pad(d.getMonth() + 1)}`; selDia = ""; render(); }); prx.setAttribute("aria-label", "Próximo mês");
+  nav.append(ant, el("h3", "grp", `${MESES[m - 1]} ${y}`), prx); box.append(nav);
+  const porDia = {}; ent.forEach(it => { (porDia[it.data] = porDia[it.data] || []).push(it); });
+  const cal = el("div", "cal");
+  SEMANA.forEach(s => cal.append(el("span", "wd", s)));
+  const ini = new Date(y, m - 1, 1).getDay(), dias = new Date(y, m, 0).getDate();
+  for (let i = 0; i < ini; i++) cal.append(el("span", "d out"));
+  for (let d = 1; d <= dias; d++) {
+    const ds = `${y}-${C.pad(m)}-${C.pad(d)}`, lst = porDia[ds] || [];
+    const b = el("button", "d" + (ds === hoje ? " hoje" : "") + (feriado(ds) ? " fer" : "") + (ds < hoje ? " pas" : "") + (ds === selDia ? " sel" : "")); b.type = "button";
+    b.append(el("b", null, String(d)));
+    const ics = {}; lst.forEach(it => { const k = icone(it); ics[k] = (ics[k] || 0) + 1; });
+    Object.entries(ics).slice(0, 4).forEach(([k, n]) => b.append(el("span", "ic", n > 1 ? k + n : k)));
+    b.setAttribute("aria-label", `${diaTxt(ds)}: ${lst.length ? lst.length + " compromisso" + (lst.length > 1 ? "s" : "") : "livre"}`);
+    b.onclick = () => { selDia = selDia === ds ? "" : ds; render(); };
+    cal.append(b);
+  }
+  box.append(cal);
+  box.append(el("p", "hint", "🎓 formatura · 📸 dia de fotos · 📷 ensaio · 📌 compromisso · ⛔ dia bloqueado · 🚗 visita · 🚫 feriado. Toque no dia para ver."));
+  if (selDia) {
+    const card = el("article", "card agdia"); const top = el("div", "card-top"); top.append(el("h3", "name", diaTxt(selDia))); card.append(top);
+    const lst = porDia[selDia] || [];
+    if (!lst.length) card.append(el("p", "hint", selDia < hoje ? "Dia que já passou." : "Dia livre ✅"));
+    lst.forEach(it => card.append(linha(it)));
+    if (marco() && selDia >= hoje && !feriado(selDia)) { const a = el("div", "actions"); a.append(C.mkBtn("+ Ensaio neste dia", "btn-sm btn-primary", () => openEnsaio(null, { data: selDia })), C.mkBtn("+ Compromisso", "btn-sm", () => openComp(null, selDia))); card.append(a); }
+    box.append(card);
+  }
+}
+
+// ---------- Entregas das fotos ----------
+function etapaEntrega(x){ return (x.entrega && x.entrega.etapa) || "Ensaio feito"; }
+function entregasAbertas(){
+  const hoje = C.todayStr();
+  return passados.filter(x => etapaEntrega(x) !== "Entregue" || (C.P.linkAvaliacao && !x.avaliacaoPedida && x.entrega.em && x.entrega.em <= C.addDays(-3)))
+    .sort((a, b) => prazoDe(a).localeCompare(prazoDe(b)));
+}
+function prazoDe(x){ const [y, m, d] = x.data.split("-").map(Number); const dt = new Date(y, m - 1, d + (Number(C.P.prazo) || 15)); return `${dt.getFullYear()}-${C.pad(dt.getMonth() + 1)}-${C.pad(dt.getDate())}`; }
+function diasAte(d){ const [y, m, dd] = d.split("-").map(Number); const [a, b, c] = C.todayStr().split("-").map(Number); return Math.round((new Date(y, m - 1, dd) - new Date(a, b - 1, c)) / 864e5); }
+function cardEntrega(x){
+  const et = etapaEntrega(x), entregue = et === "Entregue";
+  const pz = prazoDe(x), falta = diasAte(pz);
+  const cls = entregue ? "won" : falta < 0 ? "late" : falta <= 3 ? "today" : "";
+  const e = el("article", "card " + cls);
+  const top = el("div", "card-top"); top.append(el("h3", "name", `📷 ${title(x.cliente)}`), el("span", "stage", entregue ? "AVALIAÇÃO" : et.toUpperCase())); e.append(top);
+  e.append(el("div", "meta")); e.lastChild.append(el("span", "tag svc", x.tipo || "Ensaio"), el("span", "tag", "Ensaio em " + C.fmtDate(x.data)));
+  if (!entregue) {
+    e.append(el("div", "fu " + (falta < 0 ? "late" : falta <= 3 ? "today" : ""), falta < 0 ? `Atrasado ${-falta} dia${falta < -1 ? "s" : ""} (prazo era ${C.fmtDate(pz)})` : falta === 0 ? "Prazo de entrega: hoje" : `Faltam ${falta} dia${falta > 1 ? "s" : ""} para entregar (até ${C.fmtDate(pz)})`));
+    const passos = el("div", "passos"); const i = ETAPAS_ENTREGA.indexOf(et);
+    ETAPAS_ENTREGA.forEach((p, k) => passos.append(el("span", k <= i ? "on" : "", p))); e.append(passos);
+  } else e.append(el("div", "fu", `Entregue em ${C.fmtDate(x.entrega.em)}. Hora de pedir a avaliação no Google ⭐`));
+  const act = el("div", "actions");
+  if (!entregue) {
+    const i = ETAPAS_ENTREGA.indexOf(et), prox = ETAPAS_ENTREGA[i + 1];
+    act.append(C.mkBtn(prox === "Entregue" ? "✅ Entregue" : "Avançar: " + prox, "btn-ok", () => avancarEntrega(x, prox)));
+    if (prox === "Entregue" && x.tel) act.append(C.mkBtn("📲 Avisar que está pronto", "", () => abrirWa(x.tel, `Oi, ${C.first(title(x.cliente))}! Suas fotos do ensaio estão prontas 🎉📸 Quer que eu envie por aqui ou prefere buscar no estúdio?`)));
+    if (et === "Ensaio feito") act.append(C.mkBtn("Cliente faltou", "", async () => { try { await FS.updateDoc(FS.doc(db, "ensaios", x.id), { status: "faltou" }); C.toast("Marcado como falta"); } catch (er) { C.handleErr(er); } }));
+  } else {
+    act.append(C.mkBtn("⭐ Pedir avaliação", "btn-primary", async () => {
+      abrirWa(x.tel, `Oi, ${C.first(title(x.cliente))}! Que bom que você fez o seu ensaio com a gente 💛 Se puder, deixa uma avaliação rapidinha no Google? Ajuda muito o nosso estúdio: ${C.P.linkAvaliacao}`);
+      try { await FS.updateDoc(FS.doc(db, "ensaios", x.id), { avaliacaoPedida: true, avaliacaoEm: C.todayStr() }); } catch (er) { console.warn(er); }
+    }));
+    act.append(C.mkBtn("Não pedir", "", async () => { try { await FS.updateDoc(FS.doc(db, "ensaios", x.id), { avaliacaoPedida: true, avaliacaoEm: "" }); } catch (er) { C.handleErr(er); } }));
+  }
+  e.append(act); return e;
+}
+async function avancarEntrega(x, etapa){
+  try { await FS.updateDoc(FS.doc(db, "ensaios", x.id), { entrega: { etapa, em: C.todayStr(), por: C.me || "" } }); C.toast(etapa === "Entregue" ? "Entregue ✅ Em 3 dias o app lembra de pedir a avaliação" : "Agora: " + etapa); }
+  catch (e) { C.handleErr(e); }
+}
+function abrirWa(tel, msg){ const d = C.digits(tel); if (!d) { C.toast("Sem WhatsApp cadastrado"); return; } window.open(`https://wa.me/${d}?text=${encodeURIComponent(msg)}`, "_blank", "noopener"); }
 
 // ---------- Colégios ----------
 function linhaColegio(x){
@@ -222,7 +322,7 @@ function linhaEnsaio(x){
   const r = el("div", "agrow");
   const t = el("div", "agtxt");
   t.append(el("b", null, `📷 ${x.hora ? x.hora + "–" + fimDe(x) : "Sem horário"} · ${title(x.cliente)}`));
-  t.append(el("span", null, [x.tipo, x.obs].filter(Boolean).join(" · ")));
+  t.append(el("span", null, [x.tipo, marco() ? (x.sinalPago ? "💰 sinal pago" : "⚠️ sem sinal") : "", x.obs].filter(Boolean).join(" · ")));
   if (x.status === "analisar") t.append(el("span", "wait", "⏳ A Luciana vai analisar: " + (x.conflito || "o dia já tem outro compromisso")));
   if (!marco()) { r.append(t, el("span", "tag", "Estúdio")); return r; }
   const act = el("div", "agact");
@@ -318,10 +418,10 @@ export function openEnsaio(x, pre){
       const t = tipoDoLead(l.servico); if (t && !tipo.value) tipo.value = t;
     });
     const tipo = el("select"); { const o = el("option", null, "escolha o tipo"); o.value = ""; tipo.append(o); }
-    TIPOS_ENSAIO.forEach(t => { const o = el("option", null, t); o.value = t; tipo.append(o); }); tipo.required = true; tipo.value = x ? x.tipo || "" : pre.tipo || "";
+    TIPOS_ENSAIO.forEach(t => { const o = el("option", null, t); o.value = t; tipo.append(o); }); tipo.required = true; tipo.value = x ? x.tipo || "" : pre.tipo || tipoDoLead(pre.servico) || "";
     const dur = el("select"); DURACOES.forEach(([m, t]) => { const o = el("option", null, t); o.value = String(m); dur.append(o); }); dur.value = String(x ? x.duracao || 60 : 60);
     const r2 = el("div", "row2"); r2.append(field("Tipo de ensaio", tipo), field("Duração", dur)); p.append(r2);
-    const data = el("input"); data.type = "date"; data.required = true; data.min = C.todayStr(); data.value = x ? x.data : "";
+    const data = el("input"); data.type = "date"; data.required = true; data.min = C.todayStr(); data.value = x ? x.data : pre.data || "";
     const hora = el("input"); hora.type = "time"; hora.required = true; hora.step = 900; hora.min = "08:00"; hora.max = "20:00"; hora.value = x ? x.hora || "" : "";
     const r3 = el("div", "row2"); r3.append(field("Dia", data), field("Horário", hora)); p.append(r3);
     const diaBox = el("p", "notes"); diaBox.hidden = true; p.append(diaBox);
@@ -330,11 +430,16 @@ export function openEnsaio(x, pre){
       err.hidden = true; p._ok = false;
       if (!data.value) { diaBox.hidden = true; return; }
       const r = resumoDia(data.value, x && x.id);
-      diaBox.textContent = r.length ? "Nesse dia já tem:\n" + r.join("\n") : "Dia livre ✅"; diaBox.hidden = false;
+      diaBox.textContent = feriado(data.value) ? `🚫 Feriado: ${feriado(data.value)}. O estúdio não trabalha.` : r.length ? "Nesse dia já tem:\n" + r.join("\n") : "Dia livre ✅"; diaBox.hidden = false;
     };
     data.addEventListener("change", () => { p._okc = false; mostraDia(); }); hora.addEventListener("change", () => { err.hidden = true; p._ok = false; p._okc = false; }); dur.addEventListener("change", () => { p._ok = false; });
-    if (x) mostraDia();
-    const obs = el("textarea"); obs.rows = 2; obs.maxLength = 1000; obs.placeholder = "ex.: vem com a mãe e o cachorro; pagou o sinal"; obs.value = x ? x.obs || "" : pre.obs || "";
+    if (x || pre.data) mostraDia();
+    const sinL = el("label", "chk"); const sinC = el("input"); sinC.type = "checkbox"; sinC.checked = x ? !!x.sinalPago : !!pre.sinalPago; sinL.append(sinC, document.createTextNode(" 💰 Sinal pago"));
+    const sinV = el("input"); sinV.inputMode = "decimal"; sinV.maxLength = 10; sinV.className = "preco"; sinV.placeholder = "R$"; sinV.setAttribute("aria-label", "Valor do sinal"); sinV.value = x ? x.sinalValor || "" : C.P.sinal || "";
+    const tot = el("input"); tot.inputMode = "decimal"; tot.maxLength = 10; tot.className = "preco"; tot.placeholder = "R$"; tot.setAttribute("aria-label", "Valor do ensaio"); tot.value = x ? x.valor || "" : pre.valor || "";
+    const rs = el("div", "prow"); rs.append(sinL, sinV); const rt = el("div", "prow"); rt.append(el("span", null, "Valor do ensaio"), tot);
+    const fs0 = el("div", "field"); fs0.append(el("label", null, "Pagamento"), rs, rt); p.append(fs0);
+    const obs = el("textarea"); obs.rows = 2; obs.maxLength = 1000; obs.placeholder = "ex.: vem com a mãe e o cachorro"; obs.value = x ? x.obs || "" : pre.obs || "";
     p.append(field("Observação", obs), err);
     const a = botoes(close, x ? "Salvar" : "Marcar ensaio");
     if (x) { const del = el("button", "btn btn-danger", "Excluir"); del.type = "button"; a.prepend(del); del.onclick = async () => {
@@ -345,6 +450,7 @@ export function openEnsaio(x, pre){
     p.addEventListener("submit", async ev => {
       ev.preventDefault();
       if (!nome.value.trim() || !tipo.value || !data.value || !hora.value) return;
+      if (feriado(data.value)) { err.textContent = `${C.fmtDate(data.value)} é feriado (${feriado(data.value)}) e o estúdio não trabalha. Escolha outro dia.`; err.hidden = false; return; }
       const { doDia, encavala, colegio, compBate } = conflitos(data.value, hora.value, dur.value, x && x.id);
       if (compBate.length && !p._okc) {
         p._okc = true; a.ok.textContent = "Marcar mesmo assim";
@@ -367,7 +473,7 @@ export function openEnsaio(x, pre){
       let status = x ? (x.status === "remarcar" ? "confirmado" : x.status || "confirmado") : "confirmado";
       if (mudouDia || (x && x.status === "remarcar")) status = !C.aprovador && motivos.length ? "analisar" : "confirmado";
       const body = { cliente: nome.value.trim(), tel: tel.value.trim(), tipo: tipo.value, duracao: Number(dur.value), data: data.value, hora: hora.value,
-        obs: obs.value.trim(), status, conflito: motivos.join(" · "), leadId, atualizadoEm: new Date().toISOString() };
+        obs: obs.value.trim(), status, conflito: motivos.join(" · "), leadId, sinalPago: sinC.checked, sinalValor: C.num(sinV.value), valor: C.num(tot.value), atualizadoEm: new Date().toISOString() };
       if (mudouDia) body.lembrado = false;
       try {
         if (x) await FS.updateDoc(FS.doc(db, "ensaios", x.id), body);
@@ -390,7 +496,7 @@ function linhaComp(x){
   const act = el("div", "agact"); if (x.diaInteiro) act.append(el("span", "tag late", "Dia bloqueado"));
   act.append(C.mkBtn("Editar", "btn-sm", () => openComp(x))); r.append(t, act); return r;
 }
-export function openComp(x){
+export function openComp(x, diaPre){
   sheet(x ? "Editar compromisso" : "Novo compromisso", (p, close) => {
     p.append(el("p", "hint", "Consulta médica, banco, viagem, outros afazeres. O vendedor vê que o horário está ocupado."));
     const tit = el("input"); tit.required = true; tit.maxLength = 80; tit.placeholder = "ex.: Consulta médica"; tit.value = x ? x.titulo || "" : "";
@@ -398,7 +504,7 @@ export function openComp(x){
     const quem = el("select"); DE_QUEM.forEach(q => { const o = el("option", null, q); o.value = q; quem.append(o); });
     quem.value = x ? x.deQuem || "Estúdio" : (/luciana/i.test(C.me || "") ? "Luciana" : /adriano/i.test(C.me || "") ? "Adriano" : "Estúdio");
     const r1 = el("div", "row2"); r1.append(field("O que é", tit), field("De quem", quem)); p.append(r1, sug);
-    const data = el("input"); data.type = "date"; data.required = true; data.min = C.todayStr(); data.value = x ? x.data : "";
+    const data = el("input"); data.type = "date"; data.required = true; data.min = C.todayStr(); data.value = x ? x.data : diaPre || "";
     const intL = el("label", "chk"); const intC = el("input"); intC.type = "checkbox"; intC.checked = x ? !!x.diaInteiro : false; intL.append(intC, document.createTextNode(" Dia inteiro (bloqueia formatura e dia de fotos)"));
     const h1 = el("input"); h1.type = "time"; h1.step = 900; h1.value = x && !x.diaInteiro ? x.hora || "" : "";
     const h2 = el("input"); h2.type = "time"; h2.step = 900; h2.value = x && !x.diaInteiro && x.hora ? fimDe(x) : "";

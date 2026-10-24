@@ -134,6 +134,39 @@ details.guide summary{cursor:pointer;font-family:var(--f-display);font-weight:70
 .tag{background:var(--chip);border-radius:4px;padding:1px 7px;color:var(--muted)}
 .tag.svc{background:var(--accent-soft);color:var(--accent)}
 .tag.ok{background:var(--ok-soft);color:var(--ok)}
+.seg2{display:flex;gap:6px;margin:-4px 0 8px}
+.calnav{display:flex;align-items:center;justify-content:space-between;gap:8px}
+.calnav .grp{margin:0}
+.cal{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));gap:4px;margin:8px 0}
+.cal .wd{text-align:center;font-size:.75rem;color:var(--muted);text-transform:uppercase}
+.cal .d{display:flex;flex-direction:column;align-items:flex-start;gap:1px;min-height:58px;background:var(--surface);border:1px solid var(--line);border-radius:8px;padding:4px;font:inherit;font-size:.78rem;color:var(--fg);cursor:pointer;overflow:hidden}
+.cal .d b{font-size:.85rem}
+.cal .d .ic{font-size:.72rem;line-height:1.15;white-space:nowrap}
+.cal .d.out{visibility:hidden}
+.cal .d.pas{opacity:.5}
+.cal .d.fer{background:var(--late-soft)}
+.cal .d.hoje{border:2px solid var(--warn)}
+.cal .d.sel{border:2px solid var(--fg)}
+.passos{display:flex;flex-wrap:wrap;gap:4px;margin:6px 0}
+.passos span{font-size:.75rem;padding:2px 7px;border-radius:999px;background:var(--chip);color:var(--muted)}
+.passos span.on{background:var(--ok-soft);color:var(--ok);font-weight:600}
+.kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:8px;margin:10px 0}
+.kpi{background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:12px 14px;display:flex;flex-direction:column;gap:2px;border-top:3px solid #2563eb}
+.kpi small{color:var(--muted);font-size:.8rem}
+.kpi b{font-size:1.35rem;font-variant-numeric:tabular-nums}
+.kpi.late{border-top-color:var(--late)}
+.vdbox{background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:14px;margin:10px 0}
+.vdbox h3{margin:0;font-size:1rem}
+.vdbox>small{color:var(--muted);font-size:.8rem}
+.vdchart{position:relative;margin-top:10px;width:100%}
+.vdlist{display:flex;flex-direction:column;margin-top:8px}
+.vdrow{display:flex;justify-content:space-between;gap:8px;padding:7px 0;border-top:1px solid var(--line);font-size:.9rem}
+.vdrow:first-child{border-top:0}
+.vdtab{display:flex;flex-direction:column;margin-top:8px;font-size:.88rem}
+.vdtr{display:grid;grid-template-columns:1.3fr repeat(5,1fr);gap:6px;padding:7px 0;border-top:1px solid var(--line);font-variant-numeric:tabular-nums}
+.vdtr.th{border-top:0;color:var(--muted);font-size:.78rem}
+@media (max-width:620px){.vdtr{grid-template-columns:1fr 1fr}.vdtr.th{display:none}.vdtr span:first-child{grid-column:1/-1;font-weight:700}.vdtr span[data-l]:not([data-l=""])::before{content:attr(data-l) ": ";color:var(--muted)}}
+.panel.wide{max-width:760px;width:100%}
 .tag.late{background:var(--late-soft);color:var(--late)}
 .agrow{display:flex;gap:8px;align-items:center;justify-content:space-between;padding:9px 0;border-top:1px solid var(--line)}
 .agrow:first-of-type{border-top:0}
@@ -247,6 +280,12 @@ details.guide summary{cursor:pointer;font-family:var(--f-display);font-weight:70
           <small>Colégios, cursos e faculdades: visitas, propostas e retornos</small>
           <span class="tile-n">Abrir</span>
         </a>
+        <a class="tile" href="#vendas" data-mod="vendas">
+          <span class="tile-ico" aria-hidden="true">📊</span>
+          <b>Vendas</b>
+          <small>Painel com gráficos: total vendido, pedidos, ticket médio, produtos e equipe</small>
+          <span class="tile-n">Só administradores</span>
+        </a>
       </div>
     </section>
 
@@ -263,6 +302,8 @@ details.guide summary{cursor:pointer;font-family:var(--f-display);font-weight:70
 
     <!-- Agendamento (montado por js/agenda.js) -->
     <section id="viewAgenda" class="view" hidden></section>
+    <!-- Painel de vendas (montado por js/vendas.js, só administradores) -->
+    <section id="viewVendas" class="view" hidden></section>
 
     <!-- Lista de um tipo de instituição (montada por js/instituicoes.js) -->
     <section id="viewInstTipo" class="view" hidden></section>
@@ -366,6 +407,10 @@ details.guide summary{cursor:pointer;font-family:var(--f-display);font-weight:70
     <div class="row2">
       <div class="field"><label for="pFotos">Fotos tratadas</label><input id="pFotos" inputmode="numeric"></div>
       <div class="field"><label for="pPrazo">Prazo de entrega (dias)</label><input id="pPrazo" inputmode="numeric"></div>
+    </div>
+    <div class="row2">
+      <div class="field"><label for="pAval">Link de avaliação no Google</label><input id="pAval" type="url" maxlength="300" placeholder="https://g.page/r/..."></div>
+      <div class="field"><label for="pComissao">Comissão da equipe de vendas (%)</label><input id="pComissao" inputmode="decimal" placeholder="10"></div>
     </div>
     <h3>PR · Linha de Frente (ensaios deste ano)</h3>
     <div class="row2">
@@ -521,6 +566,7 @@ function renderMe(){
 const MODULOS = [["funil", "Funil de vendas"], ["lf", "PR · Linha de Frente"], ["rep", "PR · Repasse"], ["agenda", "Agendamento"], ["colegios", "Instituições"]];
 function pode(m){
   if (isAdmin) return true;
+  if (m === "vendas") return false;
   const p = USERS[(user && user.email || "").toLowerCase()];
   if (!p || !Array.isArray(p.modulos)) return !!p;
   if (m === "pr") return p.modulos.includes("lf") || p.modulos.includes("rep");
@@ -685,11 +731,19 @@ function card(l){
   } else if (l.etapa === "PERDIDO") {
     act.appendChild(mkBtn("Reabrir", "", () => save(l.id, { etapa: "FOLLOW-UP", followup: todayStr(), tentativas: 0 }, "Lead reaberto")));
   }
+  if (isAdmin && l.etapa !== "PERDIDO") act.appendChild(mkBtn("📅 Marcar ensaio", "", () => marcarEnsaio(l)));
   act.appendChild(mkBtn("Editar", "", () => openForm(l)));
   el.appendChild(act);
   return el;
 }
 
+// Abre a agenda já com o cliente do Funil preenchido
+async function marcarEnsaio(l){
+  try {
+    if (!agendaMod) { agendaMod = await import("./js/agenda.js"); agendaMod.init(ctx); }
+    agendaMod.openEnsaio(null, { cliente: l.nome || "", tel: l.telefone || "", servico: l.servico || "", leadId: l.id, valor: l.valor || "", sinalPago: l.etapa === "FECHADO" });
+  } catch (e) { console.warn(e); toast("Não foi possível abrir a agenda"); }
+}
 function render(){
   renderChips(); renderStats();
   const q = $("q").value.trim().toLowerCase();
@@ -750,8 +804,8 @@ $("form").addEventListener("submit", async e => {
 $("btnPrices").onclick = () => {
   $("pInd").value = P.individual || ""; $("pSinal").value = P.sinal || ""; $("pG36").value = P.g36 || ""; $("pG7").value = P.g7 || "";
   $("pFotos").value = P.fotos || ""; $("pPrazo").value = P.prazo || "";
-  $("pLfLote").value = P.lfLoteDia || ""; $("pLfNum").value = P.lfNumero || ""; $("pRepNum").value = P.repNumero || ""; $("pLfParc").value = P.lfParcelas || ""; $("pLfPix").value = P.lfPix || ""; $("pLfCartao").value = P.lfCartao || ""; $("pKit").value = P.kitPreco || ""; $("pKitPromo").value = P.kitPromo || ""; $("pKitCartao").value = P.kitCartao || ""; $("pKitFinal").value = P.kitFinal || ""; $("pLote").value = P.loteDia || ""; $("pEntrega").value = P.entrega || ""; $("pPix").value = P.pix || ""; $("pParc").value = P.parcelas || ""; $("pPixLF").value = P.pixLF || ""; $("pPixRep").value = P.pixRep || ""; $("pPixFinal").value = P.pixFinal || ""; $("pPixSinal").value = P.pixSinal || ""; $("pLink").value = P.linkCartao || ""; $("pLinkFinal").value = P.linkCartaoFinal || ""; $("pLinkLF").value = P.linkCartaoLF || "";
-  ["pInd","pSinal","pG36","pG7","pFotos","pPrazo","pLfLote","pLfNum","pRepNum","pLfParc","pLfPix","pLfCartao","pKit","pKitPromo","pKitCartao","pKitFinal","pLote","pEntrega","pPix","pParc","pPixLF","pPixRep","pPixFinal","pPixSinal","pLink","pLinkFinal","pLinkLF"].forEach(id => $(id).disabled = !isAdmin);
+  $("pLfLote").value = P.lfLoteDia || ""; $("pLfNum").value = P.lfNumero || ""; $("pRepNum").value = P.repNumero || ""; $("pLfParc").value = P.lfParcelas || ""; $("pLfPix").value = P.lfPix || ""; $("pLfCartao").value = P.lfCartao || ""; $("pKit").value = P.kitPreco || ""; $("pKitPromo").value = P.kitPromo || ""; $("pKitCartao").value = P.kitCartao || ""; $("pKitFinal").value = P.kitFinal || ""; $("pLote").value = P.loteDia || ""; $("pEntrega").value = P.entrega || ""; $("pPix").value = P.pix || ""; $("pParc").value = P.parcelas || ""; $("pPixLF").value = P.pixLF || ""; $("pPixRep").value = P.pixRep || ""; $("pPixFinal").value = P.pixFinal || ""; $("pPixSinal").value = P.pixSinal || ""; $("pLink").value = P.linkCartao || ""; $("pLinkFinal").value = P.linkCartaoFinal || ""; $("pLinkLF").value = P.linkCartaoLF || ""; $("pAval").value = P.linkAvaliacao || ""; $("pComissao").value = P.comissaoPct || "";
+  ["pInd","pSinal","pG36","pG7","pFotos","pPrazo","pLfLote","pLfNum","pRepNum","pLfParc","pLfPix","pLfCartao","pKit","pKitPromo","pKitCartao","pKitFinal","pLote","pEntrega","pPix","pParc","pPixLF","pPixRep","pPixFinal","pPixSinal","pLink","pLinkFinal","pLinkLF","pAval","pComissao"].forEach(id => $(id).disabled = !isAdmin);
   $("pSave").hidden = !isAdmin;
   $("pricesHint").textContent = isAdmin ? "Os valores entram automaticamente nas mensagens prontas." : "Só administradores mudam os preços.";
   renderPushState(); $("sheetPrices").hidden = false;
@@ -765,7 +819,7 @@ $("formPrices").addEventListener("submit", async e => {
   const body = { individual: num($("pInd").value), sinal: num($("pSinal").value), g36: num($("pG36").value), g7: num($("pG7").value),
     fotos: num($("pFotos").value) || 30, prazo: num($("pPrazo").value) || 15,
     lfLoteDia: num($("pLfLote").value) || 20, lfNumero: $("pLfNum").value.trim(), repNumero: $("pRepNum").value.trim(), lfParcelas: num($("pLfParc").value), lfPix: num($("pLfPix").value), lfCartao: num($("pLfCartao").value), kitPreco: num($("pKit").value), kitPromo: num($("pKitPromo").value), kitCartao: num($("pKitCartao").value), kitFinal: num($("pKitFinal").value), loteDia: num($("pLote").value) || 20, entrega: $("pEntrega").value.trim(),
-    pix: $("pPix").value.trim(), parcelas: num($("pParc").value), pixLF: $("pPixLF").value.trim(), pixRep: $("pPixRep").value.trim(), pixFinal: $("pPixFinal").value.trim(), pixSinal: $("pPixSinal").value.trim(), linkCartao: $("pLink").value.trim(), linkCartaoFinal: $("pLinkFinal").value.trim(), linkCartaoLF: $("pLinkLF").value.trim() };
+    pix: $("pPix").value.trim(), parcelas: num($("pParc").value), pixLF: $("pPixLF").value.trim(), pixRep: $("pPixRep").value.trim(), pixFinal: $("pPixFinal").value.trim(), pixSinal: $("pPixSinal").value.trim(), linkCartao: $("pLink").value.trim(), linkCartaoFinal: $("pLinkFinal").value.trim(), linkCartaoLF: $("pLinkLF").value.trim(), linkAvaliacao: $("pAval").value.trim(), comissaoPct: num($("pComissao").value) };
   try {
     await setDoc(doc(db, "config", "app"), body, { merge: true });
     $("sheetPrices").hidden = true; toast("Preços salvos");
@@ -803,15 +857,16 @@ function refreshPushToken(){ if (pushSupported() && Notification.permission === 
 $("btnPush").onclick = () => enablePush(true);
 
 // ---------- navegação entre módulos ----------
-const VIEWS = { home: "viewHome", funil: "viewFunil", pr: "viewRepasse", repasse: "viewRepasse", agenda: "viewAgenda",
+const VIEWS = { home: "viewHome", funil: "viewFunil", pr: "viewRepasse", repasse: "viewRepasse", agenda: "viewAgenda", vendas: "viewVendas",
   instituicoes: "viewInst", colegios: "viewInst",
   "inst-particular": "viewInstTipo", "inst-publico": "viewInstTipo", "inst-profissionalizante": "viewInstTipo", "inst-faculdade": "viewInstTipo" };
 const INST_NOMES = { "inst-particular": "Colégio particular", "inst-publico": "Colégio público", "inst-profissionalizante": "Colégio profissionalizante", "inst-faculdade": "Faculdade" };
-let repasseMod = null, instMod = null, agendaMod = null, curView = "home";
+let repasseMod = null, instMod = null, agendaMod = null, vendasMod = null, curView = "home";
 const APROVADORES = (CFG.aprovadores || []).map(e => String(e).toLowerCase());
 const ctx = {
   db, FS, $, toast, mkBtn, money, num, digits, first, todayStr, addDays, fmtDate, hhmm, ds, pad, showNotice, handleErr,
   get me(){ return me; }, get isAdmin(){ return isAdmin; }, get aprovador(){ return APROVADORES.includes((user && user.email || "").toLowerCase()); }, get user(){ return user; }, get P(){ return P; }, team, pode,
+  get vendedores(){ return Object.entries(USERS).filter(([em, u]) => u.nome && u.ativo !== false && u.papel !== "admin" && !isDono(em)).map(([, u]) => u.nome); },
   goHome(){ location.hash = "#home"; }
 };
 let usersLoaded = false;
@@ -819,7 +874,7 @@ async function route(){
   if (!user || !usersLoaded) return;
   const r = (location.hash || "").slice(1);
   let key = VIEWS[r] ? r : "home";
-  const modDe = { funil: "funil", pr: "pr", repasse: "pr", agenda: "agenda", colegios: "colegios", instituicoes: "colegios",
+  const modDe = { vendas: "vendas", funil: "funil", pr: "pr", repasse: "pr", agenda: "agenda", colegios: "colegios", instituicoes: "colegios",
     "inst-particular": "colegios", "inst-publico": "colegios", "inst-profissionalizante": "colegios", "inst-faculdade": "colegios" };
   if (modDe[key] && !pode(modDe[key])) { key = "home"; if (r) history.replaceState(null, "", "#home"); }
   curView = key;
@@ -828,6 +883,11 @@ async function route(){
   $("btnBack").hidden = key === "home";
   $("btnBack").textContent = INST_NOMES[key] ? "‹ Instituições" : "‹ Início";
   if (agendaMod && key !== "agenda") agendaMod.hide();
+  if (vendasMod && key !== "vendas") vendasMod.hide();
+  if (key === "vendas") {
+    try { if (!vendasMod) { vendasMod = await import("./js/vendas.js"); vendasMod.init(ctx); } vendasMod.show(); }
+    catch (e) { console.warn(e); $("viewVendas").innerHTML = '<div class="empty"><strong>Não foi possível abrir</strong><span>Verifique a internet e tente de novo.</span></div>'; }
+  }
   if (key === "agenda") {
     try { if (!agendaMod) { agendaMod = await import("./js/agenda.js"); agendaMod.init(ctx); } agendaMod.show(); }
     catch (e) { console.warn(e); $("viewAgenda").innerHTML = '<div class="empty"><strong>Não foi possível abrir</strong><span>Verifique a internet e tente de novo.</span></div>'; }
@@ -876,11 +936,14 @@ function contarAgenda(){
   const eu = ctx.aprovador;
   const ens = isAdmin ? FS.getDocs(query(collection(db, "ensaios"), where("data", "==", addDays(1)), FS.limit(100))).then(s => s.docs.map(d => d.data())).catch(() => []) : Promise.resolve([]);
   const ana = isAdmin && eu ? FS.getDocs(query(collection(db, "ensaios"), where("status", "==", "analisar"), FS.limit(100))).then(s => s.size).catch(() => 0) : Promise.resolve(0);
-  Promise.all([FS.getDocs(query(collection(db, "agenda"), where("status", "==", "pendente"), FS.limit(200))).then(s => s.size).catch(() => 0), ana, ens]).then(([n, a, amanha]) => {
+  const prz = Number(P.prazo) || 15;
+  const atr = isAdmin ? FS.getDocs(query(collection(db, "ensaios"), where("data", ">=", addDays(-90)), FS.limit(600))).then(s => s.docs.map(d => d.data()).filter(e => e.kind !== "pessoal" && e.status !== "faltou" && e.status !== "remarcar" && e.data <= addDays(-prz) && !(e.entrega && e.entrega.etapa === "Entregue")).length).catch(() => 0) : Promise.resolve(0);
+  Promise.all([FS.getDocs(query(collection(db, "agenda"), where("status", "==", "pendente"), FS.limit(200))).then(s => s.size).catch(() => 0), ana, ens, atr]).then(([n, a, amanha, at]) => {
     const p = [];
     if (eu && n + a) p.push(`${n + a} para analisar`); else if (n) p.push(`${n} aguardando a Luciana`);
     const lem = amanha.filter(e => e.status !== "remarcar" && !e.lembrado && e.tel).length;
     if (lem) p.push(`${lem} lembrete${lem > 1 ? "s" : ""} para amanhã`);
+    if (at) p.push(`⚠️ ${at} entrega${at > 1 ? "s" : ""} atrasada${at > 1 ? "s" : ""}`);
     $("tAgenda").textContent = p.join(" · ") || "Abrir";
   });
 }
@@ -1009,7 +1072,7 @@ function startData(){
     applyProfile(); syncLeads(); render();
     if (!usersLoaded) { usersLoaded = true; route(); }
     else if (curView === "home") renderHome();
-    else { const md = { funil: "funil", pr: "pr", repasse: "pr", agenda: "agenda" }[curView] || (curView === "instituicoes" || curView === "colegios" || INST_NOMES[curView] ? "colegios" : null); if (md && !pode(md)) route(); }
+    else { const md = { funil: "funil", pr: "pr", repasse: "pr", agenda: "agenda", vendas: "vendas" }[curView] || (curView === "instituicoes" || curView === "colegios" || INST_NOMES[curView] ? "colegios" : null); if (md && !pode(md)) route(); }
     if (!$("sheetTeam").hidden) renderTeam();
   }, err => { if (err.code === "permission-denied") showNotice("Este e-mail não tem acesso ao app. Peça para um administrador cadastrar você."); }));
   unsub.push(onSnapshot(doc(db, "config", "app"), s => {
