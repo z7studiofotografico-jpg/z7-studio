@@ -6,6 +6,7 @@
 //   - Ensaios do estúdio marcados direto na agenda (sem vir do Funil, para não contar duas vezes)
 // E a equipe: visitas feitas, visitas marcadas, colégios fechados, vendas e comissão.
 // Os gráficos usam o Chart.js (biblioteca leve, carregada só quando o painel abre).
+import { formaDe, taxa } from "./comissao.js";
 let C, FS, db, dados = null, periodo = "mes", charts = [];
 const $ = (id) => document.getElementById(id);
 const CHART_URL = "https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js";
@@ -55,9 +56,9 @@ async function buscar(){
   ]);
   const vendas = [];
   leads.forEach(l => vendas.push({ data: l.fechadoEm || String(l.criadoEm || "").slice(0, 10), valor: n0(l.valor), produto: l.servico || "Ensaio", origem: "Funil", resp: l.resp || "" }));
-  prs.forEach(r => { const d = r.pagoEm || ""; vendas.push({ data: d, valor: n0(r.valor), produto: Number(r.ano) >= Number(d.slice(0, 4)) ? "Kit PR · Linha de Frente" : "Kit PR · Repasse", origem: "PR", resp: r.resp || "" }); });
+  prs.forEach(r => { const d = r.pagoEm || ""; vendas.push({ data: d, valor: n0(r.valor), produto: Number(r.ano) >= Number(d.slice(0, 4)) ? "Kit PR · Linha de Frente" : "Kit PR · Repasse", origem: "PR", resp: r.resp || "", linha: "pr", forma: formaDe(r.formaPag) }); });
   const instPorId = Object.fromEntries(insts.map(i => [i.id, i]));
-  forms.filter(f => f.status !== "desistiu").forEach(f => vendas.push({ data: f.vendidoEm || String(f.criadoEm || "").slice(0, 10), valor: n0(f.valor), produto: f.kit || "Kit formatura", origem: "Turmas",
+  forms.filter(f => f.status !== "desistiu").forEach(f => vendas.push({ data: f.vendidoEm || String(f.criadoEm || "").slice(0, 10), valor: n0(f.valor), produto: f.kit || "Kit formatura", origem: "Turmas", linha: "form", forma: formaDe(f.formaPag),
     resp: f.resp || (instPorId[f.instId] || {}).resp || "", recebido: n0(f.valor) * Math.min(n0(f.pagas), n0(f.parcelas) || 1) / (n0(f.parcelas) || 1) }));
   ens.filter(e => e.kind !== "pessoal" && !e.leadId && n0(e.valor) && e.status !== "faltou" && e.data <= C.todayStr())
     .forEach(e => vendas.push({ data: e.data, valor: n0(e.valor), produto: e.tipo || "Ensaio", origem: "Estúdio", resp: e.marcadoPor || "" }));
@@ -141,9 +142,12 @@ function caixa(pai, tit, sub){ const b = el("section", "vdbox"); b.append(el("h3
 function canvas(box, h){ const w = el("div", "vdchart"); w.style.height = (h || 240) + "px"; const c = el("canvas"); c.setAttribute("role", "img"); c.setAttribute("aria-label", box.querySelector("h3").textContent); w.append(c); box.append(w); return c; }
 
 function equipe(corpo, fx, vs){
-  const pct = n0(C.P.comissaoPct), comiss = new Set(C.vendedores || []);
+  const comiss = new Set(C.vendedores || []);
+  // Comissão: soma venda a venda, pela linha (PR ou Formatura) e forma de pagamento
+  const comDe = nm => vs.filter(x => x.resp === nm && x.linha).reduce((a, x) => a + x.valor * taxa(C.P, x.linha, x.forma) / 100, 0);
+  const semForma = nm => vs.filter(x => x.resp === nm && x.linha && !x.forma).length;
   const nomes = new Set([...(C.team() || []), ...vs.map(x => x.resp), ...dados.visitas.filter(x => dentro(x.data, fx)).map(x => x.por), ...dados.marcadas.map(x => x.por)].filter(Boolean));
-  const box = caixa(corpo, "Equipe", PERIODOS.find(p => p[0] === periodo)[1] + (pct ? ` · comissão de ${pct}% para a equipe de vendas` : " · defina a comissão em Ajustes"));
+  const box = caixa(corpo, "Equipe", PERIODOS.find(p => p[0] === periodo)[1] + " · comissão pela forma de pagamento (PR e Formatura)");
   const tb = el("div", "vdtab");
   const head = el("div", "vdtr th"); ["Pessoa", "Visitas feitas", "Visitas marcadas", "Colégios fechados", "Vendas", "Comissão"].forEach(t => head.append(el("span", null, t))); tb.append(head);
   [...nomes].sort((a, b) => a.localeCompare(b, "pt-BR")).forEach(nm => {
@@ -153,7 +157,7 @@ function equipe(corpo, fx, vs){
     const cf = dados.fechados.filter(x => x.por === nm && dentro(x.data, fx)).length;
     if (!vend && !vf && !vm && !cf) return;
     const r = el("div", "vdtr");
-    [C.first(nm), vf, vm, cf, moeda(vend), comiss.has(nm) && pct ? moeda(vend * pct / 100) : "—"].forEach((t, i) => { const s = el("span", null, String(t)); s.dataset.l = ["", "Visitas feitas", "Visitas marcadas", "Colégios fechados", "Vendas", "Comissão"][i]; r.append(s); });
+    [C.first(nm), vf, vm, cf, moeda(vend), comiss.has(nm) ? moeda(comDe(nm)) + (semForma(nm) ? ` (${semForma(nm)} sem forma de pagamento)` : "") : "—"].forEach((t, i) => { const s = el("span", null, String(t)); s.dataset.l = ["", "Visitas feitas", "Visitas marcadas", "Colégios fechados", "Vendas", "Comissão"][i]; r.append(s); });
     tb.append(r);
   });
   if (tb.children.length === 1) tb.append(el("p", "hint", "Sem movimento da equipe no período."));

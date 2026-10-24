@@ -63,7 +63,7 @@ export function openTurma(ctx, inst, kits){
     const at = atrasado(f), q0 = quitado(f);
     const e = el("article", "card " + (f.status === "desistiu" ? "" : at ? "late" : q0 ? "won" : ""));
     const top = el("div", "card-top"); top.append(el("h3", "name", title(f.nome)), el("span", "stage", f.status === "desistiu" ? "DESISTIU" : q0 ? "QUITADO" : at ? "ATRASADO" : "EM DIA")); e.append(top);
-    const meta = el("div", "meta"); [f.serie, f.kit, f.valor ? C.money(f.valor) : "", f.tel].filter(Boolean).forEach((t, i) => meta.append(el("span", "tag" + (i === 1 ? " svc" : ""), t))); e.append(meta);
+    const meta = el("div", "meta"); [f.serie, f.kit, f.valor ? C.money(f.valor) : "", f.formaPag, f.tel].filter(Boolean).forEach((t, i) => meta.append(el("span", "tag" + (i === 1 ? " svc" : ""), t))); e.append(meta);
     if (n0(f.parcelas)) {
       const prox = n0(f.pagas) + 1;
       e.append(el("div", "fu " + (at ? "late" : ""), q0 ? `${f.parcelas}/${f.parcelas} parcelas pagas ✓` : `${n0(f.pagas)}/${f.parcelas} pagas · ${C.money(Math.round(parcela(f)))} por parcela` + (f.primeiroVenc ? ` · ${at ? "venceu" : "vence"} ${C.fmtDate(vencDa(f, prox))}` : "")));
@@ -102,8 +102,9 @@ export function openTurma(ctx, inst, kits){
     const pagas = inp(f ? f.pagas || 0 : "0", "0", 3); pagas.inputMode = "numeric";
     const r3 = el("div", "row3"); r3.append(field("Valor total", valor), field("Parcelas", parc), field("Já pagas", pagas)); fp.append(r3);
     const venc = el("input"); venc.type = "date"; venc.value = f ? f.primeiroVenc || "" : C.todayStr();
+    const fpg = el("select"); [["", "forma de pagamento"], ...["Pix", "Cartão", "Link", "Recorrente", "Dinheiro", "Boleto"].map(x => [x, x])].forEach(([v, t]) => { const o = el("option", null, t); o.value = v; fpg.append(o); }); fpg.value = f ? f.formaPag || "" : "";
     const st = el("select"); [["ativo", "Comprou"], ["desistiu", "Desistiu"]].forEach(([v, t]) => { const o = el("option", null, t); o.value = v; st.append(o); }); st.value = f ? f.status || "ativo" : "ativo";
-    const r4 = el("div", "row2"); r4.append(field("1º vencimento", venc), field("Situação", st)); fp.append(r4);
+    const r4 = el("div", "row3"); r4.append(field("1º vencimento", venc), field("Pagamento", fpg), field("Situação", st)); fp.append(r4);
     const obs = el("textarea"); obs.rows = 2; obs.maxLength = 500; obs.value = f ? f.obs || "" : ""; fp.append(field("Observação", obs));
     const err = el("p", "err"); err.hidden = true; fp.append(err);
     const a = el("div", "panel-actions");
@@ -114,7 +115,7 @@ export function openTurma(ctx, inst, kits){
       ev.preventDefault();
       const P = n0(parc.value) || 1, pg = n0(pagas.value);
       if (pg > P) { err.textContent = "Já pagas não pode ser maior que o número de parcelas."; err.hidden = false; return; }
-      const body = { nome: nome.value.trim(), tel: tel.value.trim(), serie: serie.value, kit: kit.value.trim(), valor: C.num(valor.value), parcelas: P, pagas: pg, primeiroVenc: venc.value, status: st.value, obs: obs.value.trim(), atualizadoEm: new Date().toISOString() };
+      const body = { nome: nome.value.trim(), tel: tel.value.trim(), serie: serie.value, kit: kit.value.trim(), valor: C.num(valor.value), parcelas: P, pagas: pg, primeiroVenc: venc.value, formaPag: fpg.value, status: st.value, obs: obs.value.trim(), atualizadoEm: new Date().toISOString() };
       try {
         if (f) await FS.updateDoc(FS.doc(db, "formandos", f.id), body);
         else await FS.addDoc(col, Object.assign(body, { instId: inst.id, instNome: inst.nome, instTipo: inst.tipo || "", ano: Number(C.todayStr().slice(0, 4)), resp: inst.resp || C.me || "", vendidoEm: C.todayStr(), criadoEm: new Date().toISOString(), por: C.me || "" }));
@@ -126,7 +127,7 @@ export function openTurma(ctx, inst, kits){
   function importar(){
     const s2 = el("div", "sheet"); const fp = el("form", "panel"); s2.append(fp);
     const fechar = () => s2.remove(); s2.addEventListener("click", ev => { if (ev.target === s2) fechar(); });
-    fp.append(el("h2", null, "Importar formandos"), el("p", "hint", "Planilha do Excel com as colunas (os nomes podem variar): NOME, TELEFONE, SÉRIE, KIT, VALOR, PARCELAS, PAGAS, VENCIMENTO. Só o nome é obrigatório."));
+    fp.append(el("h2", null, "Importar formandos"), el("p", "hint", "Planilha do Excel com as colunas (os nomes podem variar): NOME, TELEFONE, SÉRIE, KIT, VALOR, PARCELAS, PAGAS, VENCIMENTO, PAGAMENTO. Só o nome é obrigatório."));
     const file = el("input"); file.type = "file"; file.accept = ".xlsx,.xls,.csv"; fp.append(file);
     const prev = el("div", "imp"); fp.append(prev);
     const a = el("div", "panel-actions"); const sp = el("span"); sp.style.flex = "1"; const c = el("button", "btn", "Cancelar"); c.type = "button"; c.onclick = fechar; const ok = el("button", "btn btn-primary", "Importar"); ok.type = "submit"; ok.disabled = true; a.append(sp, c, ok); fp.append(a);
@@ -141,7 +142,7 @@ export function openTurma(ctx, inst, kits){
         const iso = v => v instanceof Date ? `${v.getFullYear()}-${C.pad(v.getMonth() + 1)}-${C.pad(v.getDate())}` : /^(\d{2})\/(\d{2})\/(\d{4})$/.test(String(v).trim()) ? String(v).trim().replace(/^(\d{2})\/(\d{2})\/(\d{4})$/, "$3-$2-$1") : "";
         const ja = new Set(lista.map(f => norm(f.nome)));
         linhas = rows.map(r => ({ nome: String(pega(r, "nome", "formando", "aluno")).trim(), tel: String(pega(r, "telefone", "celular", "whats", "tel")).trim(), serie: String(pega(r, "serie", "turma", "ano")).trim(),
-          kit: String(pega(r, "kit", "produto", "pacote")).trim(), valor: C.num(String(pega(r, "valor", "preco", "total"))), parcelas: n0(pega(r, "parcela")) || 1, pagas: n0(pega(r, "paga")), primeiroVenc: iso(pega(r, "venc")) }))
+          kit: String(pega(r, "kit", "produto", "pacote")).trim(), valor: C.num(String(pega(r, "valor", "preco", "total"))), parcelas: n0(pega(r, "parcela")) || 1, pagas: n0(pega(r, "paga")), primeiroVenc: iso(pega(r, "venc")), formaPag: String(pega(r, "pagamento", "forma")).trim() }))
           .filter(x => x.nome && !ja.has(norm(x.nome)));
         prev.textContent = linhas.length ? `${linhas.length} formando${linhas.length > 1 ? "s" : ""} novo${linhas.length > 1 ? "s" : ""}: ${linhas.slice(0, 5).map(x => title(x.nome)).join(", ")}${linhas.length > 5 ? "…" : ""}` : "Nenhum formando novo na planilha.";
         ok.disabled = !linhas.length;

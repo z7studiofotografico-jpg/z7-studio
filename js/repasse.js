@@ -439,7 +439,7 @@ function openPago(it){
   sheet("Registrar venda", (p, close) => {
     p.append(el("p", "hint", title(it.nome) + " · " + title(it.escola)));
     const v = el("input"); v.inputMode = "decimal"; v.value = it.valor || (segDe(it) === "lf" ? (C.P.lfPix || C.P.kitPreco) : ((it.tentInteresse >= 2 && C.P.kitFinal) || C.P.kitPromo || C.P.kitPreco)) || "";
-    const fp = el("select"); ["Pix", "Cartão (link InfinityPay)", "Dinheiro", "Outro"].forEach(x => { const o = el("option", null, x); o.value = x; fp.append(o); });
+    const fp = el("select"); ["Pix", "Cartão", "Link", "Recorrente", "Dinheiro", "Boleto", "Outro"].forEach(x => { const o = el("option", null, x); o.value = x; fp.append(o); });
     const r = el("div", "row2"); r.append(field("Valor (R$)", v), field("Pagamento", fp)); p.append(r);
     p.append(entregaCampos(p, it));
     p.append(actions(close, "Salvar venda"));
