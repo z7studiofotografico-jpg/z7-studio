@@ -34,8 +34,8 @@ service cloud.firestore {
       allow update: if usaAgenda() && resource.data.status != 'confirmado' && request.resource.data.status == 'pendente' || aprovador();
       allow delete: if aprovador() || admin() || (usaAgenda() && resource.data.status != 'confirmado');
     }
-    // Ensaios no estúdio: só os donos (e administradores) marcam e veem
-    match /ensaios/{id} { allow read, write: if admin(); }
+    // Ensaios no estúdio e compromissos: todos da agenda veem; só os donos (e administradores) marcam
+    match /ensaios/{id} { allow read: if usaAgenda(); allow write: if admin(); }
     // Fila de e-mails para os colégios (enviados pelo GitHub com o Gmail do estúdio)
     match /emails/{id} {
       allow create: if aprovador() || admin();

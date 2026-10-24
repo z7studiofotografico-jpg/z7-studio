@@ -39,7 +39,7 @@ const APROVADORES = ["lucianafanjos@gmail.com"];
 const pendAgenda = (await db.collection("agenda").where("status", "==", "pendente").get()).size;
 // Ensaios no estúdio: lembrar o cliente na véspera (donos) e os que a Luciana precisa analisar
 const amanha = new Intl.DateTimeFormat("en-CA", { timeZone: "America/Sao_Paulo" }).format(new Date(Date.now() + 864e5));
-const ensAmanha = (await db.collection("ensaios").where("data", "==", amanha).get()).docs.map((d) => d.data()).filter((e) => e.status !== "remarcar" && !e.lembrado);
+const ensAmanha = (await db.collection("ensaios").where("data", "==", amanha).get()).docs.map((d) => d.data()).filter((e) => e.kind !== "pessoal" && e.status !== "remarcar" && !e.lembrado);
 const ensAnalisar = (await db.collection("ensaios").where("status", "==", "analisar").get()).size;
 const tokensSnap = await db.collection("tokens").get();
 console.log(`Hoje ${hoje}: ${vencidos.length} lead(s) com contato vencido, ${tokensSnap.size} aparelho(s).`);

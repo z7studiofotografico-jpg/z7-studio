@@ -2,10 +2,13 @@
 // - Colégios: formaturas e dias de fotos (um por dia; a Luciana aprova). Documento agenda/AAAA-MM-DD.
 // - Ensaios no estúdio: só os donos marcam (coleção "ensaios"). Pode ter vários por dia;
 //   quando o Adriano marca num dia que já tem algo, a Luciana analisa.
+// - Compromissos (consulta médica, banco, outros afazeres): na mesma coleção, com kind "pessoal".
+//   "Dia inteiro" bloqueia o dia para formatura/dia de fotos. "Particular" mostra só "Ocupado" ao vendedor.
+// O vendedor vê tudo (para saber por que o dia está ocupado), mas só os donos marcam e mudam.
 // - Visitas do vendedor: vêm do "Voltar para visita" das Instituições. Só informam, não bloqueiam o dia.
 import { avisarColegioPorEmail, nomeEvento } from "./instituicoes.js";
 let C, FS, db, col, colE;
-let unsubs = [], items = [], ensaios = [], visitas = [], filtro = "tudo";
+let unsubs = [], items = [], ensaios = [], comps = [], visitas = [], filtro = "tudo";
 const $ = (id) => document.getElementById(id);
 const CAMPO = { formatura: "formatura", fotos: "diaFotos" };
 const ICO = { formatura: "🎓", fotos: "📸" };
@@ -22,7 +25,9 @@ const min = h => { const [a, b] = String(h || "").split(":").map(Number); return
 const hm = m => C.pad(Math.floor(m / 60) % 24) + ":" + C.pad(m % 60);
 const fimDe = e => { const i = min(e.hora); return i == null ? "" : hm(i + (Number(e.duracao) || 60)); };
 const quando = d => d === C.todayStr() ? "hoje" : d === C.addDays(1) ? "amanhã" : "";
-const vejoEnsaios = () => C.isAdmin;
+const vejoEnsaios = () => true;
+const marco = () => C.isAdmin;
+const DE_QUEM = ["Luciana", "Adriano", "Estúdio"];
 const vejoVisitas = () => C.pode("colegios");
 
 export function init(ctx){ C = ctx; FS = ctx.FS; db = ctx.db; col = FS.collection(db, "agenda"); colE = FS.collection(db, "ensaios"); }
@@ -30,21 +35,22 @@ export function init(ctx){ C = ctx; FS = ctx.FS; db = ctx.db; col = FS.collectio
 export function show(){
   const v = $("viewAgenda"); v.innerHTML = "";
   const head = el("div", "vhead"); head.append(el("h2", null, "Agendamento"));
-  if (vejoEnsaios()) head.append(C.mkBtn("+ Marcar ensaio", "btn-primary btn-sm", () => openEnsaio()));
+  if (marco()) { const hb = el("div", "agact"); hb.append(C.mkBtn("+ Compromisso", "btn-sm", () => openComp()), C.mkBtn("+ Marcar ensaio", "btn-primary btn-sm", () => openEnsaio())); head.append(hb); }
   v.append(head);
   v.append(el("p", "hint", C.aprovador ? "As datas de colégio sugeridas pelo vendedor ficam seguradas até você aprovar ou recusar." : "As datas de colégio ficam seguradas até a Luciana aprovar."));
   const chips = el("div", "chips"); chips.id = "agChips"; v.append(chips);
   const pend = el("section", "view"); pend.id = "agPend"; v.append(pend);
   const prox = el("section", "view"); prox.id = "agProx"; v.append(prox);
   prox.append(el("div", "empty", "Carregando…"));
-  hide(); items = []; ensaios = []; visitas = [];
+  hide(); items = []; ensaios = []; comps = []; visitas = [];
   const hoje = C.todayStr();
   const erro = (err, o) => { console.warn(err); if (err.code === "permission-denied") C.showNotice(o === "agenda" ? "Você não tem acesso ao Agendamento." : o === "ensaios" ? "Para ver os ensaios, cole as regras novas do Firebase." : ""); };
   unsubs.push(FS.onSnapshot(FS.query(col, FS.where("data", ">=", hoje), FS.orderBy("data"), FS.limit(400)), snap => {
     items = snap.docs.map(d => Object.assign({ id: d.id }, d.data())); render();
   }, e => erro(e, "agenda")));
   if (vejoEnsaios()) unsubs.push(FS.onSnapshot(FS.query(colE, FS.where("data", ">=", hoje), FS.orderBy("data"), FS.limit(400)), snap => {
-    ensaios = snap.docs.map(d => Object.assign({ id: d.id }, d.data())); render();
+    const todos = snap.docs.map(d => Object.assign({ id: d.id }, d.data()));
+    ensaios = todos.filter(x => x.kind !== "pessoal"); comps = todos.filter(x => x.kind === "pessoal"); render();
   }, e => erro(e, "ensaios")));
   if (vejoVisitas()) unsubs.push(FS.onSnapshot(FS.query(FS.collection(db, "instituicoes"), FS.where("followup", ">=", hoje), FS.orderBy("followup"), FS.limit(400)), snap => {
     visitas = snap.docs.map(d => Object.assign({ id: d.id }, d.data()))
@@ -56,8 +62,8 @@ export function hide(){ unsubs.forEach(u => u()); unsubs = []; }
 
 function renderChips(){
   const c = $("agChips"); if (!c) return; c.innerHTML = "";
-  const ops = [["tudo", "Tudo", items.length + ensaios.length + visitas.length], ["colegio", "Colégios", items.length]];
-  if (vejoEnsaios()) ops.push(["ensaio", "Ensaios", ensaios.length]);
+  const ops = [["tudo", "Tudo", items.length + ensaios.length + comps.length + visitas.length], ["colegio", "Colégios", items.length]];
+  if (vejoEnsaios()) ops.push(["ensaio", "Ensaios", ensaios.length], ["comp", "Compromissos", comps.length]);
   if (vejoVisitas()) ops.push(["visita", "Visitas", visitas.length]);
   if (ops.length < 3) { c.hidden = true; return; } c.hidden = false;
   ops.forEach(([k, t, n]) => {
@@ -75,18 +81,19 @@ function render(){
   const analisar = ensaios.filter(x => x.status === "analisar");
   const remarcar = ensaios.filter(x => x.status === "remarcar");
   const grade = el("div", "grid");
-  if (pendentes.length && C.aprovador && filtro !== "ensaio" && filtro !== "visita") {
+  if (pendentes.length && C.aprovador && (filtro === "tudo" || filtro === "colegio")) {
     const grupos = {}; pendentes.forEach(x => { const k = x.grupo || x.id; (grupos[k] = grupos[k] || []).push(x); });
     Object.values(grupos).forEach(gr => grade.append(cardPedido(gr)));
   }
-  if (C.aprovador && filtro !== "colegio" && filtro !== "visita") analisar.forEach(x => grade.append(cardAnalisar(x)));
-  if (filtro !== "colegio" && filtro !== "visita") remarcar.forEach(x => grade.append(cardRemarcar(x)));
+  if (C.aprovador && (filtro === "tudo" || filtro === "ensaio")) analisar.forEach(x => grade.append(cardAnalisar(x)));
+  if (marco() && (filtro === "tudo" || filtro === "ensaio")) remarcar.forEach(x => grade.append(cardRemarcar(x)));
   if (grade.children.length) { pend.append(el("h3", "grp", C.aprovador ? `Para você analisar (${grade.children.length})` : `Precisa de atenção (${grade.children.length})`), grade); }
 
   // Próximos compromissos, dia a dia
   const ent = [];
   if (filtro === "tudo" || filtro === "colegio") items.filter(x => !(C.aprovador && x.status === "pendente")).forEach(x => ent.push({ data: x.data, hora: "", t: "c", x }));
   if (filtro === "tudo" || filtro === "ensaio") ensaios.filter(x => x.status !== "remarcar" && !(C.aprovador && x.status === "analisar")).forEach(x => ent.push({ data: x.data, hora: x.hora || "", t: "e", x }));
+  if (filtro === "tudo" || filtro === "comp") comps.forEach(x => ent.push({ data: x.data, hora: x.diaInteiro ? "" : x.hora || "", t: "p", x }));
   if (filtro === "tudo" || filtro === "visita") visitas.forEach(x => ent.push({ data: x.followup, hora: x.followupHora || "99", t: "v", x }));
   ent.sort((a, b) => a.data.localeCompare(b.data) || a.hora.localeCompare(b.hora));
   prox.append(el("h3", "grp", "Próximos compromissos"));
@@ -104,7 +111,7 @@ function render(){
       if (quando(dia)) top.append(el("span", "stage", quando(dia).toUpperCase()));
       card.append(top); g.append(card);
     }
-    card.append(it.t === "c" ? linhaColegio(it.x) : it.t === "e" ? linhaEnsaio(it.x) : linhaVisita(it.x));
+    card.append(it.t === "c" ? linhaColegio(it.x) : it.t === "e" ? linhaEnsaio(it.x) : it.t === "p" ? linhaComp(it.x) : linhaVisita(it.x));
   });
   prox.append(g);
 }
@@ -127,6 +134,8 @@ function cardPedido(gr){
   gr.forEach(x => e.append(el("div", "fu today", `${ICO[x.kind] || "📌"} ${nomeEvento(x.kind, x.instNome)}: ${diaTxt(x.data)}/${x.data.slice(0, 4)}${x.hora ? " às " + x.hora : ""}${x.onde ? " · " + x.onde : ""}${x.local ? " (" + x.local + ")" : ""}`)));
   const outros = gr.map(x => ensaios.filter(y => y.data === x.data && y.status !== "remarcar")).flat();
   if (outros.length) e.append(el("p", "wait", "⚠️ Nesse dia já tem ensaio no estúdio: " + outros.map(y => `${y.hora || "sem hora"} ${C.first(y.cliente)}`).join(", ")));
+  const cps = gr.map(x => comps.filter(y => y.data === x.data)).flat();
+  if (cps.length) e.append(el("p", "wait", "⚠️ Compromisso nesse dia: " + cps.map(y => `${y.titulo || "Compromisso"} (${y.deQuem || ""}) ${y.diaInteiro ? "dia inteiro" : y.hora}`).join(", ")));
   const det = [gr.map(x => x.obs).filter(Boolean)[0], x0.pedidoPor && "Pedido por " + C.first(x0.pedidoPor)].filter(Boolean).join("\n");
   if (det) e.append(el("p", "notes", det));
   const act = el("div", "actions");
@@ -197,11 +206,14 @@ function conflitos(data, hora, duracao, ignora){
   const doDia = ensaios.filter(e => e.data === data && e.id !== ignora && e.status !== "remarcar");
   const encavala = i == null ? [] : doDia.filter(e => { const a = min(e.hora); if (a == null) return false; const b = a + (Number(e.duracao) || 60); return a < f && i < b; });
   const colegio = items.find(x => x.data === data);
-  return { doDia, encavala, colegio };
+  const compDia = comps.filter(c => c.data === data && c.id !== ignora);
+  const compBate = compDia.filter(c => { if (c.diaInteiro) return true; if (i == null) return false; const a = min(c.hora); if (a == null) return false; const b = a + (Number(c.duracao) || 60); return a < f && i < b; });
+  return { doDia, encavala, colegio, compDia, compBate };
 }
 function resumoDia(data, ignora){
-  const { doDia, colegio } = conflitos(data, "", 0, ignora);
+  const { doDia, colegio, compDia } = conflitos(data, "", 0, ignora);
   const p = [];
+  compDia.forEach(c => p.push(`📌 ${c.titulo || "Compromisso"} (${c.deQuem || ""}) · ${c.diaInteiro ? "dia inteiro" : (c.hora || "") + "–" + fimDe(c)}`));
   if (colegio) p.push(`${ICO[colegio.kind] || "📌"} ${nomeEvento(colegio.kind, colegio.instNome)}${colegio.status === "pendente" ? " (aguardando)" : ""}`);
   doDia.slice().sort((a, b) => (a.hora || "").localeCompare(b.hora || "")).forEach(e => p.push(`📷 ${e.hora ? e.hora + "–" + fimDe(e) : "sem hora"} ${C.first(e.cliente)}`));
   return p;
@@ -212,6 +224,7 @@ function linhaEnsaio(x){
   t.append(el("b", null, `📷 ${x.hora ? x.hora + "–" + fimDe(x) : "Sem horário"} · ${title(x.cliente)}`));
   t.append(el("span", null, [x.tipo, x.obs].filter(Boolean).join(" · ")));
   if (x.status === "analisar") t.append(el("span", "wait", "⏳ A Luciana vai analisar: " + (x.conflito || "o dia já tem outro compromisso")));
+  if (!marco()) { r.append(t, el("span", "tag", "Estúdio")); return r; }
   const act = el("div", "agact");
   const q = quando(x.data);
   if (x.tel && (q || !x.lembrado)) {
@@ -319,7 +332,7 @@ export function openEnsaio(x, pre){
       const r = resumoDia(data.value, x && x.id);
       diaBox.textContent = r.length ? "Nesse dia já tem:\n" + r.join("\n") : "Dia livre ✅"; diaBox.hidden = false;
     };
-    data.addEventListener("change", mostraDia); hora.addEventListener("change", () => { err.hidden = true; p._ok = false; }); dur.addEventListener("change", () => { p._ok = false; });
+    data.addEventListener("change", () => { p._okc = false; mostraDia(); }); hora.addEventListener("change", () => { err.hidden = true; p._ok = false; p._okc = false; }); dur.addEventListener("change", () => { p._ok = false; });
     if (x) mostraDia();
     const obs = el("textarea"); obs.rows = 2; obs.maxLength = 1000; obs.placeholder = "ex.: vem com a mãe e o cachorro; pagou o sinal"; obs.value = x ? x.obs || "" : pre.obs || "";
     p.append(field("Observação", obs), err);
@@ -332,7 +345,12 @@ export function openEnsaio(x, pre){
     p.addEventListener("submit", async ev => {
       ev.preventDefault();
       if (!nome.value.trim() || !tipo.value || !data.value || !hora.value) return;
-      const { doDia, encavala, colegio } = conflitos(data.value, hora.value, dur.value, x && x.id);
+      const { doDia, encavala, colegio, compBate } = conflitos(data.value, hora.value, dur.value, x && x.id);
+      if (compBate.length && !p._okc) {
+        p._okc = true; a.ok.textContent = "Marcar mesmo assim";
+        err.textContent = "Nesse horário tem compromisso: " + compBate.map(c => `${c.titulo || "Compromisso"} (${c.deQuem || ""}) ${c.diaInteiro ? "dia inteiro" : c.hora + "–" + fimDe(c)}`).join(", ") + ". Toque de novo para marcar mesmo assim.";
+        err.hidden = false; err.scrollIntoView({ block: "center" }); return;
+      }
       // Horário em cima de outro ensaio: avisa antes de salvar
       if (encavala.length && !p._ok) {
         p._ok = true; a.ok.textContent = "Marcar mesmo assim";
@@ -344,6 +362,7 @@ export function openEnsaio(x, pre){
       if (colegio) motivos.push(nomeEvento(colegio.kind, colegio.instNome));
       if (doDia.length) motivos.push(`${doDia.length} ensaio${doDia.length > 1 ? "s" : ""} no mesmo dia`);
       if (encavala.length) motivos.push("horário encavalado");
+      if (compBate.length) motivos.push("compromisso: " + compBate.map(c => c.titulo || "compromisso").join(", "));
       const mudouDia = !x || x.data !== data.value || x.hora !== hora.value || String(x.duracao) !== dur.value;
       let status = x ? (x.status === "remarcar" ? "confirmado" : x.status || "confirmado") : "confirmado";
       if (mudouDia || (x && x.status === "remarcar")) status = !C.aprovador && motivos.length ? "analisar" : "confirmado";
@@ -358,6 +377,60 @@ export function openEnsaio(x, pre){
       } catch (e) { C.handleErr(e); }
     });
     setTimeout(() => (x ? data : nome).focus(), 30);
+  });
+}
+
+// ---------- Compromissos (consulta médica, outros afazeres) ----------
+function linhaComp(x){
+  const r = el("div", "agrow"); const t = el("div", "agtxt");
+  const oculto = x.particular && !marco();
+  t.append(el("b", null, oculto ? `🔒 ${x.deQuem || "Compromisso"}: ocupado` : `📌 ${x.titulo || "Compromisso"}${x.deQuem ? " · " + x.deQuem : ""}`));
+  t.append(el("span", null, [x.diaInteiro ? "Dia inteiro" : (x.hora ? x.hora + "–" + fimDe(x) : ""), !oculto && x.obs, x.particular && marco() ? "🔒 particular" : ""].filter(Boolean).join(" · ")));
+  if (!marco()) { r.append(t, el("span", "tag " + (x.diaInteiro ? "late" : ""), x.diaInteiro ? "Dia bloqueado" : "Ocupado")); return r; }
+  const act = el("div", "agact"); if (x.diaInteiro) act.append(el("span", "tag late", "Dia bloqueado"));
+  act.append(C.mkBtn("Editar", "btn-sm", () => openComp(x))); r.append(t, act); return r;
+}
+export function openComp(x){
+  sheet(x ? "Editar compromisso" : "Novo compromisso", (p, close) => {
+    p.append(el("p", "hint", "Consulta médica, banco, viagem, outros afazeres. O vendedor vê que o horário está ocupado."));
+    const tit = el("input"); tit.required = true; tit.maxLength = 80; tit.placeholder = "ex.: Consulta médica"; tit.value = x ? x.titulo || "" : "";
+    const sug = el("div", "quick"); ["Consulta médica", "Exame", "Banco", "Viagem", "Folga", "Reunião"].forEach(t => { const b = el("button", "chip chip-sm", t); b.type = "button"; b.onclick = () => { tit.value = t; }; sug.append(b); });
+    const quem = el("select"); DE_QUEM.forEach(q => { const o = el("option", null, q); o.value = q; quem.append(o); });
+    quem.value = x ? x.deQuem || "Estúdio" : (/luciana/i.test(C.me || "") ? "Luciana" : /adriano/i.test(C.me || "") ? "Adriano" : "Estúdio");
+    const r1 = el("div", "row2"); r1.append(field("O que é", tit), field("De quem", quem)); p.append(r1, sug);
+    const data = el("input"); data.type = "date"; data.required = true; data.min = C.todayStr(); data.value = x ? x.data : "";
+    const intL = el("label", "chk"); const intC = el("input"); intC.type = "checkbox"; intC.checked = x ? !!x.diaInteiro : false; intL.append(intC, document.createTextNode(" Dia inteiro (bloqueia formatura e dia de fotos)"));
+    const h1 = el("input"); h1.type = "time"; h1.step = 900; h1.value = x && !x.diaInteiro ? x.hora || "" : "";
+    const h2 = el("input"); h2.type = "time"; h2.step = 900; h2.value = x && !x.diaInteiro && x.hora ? fimDe(x) : "";
+    const r2 = el("div", "row3"); r2.append(field("Dia", data), field("Das", h1), field("Até", h2)); p.append(r2, intL);
+    const sync = () => { h1.disabled = h2.disabled = intC.checked; h1.required = h2.required = !intC.checked; }; intC.onchange = sync; sync();
+    const parL = el("label", "chk"); const parC = el("input"); parC.type = "checkbox"; parC.checked = x ? !!x.particular : true; parL.append(parC, document.createTextNode(" 🔒 Particular (o vendedor vê só “ocupado”)"));
+    p.append(parL);
+    const diaBox = el("p", "notes"); diaBox.hidden = true; p.append(diaBox);
+    data.addEventListener("change", () => { const r = resumoDia(data.value, x && x.id); diaBox.textContent = r.length ? "Nesse dia já tem:\n" + r.join("\n") : "Dia livre ✅"; diaBox.hidden = !data.value; });
+    const obs = el("textarea"); obs.rows = 2; obs.maxLength = 500; obs.placeholder = "opcional"; obs.value = x ? x.obs || "" : ""; p.append(field("Observação", obs));
+    const err = el("p", "err"); err.hidden = true; p.append(err);
+    const a = botoes(close, x ? "Salvar" : "Marcar compromisso");
+    if (x) { const del = el("button", "btn btn-danger", "Excluir"); del.type = "button"; a.prepend(del); del.onclick = async () => {
+      if (!p._del) { p._del = true; del.textContent = "Toque de novo para excluir"; return; }
+      try { await FS.deleteDoc(FS.doc(db, "ensaios", x.id)); C.toast("Compromisso excluído"); close(); } catch (e) { C.handleErr(e); }
+    }; }
+    p.append(a);
+    p.addEventListener("submit", async ev => {
+      ev.preventDefault();
+      const i = min(h1.value), f = min(h2.value);
+      if (!intC.checked && (i == null || f == null || f <= i)) { err.textContent = "O horário de fim precisa ser depois do início."; err.hidden = false; return; }
+      const body = { kind: "pessoal", titulo: tit.value.trim(), deQuem: quem.value, data: data.value, diaInteiro: intC.checked, hora: intC.checked ? "" : h1.value,
+        duracao: intC.checked ? 0 : f - i, particular: parC.checked, obs: obs.value.trim(), status: "confirmado", atualizadoEm: new Date().toISOString() };
+      try {
+        if (x) await FS.updateDoc(FS.doc(db, "ensaios", x.id), body);
+        else await FS.addDoc(colE, Object.assign(body, { marcadoPor: C.me || "", criadoEm: new Date().toISOString() }));
+        const col = items.find(y => y.data === data.value);
+        C.toast(intC.checked && col ? `Marcado. Atenção: nesse dia já tem ${nomeEvento(col.kind, col.instNome)}` : "Compromisso marcado ✅");
+        close();
+      } catch (e) { C.handleErr(e); }
+    });
+    setTimeout(() => (x ? data : tit).focus(), 30);
   });
 }
 

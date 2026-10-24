@@ -71,6 +71,12 @@ async function reservarVarios(it, pares){
   for (const [kind, f] of pares) { const atual = it[KINDS[kind].campo];
     if (atual && atual.status === "confirmado" && !C.aprovador && atual.data !== f.data) { const e = new Error("confirmado"); e.code = "confirmado"; throw e; } }
   const datas = pares.map(([, f]) => f.data); if (new Set(datas).size !== datas.length) { const e = new Error("mesmo dia"); e.code = "mesmodia"; throw e; }
+  // Dia bloqueado por compromisso de dia inteiro (consulta médica, viagem…)
+  for (const d of datas) {
+    let bl = [];
+    try { bl = (await FS.getDocs(FS.query(FS.collection(db, "ensaios"), FS.where("data", "==", d)))).docs.map(x => x.data()).filter(x => x.kind === "pessoal" && x.diaInteiro); } catch (e) { console.warn(e); }
+    if (bl.length) { const e = new Error("bloqueado"); e.code = "bloqueado"; e.ocupado = { data: d }; e.bloqueio = bl[0]; throw e; }
+  }
   const status = C.aprovador ? "confirmado" : "pendente", grupo = it.id + "_" + Date.now(), agora = new Date().toISOString();
   await FS.runTransaction(db, async tx => {
     const leit = [];
@@ -98,6 +104,7 @@ async function liberar(it, kind){
 }
 function msgErroData(e){
   if (e.code === "ocupado") return msgOcupado(e);
+  if (e.code === "bloqueado") { const x = e.bloqueio || {}; return `O dia ${C.fmtDate(e.ocupado.data)} está bloqueado: ${x.particular ? "compromisso particular" : (x.titulo || "compromisso")}${x.deQuem ? " (" + x.deQuem + ")" : ""}. Escolha outra data.`; }
   if (e.code === "confirmado") return "Essa data já foi confirmada pela Luciana. Para mudar, fale com ela.";
   if (e.code === "mesmodia") return "O dia das fotos e o dia da formatura precisam ser dias diferentes.";
   if (e.code === "ordem") return "O dia de medir beca e fazer o ensaio precisa ser ANTES da formatura.";
