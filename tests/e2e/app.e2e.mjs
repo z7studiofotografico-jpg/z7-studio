@@ -148,7 +148,7 @@ console.log("Pedro (vendedor: Linha de Frente, Agendamento, Instituições):");
   await sh.getByLabel("Resultado").selectOption("Vai decidir em reunião"); await sh.locator("button[type=submit]").click(); await pg.waitForTimeout(400);
   let s = await store();
   ok(s["instituicoes/i2"].respEmail === PEDRO && s["instituicoes/i2"].visitas[0].porEmail === PEDRO && s["instituicoes/i2"].etapa === "VISITADO", "visita registrada em transação; Pedro vira responsável pelo e-mail");
-  await pg.locator("#iList .card").filter({ hasText: "Beta" }).getByText("📸 Dia de fotos").click(); await pg.waitForTimeout(200);
+  await pg.locator("#iList .card").filter({ hasText: "Beta" }).getByRole("button", { name: "📸 Dia de fotos" }).click(); await pg.waitForTimeout(200);
   sh = pg.locator(".sheet").last(); await sh.locator("input[type=date]").first().fill(dia(12)); await sh.locator("button[type=submit]").click(); await pg.waitForTimeout(400);
   s = await store(); ok(s["agenda/" + dia(12)] && s["agenda/" + dia(12)].pedidoEmail === PEDRO && s["agenda/" + dia(12)].status === "pendente", "pedido de data com o e-mail de quem pediu");
   await pg.getByText("👥 Formandos e parcelas").click(); await pg.waitForTimeout(400);
