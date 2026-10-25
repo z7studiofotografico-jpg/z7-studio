@@ -199,6 +199,33 @@ function claim(it){
 // ---------- tela ----------
 export function init(ctx){ C = ctx; FS = ctx.FS; db = ctx.db; col = FS.collection(db, "instituicoes"); }
 
+// Agenda → "+ Agendar colégio": escolhe o colégio e o tipo (dia de fotos do PR ou formatura)
+// e abre o mesmo formulário do cartão da instituição (com aprovação da Luciana).
+export async function agendarColegio(ctx){
+  if (!C) init(ctx);
+  let lista = [];
+  try { lista = (await FS.getDocs(FS.query(col, FS.limit(3000)))).docs.map(d => Object.assign({ id: d.id }, d.data())).sort((a, b) => (a.nome || "").localeCompare(b.nome || "", "pt-BR")); }
+  catch (e) { C.handleErr(e); return; }
+  sheet("Agendar colégio", (p, close) => {
+    p.append(el("p", "hint", "Para o dia de fotos no colégio (medir beca e fazer o ensaio do PR) ou para a formatura. A data fica segurada até a Luciana aprovar."));
+    const tipoEv = sel([["fotos", "📸 Dia de fotos no colégio (PR)"], ["formatura", "🎓 Formatura"]], "fotos");
+    const nome = inp("", "comece a digitar o nome do colégio"); nome.required = true;
+    const dl = el("datalist"); dl.id = "agInst" + Date.now(); nome.setAttribute("list", dl.id);
+    lista.forEach(i => { const o = el("option"); o.value = title(i.nome); o.label = [TIPOS[i.tipo] && TIPOS[i.tipo].nome, i.etapa].filter(Boolean).join(" · "); dl.append(o); });
+    const err = el("p", "err"); err.hidden = true;
+    p.append(field("O que vai marcar", tipoEv), field("Colégio", nome), dl, err);
+    p.append(el("p", "hint", "Colégio que ainda não está na lista: cadastre primeiro em Instituições."));
+    p.append(actions(close, "Continuar"));
+    p.addEventListener("submit", ev => {
+      ev.preventDefault();
+      const alvo = norm(nome.value), it = lista.find(i => norm(i.nome) === alvo) || (alvo ? lista.filter(i => norm(i.nome).includes(alvo)) : []).find((_, k, arr) => arr.length === 1);
+      if (!it) { err.textContent = "Não achei esse colégio. Escolha um nome da lista."; err.hidden = false; return; }
+      close(); openEvento(it, tipoEv.value);
+    });
+    setTimeout(() => nome.focus(), 30);
+  });
+}
+
 export function show(t){
   tipo = t; const T = TIPOS[t];
   const v = $("viewInstTipo"); v.innerHTML = "";

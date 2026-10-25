@@ -8,7 +8,7 @@
 // - Visitas do vendedor: vêm do "Voltar para visita" das Instituições. Só informam, não bloqueiam o dia.
 // - Feriados: o estúdio não trabalha (bloqueia ensaio e colégio).
 // - Entregas: depois do ensaio, acompanha a edição até entregar, com o prazo, e pede a avaliação no Google.
-import { avisarColegioPorEmail, nomeEvento } from "./instituicoes.js";
+import { avisarColegioPorEmail, nomeEvento, agendarColegio } from "./instituicoes.js";
 import { feriado, feriadosEntre } from "./feriados.js";
 import { el, title, field, sheet, botoes, inpReais, wa, avisoErro } from "./ui.js";
 import { lerReais, brl } from "./regras.js";
@@ -39,7 +39,12 @@ export function init(ctx){ C = ctx; FS = ctx.FS; db = ctx.db; col = FS.collectio
 export function show(){
   const v = $("viewAgenda"); v.innerHTML = "";
   const head = el("div", "vhead"); head.append(el("h2", null, "Agendamento"));
-  if (marco()) { const hb = el("div", "agact"); hb.append(C.mkBtn("+ Compromisso", "btn-sm", () => openComp()), C.mkBtn("+ Marcar ensaio", "btn-primary btn-sm", () => openEnsaio())); head.append(hb); }
+  // Colégio (dia de fotos do PR ou formatura): quem tem Instituições, inclusive o vendedor.
+  // Ensaio no estúdio e compromisso: só o Adriano e a Luciana.
+  const hb = el("div", "agact");
+  if (C.pode("colegios")) hb.append(C.mkBtn("+ Agendar colégio", (marco() ? "" : "btn-primary ") + "btn-sm", () => agendarColegio(C)));
+  if (marco()) hb.append(C.mkBtn("+ Compromisso", "btn-sm", () => openComp()), C.mkBtn("+ Marcar ensaio", "btn-primary btn-sm", () => openEnsaio()));
+  if (hb.children.length) head.append(hb);
   v.append(head);
   v.append(el("p", "hint", C.aprovador ? "As datas de colégio sugeridas pelo vendedor ficam seguradas até você aprovar ou recusar." : "As datas de colégio ficam seguradas até a Luciana aprovar."));
   const chips = el("div", "chips"); chips.id = "agChips"; v.append(chips);

@@ -90,6 +90,7 @@ console.log("Adriano (admin), com dados antigos:");
   // Agenda: admin vê o assunto particular, marca ensaio e compromisso particular
   await ir(pg, "#agenda"); await pg.waitForTimeout(400);
   ok(/Consulta médica/.test(await pg.textContent("#viewAgenda")), "admin vê o assunto do compromisso particular");
+  ok(await pg.getByRole("button", { name: "+ Agendar colégio" }).count() === 1, "admin também tem o botão Agendar colégio");
   await pg.getByRole("button", { name: "+ Marcar ensaio" }).click(); await pg.waitForTimeout(200);
   let sh = pg.locator(".sheet").last();
   await sh.getByLabel("Cliente").fill("Rita Lima"); await sh.getByLabel("Tipo de ensaio").selectOption("Retrato");
@@ -132,6 +133,11 @@ console.log("Pedro (vendedor: Linha de Frente, Agendamento, Instituições):");
   const ag = await pg.textContent("#viewAgenda");
   ok(/ocupado/.test(ag) && !/Consulta/.test(ag), "compromisso particular aparece só como ocupado");
   ok(!(await pg.getByRole("button", { name: "+ Marcar ensaio" }).count()), "não marca ensaio");
+  // Agendar colégio direto pela agenda (dia de fotos do PR)
+  await pg.getByRole("button", { name: "+ Agendar colégio" }).click(); await pg.waitForTimeout(400);
+  let sa = pg.locator(".sheet").last(); await sa.getByLabel("Colégio").fill("Colegio Beta"); await sa.locator("button[type=submit]").click(); await pg.waitForTimeout(300);
+  sa = pg.locator(".sheet").last(); await sa.locator("input[type=date]").first().fill(dia(15)); await sa.locator("button[type=submit]").click(); await pg.waitForTimeout(500);
+  const sAg = await store(); ok(sAg["agenda/" + dia(15)] && sAg["agenda/" + dia(15)].instNome === "COLEGIO BETA" && sAg["agenda/" + dia(15)].pedidoEmail === PEDRO && sAg["instituicoes/i2"].diaFotos, "vendedor agenda o dia de fotos do colégio pela agenda");
   await ir(pg, "#pr"); await pg.waitForTimeout(600);
   ok((await pg.textContent("#viewRepasse")).length > 50, "PR (Linha de Frente) abre");
   await ir(pg, "#inst-particular"); await pg.waitForTimeout(400);
