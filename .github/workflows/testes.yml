@@ -33,4 +33,9 @@ jobs:
         run: npm install --no-audit --no-fund
       - name: Regras do Firebase no emulador
         working-directory: tests/firebase
-        run: npx firebase emulators:exec --only firestore --project z7-teste "node --test regras.test.mjs"
+        run: |
+          set -o pipefail
+          npx firebase emulators:exec --only firestore --project z7-teste "node --test --test-reporter=tap regras.test.mjs" 2>&1 | tee saida.txt || {
+            grep -E "^not ok|error:|expected|actual|code:|message:" saida.txt | head -30 | while IFS= read -r l; do echo "::error::$l"; done
+            tail -25 saida.txt | tr '\n' ' ' | sed 's/^/::error title=final::/'
+            exit 1; }
