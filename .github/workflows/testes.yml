@@ -37,5 +37,5 @@ jobs:
           cp ../../firestore.rules regras-copia.rules
           npx firebase emulators:exec --only firestore --project z7-teste "node --test --test-reporter=tap regras.test.mjs" > saida.txt 2>&1 && exit 0
           grep -E "^\s*not ok|^\s*(error|code|failureType|location):" saida.txt | head -10 | sed 's/%/%25/g' | while IFS= read -r l; do echo "::error::$l"; done
-          tail -10 saida.txt | sed 's/%/%25/g' | while IFS= read -r l; do echo "::warning::$l"; done
+          grep -B2 -A14 "^\s*not ok" saida.txt | grep -vE "^\s*$" | head -10 | sed 's/%/%25/g' | while IFS= read -r l; do echo "::warning::$l"; done
           exit 1
