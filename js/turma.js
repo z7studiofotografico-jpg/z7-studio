@@ -68,6 +68,8 @@ export function openTurma(ctx, inst, kits){
   const close = sheet(null, (p, fechar) => {
     const head = el("div", "vhead"); head.append(el("h2", null, "Formandos · " + title(inst.nome)), C.mkBtn("Fechar", "btn-sm", fechar)); p.append(head);
     const resumo = el("div", "kpis"); p.append(resumo);
+    // Quantidade de alunos: começa pela média (combinada com o colégio); depois das fotos confirma a certa
+    const qtdBox = el("div", "notes"); p.append(qtdBox);
     const bar = el("div", "actions");
     bar.append(C.mkBtn("+ Formando", "btn-primary", () => form()));
     if (C.isAdmin) bar.append(C.mkBtn("Importar planilha", "", () => importar()));
@@ -84,6 +86,17 @@ export function openTurma(ctx, inst, kits){
 
     function desenhar(){
       const ativos = lista.filter(f => f.status !== "desistiu"), atr = ativos.filter(atrasado);
+      const nomesUnicos = new Set(ativos.map(f => norm(f.nome))).size;
+      qtdBox.innerHTML = "";
+      qtdBox.append(document.createTextNode(inst.alunosConfirmados ? `Alunos confirmados: ${inst.alunosConfirmados} · cadastrados aqui: ${nomesUnicos}` : `Previsão (média): ${inst.mediaAlunos ? "~" + inst.mediaAlunos : "não informada"} alunos · cadastrados aqui: ${nomesUnicos}`));
+      if (nomesUnicos && nomesUnicos !== inst.alunosConfirmados) {
+        const b = C.mkBtn(`✔ Confirmar quantidade certa: ${nomesUnicos} alunos`, "btn-verde", async () => {
+          try { await FS.updateDoc(FS.doc(db, "instituicoes", inst.id), { alunosConfirmados: nomesUnicos, alunosEstimado: false, alunosConfirmadosEm: hoje(), atualizadoEm: new Date().toISOString() });
+            inst.alunosConfirmados = nomesUnicos; C.toast("Quantidade de alunos confirmada"); desenhar(); }
+          catch (e) { C.handleErr(e); }
+        });
+        b.style.marginLeft = "8px"; qtdBox.append(b);
+      }
       const vendido = somar(ativos.map(f => f.valor)), rec = somar(ativos.map(recebido));
       resumo.innerHTML = "";
       [["Formandos", String(ativos.length)], ["Vendido", brl(vendido)], ["Recebido", brl(rec)], ["Em aberto", brl(somar(ativos.map(emAberto)))], ["Atrasados", String(atr.length)]]

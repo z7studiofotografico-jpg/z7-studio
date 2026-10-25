@@ -1,5 +1,5 @@
 import { feriado } from "./feriados.js";
-import { el, title, field, inp, sel, sheet, botoes as actions, avisoErro } from "./ui.js";
+import { el, title, field, inp, sel, sheet, botoes as actions, avisoErro, wa } from "./ui.js";
 // Módulo Instituições: colégio particular, colégio público, colégio profissionalizante e faculdade.
 // Primeira versão comum aos 4 tipos: lista, cadastro, registro de visita, próximo passo com data
 // (aparece em "Para hoje" e no lembrete das 9h) e importação da planilha.
@@ -92,6 +92,7 @@ async function reservarVarios(it, pares){
     for (const x of leit) {
       if (x.s1 && x.s1.exists() && x.s1.data().instId === it.id && x.s1.data().kind === x.kind) tx.delete(x.antigo);
       tx.set(x.novo, { data: x.f.data, hora: x.f.hora || "", kind: x.kind, tipo: nomeEvento(x.kind, it.nome), local: x.f.local || "", onde: x.f.onde || "", obs: x.f.obs || "", status, grupo,
+        contato: x.f.contato || null, alunos: x.f.alunos || null,
         instId: it.id, instNome: it.nome, instTipo: it.tipo, pedidoPor: C.me || "", pedidoEmail: C.email || "", em: agora,
         ...(status === "confirmado" ? { aprovadoPor: C.me || "", aprovadoEm: agora } : {}) });
     }
@@ -152,10 +153,39 @@ export async function avisarColegioPorEmail(instId, ctx){
   await F.addDoc(F.collection(c.db, "emails"), {
     para, instId, instNome: it.nome, status: "pendente", criadoEm: new Date().toISOString(), por: c.me || "",
     assunto: `Z7 Studio · Datas confirmadas · ${nome}`,
-    texto: `Olá!\n\nConfirmamos com o ${nome} as datas das fotos de formatura:\n\n${lin.join("\n")}\n\nQualquer dúvida, é só responder este e-mail.\n\nAtenciosamente,\nZ7 Studio Fotográfico\nEstrada Dr. Rufino Gonçalves Ferreira, 290, Centro, Nilópolis/RJ`
+    texto: `Olá!\n\nConfirmamos com o ${nome} as datas das fotos de formatura:\n\n${lin.join("\n")}${it.mediaAlunos ? `\n\nPrevisão de ${it.alunosConfirmados || it.mediaAlunos} alunos${it.alunosConfirmados ? "" : " (depois das fotos informamos a quantidade certa)"}.` : ""}\n\nQualquer dúvida, é só responder este e-mail.\n\nAtenciosamente,\nZ7 Studio Fotográfico\nEstrada Dr. Rufino Gonçalves Ferreira, 290, Centro, Nilópolis/RJ`
   });
   await F.updateDoc(F.doc(c.db, "instituicoes", instId), { avisoEmail: { para, em: new Date().toISOString() } }).catch(e => avisoErro(e, "anotar o aviso por e-mail"));
   return para.length;
+}
+// Mensagem de WhatsApp para o responsável do colégio (quem envia é sempre a pessoa, pelo próprio WhatsApp)
+function diaLongo(d){ const sem = ["domingo", "segunda-feira", "terça-feira", "quarta-feira", "quinta-feira", "sexta-feira", "sábado"]; const [y, m, dd] = d.split("-").map(Number); return `${sem[new Date(y, m - 1, dd).getDay()]}, ${String(dd).padStart(2, "0")}/${String(m).padStart(2, "0")}/${y}`; }
+export function msgWhatsColegio(instNome, eventos, contato, alunos, quem){
+  const nome = contato && contato.nome ? C.first(title(contato.nome)) : "";
+  const conf = eventos.every(e => e.status === "confirmado");
+  const lin = eventos.map(e => `${KINDS[e.kind].ico} ${nomeEvento(e.kind, instNome)}: ${diaLongo(e.data)}${e.hora ? " às " + e.hora : ""}${e.kind === "formatura" && e.onde ? " · " + (e.onde === "Salão" ? "no salão" + (e.local ? " (" + e.local + ")" : "") : "no colégio") : ""}`);
+  return `Olá${nome ? ", " + nome : ""}! Aqui é ${quem ? quem + ", do" : "do"} Z7 Studio Fotográfico 📸\n` +
+    (conf ? "Está confirmado:\n" : "Deixei pré-agendado (te confirmo em seguida):\n") + lin.join("\n") +
+    (alunos ? `\nPrevisão de ${alunos} alunos (depois das fotos atualizamos a quantidade certa).` : "") +
+    "\nQualquer mudança, é só me avisar por aqui. Obrigado! 😊";
+}
+// Painel "avisar o colégio": botão do WhatsApp (precisa de um toque da pessoa) e aviso do e-mail
+export function painelAvisar(ctx, instNome, eventos, contato, alunos, extra){
+  if (!C) init(ctx);
+  if (!contato || !(contato.tel || contato.email)) { if (extra) C.toast(extra); return; }
+  sheet("Avisar o colégio", (p, close) => {
+    if (extra) p.append(el("p", "hint", extra));
+    const msg = msgWhatsColegio(instNome, eventos, contato, alunos, C.first(C.me));
+    p.append(el("p", "notes", msg));
+    const a = el("div", "panel-actions"); const sp = el("span"); sp.style.flex = "1";
+    const fechar = el("button", "btn", "Agora não"); fechar.type = "button"; fechar.onclick = close; a.append(sp, fechar);
+    if (contato.tel) { const w = el("button", "btn btn-verde", "📲 Enviar no WhatsApp" + (contato.nome ? " de " + C.first(title(contato.nome)) : "")); w.type = "button";
+      w.onclick = () => { wa(contato.tel, msg, C.toast); close(); }; a.append(w); }
+    p.append(a);
+    p.append(el("p", "hint", eventos.every(e => e.status === "confirmado")
+      ? (contato.email ? `O e-mail de confirmação vai para ${contato.email}.` : "Sem e-mail cadastrado: só o WhatsApp avisa o colégio.")
+      : "Quando a Luciana aprovar, o colégio recebe o e-mail de confirmação" + (contato.email ? ` (${contato.email})` : " (cadastre o e-mail do responsável)") + "."));
+  }, { div: true });
 }
 function linhaEvento(it, kind){
   const ev = it[KINDS[kind].campo]; if (!ev || !ev.data) return null;
@@ -218,10 +248,12 @@ export async function agendarColegio(ctx){
     const novoBox = el("div", "imp"); novoBox.hidden = true;
     const tipoN = sel(Object.entries(TIPOS).map(([k, t]) => [k, t.nome]), tipo || "particular");
     const bairro = inp("", "bairro"), cidade = inp("", "cidade");
-    const contato = inp("", "nome de quem atende"), telC = inp("", "WhatsApp", 20); telC.inputMode = "tel";
+    const contato = inp("", "nome do diretor ou responsável"), cargoC = sel(CARGOS, "Direção"), telC = inp("", "WhatsApp", 20), emailC = inp("", "e-mail", 120); telC.inputMode = "tel"; emailC.type = "email";
+    const media = inp("", "ex.: 120", 6); media.inputMode = "numeric";
     const r1 = el("div", "row2"); r1.append(field("Bairro", bairro), field("Cidade", cidade));
-    const r2 = el("div", "row2"); r2.append(field("Contato (opcional)", contato), field("Telefone (opcional)", telC));
-    novoBox.append(el("p", "hint", "Colégio novo: preencha o tipo. O resto pode completar depois em Instituições."), field("Tipo", tipoN), r1, r2);
+    const r2 = el("div", "row2"); r2.append(field("Responsável", contato), field("Cargo", cargoC));
+    const r3 = el("div", "row2"); r3.append(field("WhatsApp do responsável", telC), field("E-mail do responsável", emailC));
+    novoBox.append(el("p", "hint", "Colégio novo: tipo e média de alunos são obrigatórios. O responsável recebe a confirmação no WhatsApp e no e-mail."), field("Tipo", tipoN), field("Média de alunos", media), r1, r2, r3);
     const btNovo = el("button", "btn btn-sm", "+ Cadastrar colégio novo"); btNovo.type = "button";
     btNovo.onclick = () => { novoBox.hidden = !novoBox.hidden; btNovo.textContent = novoBox.hidden ? "+ Cadastrar colégio novo" : "Escolher da lista"; err.hidden = true; };
     const acha = () => { const alvo = norm(nome.value); if (!alvo) return null; const exato = lista.find(i => norm(i.nome) === alvo); if (exato) return exato; const parc = lista.filter(i => norm(i.nome).includes(alvo)); return parc.length === 1 ? parc[0] : null; };
@@ -235,12 +267,14 @@ export async function agendarColegio(ctx){
       if (!it && novoBox.hidden) { err.textContent = "Não achei esse colégio. Escolha um nome da lista ou toque em “+ Cadastrar colégio novo”."; err.hidden = false; return; }
       if (!it) {
         const nm = nome.value.trim(); if (!nm) { err.textContent = "Escreva o nome do colégio."; err.hidden = false; nome.focus(); return; }
+        const nMed = Number(String(media.value).replace(/\D/g, "")) || 0;
+        if (!nMed) { err.textContent = "Coloque a média de alunos."; err.hidden = false; media.focus(); return; }
         const repetido = lista.find(i => norm(i.nome) === norm(nm)); if (repetido) { it = repetido; }
         else {
           const tel = parseTel(telC.value);
           const novo = { nome: nm, nomeBusca: norm(nm), tipo: tipoN.value, endereco: { rua: "", numero: "", bairro: bairro.value.trim(), cidade: cidade.value.trim() },
-            contatos: (contato.value.trim() || tel) ? [{ nome: contato.value.trim(), cargo: "", tel: tel || telC.value.trim(), email: "" }] : [],
-            segmentos: {}, etapa: "A VISITAR", followup: null, visitas: [], tentativas: 0, resp: C.me || "", respEmail: C.email || "",
+            contatos: (contato.value.trim() || tel || emailC.value.trim()) ? [{ nome: contato.value.trim(), cargo: cargoC.value, tel: tel || telC.value.trim(), email: emailC.value.trim().toLowerCase() }] : [],
+            segmentos: {}, mediaAlunos: nMed, alunosEstimado: true, etapa: "A VISITAR", followup: null, visitas: [], tentativas: 0, resp: C.me || "", respEmail: C.email || "",
             criadoEm: new Date().toISOString(), atualizadoEm: new Date().toISOString(), origem: "agenda" };
           try { const ref = await FS.addDoc(col, novo); it = Object.assign({ id: ref.id }, novo); C.toast("Colégio cadastrado"); }
           catch (e) { C.handleErr(e); return; }
@@ -333,7 +367,7 @@ function card(it){
   const ps = it.alunosPorSerie || {};
   const segs = SEGMENTOS.filter(([k]) => (it.segmentos || {})[k] || (k === "pre" && (it.segmentos || {}).infantil)).map(([k, t]) => ps[k] ? `${t}: ${ps[k]}` : t);
   [[it.resp ? "👤 " + C.first(it.resp) : "", ""], [[title(it.endereco?.bairro), title(it.endereco?.cidade)].filter(Boolean).join(" · "), "svc"],
-   [segs.join(", "), ""], [it.mediaAlunos ? `Total: ${it.mediaAlunos} alunos` : "", ""], [it.fotografoHoje || "", ""], [it.motivo ? "Motivo: " + it.motivo : "", ""]]
+   [segs.join(", "), ""], [it.alunosConfirmados ? `${it.alunosConfirmados} alunos (confirmado)` : it.mediaAlunos ? `~${it.mediaAlunos} alunos (média)` : "", ""], [it.fotografoHoje || "", ""], [it.motivo ? "Motivo: " + it.motivo : "", ""]]
     .forEach(([v, c]) => { if (v) meta.append(el("span", "tag " + c, v)); });
   e.append(meta);
   const cs = it.contatos || [];
@@ -420,6 +454,18 @@ function openEvento(it, kind){
     if (dBox) { p.append(el("p", "hint", "Lembrete: a formatura costuma ter 2 dias. Primeiro medir beca e fazer o ensaio de estúdio no colégio, depois a formatura. Se ainda não combinou o dia das fotos, pode deixar em branco.")); p.append(dBox); }
     let avisado = false;
     const box = camposEvento(kind, ev, it.nome); p.append(box);
+    // Com quem foi combinado (recebe o WhatsApp e o e-mail) e a média de alunos (obrigatória)
+    const resp = el("div", "imp"); resp.append(el("h3", null, "👤 Responsável do colégio e alunos"));
+    const cs = (it.contatos || []).filter(c => c.tel || c.email);
+    const escolha = sel([...cs.map((c, i) => [String(i), [title(c.nome) || c.cargo || "Contato", c.cargo, c.tel, c.email].filter(Boolean).join(" · ")]), ["novo", "+ Outro / novo contato"]], cs.length ? "0" : "novo");
+    const nNome = inp("", "nome"), nCargo = sel(CARGOS, "Direção"), nTel = inp("", "WhatsApp", 20), nEmail = inp("", "e-mail", 120); nTel.inputMode = "tel"; nEmail.type = "email";
+    const novoC = el("div"); const rr1 = el("div", "row2"); rr1.append(field("Nome", nNome), field("Cargo", nCargo)); const rr2 = el("div", "row2"); rr2.append(field("WhatsApp", nTel), field("E-mail", nEmail)); novoC.append(rr1, rr2);
+    const sync = () => { novoC.hidden = escolha.value !== "novo"; }; escolha.onchange = sync; sync();
+    const alunos = inp(it.alunosConfirmados || it.mediaAlunos || "", "ex.: 120", 6); alunos.inputMode = "numeric";
+    resp.append(field("Combinado com", escolha), novoC, field(it.alunosConfirmados ? "Alunos (quantidade confirmada)" : "Média de alunos (obrigatório)", alunos),
+      el("p", "hint", "Começamos com a média. Depois das fotos, a quantidade certa é confirmada na lista de formandos."));
+    const errR = el("p", "err"); errR.hidden = true; resp.append(errR); p.append(resp);
+    const contatoEscolhido = () => escolha.value === "novo" ? { nome: nNome.value.trim(), cargo: nCargo.value, tel: parseTel(nTel.value) || nTel.value.trim(), email: nEmail.value.trim().toLowerCase(), novo: true } : Object.assign({}, cs[Number(escolha.value)]);
     if (ev && ev.data && ev.status !== "recusado") {
       const lib = el("button", "btn btn-danger btn-sm", comFotos ? "Desmarcar formatura e dia de fotos (libera os dias)" : "Desmarcar (libera o dia)"); lib.type = "button";
       lib.onclick = async () => { try { await liberar(it, kind); if (comFotos) await liberar(it, "fotos");
@@ -431,6 +477,13 @@ function openEvento(it, kind){
       evt.preventDefault();
       const f = box.valor(), fd = dBox ? dBox.valor() : null;
       if (!f.data) { box.erro("Escolha o dia."); return; }
+      const ct = contatoEscolhido(), nAl = Number(String(alunos.value).replace(/\D/g, "")) || 0;
+      errR.hidden = true;
+      if (!nAl) { errR.textContent = "Coloque a média de alunos."; errR.hidden = false; alunos.focus(); return; }
+      if (!parseTel(ct.tel)) { errR.textContent = "Coloque o WhatsApp de quem combinou a data (com DDD)."; errR.hidden = false; (escolha.value === "novo" ? nTel : escolha).focus(); return; }
+      if (ct.email && !/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(ct.email)) { errR.textContent = "E-mail inválido."; errR.hidden = false; return; }
+      const contato = { nome: ct.nome || "", cargo: ct.cargo || "", tel: parseTel(ct.tel), email: ct.email || "" };
+      f.contato = contato; f.alunos = nAl; if (fd) { fd.contato = contato; fd.alunos = nAl; }
       // Sugestão (não obrigatório): lembra o vendedor do dia de medir beca + ensaio
       if (dBox && !fd.data && !avisado) { avisado = true; dBox.erro("Não esqueça do dia de medir beca e fazer o ensaio! Se ainda não combinou, toque de novo para salvar só a formatura."); p.querySelector("button[type=submit]").textContent = "Salvar só a formatura"; return; }
       try {
@@ -439,9 +492,14 @@ function openEvento(it, kind){
         const r = await reservarVarios(it, pares);
         const patch = { [K.campo]: Object.assign(f, { status: r.status, grupo: r.grupo, pedidoPor: C.me || "" }), atualizadoEm: new Date().toISOString() };
         if (fd && fd.data) patch.diaFotos = Object.assign(fd, { status: r.status, grupo: r.grupo, pedidoPor: C.me || "" });
+        // alunos: guarda a média (a quantidade certa vem depois, pela lista de formandos)
+        if (!it.alunosConfirmados) { patch.mediaAlunos = nAl; patch.alunosEstimado = true; }
+        if (ct.novo) patch.contatos = [...(it.contatos || []), contato];
         await FS.updateDoc(FS.doc(db, "instituicoes", it.id), patch);
         if (r.status === "confirmado") await avisarColegioPorEmail(it.id);
-        C.toast(r.status === "confirmado" ? "Datas confirmadas" : "Dias segurados. Aguardando a Luciana aprovar."); close();
+        close();
+        const evs = [fd && fd.data ? Object.assign({ kind: "fotos" }, fd) : null, Object.assign({ kind }, f)].filter(Boolean);
+        painelAvisar(C, it.nome, evs, contato, nAl, r.status === "confirmado" ? "Datas confirmadas ✅" : "Dias segurados. Aguardando a Luciana aprovar.");
       } catch (e) { (e.code === "ocupado" && dBox && e.ocupado && fd && e.ocupado.data === fd.data ? dBox : box).erro(msgErroData(e)); if (!e.code) console.warn(e); }
     });
   });

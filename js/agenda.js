@@ -8,7 +8,7 @@
 // - Visitas do vendedor: vêm do "Voltar para visita" das Instituições. Só informam, não bloqueiam o dia.
 // - Feriados: o estúdio não trabalha (bloqueia ensaio e colégio).
 // - Entregas: depois do ensaio, acompanha a edição até entregar, com o prazo, e pede a avaliação no Google.
-import { avisarColegioPorEmail, nomeEvento, agendarColegio } from "./instituicoes.js";
+import { avisarColegioPorEmail, nomeEvento, agendarColegio, painelAvisar } from "./instituicoes.js";
 import { feriado, feriadosEntre } from "./feriados.js";
 import { el, title, field, sheet, botoes, inpReais, wa, avisoErro } from "./ui.js";
 import { lerReais, brl } from "./regras.js";
@@ -250,7 +250,10 @@ function linhaColegio(x){
   const det = [x.hora, x.onde && x.onde + (x.local ? " · " + x.local : "")].filter(Boolean).join(" · ");
   if (det) t.append(el("span", null, det));
   if (x.status === "pendente") t.append(el("span", "wait", "⏳ Aguardando a Luciana aprovar"));
-  r.append(t, el("span", "tag " + (x.status === "confirmado" ? "ok" : "svc"), x.status === "confirmado" ? "Confirmado" : "Aguardando"));
+  if (x.contato && (x.contato.nome || x.contato.tel)) t.append(el("span", null, `👤 ${[x.contato.nome && title(x.contato.nome), x.contato.cargo].filter(Boolean).join(" · ")}${x.alunos ? ` · ~${x.alunos} alunos` : ""}`));
+  const fim = el("div", "agact"); fim.append(el("span", "tag " + (x.status === "confirmado" ? "ok" : "svc"), x.status === "confirmado" ? "Confirmado" : "Aguardando"));
+  if (x.contato && x.contato.tel && C.pode("colegios")) fim.append(C.mkBtn("📲 Avisar", "btn-sm", () => painelAvisar(C, x.instNome, [x], x.contato, x.alunos)));
+  r.append(t, fim);
   return r;
 }
 function cardPedido(gr){
@@ -282,7 +285,10 @@ async function aprovarGrupo(gr){
     }
     await b.commit();
     let n = 0; try { n = await avisarColegioPorEmail(gr[0].instId, C); } catch (e) { avisoErro(e, "preparar o e-mail para o colégio", C.toast); }
-    C.toast(`Aprovado ✅${n ? ` · e-mail com as datas vai para ${n} contato${n > 1 ? "s" : ""}` : " · o colégio não tem e-mail cadastrado"}`);
+    const txt = `Aprovado ✅${n ? ` · e-mail com as datas vai para ${n} contato${n > 1 ? "s" : ""}` : " · o colégio não tem e-mail cadastrado"}`;
+    const ct = (gr.find(x => x.contato && x.contato.tel) || {}).contato;
+    if (ct) painelAvisar(C, gr[0].instNome, gr.map(x => Object.assign({}, x, { status: "confirmado" })), ct, (gr.find(x => x.alunos) || {}).alunos, txt);
+    else C.toast(txt);
   } catch (e) { C.handleErr(e); }
 }
 
