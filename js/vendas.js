@@ -30,7 +30,7 @@ function carregarChart(){
 
 export async function show(force){
   const v = $("viewVendas"); v.innerHTML = "";
-  const head = el("div", "vhead"); head.append(el("h2", null, "Vendas"));
+  const head = el("div", "vhead"); head.append(el("h2", null, "Dashboard"));
   head.append(C.mkBtn("↻ Atualizar", "btn-sm", () => show(true))); v.append(head);
   const chips = el("div", "chips"); v.append(chips);
   PERIODOS.forEach(([k, t]) => { const b = el("button", "chip", t); b.type = "button"; b.setAttribute("aria-pressed", String(periodo === k)); b.onclick = () => { periodo = k; chips.querySelectorAll("button").forEach(x => x.setAttribute("aria-pressed", String(x === b))); desenhar(); }; chips.append(b); });
