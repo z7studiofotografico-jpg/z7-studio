@@ -167,6 +167,7 @@ details.guide summary{cursor:pointer;font-family:var(--f-display);font-weight:70
 .vdtr.th{border-top:0;color:var(--muted);font-size:.78rem}
 @media (max-width:620px){.vdtr{grid-template-columns:1fr 1fr}.vdtr.th{display:none}.vdtr span:first-child{grid-column:1/-1;font-weight:700}.vdtr span[data-l]:not([data-l=""])::before{content:attr(data-l) ": ";color:var(--muted)}}
 .panel.wide{max-width:760px;width:100%}
+.estgrid{display:grid;grid-template-columns:repeat(auto-fit,minmax(210px,1fr));gap:6px 14px}
 .comtab{display:grid;grid-template-columns:1fr 90px 90px;gap:6px 10px;align-items:center}
 .comtab .th{font-size:.8rem;color:var(--muted);text-transform:uppercase}
 .comtab input{font:inherit;font-size:16px;padding:6px 8px;border-radius:8px;border:1px solid var(--line);background:var(--bg);color:var(--fg);text-align:right;width:100%}
@@ -427,7 +428,6 @@ details.guide summary{cursor:pointer;font-family:var(--f-display);font-weight:70
     </div>
     <div class="row2">
       <div class="field"><label for="pAval">Link de avaliação no Google</label><input id="pAval" type="url" maxlength="300" placeholder="https://g.page/r/..."></div>
-      <div class="field"><label for="pEstBecas">Estoque de becas (quantas temos)</label><input id="pEstBecas" inputmode="numeric" placeholder="ex.: 120"></div>
     </div>
     <h3>Comissão do vendedor (%)</h3>
     <p class="hint">PR: sobre a venda. Álbum de formatura (kits das turmas) e Colação de grau: sobre cada parcela paga. Só para a equipe de vendas.</p>
@@ -824,8 +824,8 @@ $("form").addEventListener("submit", async e => {
 $("btnPrices").onclick = () => {
   $("pInd").value = P.individual || ""; $("pSinal").value = P.sinal || ""; $("pG36").value = P.g36 || ""; $("pG7").value = P.g7 || "";
   $("pFotos").value = P.fotos || ""; $("pPrazo").value = P.prazo || "";
-  $("pLfLote").value = P.lfLoteDia || ""; $("pLfNum").value = P.lfNumero || ""; $("pRepNum").value = P.repNumero || ""; $("pLfParc").value = P.lfParcelas || ""; $("pLfPix").value = P.lfPix || ""; $("pLfCartao").value = P.lfCartao || ""; $("pKit").value = P.kitPreco || ""; $("pKitPromo").value = P.kitPromo || ""; $("pKitCartao").value = P.kitCartao || ""; $("pKitFinal").value = P.kitFinal || ""; $("pLote").value = P.loteDia || ""; $("pEntrega").value = P.entrega || ""; $("pPix").value = P.pix || ""; $("pParc").value = P.parcelas || ""; $("pPixLF").value = P.pixLF || ""; $("pPixRep").value = P.pixRep || ""; $("pPixFinal").value = P.pixFinal || ""; $("pPixSinal").value = P.pixSinal || ""; $("pLink").value = P.linkCartao || ""; $("pLinkFinal").value = P.linkCartaoFinal || ""; $("pLinkLF").value = P.linkCartaoLF || ""; $("pAval").value = P.linkAvaliacao || ""; $("pEstBecas").value = P.estoqueBecas || ""; montarComissao();
-  ["pInd","pSinal","pG36","pG7","pFotos","pPrazo","pLfLote","pLfNum","pRepNum","pLfParc","pLfPix","pLfCartao","pKit","pKitPromo","pKitCartao","pKitFinal","pLote","pEntrega","pPix","pParc","pPixLF","pPixRep","pPixFinal","pPixSinal","pLink","pLinkFinal","pLinkLF","pAval","pEstBecas"].forEach(id => $(id).disabled = !isAdmin); document.querySelectorAll("#comTab input").forEach(i => i.disabled = !isAdmin);
+  $("pLfLote").value = P.lfLoteDia || ""; $("pLfNum").value = P.lfNumero || ""; $("pRepNum").value = P.repNumero || ""; $("pLfParc").value = P.lfParcelas || ""; $("pLfPix").value = P.lfPix || ""; $("pLfCartao").value = P.lfCartao || ""; $("pKit").value = P.kitPreco || ""; $("pKitPromo").value = P.kitPromo || ""; $("pKitCartao").value = P.kitCartao || ""; $("pKitFinal").value = P.kitFinal || ""; $("pLote").value = P.loteDia || ""; $("pEntrega").value = P.entrega || ""; $("pPix").value = P.pix || ""; $("pParc").value = P.parcelas || ""; $("pPixLF").value = P.pixLF || ""; $("pPixRep").value = P.pixRep || ""; $("pPixFinal").value = P.pixFinal || ""; $("pPixSinal").value = P.pixSinal || ""; $("pLink").value = P.linkCartao || ""; $("pLinkFinal").value = P.linkCartaoFinal || ""; $("pLinkLF").value = P.linkCartaoLF || ""; $("pAval").value = P.linkAvaliacao || ""; montarComissao();
+  ["pInd","pSinal","pG36","pG7","pFotos","pPrazo","pLfLote","pLfNum","pRepNum","pLfParc","pLfPix","pLfCartao","pKit","pKitPromo","pKitCartao","pKitFinal","pLote","pEntrega","pPix","pParc","pPixLF","pPixRep","pPixFinal","pPixSinal","pLink","pLinkFinal","pLinkLF","pAval"].forEach(id => $(id).disabled = !isAdmin); document.querySelectorAll("#comTab input").forEach(i => i.disabled = !isAdmin);
   $("pSave").hidden = !isAdmin;
   $("pricesHint").textContent = isAdmin ? "Os valores entram automaticamente nas mensagens prontas." : "Só administradores mudam os preços.";
   renderPushState(); $("sheetPrices").hidden = false;
@@ -856,7 +856,7 @@ $("formPrices").addEventListener("submit", async e => {
   const body = { individual: num($("pInd").value), sinal: num($("pSinal").value), g36: num($("pG36").value), g7: num($("pG7").value),
     fotos: num($("pFotos").value) || 30, prazo: num($("pPrazo").value) || 15,
     lfLoteDia: num($("pLfLote").value) || 20, lfNumero: $("pLfNum").value.trim(), repNumero: $("pRepNum").value.trim(), lfParcelas: num($("pLfParc").value), lfPix: num($("pLfPix").value), lfCartao: num($("pLfCartao").value), kitPreco: num($("pKit").value), kitPromo: num($("pKitPromo").value), kitCartao: num($("pKitCartao").value), kitFinal: num($("pKitFinal").value), loteDia: num($("pLote").value) || 20, entrega: $("pEntrega").value.trim(),
-    pix: $("pPix").value.trim(), parcelas: num($("pParc").value), pixLF: $("pPixLF").value.trim(), pixRep: $("pPixRep").value.trim(), pixFinal: $("pPixFinal").value.trim(), pixSinal: $("pPixSinal").value.trim(), linkCartao: $("pLink").value.trim(), linkCartaoFinal: $("pLinkFinal").value.trim(), linkCartaoLF: $("pLinkLF").value.trim(), linkAvaliacao: $("pAval").value.trim(), estoqueBecas: num($("pEstBecas").value), comissao: lerComissao() };
+    pix: $("pPix").value.trim(), parcelas: num($("pParc").value), pixLF: $("pPixLF").value.trim(), pixRep: $("pPixRep").value.trim(), pixFinal: $("pPixFinal").value.trim(), pixSinal: $("pPixSinal").value.trim(), linkCartao: $("pLink").value.trim(), linkCartaoFinal: $("pLinkFinal").value.trim(), linkCartaoLF: $("pLinkLF").value.trim(), linkAvaliacao: $("pAval").value.trim(), comissao: lerComissao() };
   try {
     await setDoc(doc(db, "config", "app"), body, { merge: true });
     $("sheetPrices").hidden = true; toast("Preços salvos");
