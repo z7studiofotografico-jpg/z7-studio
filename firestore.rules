@@ -24,7 +24,9 @@ service cloud.firestore {
         || (resource.data.get('respEmail', '') == '' && request.resource.data.get('respEmail', '') == email());
     }
     function anoAtual(d) { return d.ano >= request.time.year(); }   // Linha de Frente = ensaios do ano atual
-    function usaAgenda() { return pode('colegios') || pode('agenda'); }
+    // Agenda: uma leitura do cadastro só (evita o limite de expressões das regras)
+    function usaAgenda() { let p = perfil(); return p.ativo == true && 'modulos' in p && ('agenda' in p.modulos || 'colegios' in p.modulos); }
+    function meuPedido() { return resource.data.get('pedidoEmail', email()) == email(); }
 
     match /usuarios/{em} { allow read: if membro(); allow write: if admin(); }
     match /config/{id} { allow read: if membro(); allow write: if admin(); }
@@ -49,17 +51,16 @@ service cloud.firestore {
     // Agenda: um documento por dia (AAAA-MM-DD), um compromisso de colégio por dia.
     // Qualquer um com acesso sugere a data (pendente); só quem aprova confirma; cada um mexe só no seu pedido.
     match /agenda/{dia} {
-      allow read: if usaAgenda();
-      allow create: if usaAgenda() && (aprovador() || admin() || (request.resource.data.status == 'pendente' && request.resource.data.pedidoEmail == email()));
-      allow update: if aprovador() || admin() || (usaAgenda() && resource.data.status != 'confirmado'
-        && request.resource.data.status == 'pendente' && resource.data.get('pedidoEmail', email()) == email() && request.resource.data.pedidoEmail == email())
-        // quem agendou marca que já avisou o colégio pelo WhatsApp (só esses campos)
-        || (usaAgenda() && resource.data.get('pedidoEmail', '') == email()
-          && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['avisadoWhats', 'avisadoEm']));
-      allow delete: if aprovador() || admin() || (usaAgenda() && resource.data.status != 'confirmado' && resource.data.get('pedidoEmail', email()) == email());
+      allow read: if admin() || usaAgenda();
+      allow create: if aprovador() || admin() || (usaAgenda() && request.resource.data.status == 'pendente' && request.resource.data.pedidoEmail == email());
+      // cada um mexe só no próprio pedido enquanto está pendente; depois de aprovado, quem pediu só marca que avisou o colégio
+      allow update: if aprovador() || admin() || (usaAgenda() && meuPedido() && (
+        (resource.data.status != 'confirmado' && request.resource.data.status == 'pendente' && request.resource.data.pedidoEmail == email())
+        || request.resource.data.diff(resource.data).affectedKeys().hasOnly(['avisadoWhats', 'avisadoEm'])));
+      allow delete: if aprovador() || admin() || (usaAgenda() && resource.data.status != 'confirmado' && meuPedido());
     }
     // Ensaios no estúdio e compromissos: todos da agenda veem; só os donos marcam
-    match /ensaios/{id} { allow read: if usaAgenda(); allow write: if admin(); }
+    match /ensaios/{id} { allow read: if admin() || usaAgenda(); allow write: if admin(); }
     // Assunto dos compromissos particulares (consulta médica etc.): só admin lê
     match /privado/{id} { allow read, write: if admin(); }
     // Formandos (álbum de formatura e colação de grau)
