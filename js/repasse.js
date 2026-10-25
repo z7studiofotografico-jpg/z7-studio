@@ -5,6 +5,9 @@
 // Trabalha com milhares de contatos, então nunca carrega a coleção inteira:
 // cada aba busca só o que precisa (hoje, interessados, pagos, busca).
 import { openMockup, textoEscolha } from "./mockup.js";
+import { el, title } from "./ui.js";
+// Assumir o contato: quem não é admin só assume o que está sem responsável (ou já é seu)
+const assumir = it => (!C.isAdmin && it.respEmail && it.respEmail !== C.email) ? {} : { resp: C.me, respEmail: C.email || "" };
 
 let C, FS, db, col;
 let tab = "hoje", seg = "lf", items = [], unsubList = null, mounted = false, meta = { escolas: {}, anos: {} };
@@ -26,8 +29,6 @@ const ABERTAS = ["SEPARADO", "CONTATADO", "INTERESSADO"];
 // ---------- utilidades ----------
 function norm(s){ return String(s || "").normalize("NFD").replace(/[̀-ͯ]/g, "").toUpperCase().replace(/\s+/g, " ").trim(); }
 function slug(s){ return norm(s).replace(/[^A-Z0-9]+/g, "-").replace(/^-|-$/g, "").toLowerCase(); }
-function title(s){ return String(s || "").toLowerCase().replace(/(^|[\s(-])(\p{L})/gu, (m, a, b) => a + b.toUpperCase()).replace(/\b(Da|De|Do|Das|Dos|E)\b/g, w => w.toLowerCase()); }
-function el(tag, cls, text){ const e = document.createElement(tag); if (cls) e.className = cls; if (text != null) e.textContent = text; return e; }
 function eu(){ const f = C.first(C.me); return f ? (/a$/i.test(f) ? "a " : "o ") + f : "a equipe"; }
 function precoTxt(it){
   const P = C.P;
@@ -395,7 +396,7 @@ function card(it){
       const p = { etapa: ns.then.etapa, followup: ns.then.days < 0 ? null : C.addDays(ns.then.days), atendendo: null, ultimo: { por: C.me || "—", em: new Date().toISOString(), para: escolhido ? escolhido.tipo : "" } };
       if (ns.then.count) p.tentativas = (it.tentativas || 0) + 1;
       if (ns.then.countI) p.tentInteresse = (it.tentInteresse || 0) + 1;
-      if (!it.resp && C.me) p.resp = C.me;
+      if (!it.resp && !it.respEmail && C.me) Object.assign(p, assumir(it));
       save(it, p, p.etapa === "NÃO QUER" ? "Contato encerrado" : "Próximo contato em " + C.fmtDate(p.followup));
     }));
     box.append(row);
@@ -404,7 +405,7 @@ function card(it){
 
   const act = el("div", "actions");
   if (it.etapa === "INCOMPLETO" || C.isAdmin) act.append(C.mkBtn(it.etapa === "INCOMPLETO" ? "Completar dados" : "Editar dados", it.etapa === "INCOMPLETO" ? "btn-primary" : "", () => openDados(it)));
-  if (it.etapa === "NA FILA") act.append(C.mkBtn("Separar para mim", "btn-primary", () => save(it, { etapa: "SEPARADO", resp: C.me, separadoEm: C.todayStr(), separadoSeg: segDe(it) || seg, followup: C.todayStr() }, "Separado para hoje")));
+  if (it.etapa === "NA FILA") act.append(C.mkBtn("Separar para mim", "btn-primary", () => save(it, { etapa: "SEPARADO", ...assumir(it), separadoEm: C.todayStr(), separadoSeg: segDe(it) || seg, followup: C.todayStr() }, "Separado para hoje")));
   if (ABERTAS.includes(it.etapa) && !li) act.append(C.mkBtn("✋ Estou respondendo", "", () => claim(it)));
   if (it.etapa === "SEPARADO" || it.etapa === "CONTATADO") act.append(C.mkBtn("Quer ver a prévia ✓", "btn-ok", () => save(it, { etapa: "INTERESSADO", followup: C.todayStr(), tentInteresse: 0 }, "Ótimo! Agora mande a prévia")));
   if (ABERTAS.includes(it.etapa)) {
@@ -415,7 +416,7 @@ function card(it){
   }
   if (it.etapa === "PAGO") act.append(C.mkBtn("📍 Endereço e data", "", () => openEntrega(it)));
   if (it.etapa === "PAGO") act.append(C.mkBtn("Entregue ✓", "btn-ok", () => save(it, { etapa: "ENTREGUE", entregueEm: C.todayStr(), followup: C.addDays(2) }, "Entrega registrada 🎉")));
-  if (["NÃO QUER", "SEM CONTATO"].includes(it.etapa)) act.append(C.mkBtn("Reabrir", "", () => save(it, { etapa: "SEPARADO", followup: C.todayStr(), tentativas: 0, tentInteresse: 0, resp: C.me }, "Contato reaberto")));
+  if (["NÃO QUER", "SEM CONTATO"].includes(it.etapa)) act.append(C.mkBtn("Reabrir", "", () => save(it, { etapa: "SEPARADO", followup: C.todayStr(), tentativas: 0, tentInteresse: 0, ...assumir(it) }, "Contato reaberto")));
   if (it.etapa === "ENTREGUE" && it.followup) act.append(C.mkBtn("Concluir", "", () => save(it, { followup: null }, "Concluído")));
   act.append(C.mkBtn("Notas", "", () => openNotas(it)));
   e.append(act);
@@ -445,7 +446,7 @@ function openPago(it){
     p.append(actions(close, "Salvar venda"));
     p.addEventListener("submit", ev => {
       ev.preventDefault(); close();
-      save(it, Object.assign({ etapa: "PAGO", valor: C.num(v.value), formaPag: fp.value, pagoEm: C.todayStr(), followup: null, atendendo: null, resp: it.resp || C.me }, p._entrega()), "Venda registrada 🎉");
+      save(it, Object.assign({ etapa: "PAGO", valor: C.num(v.value), formaPag: fp.value, pagoEm: C.todayStr(), followup: null, atendendo: null, ...(it.resp || it.respEmail ? {} : assumir(it)) }, p._entrega()), "Venda registrada 🎉");
     });
   });
 }
@@ -590,7 +591,7 @@ async function separarLote(){
     }
     if (!pegos.length) { C.toast(esc ? "Essa escola não tem mais ninguém na fila." : "A fila acabou! 🎉"); return; }
     const b = FS.writeBatch(db), hoje = C.todayStr();
-    pegos.forEach(d => b.update(d.ref, { etapa: "SEPARADO", resp: C.me, separadoEm: hoje, separadoSeg: seg, followup: hoje, atualizadoEm: new Date().toISOString() }));
+    pegos.forEach(d => b.update(d.ref, { etapa: "SEPARADO", resp: C.me, respEmail: C.email || "", separadoEm: hoje, separadoSeg: seg, followup: hoje, atualizadoEm: new Date().toISOString() }));
     await b.commit();
     C.toast(`${pegos.length} contato${pegos.length > 1 ? "s" : ""} separado${pegos.length > 1 ? "s" : ""} para você hoje`);
     refreshLote(); refreshStats(); if (tab !== "hoje") openTab("hoje");
@@ -713,7 +714,7 @@ function openImport(){
           let id = docId(d, i); while (ids.has(id)) id += "-" + i; ids.add(id);
           if (exist.has(id)) { atual++; return [id, Object.assign({}, d, { atualizadoEm: agora }), true]; }
           novos++; if (d.escola) escolas[d.escola] = (escolas[d.escola] || 0) + 1; if (d.ano) anos[d.ano] = (anos[d.ano] || 0) + 1;
-          return [id, Object.assign({}, d, { etapa: faltando(d).length ? "INCOMPLETO" : "NA FILA", followup: null, tentativas: 0, tentInteresse: 0, resp: "", importadoEm: agora, atualizadoEm: agora }), false];
+          return [id, Object.assign({}, d, { etapa: faltando(d).length ? "INCOMPLETO" : "NA FILA", followup: null, tentativas: 0, tentInteresse: 0, resp: "", respEmail: "", importadoEm: agora, atualizadoEm: agora }), false];
         });
         for (let i = 0; i < ops.length; i += 400) {
           const b = FS.writeBatch(db);

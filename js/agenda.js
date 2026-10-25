@@ -10,7 +10,9 @@
 // - Entregas: depois do ensaio, acompanha a edição até entregar, com o prazo, e pede a avaliação no Google.
 import { avisarColegioPorEmail, nomeEvento } from "./instituicoes.js";
 import { feriado, feriadosEntre } from "./feriados.js";
-let C, FS, db, col, colE;
+import { el, title, field, sheet, botoes, inpReais, wa, avisoErro } from "./ui.js";
+import { lerReais, brl } from "./regras.js";
+let C, FS, db, col, colE, privados = {};
 let unsubs = [], items = [], ensaios = [], passados = [], comps = [], visitas = [], becas = [], filtro = "tudo", mesVis = "", selDia = "";
 export const ETAPAS_ENTREGA = ["Ensaio feito", "Fotos escolhidas", "Em edição", "Pronto", "Entregue"];
 const $ = (id) => document.getElementById(id);
@@ -22,8 +24,6 @@ export const TIPOS_ENSAIO = ["Formatura individual", "Formatura em grupo", "Corp
 const DURACOES = [[30, "30 min"], [60, "1 hora"], [90, "1h30"], [120, "2 horas"], [180, "3 horas"], [240, "4 horas"]];
 const ENDERECO = "Estrada Dr. Rufino Gonçalves Ferreira, 290, Centro, Nilópolis";
 
-function el(tag, cls, text){ const e = document.createElement(tag); if (cls) e.className = cls; if (text != null) e.textContent = text; return e; }
-function title(s){ return String(s || "").toLowerCase().replace(/(^|[\s(-])(\p{L})/gu, (m, a, b) => a + b.toUpperCase()).replace(/\b(Da|De|Do|Das|Dos|E)\b/g, w => w.toLowerCase()); }
 function diaTxt(d){ const [y, m, dd] = d.split("-").map(Number); const dt = new Date(y, m - 1, dd); return `${SEMANA[dt.getDay()]}, ${C.pad(dd)}/${C.pad(m)}`; }
 const min = h => { const [a, b] = String(h || "").split(":").map(Number); return isNaN(a) ? null : a * 60 + (b || 0); };
 const hm = m => C.pad(Math.floor(m / 60) % 24) + ":" + C.pad(m % 60);
@@ -50,20 +50,25 @@ export function show(){
   hide(); items = []; ensaios = []; passados = []; comps = []; visitas = []; becas = [];
   if (!mesVis) mesVis = C.todayStr().slice(0, 7);
   const hoje = C.todayStr();
-  const erro = (err, o) => { console.warn(err); if (err.code === "permission-denied") C.showNotice(o === "agenda" ? "Você não tem acesso ao Agendamento." : o === "ensaios" ? "Para ver os ensaios, cole as regras novas do Firebase." : ""); };
+  const erro = (err, o) => { avisoErro(err, "carregar " + o); if (err.code === "permission-denied") C.showNotice(o === "agenda" ? "Você não tem acesso ao Agendamento." : o === "ensaios" ? "Para ver os ensaios, cole as regras novas do Firebase." : ""); };
   unsubs.push(FS.onSnapshot(FS.query(col, FS.where("data", ">=", hoje), FS.orderBy("data"), FS.limit(400)), snap => {
     items = snap.docs.map(d => Object.assign({ id: d.id }, d.data())); render();
   }, e => erro(e, "agenda")));
   // Ensaios dos últimos 90 dias também, para acompanhar a entrega das fotos
   if (vejoEnsaios()) unsubs.push(FS.onSnapshot(FS.query(colE, FS.where("data", ">=", C.addDays(-90)), FS.orderBy("data"), FS.limit(600)), snap => {
-    const todos = snap.docs.map(d => Object.assign({ id: d.id }, d.data()));
+    const todos = snap.docs.map(d => Object.assign({ id: d.id }, d.data(), privados[d.id] || {}));
     ensaios = todos.filter(x => x.kind !== "pessoal" && x.data >= hoje); comps = todos.filter(x => x.kind === "pessoal" && x.data >= hoje);
     passados = todos.filter(x => x.kind !== "pessoal" && x.data < hoje && x.status !== "remarcar" && x.status !== "faltou"); render();
   }, e => erro(e, "ensaios")));
+  // Assunto dos compromissos particulares: só os donos leem (coleção "privado")
+  if (marco()) unsubs.push(FS.onSnapshot(FS.query(FS.collection(db, "privado"), FS.limit(1000)), snap => {
+    privados = Object.fromEntries(snap.docs.map(d => [d.id, d.data()]));
+    comps = comps.map(x => Object.assign({}, x, privados[x.id] || {})); render();
+  }, e => avisoErro(e, "ler os compromissos particulares")));
   // Aluguel de becas: retirada e devolução (só informam, não bloqueiam o dia)
-  if (C.pode("becas") || C.pode("agenda")) unsubs.push(FS.onSnapshot(FS.query(FS.collection(db, "becas"), FS.where("devolucao", ">=", hoje), FS.orderBy("devolucao"), FS.limit(400)), snap => {
+  if (C.pode("becas")) unsubs.push(FS.onSnapshot(FS.query(FS.collection(db, "becas"), FS.where("devolucao", ">=", hoje), FS.orderBy("devolucao"), FS.limit(400)), snap => {
     becas = snap.docs.map(d => Object.assign({ id: d.id }, d.data())).filter(x => x.status !== "cancelado" && x.status !== "devolvido"); render();
-  }, e => console.warn(e)));
+  }, e => avisoErro(e, "carregar as becas")));
   if (vejoVisitas()) unsubs.push(FS.onSnapshot(FS.query(FS.collection(db, "instituicoes"), FS.where("followup", ">=", hoje), FS.orderBy("followup"), FS.limit(400)), snap => {
     visitas = snap.docs.map(d => Object.assign({ id: d.id }, d.data()))
       .filter(x => x.etapa !== "FECHADO" && x.etapa !== "NÃO FECHOU" && (x.proximoPasso === "Voltar para visita" || x.followupHora || x.etapa === "AGENDAR VISITA"));
@@ -221,7 +226,7 @@ function cardEntrega(x){
   } else {
     act.append(C.mkBtn("⭐ Pedir avaliação", "btn-primary", async () => {
       abrirWa(x.tel, `Oi, ${C.first(title(x.cliente))}! Que bom que você fez o seu ensaio com a gente 💛 Se puder, deixa uma avaliação rapidinha no Google? Ajuda muito o nosso estúdio: ${C.P.linkAvaliacao}`);
-      try { await FS.updateDoc(FS.doc(db, "ensaios", x.id), { avaliacaoPedida: true, avaliacaoEm: C.todayStr() }); } catch (er) { console.warn(er); }
+      try { await FS.updateDoc(FS.doc(db, "ensaios", x.id), { avaliacaoPedida: true, avaliacaoEm: C.todayStr() }); } catch (er) { avisoErro(er, "marcar a avaliação como pedida", C.toast); }
     }));
     act.append(C.mkBtn("Não pedir", "", async () => { try { await FS.updateDoc(FS.doc(db, "ensaios", x.id), { avaliacaoPedida: true, avaliacaoEm: "" }); } catch (er) { C.handleErr(er); } }));
   }
@@ -231,7 +236,7 @@ async function avancarEntrega(x, etapa){
   try { await FS.updateDoc(FS.doc(db, "ensaios", x.id), { entrega: { etapa, em: C.todayStr(), por: C.me || "" } }); C.toast(etapa === "Entregue" ? "Entregue ✅ Em 3 dias o app lembra de pedir a avaliação" : "Agora: " + etapa); }
   catch (e) { C.handleErr(e); }
 }
-function abrirWa(tel, msg){ const d = C.digits(tel); if (!d) { C.toast("Sem WhatsApp cadastrado"); return; } window.open(`https://wa.me/${d}?text=${encodeURIComponent(msg)}`, "_blank", "noopener"); }
+const abrirWa = (tel, msg) => wa(tel, msg, C.toast);
 
 // ---------- Colégios ----------
 function linhaColegio(x){
@@ -264,24 +269,18 @@ function cardPedido(gr){
 async function aprovarGrupo(gr){
   try {
     const agora = new Date().toISOString();
+    // agenda e instituição mudam juntas (ou nenhuma muda)
+    const b = FS.writeBatch(db);
     for (const x of gr) {
-      await FS.updateDoc(FS.doc(db, "agenda", x.id), { status: "confirmado", aprovadoPor: C.me || "", aprovadoEm: agora });
-      if (x.instId && CAMPO[x.kind]) await FS.updateDoc(FS.doc(db, "instituicoes", x.instId), { [CAMPO[x.kind] + ".status"]: "confirmado", atualizadoEm: agora }).catch(() => {});
+      b.update(FS.doc(db, "agenda", x.id), { status: "confirmado", aprovadoPor: C.me || "", aprovadoEm: agora });
+      if (x.instId && CAMPO[x.kind]) b.update(FS.doc(db, "instituicoes", x.instId), { [CAMPO[x.kind] + ".status"]: "confirmado", atualizadoEm: agora });
     }
-    let n = 0; try { n = await avisarColegioPorEmail(gr[0].instId, C); } catch (e) { console.warn(e); }
+    await b.commit();
+    let n = 0; try { n = await avisarColegioPorEmail(gr[0].instId, C); } catch (e) { avisoErro(e, "preparar o e-mail para o colégio", C.toast); }
     C.toast(`Aprovado ✅${n ? ` · e-mail com as datas vai para ${n} contato${n > 1 ? "s" : ""}` : " · o colégio não tem e-mail cadastrado"}`);
   } catch (e) { C.handleErr(e); }
 }
 
-// Painel simples (sheet)
-function sheet(tit, build){
-  const sh = el("div", "sheet"); const p = el("form", "panel"); p.autocomplete = "off"; sh.append(p);
-  const close = () => sh.remove(); sh.addEventListener("click", ev => { if (ev.target === sh) close(); });
-  p.append(el("h2", null, tit)); build(p, close); document.body.append(sh); return close;
-}
-let fid = 0;
-function field(lbl, i){ const f = el("div", "field"); const l = el("label", null, lbl); i.id = i.id || "ag" + (++fid); l.htmlFor = i.id; f.append(l, i); return f; }
-function botoes(close, okTxt, cls){ const a = el("div", "panel-actions"); const sp = el("span"); sp.style.flex = "1"; const c = el("button", "btn", "Cancelar"); c.type = "button"; c.onclick = close; const ok = el("button", "btn " + (cls || "btn-primary"), okTxt); ok.type = "submit"; a.append(sp, c, ok); a.ok = ok; return a; }
 
 function recusar(arg){
   const gr = Array.isArray(arg) ? arg : [arg], x = gr[0];
@@ -294,13 +293,15 @@ function recusar(arg){
     p.addEventListener("submit", async ev => {
       ev.preventDefault(); close();
       try {
+        const b = FS.writeBatch(db);
         for (const y of gr) {
-          await FS.deleteDoc(FS.doc(db, "agenda", y.id));
+          b.delete(FS.doc(db, "agenda", y.id));
           if (y.instId && CAMPO[y.kind]) {
             const k = CAMPO[y.kind];
-            await FS.updateDoc(FS.doc(db, "instituicoes", y.instId), { [k + ".status"]: "recusado", [k + ".motivoRecusa"]: mot.value.trim(), [k + ".sugestao"]: y.kind === "formatura" || gr.length === 1 ? (sug.value || "") : "", atualizadoEm: new Date().toISOString() }).catch(() => {});
+            b.update(FS.doc(db, "instituicoes", y.instId), { [k + ".status"]: "recusado", [k + ".motivoRecusa"]: mot.value.trim(), [k + ".sugestao"]: y.kind === "formatura" || gr.length === 1 ? (sug.value || "") : "", atualizadoEm: new Date().toISOString() });
           }
         }
+        await b.commit();
         C.toast(gr.length > 1 ? "Datas recusadas. Os dias ficaram livres." : "Data recusada. O dia ficou livre.");
       } catch (e) { C.handleErr(e); }
     });
@@ -398,14 +399,14 @@ async function lembrar(x){
   const tel = C.digits(x.tel);
   if (!tel) { C.toast("Esse ensaio está sem WhatsApp"); return; }
   window.open(`https://wa.me/${tel}?text=${encodeURIComponent(msgLembrete(x))}`, "_blank", "noopener");
-  if (!x.lembrado) { try { await FS.updateDoc(FS.doc(db, "ensaios", x.id), { lembrado: true, lembradoEm: new Date().toISOString(), lembradoPor: C.me || "" }); } catch (e) { console.warn(e); } }
+  if (!x.lembrado) { try { await FS.updateDoc(FS.doc(db, "ensaios", x.id), { lembrado: true, lembradoEm: new Date().toISOString(), lembradoPor: C.me || "" }); } catch (e) { avisoErro(e, "marcar como lembrado"); } }
 }
 
 let leadsCache = null;
 async function carregarLeads(){
   if (leadsCache || !C.pode("funil")) return leadsCache || [];
   try { const s = await FS.getDocs(FS.query(FS.collection(db, "leads"), FS.limit(600))); leadsCache = s.docs.map(d => Object.assign({ id: d.id }, d.data())).filter(l => l.nome); }
-  catch (e) { console.warn(e); leadsCache = []; }
+  catch (e) { avisoErro(e, "carregar os clientes do Funil"); leadsCache = []; }
   return leadsCache;
 }
 function tipoDoLead(s){
@@ -490,11 +491,11 @@ export function openEnsaio(x, pre){
       let status = x ? (x.status === "remarcar" ? "confirmado" : x.status || "confirmado") : "confirmado";
       if (mudouDia || (x && x.status === "remarcar")) status = !C.aprovador && motivos.length ? "analisar" : "confirmado";
       const body = { cliente: nome.value.trim(), tel: tel.value.trim(), tipo: tipo.value, duracao: Number(dur.value), data: data.value, hora: hora.value,
-        obs: obs.value.trim(), status, conflito: motivos.join(" · "), leadId, sinalPago: sinC.checked, sinalValor: C.num(sinV.value), valor: C.num(tot.value), atualizadoEm: new Date().toISOString() };
+        obs: obs.value.trim(), status, conflito: motivos.join(" · "), leadId, sinalPago: sinC.checked, sinalValor: lerReais(sinV.value), valor: lerReais(tot.value), atualizadoEm: new Date().toISOString() };
       if (mudouDia) body.lembrado = false;
       try {
         if (x) await FS.updateDoc(FS.doc(db, "ensaios", x.id), body);
-        else await FS.addDoc(colE, Object.assign(body, { marcadoPor: C.me || "", criadoEm: new Date().toISOString() }));
+        else await FS.addDoc(colE, Object.assign(body, { marcadoPor: C.me || "", marcadoEmail: C.email || "", criadoEm: new Date().toISOString() }));
         C.toast(status === "analisar" ? "Marcado. A Luciana vai analisar, porque o dia já tem: " + motivos.join(", ") : `Ensaio marcado: ${diaTxt(data.value)} às ${hora.value} ✅`);
         close();
       } catch (e) { C.handleErr(e); }
@@ -536,18 +537,23 @@ export function openComp(x, diaPre){
     const a = botoes(close, x ? "Salvar" : "Marcar compromisso");
     if (x) { const del = el("button", "btn btn-danger", "Excluir"); del.type = "button"; a.prepend(del); del.onclick = async () => {
       if (!p._del) { p._del = true; del.textContent = "Toque de novo para excluir"; return; }
-      try { await FS.deleteDoc(FS.doc(db, "ensaios", x.id)); C.toast("Compromisso excluído"); close(); } catch (e) { C.handleErr(e); }
+      try { const b = FS.writeBatch(db); b.delete(FS.doc(db, "ensaios", x.id)); if (x.particular) b.delete(FS.doc(db, "privado", x.id)); await b.commit(); C.toast("Compromisso excluído"); close(); } catch (e) { C.handleErr(e); }
     }; }
     p.append(a);
     p.addEventListener("submit", async ev => {
       ev.preventDefault();
       const i = min(h1.value), f = min(h2.value);
       if (!intC.checked && (i == null || f == null || f <= i)) { err.textContent = "O horário de fim precisa ser depois do início."; err.hidden = false; return; }
-      const body = { kind: "pessoal", titulo: tit.value.trim(), deQuem: quem.value, data: data.value, diaInteiro: intC.checked, hora: intC.checked ? "" : h1.value,
-        duracao: intC.checked ? 0 : f - i, particular: parC.checked, obs: obs.value.trim(), status: "confirmado", atualizadoEm: new Date().toISOString() };
+      // Particular: o assunto vai para a coleção "privado", que só os donos leem (o vendedor vê só "ocupado")
+      const part = parC.checked, assunto = { titulo: tit.value.trim(), obs: obs.value.trim() };
+      const body = Object.assign({ kind: "pessoal", deQuem: quem.value, data: data.value, diaInteiro: intC.checked, hora: intC.checked ? "" : h1.value,
+        duracao: intC.checked ? 0 : f - i, particular: part, status: "confirmado", atualizadoEm: new Date().toISOString() }, part ? { titulo: "", obs: "" } : assunto);
       try {
-        if (x) await FS.updateDoc(FS.doc(db, "ensaios", x.id), body);
-        else await FS.addDoc(colE, Object.assign(body, { marcadoPor: C.me || "", criadoEm: new Date().toISOString() }));
+        const ref = x ? FS.doc(db, "ensaios", x.id) : FS.doc(colE);
+        const b = FS.writeBatch(db);
+        if (x) b.update(ref, body); else b.set(ref, Object.assign(body, { marcadoPor: C.me || "", marcadoEmail: C.email || "", criadoEm: new Date().toISOString() }));
+        if (part) b.set(FS.doc(db, "privado", ref.id), Object.assign({ data: data.value }, assunto)); else if (x && x.particular) b.delete(FS.doc(db, "privado", ref.id));
+        await b.commit();
         const col = items.find(y => y.data === data.value);
         C.toast(intC.checked && col ? `Marcado. Atenção: nesse dia já tem ${nomeEvento(col.kind, col.instNome)}` : "Compromisso marcado ✅");
         close();

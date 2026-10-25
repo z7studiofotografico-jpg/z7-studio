@@ -1,4 +1,5 @@
 import { feriado } from "./feriados.js";
+import { el, title, field, inp, sel, sheet, botoes as actions, avisoErro } from "./ui.js";
 // Módulo Instituições: colégio particular, colégio público, colégio profissionalizante e faculdade.
 // Primeira versão comum aos 4 tipos: lista, cadastro, registro de visita, próximo passo com data
 // (aparece em "Para hoje" e no lembrete das 9h) e importação da planilha.
@@ -35,8 +36,6 @@ const SEGMENTOS = [["pre", "Pré"], ["ano5", "5º ano"], ["ano9", "9º ano"], ["
 // ---------- utilidades ----------
 function norm(s){ return String(s || "").normalize("NFD").replace(/[̀-ͯ]/g, "").toUpperCase().replace(/\s+/g, " ").trim(); }
 function slug(s){ return norm(s).replace(/[^A-Z0-9]+/g, "-").replace(/^-|-$/g, "").toLowerCase(); }
-function title(s){ return String(s || "").toLowerCase().replace(/(^|[\s(-])(\p{L})/gu, (m, a, b) => a + b.toUpperCase()).replace(/\b(Da|De|Do|Das|Dos|E)\b/g, w => w.toLowerCase()); }
-function el(tag, cls, text){ const e = document.createElement(tag); if (cls) e.className = cls; if (text != null) e.textContent = text; return e; }
 function eu(){ const f = C.first(C.me); return f ? (/a$/i.test(f) ? "a " : "o ") + f : "a equipe"; }
 function status(it){
   if (it.etapa === "FECHADO") return "won";
@@ -77,7 +76,7 @@ async function reservarVarios(it, pares){
   // Dia bloqueado por compromisso de dia inteiro (consulta médica, viagem…)
   for (const d of datas) {
     let bl = [];
-    try { bl = (await FS.getDocs(FS.query(FS.collection(db, "ensaios"), FS.where("data", "==", d)))).docs.map(x => x.data()).filter(x => x.kind === "pessoal" && x.diaInteiro); } catch (e) { console.warn(e); }
+    try { bl = (await FS.getDocs(FS.query(FS.collection(db, "ensaios"), FS.where("data", "==", d)))).docs.map(x => x.data()).filter(x => x.kind === "pessoal" && x.diaInteiro); } catch (e) { avisoErro(e, "conferir os compromissos do dia"); }
     if (bl.length) { const e = new Error("bloqueado"); e.code = "bloqueado"; e.ocupado = { data: d }; e.bloqueio = bl[0]; throw e; }
   }
   const status = C.aprovador ? "confirmado" : "pendente", grupo = it.id + "_" + Date.now(), agora = new Date().toISOString();
@@ -93,7 +92,7 @@ async function reservarVarios(it, pares){
     for (const x of leit) {
       if (x.s1 && x.s1.exists() && x.s1.data().instId === it.id && x.s1.data().kind === x.kind) tx.delete(x.antigo);
       tx.set(x.novo, { data: x.f.data, hora: x.f.hora || "", kind: x.kind, tipo: nomeEvento(x.kind, it.nome), local: x.f.local || "", onde: x.f.onde || "", obs: x.f.obs || "", status, grupo,
-        instId: it.id, instNome: it.nome, instTipo: it.tipo, pedidoPor: C.me || "", em: agora,
+        instId: it.id, instNome: it.nome, instTipo: it.tipo, pedidoPor: C.me || "", pedidoEmail: C.email || "", em: agora,
         ...(status === "confirmado" ? { aprovadoPor: C.me || "", aprovadoEm: agora } : {}) });
     }
   });
@@ -155,7 +154,7 @@ export async function avisarColegioPorEmail(instId, ctx){
     assunto: `Z7 Studio · Datas confirmadas · ${nome}`,
     texto: `Olá!\n\nConfirmamos com o ${nome} as datas das fotos de formatura:\n\n${lin.join("\n")}\n\nQualquer dúvida, é só responder este e-mail.\n\nAtenciosamente,\nZ7 Studio Fotográfico\nEstrada Dr. Rufino Gonçalves Ferreira, 290, Centro, Nilópolis/RJ`
   });
-  await F.updateDoc(F.doc(c.db, "instituicoes", instId), { avisoEmail: { para, em: new Date().toISOString() } }).catch(() => {});
+  await F.updateDoc(F.doc(c.db, "instituicoes", instId), { avisoEmail: { para, em: new Date().toISOString() } }).catch(e => avisoErro(e, "anotar o aviso por e-mail"));
   return para.length;
 }
 function linhaEvento(it, kind){
@@ -331,7 +330,7 @@ function card(it){
   }
   const act = el("div", "actions");
   if (it.etapa === "FECHADO") act.append(C.mkBtn("👥 Formandos e parcelas", "btn-primary", async () => {
-    try { const T = await import("./turma.js"); T.openTurma(C, it, produtos().filter(x => !x.formatura)); } catch (e) { console.warn(e); C.toast("Não foi possível abrir. Verifique a internet."); }
+    try { const T = await import("./turma.js"); T.openTurma(C, it, produtos().filter(x => !x.formatura)); } catch (e) { avisoErro(e, "abrir a turma"); C.toast("Não foi possível abrir. Verifique a internet."); }
   }));
   act.append(C.mkBtn("📝 Registrar visita / contato", it.etapa === "FECHADO" ? "" : "btn-primary", () => openVisita(it)));
   if (it.etapa !== "FECHADO") act.append(C.mkBtn("Remarcar +7d", "", () => save(it, { followup: C.addDays(7) }, "Retorno em " + C.fmtDate(C.addDays(7)))));
@@ -344,19 +343,6 @@ function card(it){
 }
 
 // ---------- janelinhas ----------
-function sheet(titleTxt, build){
-  const sh = el("div", "sheet"); const p = el("form", "panel"); p.autocomplete = "off";
-  p.append(el("h2", null, titleTxt)); sh.append(p);
-  const close = () => sh.remove();
-  sh.addEventListener("click", ev => { if (ev.target === sh) close(); });
-  build(p, close); document.body.append(sh);
-  return close;
-}
-let fid = 0;
-function field(lbl, inp){ const f = el("div", "field"); const l = el("label", null, lbl); inp.id = inp.id || "if" + (++fid); l.htmlFor = inp.id; f.append(l, inp); return f; }
-function inp(v, ph, max){ const i = el("input"); i.value = v == null ? "" : v; i.placeholder = ph || ""; i.maxLength = max || 120; return i; }
-function sel(opts, v, vazio){ const s = el("select"); if (vazio != null) { const o = el("option", null, vazio); o.value = ""; s.append(o); } opts.forEach(x => { const o = el("option", null, x); o.value = x; s.append(o); }); s.value = v || ""; return s; }
-function actions(close, okTxt){ const a = el("div", "panel-actions"); const sp = el("span"); sp.style.flex = "1"; const c = el("button", "btn", "Cancelar"); c.type = "button"; c.onclick = close; const ok = el("button", "btn btn-primary", okTxt); ok.type = "submit"; a.append(sp, c, ok); return a; }
 function quandoBtns(target){
   const q = el("div", "quick");
   [["Amanhã", 1], ["Semana que vem", 7], ["Mês que vem", 30], ["Início do ano que vem", "ano"], ["Sem data", -1]].forEach(([t, n]) => {
@@ -475,7 +461,7 @@ function openForm(it){
         contatos, email: email.value.trim(), horario: hor.value.trim(), notas: nota.value.trim(), atualizadoEm: new Date().toISOString() };
       try {
         if (it) await FS.updateDoc(FS.doc(db, "instituicoes", it.id), body);
-        else await FS.addDoc(col, Object.assign(body, { etapa: "A VISITAR", followup: null, visitas: [], tentativas: 0, resp: C.me, criadoEm: new Date().toISOString() }));
+        else await FS.addDoc(col, Object.assign(body, { etapa: "A VISITAR", followup: null, visitas: [], tentativas: 0, resp: C.me, respEmail: C.email || "", criadoEm: new Date().toISOString() }));
         C.toast("Salvo"); close();
       } catch (e) { C.handleErr(e); }
     });
@@ -541,24 +527,36 @@ function openVisita(it){
           if (r.status === "confirmado") setTimeout(() => avisarColegioPorEmail(it.id), 800);
         } catch (e) { (e.code === "ocupado" && e.ocupado && dv && e.ocupado.data === dv.data ? dBox : fBox.hidden ? dBox : fBox).erro(msgErroData(e)); return; }
       }
-      const visita = { data: data.value, como: como.value, por: C.me || "", falouCom: [falou.value.trim(), cargo.value].filter(Boolean).join(" · "), resultado: res.value,
+      const visita = { data: data.value, como: como.value, por: C.me || "", porEmail: C.email || "", falouCom: [falou.value.trim(), cargo.value].filter(Boolean).join(" · "), resultado: res.value,
         apresentou: prods.filter(x => x.c.checked).map(x => ({ nome: x.nome, preco: C.num(x.v.value) })), passo: passo.value, quando: quando.value, obs: obs.value.trim(), em: new Date().toISOString() };
-      const patch = { etapa, visitas: [visita, ...(it.visitas || [])].slice(0, 50), fotografoHoje: fot.value || it.fotografoHoje || "", proximoPasso: passo.value, followup: etapa === "FECHADO" ? null : (quando.value || null), followupHora: etapa === "FECHADO" || !quando.value ? "" : qHora.value,
-        atendendo: null, ultimo: { por: C.me || "—", em: new Date().toISOString() }, resp: it.resp || C.me };
+      const patch = { etapa, fotografoHoje: fot.value || it.fotografoHoje || "", proximoPasso: passo.value, followup: etapa === "FECHADO" ? null : (quando.value || null), followupHora: etapa === "FECHADO" || !quando.value ? "" : qHora.value,
+        atendendo: null, ultimo: { por: C.me || "—", em: new Date().toISOString() } };
       if (etapa === "FECHADO") patch.fechadoEm = C.todayStr();
       if (formatura) patch.formatura = formatura;
       if (diaFotos) patch.diaFotos = diaFotos;
       if (etapa === "NÃO FECHOU") patch.motivo = motivo.value.trim() || res.value;
-      if (etapa === "AGENDAR VISITA") patch.tentativas = (it.tentativas || 0) + 1;
-      // guarda o contato novo, se veio
       const nomeF = falou.value.trim(), telF = parseTel(tel.value);
-      if (nomeF || telF) {
-        const lista = (it.contatos || []).slice(); const i0 = lista.findIndex(c => norm(c.nome) === norm(nomeF) && nomeF);
-        if (i0 >= 0) { lista[i0] = Object.assign({}, lista[i0], { cargo: cargo.value || lista[i0].cargo, tel: telF || lista[i0].tel }); }
-        else lista.push({ nome: nomeF, cargo: cargo.value, tel: telF });
-        patch.contatos = lista;
-      }
-      close(); save(it, patch, etapa === "FECHADO" ? "Fechado! 🎉" : quando.value ? "Retorno em " + C.fmtDate(quando.value) : "Visita registrada");
+      close();
+      // Transação: lê a versão atual (outra pessoa pode ter registrado uma visita agora) e junta
+      try {
+        const ref = FS.doc(db, "instituicoes", it.id);
+        await FS.runTransaction(db, async tx => {
+          const s0 = await tx.get(ref), atual = s0.exists() ? s0.data() : it;
+          const p2 = Object.assign({}, patch, { visitas: [visita, ...(atual.visitas || [])].slice(0, 50), atualizadoEm: new Date().toISOString() });
+          if (etapa === "AGENDAR VISITA") p2.tentativas = (atual.tentativas || 0) + 1;
+          // sem responsável ainda: quem registrou a visita assume
+          if (!atual.respEmail && !atual.resp) { p2.resp = C.me || ""; p2.respEmail = C.email || ""; }
+          // guarda o contato novo, se veio
+          if (nomeF || telF) {
+            const lista = (atual.contatos || []).slice(); const i0 = lista.findIndex(c => norm(c.nome) === norm(nomeF) && nomeF);
+            if (i0 >= 0) { lista[i0] = Object.assign({}, lista[i0], { cargo: cargo.value || lista[i0].cargo, tel: telF || lista[i0].tel }); }
+            else lista.push({ nome: nomeF, cargo: cargo.value, tel: telF });
+            p2.contatos = lista;
+          }
+          tx.update(ref, p2);
+        });
+        C.toast(etapa === "FECHADO" ? "Fechado! 🎉" : quando.value ? "Retorno em " + C.fmtDate(quando.value) : "Visita registrada");
+      } catch (er) { C.handleErr(er); }
     });
   });
 }

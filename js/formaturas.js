@@ -3,13 +3,12 @@
 //  - 🎓 Colação de grau e 📘 Álbum de formatura: resumo por colégio
 //  - Turmas: colégios fechados, com acesso à lista de formandos
 // Quem não é administrador vê só as turmas dos colégios que fechou.
-import { setCtx, openTurma, cobrarWa, ajustaPag, vencDa, parcela, quitado, atrasado, ehColacao, esperadas } from "./turma.js";
+import { setCtx, openTurma, cobrarWa, registrarPagamento, atrasado } from "./turma.js";
+import { brl, somar, recebido as recebidoDe, emAberto, pagasDe, nParcelas, quitado, vencDa, valorParcela, esperadas, ehColacao, pagamentosDe, fimDoMes } from "./regras.js";
+import { el, title, avisoErro } from "./ui.js";
 let C, FS, db, unsubs = [], forms = [], insts = [], aba = "cobrancas";
 const $ = (id) => document.getElementById(id);
-const n0 = v => Number(v) || 0;
-function el(tag, cls, text){ const e = document.createElement(tag); if (cls) e.className = cls; if (text != null) e.textContent = text; return e; }
-function title(s){ return String(s || "").toLowerCase().replace(/(^|[\s(-])(\p{L})/gu, (m, a, b) => a + b.toUpperCase()).replace(/\b(Da|De|Do|Das|Dos|E)\b/g, w => w.toLowerCase()); }
-const moeda = v => C.money(Math.round(v));
+const moeda = brl;
 
 export function init(ctx){ C = ctx; FS = ctx.FS; db = ctx.db; setCtx(ctx); }
 export function hide(){ unsubs.forEach(u => u()); unsubs = []; }
@@ -22,25 +21,23 @@ export function show(){
   const chips = el("div", "chips"); chips.id = "fmChips"; v.append(chips);
   const corpo = el("div"); corpo.id = "fmCorpo"; corpo.append(el("div", "empty", "Carregando…")); v.append(corpo);
   hide(); forms = []; insts = [];
-  const erro = e => { console.warn(e); if (e.code === "permission-denied") { corpo.innerHTML = ""; corpo.append(el("div", "empty", "Cole as regras novas do Firebase para usar o card Formaturas.")); } };
+  const erro = e => { avisoErro(e, "carregar as formaturas"); if (e.code === "permission-denied") { corpo.innerHTML = ""; corpo.append(el("div", "empty", "Cole as regras novas do Firebase para usar o card Formaturas.")); } };
   unsubs.push(FS.onSnapshot(FS.query(FS.collection(db, "formandos"), FS.limit(5000)), s => { forms = s.docs.map(d => Object.assign({ id: d.id }, d.data())); render(); }, erro));
   unsubs.push(FS.onSnapshot(FS.query(FS.collection(db, "instituicoes"), FS.where("etapa", "==", "FECHADO"), FS.limit(500)), s => { insts = s.docs.map(d => Object.assign({ id: d.id }, d.data())); render(); }, erro));
 }
 
 // Só as turmas que a pessoa pode ver
-function minhasInsts(){ return C.isAdmin ? insts : insts.filter(i => i.resp === C.me); }
-function meusForms(){ const ids = new Set(minhasInsts().map(i => i.id)); return forms.filter(f => f.status !== "desistiu" && (C.isAdmin || ids.has(f.instId) || f.resp === C.me)); }
-const recebido = f => parcela(f) * Math.min(n0(f.pagas), n0(f.parcelas) || 1);
-const aReceber = f => n0(f.valor) - recebido(f);
+function minhasInsts(){ return C.isAdmin ? insts : insts.filter(i => i.respEmail ? i.respEmail === C.email : i.resp === C.me); }
+function meusForms(){ const ids = new Set(minhasInsts().map(i => i.id)); return forms.filter(f => f.status !== "desistiu" && (C.isAdmin || ids.has(f.instId) || f.respEmail === C.email)); }
 
 function render(){
   const k = $("fmKpis"), chips = $("fmChips"), corpo = $("fmCorpo"); if (!k) return;
   const fs = meusForms(), hoje = C.todayStr(), mes = hoje.slice(0, 7);
   const col = fs.filter(ehColacao), alb = fs.filter(f => !ehColacao(f));
-  const recMes = fs.reduce((a, f) => a + (f.pagamentos || []).filter(p => String(p.data || "").slice(0, 7) === mes).reduce((b, p) => b + n0(p.valor), 0), 0);
+  const recMes = somar(fs.flatMap(f => pagamentosDe(f).filter(p => String(p.data || "").slice(0, 7) === mes).map(p => p.valor)));
   const atr = fs.filter(atrasado);
   k.innerHTML = "";
-  [["Recebido no mês", moeda(recMes)], ["🎓 Colação a receber", moeda(col.reduce((a, f) => a + aReceber(f), 0))], ["📘 Álbum a receber", moeda(alb.reduce((a, f) => a + aReceber(f), 0))], ["Parcelas atrasadas", String(atr.length)]]
+  [["Recebido no mês", moeda(recMes)], ["🎓 Colação a receber", moeda(somar(col.map(emAberto)))], ["📘 Álbum a receber", moeda(somar(alb.map(emAberto)))], ["Parcelas atrasadas", String(atr.length)]]
     .forEach(([t, v], i) => { const c = el("div", "kpi" + (i === 3 && atr.length ? " late" : "")); c.append(el("small", null, t), el("b", null, v)); k.append(c); });
   const cob = cobrancas(fs);
   chips.innerHTML = "";
@@ -55,9 +52,9 @@ function render(){
 
 // Parcelas atrasadas e as que vencem até o fim do mês
 function cobrancas(fs){
-  const fim = (() => { const t = new Date(); const d = new Date(t.getFullYear(), t.getMonth() + 1, 0); return `${d.getFullYear()}-${C.pad(d.getMonth() + 1)}-${C.pad(d.getDate())}`; })();
-  return fs.filter(f => !quitado(f) && f.primeiroVenc && vencDa(f, n0(f.pagas) + 1) <= fim)
-    .map(f => ({ f, venc: vencDa(f, n0(f.pagas) + 1) })).sort((a, b) => a.venc.localeCompare(b.venc) || (a.f.nome || "").localeCompare(b.f.nome || ""));
+  const fim = fimDoMes(C.todayStr());
+  return fs.filter(f => !quitado(f) && f.primeiroVenc && vencDa(f, pagasDe(f) + 1) <= fim)
+    .map(f => ({ f, venc: vencDa(f, pagasDe(f) + 1) })).sort((a, b) => a.venc.localeCompare(b.venc) || (a.f.nome || "").localeCompare(b.f.nome || ""));
 }
 function renderCobrancas(corpo, cob){
   if (!cob.length) { const e = el("div", "empty"); e.append(el("strong", null, "Nenhuma parcela para cobrar este mês ✓"), el("span", null, "Aqui aparecem as parcelas atrasadas e as que vencem até o fim do mês, de todas as turmas.")); corpo.append(e); return; }
@@ -67,12 +64,10 @@ function renderCobrancas(corpo, cob){
     const e = el("article", "card " + (at ? "late" : "today"));
     const top = el("div", "card-top"); top.append(el("h3", "name", title(f.nome)), el("span", "stage", at ? "ATRASADO" : "VENCE " + C.fmtDate(venc))); e.append(top);
     const meta = el("div", "meta"); [title(f.instNome), ehColacao(f) ? "🎓 Colação de grau" : "📘 " + (f.kit || "Álbum de formatura"), f.serie].filter(Boolean).forEach((t, i) => meta.append(el("span", "tag" + (i === 1 ? " svc" : ""), t))); e.append(meta);
-    e.append(el("div", "fu " + (at ? "late" : "today"), `Parcela ${n0(f.pagas) + 1}/${f.parcelas} · ${moeda(parcela(f))} · ${at ? "venceu" : "vence"} ${C.fmtDate(venc)}` + (at && esperadas(f, C.todayStr()) - n0(f.pagas) > 1 ? ` · ${esperadas(f, C.todayStr()) - n0(f.pagas)} em atraso` : "")));
+    const pg = pagasDe(f), emAtraso = esperadas(f, C.todayStr()) - pg;
+    e.append(el("div", "fu " + (at ? "late" : "today"), `Parcela ${pg + 1}/${nParcelas(f)} · ${moeda(valorParcela(f, pg + 1))} · ${at ? "venceu" : "vence"} ${C.fmtDate(venc)}` + (at && emAtraso > 1 ? ` · ${emAtraso} em atraso` : "")));
     const act = el("div", "actions");
-    act.append(C.mkBtn("✅ Parcela paga", "btn-ok", async () => {
-      try { await FS.updateDoc(FS.doc(db, "formandos", f.id), { pagas: n0(f.pagas) + 1, ultimoPag: C.todayStr(), pagamentos: ajustaPag(f, n0(f.pagas) + 1), atualizadoEm: new Date().toISOString() }); C.toast(`Parcela ${n0(f.pagas) + 1} de ${C.first(title(f.nome))} registrada`); }
-      catch (er) { C.handleErr(er); }
-    }));
+    if (C.isAdmin) act.append(C.mkBtn("✅ Parcela paga", "btn-ok", () => registrarPagamento(f).catch(er => C.handleErr(er))));
     if (f.tel) act.append(C.mkBtn("💬 Cobrar", at ? "btn-primary" : "", () => cobrarWa(f)));
     const inst = insts.find(i => i.id === f.instId); if (inst) act.append(C.mkBtn("Ver turma", "", () => openTurma(C, inst, [])));
     e.append(act); g.append(e);
@@ -81,8 +76,7 @@ function renderCobrancas(corpo, cob){
 }
 
 function resumoInst(i, lst){
-  const vend = lst.reduce((a, f) => a + n0(f.valor), 0), rec = lst.reduce((a, f) => a + recebido(f), 0);
-  return { n: lst.length, vend, rec, aberto: vend - rec, atr: lst.filter(atrasado).length };
+  return { n: lst.length, vend: somar(lst.map(f => f.valor)), rec: somar(lst.map(recebidoDe)), aberto: somar(lst.map(emAberto)), atr: lst.filter(atrasado).length };
 }
 function renderContrato(corpo, tipo){
   const colacao = tipo === "colacao";

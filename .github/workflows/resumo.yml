@@ -1,0 +1,25 @@
+name: Resumo do Dashboard
+
+on:
+  schedule:
+    # 06:00 UTC = 3h em Brasília, todos os dias
+    - cron: "0 6 * * *"
+  workflow_dispatch:
+
+jobs:
+  resumo:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - name: Instalar
+        working-directory: scripts
+        run: npm install --no-audit --no-fund
+      - name: Gerar resumo
+        working-directory: scripts
+        run: node resumo.mjs
+        env:
+          FIREBASE_SERVICE_ACCOUNT: ${{ secrets.FIREBASE_SERVICE_ACCOUNT }}

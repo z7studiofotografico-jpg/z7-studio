@@ -1,0 +1,36 @@
+name: Testes
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  testes:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - name: Regras de negócio, cálculo e arquivos do app
+        run: node --test tests/*.test.mjs
+
+  regras-firebase:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 21
+      - name: Instalar
+        working-directory: tests/firebase
+        run: npm install --no-audit --no-fund
+      - name: Regras do Firebase no emulador
+        working-directory: tests/firebase
+        run: npx firebase emulators:exec --only firestore --project z7-teste "node --test regras.test.mjs"

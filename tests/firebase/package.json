@@ -1,0 +1,10 @@
+{
+  "name": "z7-testes-regras",
+  "private": true,
+  "type": "module",
+  "devDependencies": {
+    "@firebase/rules-unit-testing": "3.0.4",
+    "firebase": "10.12.2",
+    "firebase-tools": "13.29.1"
+  }
+}

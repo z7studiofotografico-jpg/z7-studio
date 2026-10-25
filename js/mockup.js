@@ -2,10 +2,10 @@
 // - "Prévia do kit": quadro 30x40 (moldura preta) + 2 porta-retratos 15x10 em pé, com as fotos escolhidas.
 // - "Fotos para escolher": todas as fotos do ensaio numeradas, para o formando escolher o que vai em cada lugar.
 // Toda imagem sai com marca d'água repetida (um print não serve como foto final).
+import { el } from "./ui.js";
 const W = 1080, H = 1350;
 let logoImg = null;
 
-function el(tag, cls, text){ const e = document.createElement(tag); if (cls) e.className = cls; if (text != null) e.textContent = text; return e; }
 function loadImg(src){ return new Promise((res, rej) => { const i = new Image(); i.onload = () => res(i); i.onerror = rej; i.src = src; }); }
 function fileToImg(f){ return loadImg(URL.createObjectURL(f)); }
 

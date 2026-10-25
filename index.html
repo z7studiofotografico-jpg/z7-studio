@@ -520,9 +520,12 @@ details.guide summary{cursor:pointer;font-family:var(--f-display);font-weight:70
 <script type="module">
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
 import { getAuth, initializeAuth, onAuthStateChanged, signInWithEmailAndPassword, createUserWithEmailAndPassword, sendPasswordResetEmail, signOut, setPersistence, indexedDBLocalPersistence, inMemoryPersistence } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
-import { initializeFirestore, persistentLocalCache, persistentMultipleTabManager, collection, doc, onSnapshot, addDoc, updateDoc, setDoc, deleteDoc, query, where, getCountFromServer } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
+import { initializeFirestore, persistentLocalCache, persistentMultipleTabManager, collection, doc, onSnapshot, updateDoc, setDoc, query, where, getCountFromServer } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
 import * as FS from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
 import { getMessaging, getToken, onMessage, isSupported } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-messaging.js";
+import { brl, lerReais, COMISSAO_PADRAO, FORMAS, proxVenc, pagamentosDe } from "./js/regras.js";
+import { avisoErro } from "./js/ui.js";
+import * as Funil from "./js/funil.js";
 
 const $ = (id) => document.getElementById(id);
 const CFG = self.Z7_CONFIG || {};
@@ -531,17 +534,13 @@ if (!CFG.firebase || !CFG.firebase.apiKey) {
   throw new Error("config.js vazio");
 }
 
-const STAGES = ["NOVO LEAD","QUALIFICADO","PROPOSTA ENVIADA","FOLLOW-UP","FECHADO","PERDIDO"];
-const OPEN = ["NOVO LEAD","QUALIFICADO","PROPOSTA ENVIADA","FOLLOW-UP"];
-const SERVS = ["Formatura individual (estúdio)","Formatura individual (externo)","Turma","Corporativo","Retrato","Outro"];
-const ORIGS = ["Meta Ads","Instagram","WhatsApp","Indicação","Google","Ex-cliente","Instituição/Coordenação","Outro"];
 
 const app = initializeApp(CFG.firebase);
 const auth = getAuth(app);
-setPersistence(auth, indexedDBLocalPersistence).catch(() => {});
+setPersistence(auth, indexedDBLocalPersistence).catch(e => console.warn("[Z7] login persistente", e));
 const db = initializeFirestore(app, { localCache: persistentLocalCache({ tabManager: persistentMultipleTabManager() }) });
 
-let leads = [], filter = "ABERTOS", editing = null, user = null, unsub = [];
+let user = null, unsub = [];
 let P = { individual: 0, sinal: 0, g36: 0, g7: 0, fotos: 30, prazo: 15 };
 let USERS = {};            // e-mail -> { nome, papel, ativo }
 let me = "", isAdmin = false;
@@ -553,42 +552,33 @@ let secAuth = null;
 function cadastroAuth(){ if (!secAuth) secAuth = initializeAuth(initializeApp(CFG.firebase, "cadastro"), { persistence: inMemoryPersistence }); return secAuth; }
 
 // ---------- utilidades ----------
-function fill(sel, arr){ sel.innerHTML = ""; arr.forEach(v => { const o = document.createElement("option"); o.value = v; o.textContent = v; sel.appendChild(o); }); }
-fill($("fServ"), SERVS); fill($("fOrig"), ORIGS); fill($("fEtapa"), STAGES);
 const pad = n => String(n).padStart(2, "0");
 const ds = d => d.getFullYear() + "-" + pad(d.getMonth() + 1) + "-" + pad(d.getDate());
 const todayStr = () => ds(new Date());
 function addDays(n){ const d = new Date(); d.setDate(d.getDate() + n); return ds(d); }
 function fmtDate(s){ if (!s) return ""; const [, m, d] = s.split("-"); return d + "/" + m; }
 function hhmm(iso){ const d = new Date(iso); return pad(d.getHours()) + ":" + pad(d.getMinutes()); }
-function money(n){ return "R$ " + (Number(n) || 0).toLocaleString("pt-BR", { maximumFractionDigits: 2 }); }
-function num(v){ return Number(String(v || "").replace(/\./g, "").replace(",", ".")) || 0; }
+// Dinheiro no padrão brasileiro (contas em centavos: js/regras.js)
+const money = brl;
+const num = lerReais;
 function digits(t){ let d = (t || "").replace(/\D/g, ""); if (d.length === 10 || d.length === 11) d = "55" + d; return d; }
 function first(n){ return (n || "").trim().split(/\s+/)[0] || ""; }
-const pv = v => v ? money(v) : "[valor]";
 const team = () => Object.values(USERS).filter(u => u.ativo !== false && u.nome).map(u => u.nome).sort((a, b) => a.localeCompare(b, "pt-BR"));
-function status(l){ if (l.etapa === "FECHADO") return "won"; if (!OPEN.includes(l.etapa) || !l.followup) return "none"; const t = todayStr(); return l.followup < t ? "late" : l.followup === t ? "today" : "later"; }
 function toast(msg){ const t = $("toast"); t.textContent = msg; t.hidden = false; clearTimeout(toast._t); toast._t = setTimeout(() => t.hidden = true, 2400); }
 function showNotice(t){ const n = $("notice"); n.textContent = t; n.hidden = !t; }
-function lockInfo(l){ const a = l.atendendo; if (!a || !a.por || !a.desde) return null; const mins = (Date.now() - Date.parse(a.desde)) / 60000; if (!(mins >= 0 && mins <= 30)) return null; return { por: a.por, desde: a.desde, mine: a.por === me }; }
 
 // ---------- quem está usando (vem do login) ----------
 function renderMe(){
   $("btnMe").textContent = me ? "👤 " + first(me) : "";
   $("btnTeam").hidden = !isAdmin;
-  const sel = $("fResp"), cur = sel.value; sel.innerHTML = "";
-  const o0 = document.createElement("option"); o0.value = ""; o0.textContent = "Ninguém"; sel.appendChild(o0);
-  const names = team(); if (cur && !names.includes(cur)) names.push(cur);
-  names.forEach(n => { const o = document.createElement("option"); o.value = n; o.textContent = n; sel.appendChild(o); });
-  sel.value = cur;
 }
-// Módulos do app. Administradores e donos veem tudo; a equipe vê só o que foi liberado no cadastro.
+// Módulos do app. Administradores e donos veem tudo; a equipe vê só o que foi marcado no cadastro (sem módulos = sem acesso).
 const MODULOS = [["funil", "Funil de vendas"], ["lf", "PR · Linha de Frente"], ["rep", "PR · Repasse"], ["agenda", "Agendamento"], ["colegios", "Instituições"], ["formaturas", "Formaturas"], ["becas", "Aluguel de becas"]];
 function pode(m){
   if (isAdmin) return true;
   if (m === "vendas") return false;
   const p = USERS[(user && user.email || "").toLowerCase()];
-  if (!p || !Array.isArray(p.modulos)) return !!p;
+  if (!p || p.ativo === false || !Array.isArray(p.modulos)) return false;
   if (m === "pr") return p.modulos.includes("lf") || p.modulos.includes("rep");
   return p.modulos.includes(m);
 }
@@ -602,223 +592,17 @@ function applyProfile(){
   if (me !== prev) refreshPushToken();
 }
 
-// ---------- mensagens prontas ----------
-function nextStep(l){
-  const n = first(l.nome), turma = l.servico === "Turma", corp = l.servico === "Corporativo";
-  const valor = l.valor ? money(l.valor) : pv(P.individual);
-  const t = l.tentativas || 0;
-  switch (l.etapa) {
-    case "NOVO LEAD": return { title: "Qualificar: descobrir o que a pessoa precisa",
-      msg: `Olá, ${n}! Que bom ter você aqui 😊 Sou ${first(me) ? (/a$/i.test(first(me)) ? "a " : "o ") + first(me) : "do time"}, do Z7 Studio.\nO orçamento é só para você ou para a sua turma? E qual a data da sua colação?`,
-      then: { etapa: "QUALIFICADO", days: 1 } };
-    case "QUALIFICADO":
-      if (turma) return { title: "Coletar dados da turma",
-        msg: `Perfeito, ${n}! Para montar o orçamento da turma, me diga:\n• Instituição\n• Curso\n• Quantidade de alunos\n• Mês previsto para as fotos`,
-        then: { etapa: "PROPOSTA ENVIADA", days: 1 } };
-      if (corp) return { title: "Entender o trabalho corporativo",
-        msg: `Perfeito, ${n}! Para te passar o orçamento: quantas pessoas serão fotografadas, as fotos são para site/LinkedIn ou evento, e qual a data ideal?`,
-        then: { etapa: "PROPOSTA ENVIADA", days: 1 } };
-      return { title: "Enviar o valor em texto (sem PDF)",
-        msg: `${n}, o ensaio de formatura no estúdio fica ${valor}, com cerca de ${P.fotos || 30} fotos tratadas entregues em até ${P.prazo || 15} dias.\nJá estão inclusos: beca, cadeira, 2 fundos, acessórios, fotos com família (até 4 pessoas) e pet.\nPara reservar a data, o sinal é de ${pv(P.sinal)} via Pix. Qual dia fica melhor para você?`,
-        then: { etapa: "PROPOSTA ENVIADA", days: 1 } };
-    case "PROPOSTA ENVIADA": return { title: "1º follow-up (tirar dúvida)",
-      msg: `Oi, ${n}! Conseguiu ver o orçamento? Ficou alguma dúvida que eu possa te ajudar a resolver?`,
-      then: { etapa: "FOLLOW-UP", days: 2, count: true } };
-    case "FOLLOW-UP":
-      if (t <= 1) return { title: "2º follow-up (oferecer data)",
-        msg: `${n}, separei algumas datas livres para o seu ensaio. Quer que eu te mostre? Se vier com colegas no mesmo dia, cada um paga ${pv(P.g36)} (de 3 a 6 formandos).`,
-        then: { etapa: "FOLLOW-UP", days: 4, count: true } };
-      return { title: "3º follow-up (encerrar com elegância)",
-        msg: `${n}, vou entender que agora não é o momento e não vou mais te incomodar. Quando quiser, é só me chamar! 😊`,
-        then: { etapa: "PERDIDO", days: -1, count: true } };
-    case "FECHADO": return { title: "Pós-venda: pedir depoimento e indicação",
-      msg: `${n}, que bom que você gostou das fotos! 💛 Pode me mandar um áudio ou texto curto contando como foi a experiência? E se algum colega também vai se formar, me indica? Vou adorar fotografar.`,
-      then: null };
-    default: return null;
-  }
-}
 
-// ---------- gravação ----------
-async function save(id, patch, msg){
-  try { patch.atualizadoEm = new Date().toISOString(); await updateDoc(doc(db, "leads", id), patch); toast(msg || "Salvo"); }
-  catch (e) { handleErr(e); }
-}
 function handleErr(e){
-  if (e && e.code === "permission-denied") showNotice("Este e-mail não tem permissão para alterar o funil.");
+  console.warn("[Z7]", e);
+  if (e && e.code === "permission-denied") toast("Você não tem permissão para fazer isso. Fale com o Adriano.");
   else toast("Não salvou. Verifique a internet e tente de novo.");
-}
-function claim(l){
-  if (!me) return;
-  const li = lockInfo(l); if (li && li.mine) return;
-  save(l.id, { atendendo: { por: me, desde: new Date().toISOString() } }, "O outro aparelho vai ver: " + me + " está respondendo");
 }
 
 // ---------- desenho da tela ----------
 function mkBtn(text, cls, fn){ const b = document.createElement("button"); b.type = "button"; b.className = "btn btn-sm " + (cls || ""); b.textContent = text; b.onclick = fn; return b; }
 
-function renderChips(){
-  const c = $("chips"); c.innerHTML = "";
-  const counts = { ABERTOS: leads.filter(l => OPEN.includes(l.etapa)).length, TODOS: leads.length, MEUS: leads.filter(l => me && l.resp === me && OPEN.includes(l.etapa)).length };
-  STAGES.forEach(s => counts[s] = leads.filter(l => l.etapa === s).length);
-  ["ABERTOS","MEUS",...STAGES,"TODOS"].forEach(k => {
-    const b = document.createElement("button"); b.type = "button"; b.className = "chip"; b.setAttribute("aria-pressed", String(filter === k));
-    b.textContent = k === "ABERTOS" ? "Em aberto" : k === "TODOS" ? "Todos" : k === "MEUS" ? "Só os meus" : k;
-    const n = document.createElement("span"); n.className = "n"; n.textContent = counts[k]; b.appendChild(n);
-    b.onclick = () => { filter = k; render(); }; c.appendChild(b);
-  });
-}
-function renderStats(){
-  const st = leads.map(status);
-  const late = st.filter(s => s === "late").length, today = st.filter(s => s === "today").length;
-  $("sLate").textContent = late; $("sToday").textContent = today;
-  $("sOpen").textContent = leads.filter(l => OPEN.includes(l.etapa)).length;
-  const ym = todayStr().slice(0, 7);
-  $("sWon").textContent = money(leads.filter(l => l.etapa === "FECHADO" && (l.fechadoEm || "").slice(0, 7) === ym).reduce((a, l) => a + (Number(l.valor) || 0), 0));
-  try { if ("setAppBadge" in navigator) { (late + today) ? navigator.setAppBadge(late + today) : navigator.clearAppBadge(); } } catch (_) {}
-}
 
-function card(l){
-  const s = status(l);
-  const el = document.createElement("article"); el.className = "card " + (["late","today","won"].includes(s) ? s : "");
-  const top = document.createElement("div"); top.className = "card-top";
-  const h = document.createElement("h3"); h.className = "name"; h.textContent = l.nome || "Sem nome";
-  const sg = document.createElement("span"); sg.className = "stage"; sg.textContent = l.etapa;
-  top.append(h, sg); el.appendChild(top);
-
-  const meta = document.createElement("div"); meta.className = "meta";
-  [[l.resp ? "👤 " + first(l.resp) : "", ""], [l.servico, "svc"], [l.origem, ""], [l.valor ? money(l.valor) : "", ""], [l.tentativas ? l.tentativas + "º follow-up feito" : "", ""]]
-    .forEach(([v, c]) => { if (v) { const t = document.createElement("span"); t.className = "tag " + c; t.textContent = v; meta.appendChild(t); } });
-  el.appendChild(meta);
-  if (l.telefone) { const p = document.createElement("div"); p.className = "phone"; p.textContent = l.telefone; el.appendChild(p); }
-
-  const fu = document.createElement("div"); fu.className = "fu " + (s === "late" ? "late" : s === "today" ? "today" : l.followup ? "" : "none");
-  if (OPEN.includes(l.etapa)) fu.textContent = l.followup ? (s === "late" ? "Atrasado desde " + fmtDate(l.followup) : s === "today" ? "Contato para hoje" : "Próximo contato: " + fmtDate(l.followup)) : "Sem data de contato";
-  else fu.textContent = l.etapa === "FECHADO" ? "Fechado" + (l.fechadoEm ? " em " + fmtDate(l.fechadoEm) : "") : "Encerrado";
-  el.appendChild(fu);
-  if (l.notas) { const n = document.createElement("p"); n.className = "notes"; n.textContent = l.notas; el.appendChild(n); }
-  if (l.ultimo && l.ultimo.em) { const u = document.createElement("div"); u.className = "last"; u.textContent = "Último contato: " + (first(l.ultimo.por) || "—") + " · " + fmtDate(ds(new Date(l.ultimo.em))) + " às " + hhmm(l.ultimo.em); el.appendChild(u); }
-
-  const li = lockInfo(l);
-  if (li) {
-    const lk = document.createElement("div"); lk.className = "lock " + (li.mine ? "mine" : "other");
-    const t = document.createElement("span"); t.textContent = li.mine ? "✋ Você está respondendo (desde " + hhmm(li.desde) + ")" : "⚠️ " + first(li.por) + " está respondendo desde " + hhmm(li.desde);
-    lk.appendChild(t);
-    if (li.mine) lk.appendChild(mkBtn("Liberar", "", () => save(l.id, { atendendo: null }, "Cartão liberado")));
-    else lk.appendChild(mkBtn("Assumir mesmo assim", "", () => { if (!me) return; save(l.id, { atendendo: { por: me, desde: new Date().toISOString() } }, "Agora você está respondendo"); }));
-    el.appendChild(lk);
-  }
-  const blocked = li && !li.mine;
-
-  const ns = nextStep(l);
-  if (ns) {
-    const box = document.createElement("div"); box.className = "next";
-    const sm = document.createElement("small"); sm.textContent = "Próximo passo: " + ns.title;
-    const msg = document.createElement("p"); msg.textContent = ns.msg;
-    if (blocked) {
-      const w = document.createElement("p"); w.className = "wait"; w.textContent = "Espere " + first(li.por) + " terminar, ou toque em “Assumir mesmo assim”.";
-      box.append(sm, msg, w);
-    } else {
-      const row = document.createElement("div"); row.className = "row";
-      const d = digits(l.telefone);
-      if (d) { const a = document.createElement("a"); a.className = "btn btn-sm btn-primary"; a.href = "https://wa.me/" + d + "?text=" + encodeURIComponent(ns.msg); a.target = "_blank"; a.rel = "noopener"; a.textContent = "Abrir no WhatsApp"; a.addEventListener("click", () => claim(l)); row.appendChild(a); }
-      row.appendChild(mkBtn("Copiar texto", "", async () => {
-        claim(l);
-        try { await navigator.clipboard.writeText(ns.msg); toast("Texto copiado"); }
-        catch (_) { const r = document.createRange(); r.selectNodeContents(msg); const sel = getSelection(); sel.removeAllRanges(); sel.addRange(r); toast("Texto selecionado, copie com o dedo"); }
-      }));
-      if (P.pixSinal && d && ["QUALIFICADO", "PROPOSTA ENVIADA", "FOLLOW-UP"].includes(l.etapa)) {
-        const pm = `Para reservar a data, o sinal${P.sinal ? ` é de ${money(P.sinal)}` : ""} no Pix: abra o app do seu banco, escolha *Pix Copia e Cola* e cole o código que vou mandar na próxima mensagem 👇 Depois me manda o comprovante por aqui 😊`;
-        const a4 = document.createElement("a"); a4.className = "btn btn-sm"; a4.textContent = "💠 Pix do sinal"; a4.href = "https://wa.me/" + d + "?text=" + encodeURIComponent(pm); a4.target = "_blank"; a4.rel = "noopener"; row.appendChild(a4);
-        const a5 = document.createElement("a"); a5.className = "btn btn-sm"; a5.textContent = "📋 Código Pix"; a5.href = "https://wa.me/" + d + "?text=" + encodeURIComponent(P.pixSinal); a5.target = "_blank"; a5.rel = "noopener"; row.appendChild(a5);
-      }
-      if (ns.then) row.appendChild(mkBtn("Enviei ✓", "btn-ok", () => {
-        const p = { etapa: ns.then.etapa, followup: ns.then.days < 0 ? "" : addDays(ns.then.days), atendendo: null, ultimo: { por: me || "—", em: new Date().toISOString() } };
-        if (ns.then.count) p.tentativas = (l.tentativas || 0) + 1;
-        if (!l.resp && me) p.resp = me;
-        save(l.id, p, p.etapa === "PERDIDO" ? "Lead encerrado" : "Próximo contato em " + fmtDate(p.followup));
-      }));
-      box.append(sm, msg, row);
-    }
-    el.appendChild(box);
-  }
-
-  const act = document.createElement("div"); act.className = "actions";
-  if (OPEN.includes(l.etapa) && !li) act.appendChild(mkBtn("✋ Estou respondendo", "", () => claim(l)));
-  if (OPEN.includes(l.etapa)) {
-    act.appendChild(mkBtn("Fechou", "btn-ok", () => openForm(l, { etapa: "FECHADO" })));
-    act.appendChild(mkBtn("Remarcar +1d", "", () => save(l.id, { followup: addDays(1) }, "Remarcado para " + fmtDate(addDays(1)))));
-    act.appendChild(mkBtn("Perdido", "", () => save(l.id, { etapa: "PERDIDO", followup: "", atendendo: null }, "Lead encerrado")));
-  } else if (l.etapa === "PERDIDO") {
-    act.appendChild(mkBtn("Reabrir", "", () => save(l.id, { etapa: "FOLLOW-UP", followup: todayStr(), tentativas: 0 }, "Lead reaberto")));
-  }
-  if (isAdmin && l.etapa !== "PERDIDO") act.appendChild(mkBtn("📅 Marcar ensaio", "", () => marcarEnsaio(l)));
-  act.appendChild(mkBtn("Editar", "", () => openForm(l)));
-  el.appendChild(act);
-  return el;
-}
-
-// Abre a agenda já com o cliente do Funil preenchido
-async function marcarEnsaio(l){
-  try {
-    if (!agendaMod) { agendaMod = await import("./js/agenda.js"); agendaMod.init(ctx); }
-    agendaMod.openEnsaio(null, { cliente: l.nome || "", tel: l.telefone || "", servico: l.servico || "", leadId: l.id, valor: l.valor || "", sinalPago: l.etapa === "FECHADO" });
-  } catch (e) { console.warn(e); toast("Não foi possível abrir a agenda"); }
-}
-function render(){
-  renderChips(); renderStats();
-  const q = $("q").value.trim().toLowerCase();
-  let arr = leads.filter(l => filter === "TODOS" ? true : filter === "ABERTOS" ? OPEN.includes(l.etapa) : filter === "MEUS" ? (me && l.resp === me && OPEN.includes(l.etapa)) : l.etapa === filter);
-  if (q) arr = arr.filter(l => [l.nome, l.telefone, l.notas, l.servico, l.origem, l.resp].join(" ").toLowerCase().includes(q));
-  const rank = { late: 0, today: 1, later: 2, none: 3, won: 4 };
-  arr.sort((a, b) => (rank[status(a)] - rank[status(b)]) || ((a.followup || "9") < (b.followup || "9") ? -1 : (a.followup || "9") > (b.followup || "9") ? 1 : 0) || ((b.criadoEm || "") > (a.criadoEm || "") ? 1 : -1));
-  const list = $("list"); list.innerHTML = "";
-  if (!arr.length) {
-    const e = document.createElement("div"); e.className = "empty"; e.style.gridColumn = "1/-1";
-    const s = document.createElement("strong"); s.textContent = leads.length ? "Nada nesta etapa" : "Nenhum lead ainda";
-    const p = document.createElement("span"); p.textContent = leads.length ? "Troque o filtro acima ou cadastre um contato novo." : "Toque em “+ Novo lead” quando alguém chamar no WhatsApp pedindo orçamento.";
-    e.append(s, p); list.appendChild(e); return;
-  }
-  arr.forEach(l => list.appendChild(card(l)));
-}
-
-// ---------- formulário de lead ----------
-function openForm(l, preset){
-  editing = l || null; preset = preset || {};
-  $("formTitle").textContent = preset.etapa === "FECHADO" ? "Registrar venda" : l ? "Editar lead" : "Novo lead";
-  $("fNome").value = l?.nome || ""; $("fTel").value = l?.telefone || ""; $("fValor").value = l?.valor || "";
-  $("fServ").value = l?.servico || SERVS[0]; $("fOrig").value = l?.origem || "WhatsApp";
-  $("fEtapa").value = preset.etapa || l?.etapa || "NOVO LEAD"; $("fFu").value = l ? l.followup || "" : todayStr();
-  $("fNotas").value = l?.notas || "";
-  renderMe(); $("fResp").value = l ? (l.resp || "") : (me || "");
-  $("btnDel").hidden = !l; $("confirmDel").hidden = true;
-  $("sheet").hidden = false; setTimeout(() => (preset.etapa === "FECHADO" ? $("fValor") : $("fNome")).focus(), 30);
-}
-function closeForm(){ $("sheet").hidden = true; editing = null; }
-
-$("btnNew").onclick = () => openForm(null);
-$("btnCancel").onclick = closeForm;
-$("sheet").addEventListener("click", e => { if (e.target === $("sheet")) closeForm(); });
-$("sheetPrices").addEventListener("click", e => { if (e.target === $("sheetPrices")) $("sheetPrices").hidden = true; });
-document.addEventListener("keydown", e => { if (e.key === "Escape") { closeForm(); $("sheetPrices").hidden = true; $("sheetTeam").hidden = true; } });
-document.querySelectorAll("[data-add]").forEach(b => b.onclick = () => { const n = +b.dataset.add; $("fFu").value = n < 0 ? "" : addDays(n); });
-$("btnDel").onclick = () => { $("confirmDel").hidden = false; };
-$("delNo").onclick = () => { $("confirmDel").hidden = true; };
-$("delYes").onclick = async () => { if (!editing) return; try { await deleteDoc(doc(db, "leads", editing.id)); toast("Lead apagado"); closeForm(); } catch (e) { handleErr(e); } };
-$("q").addEventListener("input", render);
-
-$("form").addEventListener("submit", async e => {
-  e.preventDefault();
-  const nome = $("fNome").value.trim(); if (!nome) { $("fNome").focus(); return; }
-  const etapa = $("fEtapa").value;
-  const body = { nome, telefone: $("fTel").value.trim(), valor: num($("fValor").value), servico: $("fServ").value, origem: $("fOrig").value,
-    etapa, followup: OPEN.includes(etapa) ? $("fFu").value : "", notas: $("fNotas").value.trim(), resp: $("fResp").value, atualizadoEm: new Date().toISOString() };
-  $("btnSave").disabled = true;
-  try {
-    if (editing) { if (etapa === "FECHADO") { body.fechadoEm = editing.fechadoEm || todayStr(); body.atendendo = null; } await updateDoc(doc(db, "leads", editing.id), body); }
-    else { body.criadoEm = new Date().toISOString(); body.tentativas = 0; if (etapa === "FECHADO") body.fechadoEm = todayStr(); await addDoc(collection(db, "leads"), body); }
-    toast(etapa === "FECHADO" ? "Venda registrada 🎉" : "Lead salvo"); closeForm();
-  } catch (err) { handleErr(err); } finally { $("btnSave").disabled = false; }
-});
 
 // ---------- ajustes ----------
 $("btnPrices").onclick = () => {
@@ -831,8 +615,7 @@ $("btnPrices").onclick = () => {
   renderPushState(); $("sheetPrices").hidden = false;
 };
 // Tabela de comissão: PR e Formatura × forma de pagamento
-const COM_FORMAS = ["Pix", "Cartão", "Link", "Recorrente", "Dinheiro", "Boleto"];
-const COM_PADRAO = { pr: { "Cartão": 20, "Recorrente": 17, "Link": 17, "Dinheiro": 20, "Pix": 20, "Boleto": 9.5 }, form: { "Cartão": 15, "Recorrente": 13, "Link": 13, "Dinheiro": 15, "Pix": 15, "Boleto": 9.5 } };
+const COM_FORMAS = FORMAS, COM_PADRAO = COMISSAO_PADRAO;
 function montarComissao(){
   const t = $("comTab"); t.innerHTML = "";
   const cfg = P.comissao || {};
@@ -844,7 +627,7 @@ function montarComissao(){
   });
   const s = document.createElement("span"); s.textContent = "🎓 Colação de grau (boleto, por parcela paga)"; s.style.gridColumn = "1 / 3"; t.appendChild(s);
   const ic = document.createElement("input"); ic.inputMode = "decimal"; ic.id = "comColacao"; ic.setAttribute("aria-label", "Comissão da colação de grau");
-  ic.value = String(cfg.colacao != null && cfg.colacao !== "" ? cfg.colacao : 20).replace(".", ","); t.appendChild(ic);
+  ic.value = String(cfg.colacao != null && cfg.colacao !== "" ? cfg.colacao : COM_PADRAO.colacao).replace(".", ","); t.appendChild(ic);
 }
 function lerComissao(){ const o = { pr: {}, form: {} }; document.querySelectorAll("#comTab input[data-l]").forEach(i => { o[i.dataset.l][i.dataset.f] = num(i.value); }); o.colacao = num($("comColacao").value); return o; }
 $("pCancel").onclick = () => { $("sheetPrices").hidden = true; };
@@ -904,9 +687,15 @@ const ctx = {
   db, FS, $, toast, mkBtn, money, num, digits, first, todayStr, addDays, fmtDate, hhmm, ds, pad, showNotice, handleErr,
   get me(){ return me; }, get isAdmin(){ return isAdmin; }, get aprovador(){ return APROVADORES.includes((user && user.email || "").toLowerCase()); }, get user(){ return user; }, get P(){ return P; }, team, pode,
   get vendedores(){ return Object.entries(USERS).filter(([em, u]) => u.nome && u.ativo !== false && u.papel !== "admin" && !isDono(em)).map(([, u]) => u.nome); },
+  get vendedoresEmails(){ return Object.entries(USERS).filter(([em, u]) => u.ativo !== false && u.papel !== "admin" && !isDono(em)).map(([em]) => em); },
+  get email(){ return (user && user.email || "").toLowerCase(); }, get usuarios(){ return USERS; },
+  // Funil → Agenda: abre o ensaio já preenchido
+  async abrirEnsaio(pre){ if (!agendaMod) { agendaMod = await import("./js/agenda.js"); agendaMod.init(ctx); } agendaMod.openEnsaio(null, pre); },
+  aoMudarLeads(){ if (curView === "home") renderHome(); },
   goHome(){ location.hash = "#home"; }
 };
-let usersLoaded = false;
+Funil.init(ctx);
+let usersLoaded = false, configLoaded = false;
 async function route(){
   if (!user || !usersLoaded) return;
   const r = (location.hash || "").slice(1);
@@ -963,15 +752,15 @@ let repCount = { at: 0, n: null };
 function renderHome(){
   const h = new Date().getHours();
   $("hello").textContent = (h < 12 ? "Bom dia" : h < 18 ? "Boa tarde" : "Boa noite") + (me ? ", " + first(me) : "") + "!";
-  const st = leads.map(status), late = st.filter(s => s === "late").length, today = st.filter(s => s === "today").length;
+  const { late, today } = Funil.contagem();
   document.querySelectorAll(".tile[data-mod]").forEach(t => { t.hidden = !pode(t.dataset.mod); });
   $("tFunil").textContent = (late + today) ? `${late + today} para hoje` + (late ? ` · ${late} atrasado${late > 1 ? "s" : ""}` : "") : "Nada pendente hoje ✓";
   if (Date.now() - repCount.at > 5 * 60000) {
     repCount.at = Date.now();
     if (pode("rep")) getCountFromServer(query(collection(db, "repasse"), where("followup", "<=", todayStr())))
-      .then(c => { repCount.n = c.data().count; paintRep(); }).catch(() => {});
+      .then(c => { repCount.n = c.data().count; paintRep(); }).catch(e => avisoErro(e, "contar o PR"));
     else if (pode("lf")) FS.getDocs(query(collection(db, "repasse"), where("ano", "==", new Date().getFullYear()), where("etapa", "in", ["SEPARADO", "CONTATADO", "INTERESSADO"]), FS.limit(300)))
-      .then(s => { repCount.n = s.docs.filter(d => (d.data().followup || "9") <= todayStr() && (!d.data().resp || d.data().resp === me)).length; paintRep(); }).catch(() => {});
+      .then(s => { repCount.n = s.docs.filter(d => (d.data().followup || "9") <= todayStr() && (!d.data().respEmail || d.data().respEmail === ctx.email)).length; paintRep(); }).catch(e => avisoErro(e, "contar o PR"));
   }
   paintRep(); contarInst(); contarAgenda(); contarFormBecas();
 }
@@ -980,16 +769,17 @@ let fbCount = { at: 0 };
 function contarFormBecas(){
   if (Date.now() - fbCount.at < 60000) return; fbCount.at = Date.now();
   const hoje = todayStr();
-  if (pode("formaturas")) FS.getDocs(query(collection(db, "formandos"), FS.limit(5000))).then(s => {
-    const esp = f => { if (!f.primeiroVenc || !Number(f.parcelas)) return 0; const [y, m, d] = f.primeiroVenc.split("-").map(Number), [ty, tm, td] = hoje.split("-").map(Number); return Math.max(0, Math.min(Number(f.parcelas), (ty - y) * 12 + (tm - m) + (td > d ? 1 : 0))); };
-    const n = s.docs.map(d => d.data()).filter(f => f.status !== "desistiu" && (isAdmin || f.resp === me) && Number(f.pagas || 0) < Number(f.parcelas || 1) && esp(f) > Number(f.pagas || 0)).length;
-    $("tFormaturas").textContent = n ? `⚠️ ${n} parcela${n > 1 ? "s" : ""} atrasada${n > 1 ? "s" : ""}` : "Abrir";
-  }).catch(() => {});
+  // Parcelas atrasadas = próximo vencimento em aberto (proxVenc) antes de hoje. O admin conta no servidor, sem baixar nada.
+  const pinta = n => { $("tFormaturas").textContent = n ? `⚠️ ${n} parcela${n > 1 ? "s" : ""} atrasada${n > 1 ? "s" : ""}` : "Abrir"; };
+  if (pode("formaturas")) {
+    if (isAdmin) getCountFromServer(query(collection(db, "formandos"), where("proxVenc", ">", ""), where("proxVenc", "<", hoje))).then(c => pinta(c.data().count)).catch(e => avisoErro(e, "contar parcelas atrasadas"));
+    else FS.getDocs(query(collection(db, "formandos"), where("respEmail", "==", ctx.email), FS.limit(2000))).then(s => pinta(s.docs.map(d => d.data()).filter(f => f.proxVenc && f.proxVenc < hoje).length)).catch(e => avisoErro(e, "contar parcelas atrasadas"));
+  }
   if (pode("becas")) FS.getDocs(query(collection(db, "becas"), where("status", "in", ["reservado", "retirado"]), FS.limit(500))).then(s => {
     const l = s.docs.map(d => d.data()), at = l.filter(b => b.status === "retirado" && b.devolucao && b.devolucao < hoje).length, ret = l.filter(b => b.status === "reservado" && b.retirada && b.retirada <= addDays(1)).length;
     const p = []; if (at) p.push(`⚠️ ${at} devolução${at > 1 ? "ões" : ""} atrasada${at > 1 ? "s" : ""}`); if (ret) p.push(`${ret} retirada${ret > 1 ? "s" : ""} hoje/amanhã`);
     $("tBecas").textContent = p.join(" · ") || "Abrir";
-  }).catch(() => {});
+  }).catch(e => avisoErro(e, "contar as becas"));
 }
 // Cartão do Agendamento: para a Luciana, quantas datas esperam aprovação
 let agCount = { at: 0 };
@@ -997,11 +787,12 @@ function contarAgenda(){
   if (!pode("agenda") && !pode("colegios")) return;
   if (Date.now() - agCount.at < 60000) return; agCount.at = Date.now();
   const eu = ctx.aprovador;
-  const ens = isAdmin ? FS.getDocs(query(collection(db, "ensaios"), where("data", "==", addDays(1)), FS.limit(100))).then(s => s.docs.map(d => d.data())).catch(() => []) : Promise.resolve([]);
-  const ana = isAdmin && eu ? FS.getDocs(query(collection(db, "ensaios"), where("status", "==", "analisar"), FS.limit(100))).then(s => s.size).catch(() => 0) : Promise.resolve(0);
+  const falhou = (onde, v) => e => { avisoErro(e, onde); return v; };
+  const ens = isAdmin ? FS.getDocs(query(collection(db, "ensaios"), where("data", "==", addDays(1)), FS.limit(100))).then(s => s.docs.map(d => d.data())).catch(falhou("ver os ensaios de amanhã", [])) : Promise.resolve([]);
+  const ana = isAdmin && eu ? getCountFromServer(query(collection(db, "ensaios"), where("status", "==", "analisar"))).then(c => c.data().count).catch(falhou("contar ensaios para analisar", 0)) : Promise.resolve(0);
   const prz = Number(P.prazo) || 15;
-  const atr = isAdmin ? FS.getDocs(query(collection(db, "ensaios"), where("data", ">=", addDays(-90)), FS.limit(600))).then(s => s.docs.map(d => d.data()).filter(e => e.kind !== "pessoal" && e.status !== "faltou" && e.status !== "remarcar" && e.data <= addDays(-prz) && !(e.entrega && e.entrega.etapa === "Entregue")).length).catch(() => 0) : Promise.resolve(0);
-  Promise.all([FS.getDocs(query(collection(db, "agenda"), where("status", "==", "pendente"), FS.limit(200))).then(s => s.size).catch(() => 0), ana, ens, atr]).then(([n, a, amanha, at]) => {
+  const atr = isAdmin ? FS.getDocs(query(collection(db, "ensaios"), where("data", ">=", addDays(-90)), FS.limit(600))).then(s => s.docs.map(d => d.data()).filter(e => e.kind !== "pessoal" && e.status !== "faltou" && e.status !== "remarcar" && e.data <= addDays(-prz) && !(e.entrega && e.entrega.etapa === "Entregue")).length).catch(falhou("contar entregas", 0)) : Promise.resolve(0);
+  Promise.all([getCountFromServer(query(collection(db, "agenda"), where("status", "==", "pendente"))).then(c => c.data().count).catch(falhou("contar datas pendentes", 0)), ana, ens, atr]).then(([n, a, amanha, at]) => {
     const p = [];
     if (eu && n + a) p.push(`${n + a} para analisar`); else if (n) p.push(`${n} aguardando a Luciana`);
     const lem = amanha.filter(e => e.status !== "remarcar" && !e.lembrado && e.tel).length;
@@ -1025,7 +816,7 @@ function contarInst(force){
     // pendência: formatura sem o dia de medir beca + ensaio
     s2.docs.forEach(d => { const x = d.data(); const df = x.diaFotos; if (!vistos.has(d.id) && !(df && df.data && df.status !== "recusado")) por[x.tipo] = (por[x.tipo] || 0) + 1; });
     instCount.por = por; paintInst();
-  }).catch(() => {});
+  }).catch(e => avisoErro(e, "contar os retornos das instituições"));
 }
 function paintInst(){
   const por = instCount.por || {};
@@ -1072,7 +863,7 @@ function renderTeam(){
     r.append(head);
     if (!isDono(em) && u.papel !== "admin" && u.ativo !== false) {
       const mods = document.createElement("div"); mods.className = "quick";
-      const atuais = Array.isArray(u.modulos) ? u.modulos : MODULOS.map(m => m[0]);
+      const atuais = Array.isArray(u.modulos) ? u.modulos : []; // sem módulos marcados = sem acesso
       MODULOS.forEach(([k, lbl]) => {
         const l = document.createElement("label"); l.className = "chk"; const c = document.createElement("input"); c.type = "checkbox"; c.checked = atuais.includes(k);
         c.onchange = () => { const novo = MODULOS.map(m => m[0]).filter(x => x === k ? c.checked : atuais.includes(x)); updUser(em, { modulos: novo }); };
@@ -1130,44 +921,72 @@ function startData(){
     // Primeiro acesso de um dono: cria o cadastro dele automaticamente.
     if (isDono(em) && !USERS[em] && !bootstrapped) {
       bootstrapped = true;
-      setDoc(doc(db, "usuarios", em), { nome: DONOS[em] || em, papel: "admin", ativo: true, criadoEm: new Date().toISOString() }).catch(() => {});
+      setDoc(doc(db, "usuarios", em), { nome: DONOS[em] || em, papel: "admin", ativo: true, criadoEm: new Date().toISOString() }).catch(e => avisoErro(e, "criar o seu cadastro"));
     }
-    applyProfile(); syncLeads(); render();
+    applyProfile(); Funil.syncLeads(); Funil.render();
     if (!usersLoaded) { usersLoaded = true; route(); }
+    if (isAdmin && configLoaded) migrar();
     else if (curView === "home") renderHome();
     else { const md = { funil: "funil", pr: "pr", repasse: "pr", agenda: "agenda", vendas: "vendas", formaturas: "formaturas", becas: "becas" }[curView] || (curView === "instituicoes" || curView === "colegios" || INST_NOMES[curView] ? "colegios" : null); if (md && !pode(md)) route(); }
     if (!$("sheetTeam").hidden) renderTeam();
   }, err => { if (err.code === "permission-denied") showNotice("Este e-mail não tem acesso ao app. Peça para um administrador cadastrar você."); }));
   unsub.push(onSnapshot(doc(db, "config", "app"), s => {
     if (s.exists()) P = Object.assign({}, P, s.data());
-    render();
-  }, () => {}));
+    configLoaded = true; if (isAdmin && usersLoaded) migrar();
+    Funil.render();
+  }, e => avisoErro(e, "ler os ajustes")));
 }
-// O funil só é carregado para quem tem permissão.
-let unsubLeads = null;
-function syncLeads(){
-  const ok = pode("funil");
-  if (ok && !unsubLeads) unsubLeads = onSnapshot(collection(db, "leads"), snap => {
-    leads = snap.docs.map(d => Object.assign({ id: d.id }, d.data())); render(); if (curView === "home") renderHome();
-  }, err => { if (err.code !== "permission-denied") showNotice("A conexão caiu. Feche e abra o app de novo."); });
-  if (!ok && unsubLeads) { unsubLeads(); unsubLeads = null; leads = []; render(); }
+
+// ---------- atualização dos dados antigos (roda uma vez, no aparelho de um administrador) ----------
+// v3: responsável guardado pelo e-mail (respEmail), parcelas pela lista de pagamentos + próximo vencimento (proxVenc),
+//     pedidos de data com o e-mail de quem pediu, assunto dos compromissos particulares na coleção "privado".
+const VERSAO_DADOS = 3;
+let migrando = false;
+async function migrar(){
+  if (migrando || !usersLoaded || (P.versaoDados || 0) >= VERSAO_DADOS) return;
+  migrando = true;
+  try {
+    const porNome = {}; Object.entries(USERS).forEach(([em, u]) => { if (u.nome) porNome[u.nome] = em; }); Object.entries(DONOS).forEach(([em, nm]) => { if (nm && !porNome[nm]) porNome[nm] = em; });
+    const emailDe = nm => porNome[nm] || "";
+    const ops = [];
+    const ler = async n => (await FS.getDocs(collection(db, n))).docs;
+    for (const d of await ler("instituicoes")) { const x = d.data(); if (x.resp && !x.respEmail && emailDe(x.resp)) ops.push(["u", d.ref, { respEmail: emailDe(x.resp) }]); }
+    const insts = Object.fromEntries((await ler("instituicoes")).map(d => [d.id, d.data()]));
+    for (const d of await ler("formandos")) {
+      const f = d.data(), pags = pagamentosDe(f), patch = {};
+      if (!Array.isArray(f.pagamentos)) { patch.pagamentos = pags; patch.pagas = pags.length; }
+      const pv = proxVenc(Object.assign({}, f, { pagamentos: pags })); if (f.proxVenc !== pv) patch.proxVenc = pv;
+      const re = f.respEmail || (insts[f.instId] || {}).respEmail || emailDe(f.resp || (insts[f.instId] || {}).resp); if (re && !f.respEmail) patch.respEmail = re;
+      if (Object.keys(patch).length) ops.push(["u", d.ref, patch]);
+    }
+    for (const d of (await FS.getDocs(query(collection(db, "repasse"), where("resp", ">", "")))).docs) { const x = d.data(); if (!x.respEmail && emailDe(x.resp)) ops.push(["u", d.ref, { respEmail: emailDe(x.resp) }]); }
+    for (const d of await ler("agenda")) { const x = d.data(); if (!x.pedidoEmail && emailDe(x.pedidoPor)) ops.push(["u", d.ref, { pedidoEmail: emailDe(x.pedidoPor) }]); }
+    for (const d of await ler("ensaios")) { const x = d.data(); if (x.kind === "pessoal" && x.particular && (x.titulo || x.obs)) { ops.push(["s", doc(db, "privado", d.id), { titulo: x.titulo || "", obs: x.obs || "", data: x.data || "" }]); ops.push(["u", d.ref, { titulo: "", obs: "" }]); } }
+    for (let i = 0; i < ops.length; i += 400) { const b = FS.writeBatch(db); ops.slice(i, i + 400).forEach(([t, r, v]) => t === "s" ? b.set(r, v) : b.update(r, v)); await b.commit(); }
+    await setDoc(doc(db, "config", "app"), { versaoDados: VERSAO_DADOS }, { merge: true });
+    if (ops.length) console.info(`[Z7] dados atualizados: ${ops.length} registros`);
+    fbCount.at = 0; agCount.at = 0; if (curView === "home") renderHome();
+  } catch (e) { avisoErro(e, "atualizar os dados antigos (cole as regras novas do Firebase)"); }
+  finally { migrando = false; }
 }
 
 onAuthStateChanged(auth, u => {
   user = u;
   $("viewLogin").hidden = !!u; $("viewApp").hidden = !u;
   if (u) { startData(); renderPushBanner(); refreshPushToken(); route(); }
-  else { usersLoaded = false; unsub.forEach(f => f()); unsub = []; if (unsubLeads) { unsubLeads(); unsubLeads = null; } leads = []; USERS = {}; }
+  else { usersLoaded = false; unsub.forEach(f => f()); unsub = []; Funil.parar(); USERS = {}; }
 });
 
 // ---------- service worker e atualizações ----------
 if ("serviceWorker" in navigator) {
-  navigator.serviceWorker.register("./sw.js").then(r => { swReg = r; if (user) refreshPushToken(); }).catch(() => {});
+  navigator.serviceWorker.register("./sw.js").then(r => { swReg = r; if (user) refreshPushToken(); }).catch(e => console.warn("[Z7] service worker", e));
 }
 try { onMessage(getMessaging(app), p => { const n = p.notification || {}; toast((n.title || "") + (n.body ? " · " + n.body : "")); }); } catch (_) {}
 try { if (!localStorage.getItem("z7guide")) $("guide").open = true; $("guide").addEventListener("toggle", () => { try { localStorage.setItem("z7guide", "1"); } catch (_) {} }); } catch (_) {}
-setInterval(() => { if ($("sheet").hidden && $("sheetPrices").hidden) render(); }, 60000);
-document.addEventListener("visibilitychange", () => { if (!document.hidden) render(); });
+setInterval(() => { if ($("sheet").hidden && $("sheetPrices").hidden) Funil.render(); }, 60000);
+document.addEventListener("visibilitychange", () => { if (!document.hidden) Funil.render(); });
+$("sheetPrices").addEventListener("click", e => { if (e.target === $("sheetPrices")) $("sheetPrices").hidden = true; });
+document.addEventListener("keydown", e => { if (e.key === "Escape") { Funil.fecharForm(); $("sheetPrices").hidden = true; $("sheetTeam").hidden = true; } });
 </script>
 </body>
 </html>

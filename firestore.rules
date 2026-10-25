@@ -1,50 +1,78 @@
 rules_version = '2';
 // Regras do app Z7 Studio. Só entra quem está cadastrado e ativo em "usuarios".
-// Donos e administradores veem tudo. A equipe vê só os módulos liberados no cadastro
-// (campo "modulos": funil, lf, rep, agenda, colegios, formaturas, becas).
+// Donos e administradores veem e mudam tudo. A equipe vê só os módulos marcados no cadastro
+// (campo "modulos": funil, lf, rep, agenda, colegios, formaturas, becas). Sem módulos = sem acesso.
+// Dinheiro (valores, forma de pagamento, parcelas pagas) e o responsável pela venda só o administrador muda,
+// porque a comissão é calculada a partir deles.
 // Cole este texto em Firebase → Firestore Database → Regras → Publicar.
 service cloud.firestore {
   match /databases/{database}/documents {
     function logado() { return request.auth != null && request.auth.token.email != null; }
     function email() { return request.auth.token.email.lower(); }
     function dono() { return logado() && email() in ['z7studiofotografico@gmail.com', 'lucianafanjos@gmail.com']; }
+    function aprovador() { return logado() && email() in ['lucianafanjos@gmail.com']; }
     function perfilPath() { return /databases/$(database)/documents/usuarios/$(email()); }
     function perfil() { return get(perfilPath()).data; }
     function membro() { return dono() || (logado() && exists(perfilPath()) && perfil().ativo == true); }
     function admin() { return dono() || (membro() && perfil().papel == 'admin'); }
-    function pode(m) { return admin() || (membro() && (!('modulos' in perfil()) || m in perfil().modulos)); }
-    // Linha de Frente = ensaios do ano atual
-    function anoAtual(d) { return d.ano >= request.time.year(); }
+    function pode(m) { return admin() || (membro() && ('modulos' in perfil()) && m in perfil().modulos); }
+    // Campos que mudaram nesta gravação
+    function mudou(campos) { return request.resource.data.diff(resource.data).affectedKeys().hasAny(campos); }
+    // Responsável: quem não é admin só pode assumir algo sem dono (para si) ou manter como está
+    function respOk() {
+      return request.resource.data.get('respEmail', '') == resource.data.get('respEmail', '')
+        || (resource.data.get('respEmail', '') == '' && request.resource.data.get('respEmail', '') == email());
+    }
+    function anoAtual(d) { return d.ano >= request.time.year(); }   // Linha de Frente = ensaios do ano atual
+    function usaAgenda() { return pode('colegios') || pode('agenda'); }
 
     match /usuarios/{em} { allow read: if membro(); allow write: if admin(); }
     match /config/{id} { allow read: if membro(); allow write: if admin(); }
-    match /tokens/{token} { allow read, write: if membro(); }
+    // Resumo do Dashboard (gerado de madrugada pelo GitHub ou pelo admin)
+    match /resumos/{id} { allow read, write: if admin(); }
+    // Aparelhos que recebem notificação: cada um só grava o seu
+    match /tokens/{token} {
+      allow create, update: if membro() && request.resource.data.email == email();
+      allow delete: if admin() || (membro() && resource.data.email == email());
+      allow read: if admin();
+    }
     match /leads/{id} { allow read, write: if pode('funil'); }
+
     match /instituicoes/{id} {
-      allow read, create, update: if pode('colegios');
+      allow read: if pode('colegios');
+      allow create: if pode('colegios') && (admin() || request.resource.data.get('respEmail', email()) == email());
+      // valor da colação e responsável: só admin (o responsável recebe a comissão da turma)
+      allow update: if admin() || (pode('colegios') && respOk() && !mudou(['colacao'])
+        && (!mudou(['resp']) || resource.data.get('respEmail', '') == ''));
       allow delete: if admin();
     }
-    // Agenda: um documento por dia (AAAA-MM-DD), um compromisso por dia.
-    // Qualquer um com acesso sugere a data (pendente); só quem aprova confirma.
-    function aprovador() { return logado() && email() in ['lucianafanjos@gmail.com']; }
-    function usaAgenda() { return pode('colegios') || pode('agenda'); }
+    // Agenda: um documento por dia (AAAA-MM-DD), um compromisso de colégio por dia.
+    // Qualquer um com acesso sugere a data (pendente); só quem aprova confirma; cada um mexe só no seu pedido.
     match /agenda/{dia} {
       allow read: if usaAgenda();
-      allow create: if usaAgenda() && (request.resource.data.status == 'pendente' || aprovador());
-      allow update: if usaAgenda() && resource.data.status != 'confirmado' && request.resource.data.status == 'pendente' || aprovador();
-      allow delete: if aprovador() || admin() || (usaAgenda() && resource.data.status != 'confirmado');
+      allow create: if usaAgenda() && (aprovador() || admin() || (request.resource.data.status == 'pendente' && request.resource.data.pedidoEmail == email()));
+      allow update: if aprovador() || admin() || (usaAgenda() && resource.data.status != 'confirmado'
+        && request.resource.data.status == 'pendente' && resource.data.get('pedidoEmail', email()) == email() && request.resource.data.pedidoEmail == email());
+      allow delete: if aprovador() || admin() || (usaAgenda() && resource.data.status != 'confirmado' && resource.data.get('pedidoEmail', email()) == email());
     }
-    // Ensaios no estúdio e compromissos: todos da agenda veem; só os donos (e administradores) marcam
+    // Ensaios no estúdio e compromissos: todos da agenda veem; só os donos marcam
     match /ensaios/{id} { allow read: if usaAgenda(); allow write: if admin(); }
-    // Formandos das turmas fechadas (kit e parcelas)
+    // Assunto dos compromissos particulares (consulta médica etc.): só admin lê
+    match /privado/{id} { allow read, write: if admin(); }
+    // Formandos (álbum de formatura e colação de grau)
     match /formandos/{id} {
-      allow read, create, update: if pode('colegios') || pode('formaturas');
+      allow read: if pode('colegios') || pode('formaturas');
+      // a equipe cadastra o formando, mas sem parcelas pagas
+      allow create: if admin() || ((pode('colegios') || pode('formaturas')) && request.resource.data.get('pagamentos', []).size() == 0
+        && request.resource.data.get('pagas', 0) == 0);
+      // depois de cadastrado, a equipe só corrige contato e observação
+      allow update: if admin() || ((pode('colegios') || pode('formaturas'))
+        && !mudou(['valor', 'parcelas', 'pagas', 'pagamentos', 'formaPag', 'contrato', 'kit', 'resp', 'respEmail', 'primeiroVenc', 'instId', 'status', 'vendidoEm', 'proxVenc']));
       allow delete: if admin();
     }
-    // Aluguel de becas (para os nossos eventos e para outros)
+    // Aluguel de becas
     match /becas/{id} {
-      allow read: if pode('becas') || pode('agenda');
-      allow create, update: if pode('becas');
+      allow read, create, update: if pode('becas');
       allow delete: if admin();
     }
     // Fila de e-mails para os colégios (enviados pelo GitHub com o Gmail do estúdio)
@@ -52,9 +80,12 @@ service cloud.firestore {
       allow create: if aprovador() || admin();
       allow read: if aprovador() || admin();
     }
+    // PR: depois de pago, valor, forma de pagamento e responsável só o admin muda
     match /repasse/{id} {
       allow read: if pode('rep') || (pode('lf') && anoAtual(resource.data));
-      allow update: if pode('rep') || (pode('lf') && anoAtual(resource.data) && anoAtual(request.resource.data));
+      allow update: if admin() || ((pode('rep') || (pode('lf') && anoAtual(resource.data) && anoAtual(request.resource.data)))
+        && respOk()
+        && !(resource.data.etapa in ['PAGO', 'ENTREGUE'] && mudou(['valor', 'formaPag', 'pagoEm', 'resp', 'respEmail'])));
       allow create, delete: if pode('rep') || admin();
     }
   }

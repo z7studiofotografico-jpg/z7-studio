@@ -4,6 +4,8 @@
 import { initializeApp, cert } from "firebase-admin/app";
 import { getFirestore } from "firebase-admin/firestore";
 import { getMessaging } from "firebase-admin/messaging";
+import { somaDias } from "../js/regras.js";
+import { DONOS, APROVADORES } from "./config.mjs";
 
 const OPEN = ["NOVO LEAD", "QUALIFICADO", "PROPOSTA ENVIADA", "FOLLOW-UP"];
 const APP_URL = (process.env.APP_URL || "").replace(/\/?$/, "/");
@@ -35,7 +37,6 @@ const nomesVenc = new Set(instVencidos.map((x) => x.nome));
 comFormatura.docs.map((d) => d.data()).filter((x) => !(x.diaFotos && x.diaFotos.data && x.diaFotos.status !== "recusado") && !nomesVenc.has(x.nome))
   .forEach((x) => instVencidos.push(Object.assign({}, x, { followup: hoje })));
 // Agenda: datas esperando aprovação (só para quem aprova)
-const APROVADORES = ["lucianafanjos@gmail.com"];
 const pendAgenda = (await db.collection("agenda").where("status", "==", "pendente").get()).size;
 // Ensaios no estúdio: lembrar o cliente na véspera (donos) e os que a Luciana precisa analisar
 const amanha = new Intl.DateTimeFormat("en-CA", { timeZone: "America/Sao_Paulo" }).format(new Date(Date.now() + 864e5));
@@ -43,13 +44,11 @@ const ensAmanha = (await db.collection("ensaios").where("data", "==", amanha).ge
 const ensAnalisar = (await db.collection("ensaios").where("status", "==", "analisar").get()).size;
 // Entregas de fotos atrasadas e avaliações para pedir (ensaios dos últimos 90 dias)
 const cfg = (await db.collection("config").doc("app").get()).data() || {};
-const somaDias = (d, n) => { const [y, m, dd] = d.split("-").map(Number); const x = new Date(Date.UTC(y, m - 1, dd + n)); return x.toISOString().slice(0, 10); };
 const recentes = (await db.collection("ensaios").where("data", ">=", somaDias(hoje, -90)).get()).docs.map((d) => d.data()).filter((e) => e.kind !== "pessoal" && e.data < hoje && e.status !== "faltou" && e.status !== "remarcar");
 const entAtrasadas = recentes.filter((e) => !(e.entrega && e.entrega.etapa === "Entregue") && somaDias(e.data, Number(cfg.prazo) || 15) < hoje).length;
 const avaliacoes = cfg.linkAvaliacao ? recentes.filter((e) => e.entrega && e.entrega.etapa === "Entregue" && !e.avaliacaoPedida && e.entrega.em <= somaDias(hoje, -3)).length : 0;
-// Parcelas atrasadas das turmas
-const esperadas = (f) => { if (!f.primeiroVenc || !Number(f.parcelas)) return 0; const [y, m, d] = f.primeiroVenc.split("-").map(Number), [ty, tm, td] = hoje.split("-").map(Number); return Math.max(0, Math.min(Number(f.parcelas), (ty - y) * 12 + (tm - m) + (td > d ? 1 : 0))); };
-const parcAtrasadas = (await db.collection("formandos").get()).docs.map((d) => d.data()).filter((f) => f.status !== "desistiu" && Number(f.pagas || 0) < Number(f.parcelas || 1) && esperadas(f) > Number(f.pagas || 0)).length;
+// Parcelas atrasadas das turmas: o próximo vencimento em aberto (proxVenc) já passou. Conta sem baixar os documentos.
+const parcAtrasadas = (await db.collection("formandos").where("proxVenc", ">", "").where("proxVenc", "<", hoje).count().get()).data().count;
 // Aluguel de becas: devoluções atrasadas e retiradas de amanhã
 const becasAbertas = (await db.collection("becas").where("status", "in", ["reservado", "retirado"]).get()).docs.map((d) => d.data());
 const becasAtr = becasAbertas.filter((b) => b.status === "retirado" && b.devolucao && b.devolucao < hoje).length;
@@ -79,7 +78,7 @@ for (const t of tokensSnap.docs) {
   } else {
     const souAprov = APROVADORES.includes(String(t.get("email") || "").toLowerCase());
     const aprova = souAprov ? pendAgenda + ensAnalisar : 0;
-    const souAdmin = ["z7studiofotografico@gmail.com", "lucianafanjos@gmail.com"].includes(String(t.get("email") || "").toLowerCase()) || (perfil && perfil.papel === "admin");
+    const souAdmin = DONOS.includes(String(t.get("email") || "").toLowerCase()) || (perfil && perfil.papel === "admin");
     const lembrar = souAdmin ? ensAmanha.length : 0;
     const ent = souAdmin ? entAtrasadas : 0, aval = souAdmin ? avaliacoes : 0, parc = souAdmin ? parcAtrasadas : 0;
     const bec = souAdmin || (mods && mods.includes("becas")) ? becasAtr + becasRet : 0;

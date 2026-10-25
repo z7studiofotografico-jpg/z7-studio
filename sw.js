@@ -1,8 +1,14 @@
 // Service worker do Z7 Studio: deixa o app abrir rápido (e sem internet) e recebe as notificações.
-const CACHE = "z7-funil-v32";
+// Os arquivos do app são sempre buscados de novo na internet (sem cache do navegador), então
+// uma atualização publicada aparece na próxima abertura, sem precisar trocar versão aqui.
+// A lista abaixo só garante que o app abra sem internet; um teste confere que nenhum arquivo ficou de fora.
+const CACHE = "z7-app";
+const CDN = "z7-cdn-v1";
 const SHELL = ["./", "./index.html", "./config.js", "./manifest.webmanifest",
   "./icons/icon-192.png", "./icons/icon-512.png", "./icons/apple-touch-icon.png",
-  "./js/repasse.js", "./js/mockup.js", "./js/instituicoes.js", "./js/agenda.js", "./js/feriados.js", "./js/vendas.js", "./js/turma.js", "./js/comissao.js", "./js/formaturas.js", "./js/becas.js"];
+  "./js/ui.js", "./js/regras.js", "./js/calc.js", "./js/feriados.js",
+  "./js/repasse.js", "./js/mockup.js", "./js/instituicoes.js", "./js/agenda.js", "./js/vendas.js",
+  "./js/turma.js", "./js/formaturas.js", "./js/becas.js", "./js/funil.js"];
 
 importScripts("./config.js");
 importScripts(
@@ -17,17 +23,24 @@ self.addEventListener("install", (e) => {
 self.addEventListener("activate", (e) => {
   e.waitUntil(
     caches.keys()
-      .then((keys) => Promise.all(keys.filter((k) => k !== CACHE).map((k) => caches.delete(k))))
+      .then((keys) => Promise.all(keys.filter((k) => k !== CACHE && k !== CDN).map((k) => caches.delete(k))))
       .then(() => self.clients.claim())
   );
 });
 
-// Arquivos do próprio app: busca na internet primeiro e usa a cópia guardada se estiver sem sinal.
+// Bibliotecas de fora (Firebase, gráficos, planilha): têm a versão no endereço, então podem ficar guardadas.
+const ehCDN = (u) => /^(www\.gstatic\.com|cdnjs\.cloudflare\.com)$/.test(u.hostname);
+// Arquivos do próprio app: busca na internet primeiro (sem cache do navegador) e usa a cópia guardada se estiver sem sinal.
 self.addEventListener("fetch", (e) => {
   const url = new URL(e.request.url);
-  if (e.request.method !== "GET" || url.origin !== self.location.origin) return;
+  if (e.request.method !== "GET") return;
+  if (ehCDN(url)) {
+    e.respondWith(caches.open(CDN).then((c) => c.match(e.request).then((r) => r || fetch(e.request).then((res) => { if (res.ok) c.put(e.request, res.clone()); return res; }))));
+    return;
+  }
+  if (url.origin !== self.location.origin) return;
   e.respondWith(
-    fetch(e.request)
+    fetch(e.request, { cache: "no-cache" })
       .then((res) => {
         const copy = res.clone();
         caches.open(CACHE).then((c) => c.put(e.request, copy));
