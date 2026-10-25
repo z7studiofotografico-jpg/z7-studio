@@ -42,8 +42,8 @@ export function show(){
   // Colégio (dia de fotos do PR ou formatura): quem tem Instituições, inclusive o vendedor.
   // Ensaio no estúdio e compromisso: só o Adriano e a Luciana.
   const hb = el("div", "agact");
-  if (C.pode("colegios")) hb.append(C.mkBtn("+ Agendar colégio", (marco() ? "" : "btn-primary ") + "btn-sm", () => agendarColegio(C)));
-  if (marco()) hb.append(C.mkBtn("+ Compromisso", "btn-sm", () => openComp()), C.mkBtn("+ Marcar ensaio", "btn-primary btn-sm", () => openEnsaio()));
+  if (C.pode("colegios")) hb.append(C.mkBtn("+ Agendar colégio", "btn-verde btn-sm", () => agendarColegio(C)));
+  if (marco()) hb.append(C.mkBtn("+ Compromisso", "btn-amarelo btn-sm", () => openComp()), C.mkBtn("+ Marcar ensaio", "btn-primary btn-sm", () => openEnsaio()));
   if (hb.children.length) head.append(hb);
   v.append(head);
   v.append(el("p", "hint", C.aprovador ? "As datas de colégio sugeridas pelo vendedor ficam seguradas até você aprovar ou recusar." : "As datas de colégio ficam seguradas até a Luciana aprovar."));
