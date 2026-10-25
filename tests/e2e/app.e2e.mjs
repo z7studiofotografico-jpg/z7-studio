@@ -138,6 +138,16 @@ console.log("Pedro (vendedor: Linha de Frente, Agendamento, Instituições):");
   let sa = pg.locator(".sheet").last(); await sa.getByLabel("Colégio").fill("Colegio Beta"); await sa.locator("button[type=submit]").click(); await pg.waitForTimeout(300);
   sa = pg.locator(".sheet").last(); await sa.locator("input[type=date]").first().fill(dia(15)); await sa.locator("button[type=submit]").click(); await pg.waitForTimeout(500);
   const sAg = await store(); ok(sAg["agenda/" + dia(15)] && sAg["agenda/" + dia(15)].instNome === "COLEGIO BETA" && sAg["agenda/" + dia(15)].pedidoEmail === PEDRO && sAg["instituicoes/i2"].diaFotos, "vendedor agenda o dia de fotos do colégio pela agenda");
+  // Colégio novo cadastrado pela própria agenda
+  await pg.getByRole("button", { name: "+ Agendar colégio" }).click(); await pg.waitForTimeout(400);
+  sa = pg.locator(".sheet").last(); await sa.getByLabel("O que vai marcar").selectOption("formatura");
+  await sa.getByLabel("Colégio").fill("Colégio Delta Novo"); await sa.getByLabel("Colégio").dispatchEvent("change");
+  await sa.getByLabel("Tipo").selectOption("publico"); await sa.getByLabel("Bairro").fill("Centro"); await sa.getByLabel("Telefone (opcional)").fill("21 3333-4444");
+  await sa.locator("button[type=submit]").click(); await pg.waitForTimeout(500);
+  sa = pg.locator(".sheet").last(); ok(/Formatura do Colégio Delta Novo/i.test(await sa.locator("h2").textContent()), "depois de cadastrar, abre a formatura do colégio novo");
+  const sNovo = await store(); const delta = Object.values(sNovo).find(x => x.nome === "Colégio Delta Novo");
+  ok(delta && delta.tipo === "publico" && delta.respEmail === PEDRO && delta.etapa === "A VISITAR" && delta.contatos.length === 1, "colégio novo cadastrado pela agenda (tipo, responsável, contato)");
+  await sa.getByText("Cancelar").click();
   await ir(pg, "#pr"); await pg.waitForTimeout(600);
   ok((await pg.textContent("#viewRepasse")).length > 50, "PR (Linha de Frente) abre");
   await ir(pg, "#inst-particular"); await pg.waitForTimeout(400);
