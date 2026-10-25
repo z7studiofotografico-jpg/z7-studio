@@ -14,7 +14,7 @@ const MESES_C = ["jan", "fev", "mar", "abr", "mai", "jun", "jul", "ago", "set", 
 const PERIODOS = [["mes", "Este mês"], ["passado", "Mês passado"], ["ano", "Este ano"], ["12m", "Últimos 12 meses"]];
 // Cores do painel: azul, grafite e branco (os gráficos seguem o tema claro/escuro do app)
 const AZUL = "#2563eb", AZUL_CLARO = "rgba(37,99,235,.14)", GRAFITE = "#3f4652";
-const CORES_ORIGEM = { "Funil": "#2563eb", "PR": "#3f4652", "Turmas": "#0ea5e9", "Estúdio": "#94a3b8" };
+const CORES_ORIGEM = { "Funil": "#2563eb", "PR": "#3f4652", "Formaturas": "#0ea5e9", "Estúdio": "#94a3b8", "Becas": "#64748b" };
 
 function el(tag, cls, text){ const e = document.createElement(tag); if (cls) e.className = cls; if (text != null) e.textContent = text; return e; }
 function title(s){ return String(s || "").toLowerCase().replace(/(^|[\s(-])(\p{L})/gu, (m, a, b) => a + b.toUpperCase()).replace(/\b(Da|De|Do|Das|Dos|E)\b/g, w => w.toLowerCase()); }
@@ -47,21 +47,23 @@ export async function show(force){
 // Cada venda vira { data: "AAAA-MM-DD", valor, produto, origem, resp }.
 async function buscar(){
   const get = async (q) => { try { return (await FS.getDocs(q)).docs.map(d => Object.assign({ id: d.id }, d.data())); } catch (e) { console.warn(e); if (e.code === "permission-denied" && q._obrig) throw e; return []; } };
-  const [leads, prs, forms, insts, ens] = await Promise.all([
+  const [leads, prs, forms, insts, ens, becas] = await Promise.all([
     get(FS.query(FS.collection(db, "leads"), FS.where("etapa", "==", "FECHADO"), FS.limit(3000))),
     get(FS.query(FS.collection(db, "repasse"), FS.where("etapa", "in", ["PAGO", "ENTREGUE"]), FS.limit(5000))),
     get(FS.query(FS.collection(db, "formandos"), FS.limit(5000))),
     get(FS.query(FS.collection(db, "instituicoes"), FS.limit(3000))),
-    get(FS.query(FS.collection(db, "ensaios"), FS.where("data", ">=", C.addDays(-400)), FS.limit(3000)))
+    get(FS.query(FS.collection(db, "ensaios"), FS.where("data", ">=", C.addDays(-400)), FS.limit(3000))),
+    get(FS.query(FS.collection(db, "becas"), FS.limit(3000)))
   ]);
   const vendas = [];
   leads.forEach(l => vendas.push({ data: l.fechadoEm || String(l.criadoEm || "").slice(0, 10), valor: n0(l.valor), produto: l.servico || "Ensaio", origem: "Funil", resp: l.resp || "" }));
   prs.forEach(r => { const d = r.pagoEm || ""; vendas.push({ data: d, valor: n0(r.valor), produto: Number(r.ano) >= Number(d.slice(0, 4)) ? "Kit PR · Linha de Frente" : "Kit PR · Repasse", origem: "PR", resp: r.resp || "", linha: "pr", forma: formaDe(r.formaPag) }); });
   const instPorId = Object.fromEntries(insts.map(i => [i.id, i]));
-  forms.filter(f => f.status !== "desistiu").forEach(f => vendas.push({ data: f.vendidoEm || String(f.criadoEm || "").slice(0, 10), valor: n0(f.valor), produto: f.contrato === "colacao" ? "Colação de grau" : f.kit || "Álbum de formatura", origem: "Turmas", linha: f.contrato === "colacao" ? "colacao" : "form", forma: f.contrato === "colacao" ? "Boleto" : formaDe(f.formaPag),
+  forms.filter(f => f.status !== "desistiu").forEach(f => vendas.push({ data: f.vendidoEm || String(f.criadoEm || "").slice(0, 10), valor: n0(f.valor), produto: f.contrato === "colacao" ? "Colação de grau" : f.kit || "Álbum de formatura", origem: "Formaturas", linha: f.contrato === "colacao" ? "colacao" : "form", forma: f.contrato === "colacao" ? "Boleto" : formaDe(f.formaPag),
     resp: f.resp || (instPorId[f.instId] || {}).resp || "", recebido: n0(f.valor) * Math.min(n0(f.pagas), n0(f.parcelas) || 1) / (n0(f.parcelas) || 1) }));
   ens.filter(e => e.kind !== "pessoal" && !e.leadId && n0(e.valor) && e.status !== "faltou" && e.data <= C.todayStr())
     .forEach(e => vendas.push({ data: e.data, valor: n0(e.valor), produto: e.tipo || "Ensaio", origem: "Estúdio", resp: e.marcadoPor || "" }));
+  becas.filter(b => b.status !== "cancelado" && n0(b.valor)).forEach(b => vendas.push({ data: b.retirada || String(b.criadoEm || "").slice(0, 10), valor: n0(b.valor), produto: "Aluguel de becas", origem: "Becas", resp: b.por || "" }));
   // Equipe: visitas feitas, visitas marcadas e colégios fechados
   const visitas = [], marcadas = [], fechados = [];
   insts.forEach(i => {
@@ -100,14 +102,14 @@ function desenhar(){
   const corpo = $("vdCorpo"); if (!corpo || !dados) return; corpo.innerHTML = "";
   const fx = faixa(), vs = dados.vendas.filter(x => dentro(x.data, fx));
   const total = vs.reduce((a, x) => a + x.valor, 0), pedidos = vs.length, ticket = pedidos ? total / pedidos : 0;
-  const turmas = dados.vendas.filter(x => x.origem === "Turmas"), aReceber = turmas.reduce((a, x) => a + x.valor - (x.recebido || 0), 0);
+  const turmas = dados.vendas.filter(x => x.origem === "Formaturas"), aReceber = turmas.reduce((a, x) => a + x.valor - (x.recebido || 0), 0);
 
   // KPIs
   const k = el("div", "kpis");
-  [["Total de vendas", moeda(total)], ["Pedidos", String(pedidos)], ["Ticket médio", pedidos ? moeda(ticket) : "—"], ["A receber das turmas", moeda(aReceber)]]
+  [["Total de vendas", moeda(total)], ["Pedidos", String(pedidos)], ["Ticket médio", pedidos ? moeda(ticket) : "—"], ["A receber das formaturas", moeda(aReceber)]]
     .forEach(([t, v]) => { const c = el("div", "kpi"); c.append(el("small", null, t), el("b", null, v)); k.append(c); });
   corpo.append(k);
-  if (!dados.vendas.length) corpo.append(el("p", "hint", "Ainda não há vendas registradas. Elas aparecem aqui quando um lead do Funil é marcado como Fechado, um kit do PR é pago, um formando entra numa turma ou um ensaio do estúdio tem valor."));
+  if (!dados.vendas.length) corpo.append(el("p", "hint", "Ainda não há vendas registradas. Elas aparecem aqui quando um lead do Funil é marcado como Fechado, um kit do PR é pago, um formando entra numa turma, um aluguel de becas tem valor ou um ensaio do estúdio tem valor."));
 
   // Gráfico de linha: evolução mensal (últimos 12 meses)
   const meses = []; { const t = C.todayStr(); const y = Number(t.slice(0, 4)), m = Number(t.slice(5, 7)); for (let i = 11; i >= 0; i--) { const d = new Date(y, m - 1 - i, 1); meses.push(`${d.getFullYear()}-${C.pad(d.getMonth() + 1)}`); } }

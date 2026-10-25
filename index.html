@@ -283,6 +283,18 @@ details.guide summary{cursor:pointer;font-family:var(--f-display);font-weight:70
           <small>Colégios, cursos e faculdades: visitas, propostas e retornos</small>
           <span class="tile-n">Abrir</span>
         </a>
+        <a class="tile" href="#formaturas" data-mod="formaturas">
+          <span class="tile-ico" aria-hidden="true">🎓</span>
+          <b>Formaturas</b>
+          <small>Colação de grau e álbum de formatura dos colégios fechados: parcelas e cobranças</small>
+          <span class="tile-n" id="tFormaturas">Abrir</span>
+        </a>
+        <a class="tile" href="#becas" data-mod="becas">
+          <span class="tile-ico" aria-hidden="true">👘</span>
+          <b>Aluguel de becas</b>
+          <small>Para os nossos eventos e para outros: retirada, devolução e estoque</small>
+          <span class="tile-n" id="tBecas">Abrir</span>
+        </a>
         <a class="tile" href="#vendas" data-mod="vendas">
           <span class="tile-ico" aria-hidden="true">📊</span>
           <b>Vendas</b>
@@ -305,6 +317,8 @@ details.guide summary{cursor:pointer;font-family:var(--f-display);font-weight:70
 
     <!-- Agendamento (montado por js/agenda.js) -->
     <section id="viewAgenda" class="view" hidden></section>
+    <section id="viewFormaturas" class="view" hidden></section>
+    <section id="viewBecas" class="view" hidden></section>
     <!-- Painel de vendas (montado por js/vendas.js, só administradores) -->
     <section id="viewVendas" class="view" hidden></section>
 
@@ -413,6 +427,7 @@ details.guide summary{cursor:pointer;font-family:var(--f-display);font-weight:70
     </div>
     <div class="row2">
       <div class="field"><label for="pAval">Link de avaliação no Google</label><input id="pAval" type="url" maxlength="300" placeholder="https://g.page/r/..."></div>
+      <div class="field"><label for="pEstBecas">Estoque de becas (quantas temos)</label><input id="pEstBecas" inputmode="numeric" placeholder="ex.: 120"></div>
     </div>
     <h3>Comissão do vendedor (%)</h3>
     <p class="hint">PR: sobre a venda. Álbum de formatura (kits das turmas) e Colação de grau: sobre cada parcela paga. Só para a equipe de vendas.</p>
@@ -568,7 +583,7 @@ function renderMe(){
   sel.value = cur;
 }
 // Módulos do app. Administradores e donos veem tudo; a equipe vê só o que foi liberado no cadastro.
-const MODULOS = [["funil", "Funil de vendas"], ["lf", "PR · Linha de Frente"], ["rep", "PR · Repasse"], ["agenda", "Agendamento"], ["colegios", "Instituições"]];
+const MODULOS = [["funil", "Funil de vendas"], ["lf", "PR · Linha de Frente"], ["rep", "PR · Repasse"], ["agenda", "Agendamento"], ["colegios", "Instituições"], ["formaturas", "Formaturas"], ["becas", "Aluguel de becas"]];
 function pode(m){
   if (isAdmin) return true;
   if (m === "vendas") return false;
@@ -809,8 +824,8 @@ $("form").addEventListener("submit", async e => {
 $("btnPrices").onclick = () => {
   $("pInd").value = P.individual || ""; $("pSinal").value = P.sinal || ""; $("pG36").value = P.g36 || ""; $("pG7").value = P.g7 || "";
   $("pFotos").value = P.fotos || ""; $("pPrazo").value = P.prazo || "";
-  $("pLfLote").value = P.lfLoteDia || ""; $("pLfNum").value = P.lfNumero || ""; $("pRepNum").value = P.repNumero || ""; $("pLfParc").value = P.lfParcelas || ""; $("pLfPix").value = P.lfPix || ""; $("pLfCartao").value = P.lfCartao || ""; $("pKit").value = P.kitPreco || ""; $("pKitPromo").value = P.kitPromo || ""; $("pKitCartao").value = P.kitCartao || ""; $("pKitFinal").value = P.kitFinal || ""; $("pLote").value = P.loteDia || ""; $("pEntrega").value = P.entrega || ""; $("pPix").value = P.pix || ""; $("pParc").value = P.parcelas || ""; $("pPixLF").value = P.pixLF || ""; $("pPixRep").value = P.pixRep || ""; $("pPixFinal").value = P.pixFinal || ""; $("pPixSinal").value = P.pixSinal || ""; $("pLink").value = P.linkCartao || ""; $("pLinkFinal").value = P.linkCartaoFinal || ""; $("pLinkLF").value = P.linkCartaoLF || ""; $("pAval").value = P.linkAvaliacao || ""; montarComissao();
-  ["pInd","pSinal","pG36","pG7","pFotos","pPrazo","pLfLote","pLfNum","pRepNum","pLfParc","pLfPix","pLfCartao","pKit","pKitPromo","pKitCartao","pKitFinal","pLote","pEntrega","pPix","pParc","pPixLF","pPixRep","pPixFinal","pPixSinal","pLink","pLinkFinal","pLinkLF","pAval"].forEach(id => $(id).disabled = !isAdmin); document.querySelectorAll("#comTab input").forEach(i => i.disabled = !isAdmin);
+  $("pLfLote").value = P.lfLoteDia || ""; $("pLfNum").value = P.lfNumero || ""; $("pRepNum").value = P.repNumero || ""; $("pLfParc").value = P.lfParcelas || ""; $("pLfPix").value = P.lfPix || ""; $("pLfCartao").value = P.lfCartao || ""; $("pKit").value = P.kitPreco || ""; $("pKitPromo").value = P.kitPromo || ""; $("pKitCartao").value = P.kitCartao || ""; $("pKitFinal").value = P.kitFinal || ""; $("pLote").value = P.loteDia || ""; $("pEntrega").value = P.entrega || ""; $("pPix").value = P.pix || ""; $("pParc").value = P.parcelas || ""; $("pPixLF").value = P.pixLF || ""; $("pPixRep").value = P.pixRep || ""; $("pPixFinal").value = P.pixFinal || ""; $("pPixSinal").value = P.pixSinal || ""; $("pLink").value = P.linkCartao || ""; $("pLinkFinal").value = P.linkCartaoFinal || ""; $("pLinkLF").value = P.linkCartaoLF || ""; $("pAval").value = P.linkAvaliacao || ""; $("pEstBecas").value = P.estoqueBecas || ""; montarComissao();
+  ["pInd","pSinal","pG36","pG7","pFotos","pPrazo","pLfLote","pLfNum","pRepNum","pLfParc","pLfPix","pLfCartao","pKit","pKitPromo","pKitCartao","pKitFinal","pLote","pEntrega","pPix","pParc","pPixLF","pPixRep","pPixFinal","pPixSinal","pLink","pLinkFinal","pLinkLF","pAval","pEstBecas"].forEach(id => $(id).disabled = !isAdmin); document.querySelectorAll("#comTab input").forEach(i => i.disabled = !isAdmin);
   $("pSave").hidden = !isAdmin;
   $("pricesHint").textContent = isAdmin ? "Os valores entram automaticamente nas mensagens prontas." : "Só administradores mudam os preços.";
   renderPushState(); $("sheetPrices").hidden = false;
@@ -841,7 +856,7 @@ $("formPrices").addEventListener("submit", async e => {
   const body = { individual: num($("pInd").value), sinal: num($("pSinal").value), g36: num($("pG36").value), g7: num($("pG7").value),
     fotos: num($("pFotos").value) || 30, prazo: num($("pPrazo").value) || 15,
     lfLoteDia: num($("pLfLote").value) || 20, lfNumero: $("pLfNum").value.trim(), repNumero: $("pRepNum").value.trim(), lfParcelas: num($("pLfParc").value), lfPix: num($("pLfPix").value), lfCartao: num($("pLfCartao").value), kitPreco: num($("pKit").value), kitPromo: num($("pKitPromo").value), kitCartao: num($("pKitCartao").value), kitFinal: num($("pKitFinal").value), loteDia: num($("pLote").value) || 20, entrega: $("pEntrega").value.trim(),
-    pix: $("pPix").value.trim(), parcelas: num($("pParc").value), pixLF: $("pPixLF").value.trim(), pixRep: $("pPixRep").value.trim(), pixFinal: $("pPixFinal").value.trim(), pixSinal: $("pPixSinal").value.trim(), linkCartao: $("pLink").value.trim(), linkCartaoFinal: $("pLinkFinal").value.trim(), linkCartaoLF: $("pLinkLF").value.trim(), linkAvaliacao: $("pAval").value.trim(), comissao: lerComissao() };
+    pix: $("pPix").value.trim(), parcelas: num($("pParc").value), pixLF: $("pPixLF").value.trim(), pixRep: $("pPixRep").value.trim(), pixFinal: $("pPixFinal").value.trim(), pixSinal: $("pPixSinal").value.trim(), linkCartao: $("pLink").value.trim(), linkCartaoFinal: $("pLinkFinal").value.trim(), linkCartaoLF: $("pLinkLF").value.trim(), linkAvaliacao: $("pAval").value.trim(), estoqueBecas: num($("pEstBecas").value), comissao: lerComissao() };
   try {
     await setDoc(doc(db, "config", "app"), body, { merge: true });
     $("sheetPrices").hidden = true; toast("Preços salvos");
@@ -879,11 +894,11 @@ function refreshPushToken(){ if (pushSupported() && Notification.permission === 
 $("btnPush").onclick = () => enablePush(true);
 
 // ---------- navegação entre módulos ----------
-const VIEWS = { home: "viewHome", funil: "viewFunil", pr: "viewRepasse", repasse: "viewRepasse", agenda: "viewAgenda", vendas: "viewVendas",
+const VIEWS = { home: "viewHome", funil: "viewFunil", pr: "viewRepasse", repasse: "viewRepasse", agenda: "viewAgenda", vendas: "viewVendas", formaturas: "viewFormaturas", becas: "viewBecas",
   instituicoes: "viewInst", colegios: "viewInst",
   "inst-particular": "viewInstTipo", "inst-publico": "viewInstTipo", "inst-profissionalizante": "viewInstTipo", "inst-faculdade": "viewInstTipo" };
 const INST_NOMES = { "inst-particular": "Colégio particular", "inst-publico": "Colégio público", "inst-profissionalizante": "Colégio profissionalizante", "inst-faculdade": "Faculdade" };
-let repasseMod = null, instMod = null, agendaMod = null, vendasMod = null, curView = "home";
+let repasseMod = null, instMod = null, agendaMod = null, vendasMod = null, formMod = null, becasMod = null, curView = "home";
 const APROVADORES = (CFG.aprovadores || []).map(e => String(e).toLowerCase());
 const ctx = {
   db, FS, $, toast, mkBtn, money, num, digits, first, todayStr, addDays, fmtDate, hhmm, ds, pad, showNotice, handleErr,
@@ -896,7 +911,7 @@ async function route(){
   if (!user || !usersLoaded) return;
   const r = (location.hash || "").slice(1);
   let key = VIEWS[r] ? r : "home";
-  const modDe = { vendas: "vendas", funil: "funil", pr: "pr", repasse: "pr", agenda: "agenda", colegios: "colegios", instituicoes: "colegios",
+  const modDe = { vendas: "vendas", formaturas: "formaturas", becas: "becas", funil: "funil", pr: "pr", repasse: "pr", agenda: "agenda", colegios: "colegios", instituicoes: "colegios",
     "inst-particular": "colegios", "inst-publico": "colegios", "inst-profissionalizante": "colegios", "inst-faculdade": "colegios" };
   if (modDe[key] && !pode(modDe[key])) { key = "home"; if (r) history.replaceState(null, "", "#home"); }
   curView = key;
@@ -906,6 +921,16 @@ async function route(){
   $("btnBack").textContent = INST_NOMES[key] ? "‹ Instituições" : "‹ Início";
   if (agendaMod && key !== "agenda") agendaMod.hide();
   if (vendasMod && key !== "vendas") vendasMod.hide();
+  if (formMod && key !== "formaturas") formMod.hide();
+  if (becasMod && key !== "becas") becasMod.hide();
+  if (key === "formaturas") {
+    try { if (!formMod) { formMod = await import("./js/formaturas.js"); formMod.init(ctx); } formMod.show(); }
+    catch (e) { console.warn(e); $("viewFormaturas").innerHTML = '<div class="empty"><strong>Não foi possível abrir</strong><span>Verifique a internet e tente de novo.</span></div>'; }
+  }
+  if (key === "becas") {
+    try { if (!becasMod) { becasMod = await import("./js/becas.js"); becasMod.init(ctx); } becasMod.show(); }
+    catch (e) { console.warn(e); $("viewBecas").innerHTML = '<div class="empty"><strong>Não foi possível abrir</strong><span>Verifique a internet e tente de novo.</span></div>'; }
+  }
   if (key === "vendas") {
     try { if (!vendasMod) { vendasMod = await import("./js/vendas.js"); vendasMod.init(ctx); } vendasMod.show(); }
     catch (e) { console.warn(e); $("viewVendas").innerHTML = '<div class="empty"><strong>Não foi possível abrir</strong><span>Verifique a internet e tente de novo.</span></div>'; }
@@ -948,7 +973,23 @@ function renderHome(){
     else if (pode("lf")) FS.getDocs(query(collection(db, "repasse"), where("ano", "==", new Date().getFullYear()), where("etapa", "in", ["SEPARADO", "CONTATADO", "INTERESSADO"]), FS.limit(300)))
       .then(s => { repCount.n = s.docs.filter(d => (d.data().followup || "9") <= todayStr() && (!d.data().resp || d.data().resp === me)).length; paintRep(); }).catch(() => {});
   }
-  paintRep(); contarInst(); contarAgenda();
+  paintRep(); contarInst(); contarAgenda(); contarFormBecas();
+}
+// Cartões Formaturas e Becas: parcelas atrasadas e devoluções atrasadas
+let fbCount = { at: 0 };
+function contarFormBecas(){
+  if (Date.now() - fbCount.at < 60000) return; fbCount.at = Date.now();
+  const hoje = todayStr();
+  if (pode("formaturas")) FS.getDocs(query(collection(db, "formandos"), FS.limit(5000))).then(s => {
+    const esp = f => { if (!f.primeiroVenc || !Number(f.parcelas)) return 0; const [y, m, d] = f.primeiroVenc.split("-").map(Number), [ty, tm, td] = hoje.split("-").map(Number); return Math.max(0, Math.min(Number(f.parcelas), (ty - y) * 12 + (tm - m) + (td > d ? 1 : 0))); };
+    const n = s.docs.map(d => d.data()).filter(f => f.status !== "desistiu" && (isAdmin || f.resp === me) && Number(f.pagas || 0) < Number(f.parcelas || 1) && esp(f) > Number(f.pagas || 0)).length;
+    $("tFormaturas").textContent = n ? `⚠️ ${n} parcela${n > 1 ? "s" : ""} atrasada${n > 1 ? "s" : ""}` : "Abrir";
+  }).catch(() => {});
+  if (pode("becas")) FS.getDocs(query(collection(db, "becas"), where("status", "in", ["reservado", "retirado"]), FS.limit(500))).then(s => {
+    const l = s.docs.map(d => d.data()), at = l.filter(b => b.status === "retirado" && b.devolucao && b.devolucao < hoje).length, ret = l.filter(b => b.status === "reservado" && b.retirada && b.retirada <= addDays(1)).length;
+    const p = []; if (at) p.push(`⚠️ ${at} devolução${at > 1 ? "ões" : ""} atrasada${at > 1 ? "s" : ""}`); if (ret) p.push(`${ret} retirada${ret > 1 ? "s" : ""} hoje/amanhã`);
+    $("tBecas").textContent = p.join(" · ") || "Abrir";
+  }).catch(() => {});
 }
 // Cartão do Agendamento: para a Luciana, quantas datas esperam aprovação
 let agCount = { at: 0 };
@@ -1094,7 +1135,7 @@ function startData(){
     applyProfile(); syncLeads(); render();
     if (!usersLoaded) { usersLoaded = true; route(); }
     else if (curView === "home") renderHome();
-    else { const md = { funil: "funil", pr: "pr", repasse: "pr", agenda: "agenda", vendas: "vendas" }[curView] || (curView === "instituicoes" || curView === "colegios" || INST_NOMES[curView] ? "colegios" : null); if (md && !pode(md)) route(); }
+    else { const md = { funil: "funil", pr: "pr", repasse: "pr", agenda: "agenda", vendas: "vendas", formaturas: "formaturas", becas: "becas" }[curView] || (curView === "instituicoes" || curView === "colegios" || INST_NOMES[curView] ? "colegios" : null); if (md && !pode(md)) route(); }
     if (!$("sheetTeam").hidden) renderTeam();
   }, err => { if (err.code === "permission-denied") showNotice("Este e-mail não tem acesso ao app. Peça para um administrador cadastrar você."); }));
   unsub.push(onSnapshot(doc(db, "config", "app"), s => {

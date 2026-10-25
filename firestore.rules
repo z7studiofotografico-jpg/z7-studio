@@ -1,7 +1,7 @@
 rules_version = '2';
 // Regras do app Z7 Studio. Só entra quem está cadastrado e ativo em "usuarios".
 // Donos e administradores veem tudo. A equipe vê só os módulos liberados no cadastro
-// (campo "modulos": funil, lf, rep, agenda, colegios).
+// (campo "modulos": funil, lf, rep, agenda, colegios, formaturas, becas).
 // Cole este texto em Firebase → Firestore Database → Regras → Publicar.
 service cloud.firestore {
   match /databases/{database}/documents {
@@ -38,7 +38,13 @@ service cloud.firestore {
     match /ensaios/{id} { allow read: if usaAgenda(); allow write: if admin(); }
     // Formandos das turmas fechadas (kit e parcelas)
     match /formandos/{id} {
-      allow read, create, update: if pode('colegios');
+      allow read, create, update: if pode('colegios') || pode('formaturas');
+      allow delete: if admin();
+    }
+    // Aluguel de becas (para os nossos eventos e para outros)
+    match /becas/{id} {
+      allow read: if pode('becas') || pode('agenda');
+      allow create, update: if pode('becas');
       allow delete: if admin();
     }
     // Fila de e-mails para os colégios (enviados pelo GitHub com o Gmail do estúdio)

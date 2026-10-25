@@ -11,7 +11,7 @@
 import { avisarColegioPorEmail, nomeEvento } from "./instituicoes.js";
 import { feriado, feriadosEntre } from "./feriados.js";
 let C, FS, db, col, colE;
-let unsubs = [], items = [], ensaios = [], passados = [], comps = [], visitas = [], filtro = "tudo", mesVis = "", selDia = "";
+let unsubs = [], items = [], ensaios = [], passados = [], comps = [], visitas = [], becas = [], filtro = "tudo", mesVis = "", selDia = "";
 export const ETAPAS_ENTREGA = ["Ensaio feito", "Fotos escolhidas", "Em edição", "Pronto", "Entregue"];
 const $ = (id) => document.getElementById(id);
 const CAMPO = { formatura: "formatura", fotos: "diaFotos" };
@@ -47,7 +47,7 @@ export function show(){
   const pend = el("section", "view"); pend.id = "agPend"; v.append(pend);
   const prox = el("section", "view"); prox.id = "agProx"; v.append(prox);
   prox.append(el("div", "empty", "Carregando…"));
-  hide(); items = []; ensaios = []; passados = []; comps = []; visitas = [];
+  hide(); items = []; ensaios = []; passados = []; comps = []; visitas = []; becas = [];
   if (!mesVis) mesVis = C.todayStr().slice(0, 7);
   const hoje = C.todayStr();
   const erro = (err, o) => { console.warn(err); if (err.code === "permission-denied") C.showNotice(o === "agenda" ? "Você não tem acesso ao Agendamento." : o === "ensaios" ? "Para ver os ensaios, cole as regras novas do Firebase." : ""); };
@@ -60,6 +60,10 @@ export function show(){
     ensaios = todos.filter(x => x.kind !== "pessoal" && x.data >= hoje); comps = todos.filter(x => x.kind === "pessoal" && x.data >= hoje);
     passados = todos.filter(x => x.kind !== "pessoal" && x.data < hoje && x.status !== "remarcar" && x.status !== "faltou"); render();
   }, e => erro(e, "ensaios")));
+  // Aluguel de becas: retirada e devolução (só informam, não bloqueiam o dia)
+  if (C.pode("becas") || C.pode("agenda")) unsubs.push(FS.onSnapshot(FS.query(FS.collection(db, "becas"), FS.where("devolucao", ">=", hoje), FS.orderBy("devolucao"), FS.limit(400)), snap => {
+    becas = snap.docs.map(d => Object.assign({ id: d.id }, d.data())).filter(x => x.status !== "cancelado" && x.status !== "devolvido"); render();
+  }, e => console.warn(e)));
   if (vejoVisitas()) unsubs.push(FS.onSnapshot(FS.query(FS.collection(db, "instituicoes"), FS.where("followup", ">=", hoje), FS.orderBy("followup"), FS.limit(400)), snap => {
     visitas = snap.docs.map(d => Object.assign({ id: d.id }, d.data()))
       .filter(x => x.etapa !== "FECHADO" && x.etapa !== "NÃO FECHOU" && (x.proximoPasso === "Voltar para visita" || x.followupHora || x.etapa === "AGENDAR VISITA"));
@@ -70,9 +74,10 @@ export function hide(){ unsubs.forEach(u => u()); unsubs = []; }
 
 function renderChips(){
   const c = $("agChips"); if (!c) return; c.innerHTML = "";
-  const ops = [["tudo", "Tudo", items.length + ensaios.length + comps.length + visitas.length], ["colegio", "Colégios", items.length]];
+  const ops = [["tudo", "Tudo", items.length + ensaios.length + comps.length + visitas.length + becas.length], ["colegio", "Colégios", items.length]];
   if (vejoEnsaios()) ops.push(["ensaio", "Ensaios", ensaios.length], ["comp", "Compromissos", comps.length]);
   if (vejoVisitas()) ops.push(["visita", "Visitas", visitas.length]);
+  if (becas.length) ops.push(["beca", "Becas", becas.length]);
   if (marco()) ops.push(["entrega", "Entregas", entregasAbertas().length]);
   if (ops.length < 3) { c.hidden = true; return; } c.hidden = false;
   ops.forEach(([k, t, n]) => {
@@ -112,6 +117,10 @@ function render(){
   if (filtro === "tudo" || filtro === "comp") comps.forEach(x => ent.push({ data: x.data, hora: x.diaInteiro ? "" : x.hora || "", t: "p", x }));
   if (filtro === "tudo" || filtro === "visita") visitas.forEach(x => ent.push({ data: x.followup, hora: x.followupHora || "99", t: "v", x }));
   const hoje = C.todayStr();
+  if (filtro === "tudo" || filtro === "beca") becas.forEach(x => {
+    if (x.status === "reservado" && x.retirada && x.retirada >= hoje) ent.push({ data: x.retirada, hora: x.retiradaHora || "", t: "b", x, ret: true });
+    if (x.devolucao) ent.push({ data: x.devolucao, hora: "98", t: "b", x, ret: false });
+  });
   if (filtro === "tudo") feriadosEntre(hoje, C.addDays(400)).forEach(f => ent.push({ data: f.data, hora: "", t: "f", x: f }));
   ent.sort((a, b) => a.data.localeCompare(b.data) || a.hora.localeCompare(b.hora));
   // Calendário do mês sempre no topo; a lista vem depois (feriados só dos próximos 60 dias)
@@ -136,9 +145,15 @@ function render(){
   });
   prox.append(g);
 }
-function linha(it){ return it.t === "c" ? linhaColegio(it.x) : it.t === "e" ? linhaEnsaio(it.x) : it.t === "p" ? linhaComp(it.x) : it.t === "f" ? linhaFeriado(it.x) : linhaVisita(it.x); }
+function linhaBeca(it){
+  const x = it.x, r = el("div", "agrow"), t = el("div", "agtxt");
+  t.append(el("b", null, `${it.ret ? "👘 Retirada" : "↩️ Devolução"} de becas: ${title(x.cliente)}`));
+  t.append(el("span", null, [`${x.qtd || 1} beca${(x.qtd || 1) > 1 ? "s" : ""}`, it.ret && x.retiradaHora, x.evento, x.dataEvento && "evento " + C.fmtDate(x.dataEvento)].filter(Boolean).join(" · ")));
+  r.append(t); if (C.pode("becas")) r.append(C.mkBtn("Abrir", "btn-sm", () => { location.hash = "#becas"; })); return r;
+}
+function linha(it){ return it.t === "b" ? linhaBeca(it) : it.t === "c" ? linhaColegio(it.x) : it.t === "e" ? linhaEnsaio(it.x) : it.t === "p" ? linhaComp(it.x) : it.t === "f" ? linhaFeriado(it.x) : linhaVisita(it.x); }
 function linhaFeriado(f){ const r = el("div", "agrow"); const t = el("div", "agtxt"); t.append(el("b", null, "🚫 Feriado: " + f.nome), el("span", null, "Estúdio fechado")); r.append(t, el("span", "tag late", "Fechado")); return r; }
-const icone = it => it.t === "c" ? (ICO[it.x.kind] || "📌") : it.t === "e" ? "📷" : it.t === "p" ? (it.x.diaInteiro ? "⛔" : "📌") : it.t === "f" ? "🚫" : "🚗";
+const icone = it => it.t === "b" ? (it.ret ? "👘" : "↩️") : it.t === "c" ? (ICO[it.x.kind] || "📌") : it.t === "e" ? "📷" : it.t === "p" ? (it.x.diaInteiro ? "⛔" : "📌") : it.t === "f" ? "🚫" : "🚗";
 
 // ---------- Calendário do mês ----------
 function renderMes(box, ent){
@@ -165,7 +180,7 @@ function renderMes(box, ent){
     cal.append(b);
   }
   box.append(cal);
-  box.append(el("p", "hint", "🎓 formatura · 📸 dia de fotos · 📷 ensaio · 📌 compromisso · ⛔ dia bloqueado · 🚗 visita · 🚫 feriado. Toque no dia para ver."));
+  box.append(el("p", "hint", "🎓 formatura · 📸 dia de fotos · 📷 ensaio · 📌 compromisso · ⛔ dia bloqueado · 🚗 visita · 👘 retirada de becas · ↩️ devolução · 🚫 feriado. Toque no dia para ver."));
   if (selDia) {
     const card = el("article", "card agdia"); const top = el("div", "card-top"); top.append(el("h3", "name", diaTxt(selDia))); card.append(top);
     const lst = porDia[selDia] || [];

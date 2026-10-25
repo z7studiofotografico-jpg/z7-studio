@@ -16,8 +16,8 @@ export function esperadas(f, hoje){
   const k = (ty - y) * 12 + (tm - m) + (td > d ? 1 : 0);
   return Math.max(0, Math.min(n0(f.parcelas), k));
 }
-function vencDa(f, n){ const [y, m, d] = f.primeiroVenc.split("-").map(Number); const dt = new Date(y, m - 1 + n - 1, d); return `${dt.getFullYear()}-${C.pad(dt.getMonth() + 1)}-${C.pad(dt.getDate())}`; }
-const parcela = f => n0(f.valor) / (n0(f.parcelas) || 1);
+export function vencDa(f, n){ const [y, m, d] = f.primeiroVenc.split("-").map(Number); const dt = new Date(y, m - 1 + n - 1, d); return `${dt.getFullYear()}-${C.pad(dt.getMonth() + 1)}-${C.pad(dt.getDate())}`; }
+export const parcela = f => n0(f.valor) / (n0(f.parcelas) || 1);
 // Kits do contrato (opcionais), com valor total e parcelas; vencimento todo dia 5
 export const KITS_CONTRATO = [
   { nome: "Kit 01 · Beca + canudo", valor: 65, parcelas: 1 },
@@ -26,10 +26,10 @@ export const KITS_CONTRATO = [
   { nome: "Kit 04 · Álbum revista 21x30 (170g)", valor: 850, parcelas: 10 },
   { nome: "Kit 05 · Álbum Layflat 21x30 (500g)", valor: 1350, parcelas: 10 }
 ];
-const ehColacao = f => f.contrato === "colacao";
+export const ehColacao = f => f.contrato === "colacao";
 // Histórico de parcelas pagas (data e valor): a comissão da formatura é paga sobre cada parcela recebida.
 // Quem já tinha parcelas pagas antes do histórico conta como pago na data da venda.
-function ajustaPag(f, novas, novoValor){
+export function ajustaPag(f, novas, novoValor){
   const pv = (novoValor != null ? n0(novoValor) : n0(f.valor)) / (n0(f.parcelas) || 1);
   let lst = Array.isArray(f.pagamentos) ? f.pagamentos.slice() : [];
   const base = f.vendidoEm || C.todayStr();
@@ -38,9 +38,21 @@ function ajustaPag(f, novas, novoValor){
   while (lst.length < novas) lst.push({ data: C.todayStr(), valor: pv });
   return lst;
 }
-const quitado = f => n0(f.pagas) >= (n0(f.parcelas) || 1);
-const atrasado = f => !quitado(f) && f.status !== "desistiu" && esperadas(f, C.todayStr()) > n0(f.pagas);
+export const quitado = f => n0(f.pagas) >= (n0(f.parcelas) || 1);
+export const atrasado = f => !quitado(f) && f.status !== "desistiu" && esperadas(f, C.todayStr()) > n0(f.pagas);
 
+// Mensagem de cobrança no WhatsApp (usada aqui e no card Formaturas)
+export function cobrarWa(f){
+  const prox = n0(f.pagas) + 1, venc = f.primeiroVenc ? vencDa(f, prox) : "";
+  const col = ehColacao(f);
+  const item = col ? "da colação de grau" : `do álbum de formatura (${f.kit || "kit"})`;
+  const pagar = col ? "\nO pagamento é pelo boleto." : (C.P.pix ? `\nChave Pix: ${C.P.pix}` : "");
+  const msg = atrasado(f)
+    ? `Oi, ${C.first(title(f.nome))}! Aqui é do Z7 Studio Fotográfico 📸 Passando para lembrar da parcela ${prox}/${f.parcelas} ${item}, de ${C.money(Math.round(parcela(f)))}, que venceu ${venc ? "dia " + C.fmtDate(venc) : "este mês"}.${pagar}\nPode me mandar o comprovante por aqui? Se já pagou, é só desconsiderar 😊`
+    : `Oi, ${C.first(title(f.nome))}! Aqui é do Z7 Studio Fotográfico 📸 Só lembrando que a parcela ${prox}/${f.parcelas} ${item}, de ${C.money(Math.round(parcela(f)))}, vence ${venc ? "dia " + C.fmtDate(venc) : "em breve"}.${pagar}\nQualquer dúvida, estou por aqui 😊`;
+  window.open(`https://wa.me/${C.digits(f.tel)}?text=${encodeURIComponent(msg)}`, "_blank", "noopener");
+}
+export function setCtx(ctx){ C = ctx; FS = ctx.FS; db = ctx.db; }
 export function openTurma(ctx, inst, kits){
   C = ctx; FS = ctx.FS; db = ctx.db;
   const col = FS.collection(db, "formandos");
@@ -97,14 +109,7 @@ export function openTurma(ctx, inst, kits){
     act.append(C.mkBtn("Editar", "", () => form(f)));
     e.append(act); return e;
   }
-  function cobrar(f){
-    const prox = n0(f.pagas) + 1, venc = f.primeiroVenc ? vencDa(f, prox) : "";
-    const pix = C.P.pix ? `\nChave Pix: ${C.P.pix}` : "";
-    const msg = atrasado(f)
-      ? `Oi, ${C.first(title(f.nome))}! Aqui é do Z7 Studio Fotográfico 📸 Passando para lembrar da parcela ${prox}/${f.parcelas} do kit de formatura (${f.kit || "kit"}), de ${C.money(Math.round(parcela(f)))}, que venceu ${venc ? "dia " + C.fmtDate(venc) : "este mês"}.${pix}\nPode me mandar o comprovante por aqui? Se já pagou, é só desconsiderar 😊`
-      : `Oi, ${C.first(title(f.nome))}! Aqui é do Z7 Studio Fotográfico 📸 Só lembrando que a parcela ${prox}/${f.parcelas} do kit de formatura, de ${C.money(Math.round(parcela(f)))}, vence ${venc ? "dia " + C.fmtDate(venc) : "em breve"}.${pix}\nQualquer dúvida, estou por aqui 😊`;
-    window.open(`https://wa.me/${C.digits(f.tel)}?text=${encodeURIComponent(msg)}`, "_blank", "noopener");
-  }
+  function cobrar(f){ cobrarWa(f); }
   async function salvar(f, patch, msg){ try { await FS.updateDoc(FS.doc(db, "formandos", f.id), Object.assign(patch, { atualizadoEm: new Date().toISOString() })); C.toast(msg); } catch (e) { C.handleErr(e); } }
 
   function form(f){
