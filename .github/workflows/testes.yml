@@ -34,8 +34,7 @@ jobs:
       - name: Regras do Firebase no emulador
         working-directory: tests/firebase
         run: |
-          set -o pipefail
-          npx firebase emulators:exec --only firestore --project z7-teste "node --test --test-reporter=tap regras.test.mjs" 2>&1 | tee saida.txt || {
-            grep -E "^not ok|error:|expected|actual|code:|message:" saida.txt | head -30 | while IFS= read -r l; do echo "::error::$l"; done
-            tail -25 saida.txt | tr '\n' ' ' | sed 's/^/::error title=final::/'
-            exit 1; }
+          npx firebase emulators:exec --only firestore --project z7-teste "node --test --test-reporter=tap regras.test.mjs" > saida.txt 2>&1 && exit 0
+          grep -nE "not ok|Error|error|expected|actual" saida.txt | head -10 | sed 's/%/%25/g' | while IFS= read -r l; do echo "::error::$l"; done
+          tail -10 saida.txt | sed 's/%/%25/g' | while IFS= read -r l; do echo "::warning::$l"; done
+          exit 1
