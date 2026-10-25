@@ -18,6 +18,17 @@ export function esperadas(f, hoje){
 }
 function vencDa(f, n){ const [y, m, d] = f.primeiroVenc.split("-").map(Number); const dt = new Date(y, m - 1 + n - 1, d); return `${dt.getFullYear()}-${C.pad(dt.getMonth() + 1)}-${C.pad(dt.getDate())}`; }
 const parcela = f => n0(f.valor) / (n0(f.parcelas) || 1);
+// Histórico de parcelas pagas (data e valor): a comissão da formatura é paga sobre cada parcela recebida.
+// Quem já tinha parcelas pagas antes do histórico conta como pago na data da venda.
+function ajustaPag(f, novas, novoValor){
+  const pv = (novoValor != null ? n0(novoValor) : n0(f.valor)) / (n0(f.parcelas) || 1);
+  let lst = Array.isArray(f.pagamentos) ? f.pagamentos.slice() : [];
+  const base = f.vendidoEm || C.todayStr();
+  while (lst.length < Math.min(n0(f.pagas), novas)) lst.unshift({ data: base, valor: pv });
+  while (lst.length > novas) lst.pop();
+  while (lst.length < novas) lst.push({ data: C.todayStr(), valor: pv });
+  return lst;
+}
 const quitado = f => n0(f.pagas) >= (n0(f.parcelas) || 1);
 const atrasado = f => !quitado(f) && f.status !== "desistiu" && esperadas(f, C.todayStr()) > n0(f.pagas);
 
@@ -70,7 +81,7 @@ export function openTurma(ctx, inst, kits){
     }
     if (f.obs) e.append(el("p", "notes", f.obs));
     const act = el("div", "actions");
-    if (f.status !== "desistiu" && !q0) act.append(C.mkBtn("✅ +1 parcela paga", "btn-ok", () => salvar(f, { pagas: n0(f.pagas) + 1, ultimoPag: C.todayStr() }, `Parcela ${n0(f.pagas) + 1} registrada`)));
+    if (f.status !== "desistiu" && !q0) act.append(C.mkBtn("✅ +1 parcela paga", "btn-ok", () => salvar(f, { pagas: n0(f.pagas) + 1, ultimoPag: C.todayStr(), pagamentos: ajustaPag(f, n0(f.pagas) + 1) }, `Parcela ${n0(f.pagas) + 1} registrada`)));
     if (f.status !== "desistiu" && !q0 && f.tel) act.append(C.mkBtn("💬 Cobrar", at ? "btn-primary" : "", () => cobrar(f)));
     act.append(C.mkBtn("Editar", "", () => form(f)));
     e.append(act); return e;
@@ -117,6 +128,8 @@ export function openTurma(ctx, inst, kits){
       if (pg > P) { err.textContent = "Já pagas não pode ser maior que o número de parcelas."; err.hidden = false; return; }
       const body = { nome: nome.value.trim(), tel: tel.value.trim(), serie: serie.value, kit: kit.value.trim(), valor: C.num(valor.value), parcelas: P, pagas: pg, primeiroVenc: venc.value, formaPag: fpg.value, status: st.value, obs: obs.value.trim(), atualizadoEm: new Date().toISOString() };
       try {
+        if (f) body.pagamentos = ajustaPag(Object.assign({}, f, { parcelas: P }), pg, body.valor);
+        else body.pagamentos = Array.from({ length: pg }, () => ({ data: C.todayStr(), valor: body.valor / P }));
         if (f) await FS.updateDoc(FS.doc(db, "formandos", f.id), body);
         else await FS.addDoc(col, Object.assign(body, { instId: inst.id, instNome: inst.nome, instTipo: inst.tipo || "", ano: Number(C.todayStr().slice(0, 4)), resp: inst.resp || C.me || "", vendidoEm: C.todayStr(), criadoEm: new Date().toISOString(), por: C.me || "" }));
         fechar(); C.toast(f ? "Salvo" : "Formando incluído");
@@ -152,7 +165,8 @@ export function openTurma(ctx, inst, kits){
       ev.preventDefault(); ok.disabled = true; let n = 0;
       try {
         for (const x of linhas) {
-          await FS.addDoc(col, Object.assign(x, { pagas: Math.min(x.pagas, x.parcelas), status: "ativo", instId: inst.id, instNome: inst.nome, instTipo: inst.tipo || "", ano: Number(C.todayStr().slice(0, 4)), resp: inst.resp || C.me || "", vendidoEm: C.todayStr(), criadoEm: new Date().toISOString(), por: C.me || "" }));
+          const pg = Math.min(x.pagas, x.parcelas);
+          await FS.addDoc(col, Object.assign(x, { pagas: pg, pagamentos: Array.from({ length: pg }, () => ({ data: C.todayStr(), valor: x.valor / x.parcelas })), status: "ativo", instId: inst.id, instNome: inst.nome, instTipo: inst.tipo || "", ano: Number(C.todayStr().slice(0, 4)), resp: inst.resp || C.me || "", vendidoEm: C.todayStr(), criadoEm: new Date().toISOString(), por: C.me || "" }));
           n++;
         }
         fechar(); C.toast(`${n} formando${n > 1 ? "s" : ""} importado${n > 1 ? "s" : ""}`);

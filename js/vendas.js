@@ -71,7 +71,15 @@ async function buscar(){
       marcadas.push({ data: i.followup, hora: i.followupHora || "", por: i.resp || "", inst: i.nome });
   });
   marcadas.sort((a, b) => (a.data + a.hora).localeCompare(b.data + b.hora));
-  return { vendas: vendas.filter(x => x.data), visitas, marcadas, fechados, carregadoEm: new Date() };
+  // Comissão: PR sobre a venda; Formatura sobre cada parcela paga, na data em que foi paga
+  const comissoes = [];
+  prs.forEach(r => comissoes.push({ data: r.pagoEm || "", base: n0(r.valor), linha: "pr", forma: formaDe(r.formaPag), resp: r.resp || "" }));
+  forms.filter(f => f.status !== "desistiu").forEach(f => {
+    const resp = f.resp || (instPorId[f.instId] || {}).resp || "", forma = formaDe(f.formaPag), pv = n0(f.valor) / (n0(f.parcelas) || 1);
+    const pags = Array.isArray(f.pagamentos) ? f.pagamentos : Array.from({ length: Math.min(n0(f.pagas), n0(f.parcelas) || 1) }, () => ({ data: f.vendidoEm || "", valor: pv }));
+    pags.forEach(p => comissoes.push({ data: p.data || f.vendidoEm || "", base: n0(p.valor), linha: "form", forma, resp }));
+  });
+  return { vendas: vendas.filter(x => x.data), comissoes: comissoes.filter(x => x.data), visitas, marcadas, fechados, carregadoEm: new Date() };
 }
 
 // ---------- 2. Período escolhido ----------
@@ -144,10 +152,11 @@ function canvas(box, h){ const w = el("div", "vdchart"); w.style.height = (h || 
 function equipe(corpo, fx, vs){
   const comiss = new Set(C.vendedores || []);
   // Comissão: soma venda a venda, pela linha (PR ou Formatura) e forma de pagamento
-  const comDe = nm => vs.filter(x => x.resp === nm && x.linha).reduce((a, x) => a + x.valor * taxa(C.P, x.linha, x.forma) / 100, 0);
-  const semForma = nm => vs.filter(x => x.resp === nm && x.linha && !x.forma).length;
+  const cs = dados.comissoes.filter(x => dentro(x.data, fx));
+  const comDe = nm => cs.filter(x => x.resp === nm).reduce((a, x) => a + x.base * taxa(C.P, x.linha, x.forma) / 100, 0);
+  const semForma = nm => cs.filter(x => x.resp === nm && !x.forma).length;
   const nomes = new Set([...(C.team() || []), ...vs.map(x => x.resp), ...dados.visitas.filter(x => dentro(x.data, fx)).map(x => x.por), ...dados.marcadas.map(x => x.por)].filter(Boolean));
-  const box = caixa(corpo, "Equipe", PERIODOS.find(p => p[0] === periodo)[1] + " · comissão pela forma de pagamento (PR e Formatura)");
+  const box = caixa(corpo, "Equipe", PERIODOS.find(p => p[0] === periodo)[1] + " · comissão: PR sobre a venda, Formatura sobre as parcelas pagas no período");
   const tb = el("div", "vdtab");
   const head = el("div", "vdtr th"); ["Pessoa", "Visitas feitas", "Visitas marcadas", "Colégios fechados", "Vendas", "Comissão"].forEach(t => head.append(el("span", null, t))); tb.append(head);
   [...nomes].sort((a, b) => a.localeCompare(b, "pt-BR")).forEach(nm => {
@@ -155,7 +164,7 @@ function equipe(corpo, fx, vs){
     const vf = dados.visitas.filter(x => x.por === nm && dentro(x.data, fx) && /visita/i.test(x.como || "Visita")).length;
     const vm = dados.marcadas.filter(x => x.por === nm).length;
     const cf = dados.fechados.filter(x => x.por === nm && dentro(x.data, fx)).length;
-    if (!vend && !vf && !vm && !cf) return;
+    if (!vend && !vf && !vm && !cf && !comDe(nm)) return;
     const r = el("div", "vdtr");
     [C.first(nm), vf, vm, cf, moeda(vend), comiss.has(nm) ? moeda(comDe(nm)) + (semForma(nm) ? ` (${semForma(nm)} sem forma de pagamento)` : "") : "—"].forEach((t, i) => { const s = el("span", null, String(t)); s.dataset.l = ["", "Visitas feitas", "Visitas marcadas", "Colégios fechados", "Vendas", "Comissão"][i]; r.append(s); });
     tb.append(r);
