@@ -1,6 +1,6 @@
 // Card Aluguel de becas: para os nossos eventos e para outros eventos.
 // Coleção "becas": { cliente, tel, tipoEvento ("nosso" | "outro"), evento, dataEvento, retirada, retiradaHora, devolucao,
-//   qtd (total de becas), becasQtd: { pelerineAzul, infAzul, infPreta, tradPreta, americana }, faixasQtd: { azul, branca, ... }, itens: { capelo, jabor }, tamanhos, valor, caucao, pago, formaPag, status, obs }
+//   qtd (total de becas), becasQtd: { pelerineAzul, infAzul, infPreta, tradPreta, americana }, faixasQtd: { azul, branca, ... }, capelosQtd: { capelo }, tamanhos (o jabor já vai com a beca), valor, caucao, pago, formaPag, status, obs }
 // Status: reservado → retirado → devolvido (ou cancelado). Retirada e devolução aparecem no Agendamento.
 let C, FS, db, col, unsubs = [], lista = [], aba = "proximas";
 const $ = (id) => document.getElementById(id);
@@ -10,7 +10,8 @@ function title(s){ return String(s || "").toLowerCase().replace(/(^|[\s(-])(\p{L
 let fid = 0;
 function field(lbl, i){ const f = el("div", "field"); const l = el("label", null, lbl); i.id = i.id || "bc" + (++fid); l.htmlFor = i.id; f.append(l, i); return f; }
 function inp(v, ph, max){ const i = el("input"); i.value = v == null ? "" : v; i.placeholder = ph || ""; i.maxLength = max || 120; return i; }
-const ITENS = [["capelo", "Capelo"], ["jabor", "Jabor"]];
+const ITENS = [["capelo", "Capelo"], ["jabor", "Jabor"]]; // só para aluguéis antigos
+export const CAPELOS = [["capelo", "Capelo"]];
 // Tipos de beca e cores de faixa: cada um tem o seu estoque (definido no botão "📦 Estoque")
 export const BECAS = [["pelerineAzul", "Beca pelerine azul"], ["infAzul", "Beca infantil azul"], ["infPreta", "Beca infantil preta"], ["tradPreta", "Beca tradicional preta"], ["americana", "Beca americana"]];
 export const FAIXAS = [["azul", "Azul"], ["branca", "Branca"], ["amarela", "Amarela"], ["lilas", "Lilás"], ["verde", "Verde"], ["laranja", "Laranja"], ["rosa", "Rosa"], ["vermelha", "Vermelha"]];
@@ -44,10 +45,11 @@ export function show(){
 
 // Quantas becas estão comprometidas entre duas datas (para conferir o estoque)
 function emUso(de, ate, ignora){
-  const out = { becas: {}, faixas: {} };
+  const out = { becas: {}, faixas: {}, capelos: {} };
   lista.filter(x => x.id !== ignora && ativo(x) && x.retirada && x.devolucao && x.retirada <= ate && x.devolucao >= de).forEach(x => {
     Object.entries(x.becasQtd || {}).forEach(([k, v]) => { out.becas[k] = (out.becas[k] || 0) + n0(v); });
     Object.entries(x.faixasQtd || {}).forEach(([k, v]) => { out.faixas[k] = (out.faixas[k] || 0) + n0(v); });
+    Object.entries(x.capelosQtd || {}).forEach(([k, v]) => { out.capelos[k] = (out.capelos[k] || 0) + n0(v); });
   });
   return out;
 }
@@ -80,7 +82,7 @@ function card(x){
   [`👘 ${totBecas(x)} beca${totBecas(x) !== 1 ? "s" : ""}`, x.tipoEvento === "nosso" ? "Nosso evento" : "Outro evento", x.evento,
     ...BECAS.filter(([k]) => n0((x.becasQtd || {})[k])).map(([k, t]) => `${t.replace("Beca ", "")}: ${x.becasQtd[k]}`),
     ...FAIXAS.filter(([k]) => n0((x.faixasQtd || {})[k])).map(([k, t]) => `Faixa ${t.toLowerCase()}: ${x.faixasQtd[k]}`),
-    ITENS.filter(([kk]) => x.itens && x.itens[kk]).map(([, t]) => t).join(" + "), x.corFaixa ? "Faixa " + x.corFaixa : "", x.valor ? C.money(x.valor) : ""]
+    n0((x.capelosQtd || {}).capelo) ? `Capelo: ${x.capelosQtd.capelo}` : "", x.capelosQtd ? "" : ITENS.filter(([kk]) => x.itens && x.itens[kk]).map(([, t]) => t).join(" + "), x.corFaixa ? "Faixa " + x.corFaixa : "", x.valor ? C.money(x.valor) : ""]
     .filter(Boolean).forEach((t, i) => meta.append(el("span", "tag" + (i === 0 ? " svc" : ""), t)));
   e.append(meta);
   const datas = [x.retirada && `Retirada ${C.fmtDate(x.retirada)}${x.retiradaHora ? " " + x.retiradaHora : ""}`, x.dataEvento && `Evento ${C.fmtDate(x.dataEvento)}`, x.devolucao && `Devolução ${C.fmtDate(x.devolucao)}`].filter(Boolean).join(" · ");
@@ -114,7 +116,7 @@ function botoes(close, okTxt){ const a = el("div", "panel-actions"); const sp = 
 
 function devolver(x){
   sheet("Devolução · " + title(x.cliente), (p, close) => {
-    p.append(el("p", "hint", `${totBecas(x)} beca${totBecas(x) !== 1 ? "s" : ""} · ${[...BECAS.filter(([k]) => n0((x.becasQtd || {})[k])).map(([k, t]) => `${x.becasQtd[k]} ${t.toLowerCase()}`), ...FAIXAS.filter(([k]) => n0((x.faixasQtd || {})[k])).map(([k, t]) => `${x.faixasQtd[k]} faixa ${t.toLowerCase()}`), ...ITENS.filter(([kk]) => x.itens && x.itens[kk]).map(([, t]) => t.toLowerCase())].join(", ")}`));
+    p.append(el("p", "hint", `${totBecas(x)} beca${totBecas(x) !== 1 ? "s" : ""} · ${[...BECAS.filter(([k]) => n0((x.becasQtd || {})[k])).map(([k, t]) => `${x.becasQtd[k]} ${t.toLowerCase()}`), ...FAIXAS.filter(([k]) => n0((x.faixasQtd || {})[k])).map(([k, t]) => `${x.faixasQtd[k]} faixa ${t.toLowerCase()}`), ...(n0((x.capelosQtd || {}).capelo) ? [`${x.capelosQtd.capelo} capelo${x.capelosQtd.capelo > 1 ? "s" : ""}`] : [])].join(", ")}`));
     const tudoL = el("label", "chk"); const tudo = el("input"); tudo.type = "checkbox"; tudo.checked = true; tudoL.append(tudo, document.createTextNode(" Devolveu tudo, em bom estado")); p.append(tudoL);
     const falt = inp("", "ex.: 1 capelo, faixa manchada"); const fb = field("O que faltou ou voltou com problema", falt); fb.hidden = true; p.append(fb);
     tudo.onchange = () => { fb.hidden = tudo.checked; };
@@ -132,7 +134,7 @@ function devolver(x){
 
 // Estoque por tipo de beca e cor de faixa (salvo em Ajustes / config). Mostra o que está fora agora.
 function openEstoque(){
-  sheet("📦 Estoque de becas e faixas", (p, close) => {
+  sheet("📦 Estoque de becas, faixas e capelos", (p, close) => {
     const E = estoque(), hoje = C.todayStr(), u = emUso(hoje, hoje);
     p.append(el("p", "hint", C.isAdmin ? "Quantas peças vocês têm de cada tipo. O app usa isso para avisar quando faltar num período." : "Só administradores mudam o estoque."));
     const tab = (titulo, tipos, atual, fora) => {
@@ -141,13 +143,13 @@ function openEstoque(){
         const out = n0(fora[k]); r.append(el("span", null, t + (out ? ` · ${out} fora hoje` : "")), q); box.append(r); return [k, q]; });
       f.append(box); p.append(f); return ins;
     };
-    const iB = tab("Becas", BECAS, E.becas, u.becas), iF = tab("Faixas", FAIXAS, E.faixas, u.faixas);
+    const iB = tab("Becas (o jabor vai junto)", BECAS, E.becas, u.becas), iF = tab("Faixas", FAIXAS, E.faixas, u.faixas), iC = tab("Capelos", CAPELOS, E.capelos, u.capelos);
     p.append(el("p", "hint", "Beca americana: deixe 0 até chegar. O app avisa se alguém tentar alugar."));
     p.append(botoes(close, "Salvar estoque"));
     if (!C.isAdmin) p.querySelector("button[type=submit]").hidden = true;
     p.addEventListener("submit", async ev => {
       ev.preventDefault(); if (!C.isAdmin) return;
-      const novo = { becas: Object.fromEntries(iB.map(([k, q]) => [k, n0(q.value)])), faixas: Object.fromEntries(iF.map(([k, q]) => [k, n0(q.value)])) };
+      const novo = { becas: Object.fromEntries(iB.map(([k, q]) => [k, n0(q.value)])), faixas: Object.fromEntries(iF.map(([k, q]) => [k, n0(q.value)])), capelos: Object.fromEntries(iC.map(([k, q]) => [k, n0(q.value)])) };
       try { await FS.setDoc(FS.doc(db, "config", "app"), { estoque: novo }, { merge: true }); C.P.estoque = novo; close(); C.toast("Estoque salvo"); render(); }
       catch (e) { C.handleErr(e); }
     });
@@ -179,8 +181,8 @@ export function form(x, pre){
     };
     const qB = grade("Becas", BECAS, x ? x.becasQtd || (x.qtd ? { tradPreta: x.qtd } : {}) : pre.becasQtd, "");
     const qF = grade("Faixas", FAIXAS, x ? x.faixasQtd : pre.faixasQtd, " (faixa)");
-    const itBox = el("div", "quick"); const its = ITENS.map(([kk, t]) => { const l = el("label", "chk"); const c = el("input"); c.type = "checkbox"; c.checked = x ? !!(x.itens && x.itens[kk]) : kk === "capelo"; l.append(c, document.createTextNode(" " + t)); itBox.append(l); return [kk, c]; });
-    { const f = el("div", "field"); f.append(el("label", null, "Acompanha"), itBox); p.append(f); }
+    const qC = grade("Capelos", CAPELOS, x ? x.capelosQtd || (x.itens && x.itens.capelo ? { capelo: totBecas(x) } : {}) : pre.capelosQtd, " (quantidade)");
+    p.append(el("p", "hint", "O jabor já vai com a beca. Capelo tem estoque próprio e pode ser alugado sozinho."));
     const valObj = ins => Object.fromEntries(ins.map(([k, q]) => [k, n0(q.value)]).filter(([, v]) => v));
     const tam = inp(x ? x.tamanhos : "", "ex.: 3 P, 5 M, 2 G", 200); p.append(field("Tamanhos", tam));
     const val = inp(x ? x.valor || "" : "", "R$", 10); val.inputMode = "decimal";
@@ -198,6 +200,7 @@ export function form(x, pre){
       const u = emUso(ret.value, dev.value, x && x.id), E = estoque(), out = [];
       qB.forEach(([k, q]) => { const pede = n0(q.value); if (!pede) return; const tem = n0((E.becas || {})[k]), livre = tem - n0(u.becas[k]); if (pede > livre) out.push(`${BECAS.find(b => b[0] === k)[1]}: pediu ${pede}, livres ${Math.max(0, livre)}${tem ? "" : " (sem estoque cadastrado)"}`); });
       qF.forEach(([k, q]) => { const pede = n0(q.value); if (!pede) return; const tem = n0((E.faixas || {})[k]), livre = tem - n0(u.faixas[k]); if (pede > livre) out.push(`Faixa ${FAIXAS.find(b => b[0] === k)[1].toLowerCase()}: pediu ${pede}, livres ${Math.max(0, livre)}${tem ? "" : " (sem estoque cadastrado)"}`); });
+      qC.forEach(([k, q]) => { const pede = n0(q.value); if (!pede) return; const tem = n0((E.capelos || {})[k]), livre = tem - n0(u.capelos[k]); if (pede > livre) out.push(`Capelo: pediu ${pede}, livres ${Math.max(0, livre)}${tem ? "" : " (sem estoque cadastrado)"}`); });
       return out;
     }
     function checa(){
@@ -215,12 +218,12 @@ export function form(x, pre){
     p.addEventListener("submit", async ev2 => {
       ev2.preventDefault();
       if (dev.value < ret.value) { err.textContent = "A devolução precisa ser depois da retirada."; err.hidden = false; return; }
-      const becasQtd = valObj(qB), faixasQtd = valObj(qF), q = somaObj(becasQtd);
-      if (!q && !somaObj(faixasQtd)) { err.textContent = "Coloque a quantidade de becas ou de faixas."; err.hidden = false; return; }
+      const becasQtd = valObj(qB), faixasQtd = valObj(qF), capelosQtd = valObj(qC), q = somaObj(becasQtd);
+      if (!q && !somaObj(faixasQtd) && !somaObj(capelosQtd)) { err.textContent = "Coloque a quantidade de becas, faixas ou capelos."; err.hidden = false; return; }
       const f = faltas();
       if (f.length && !p._ok) { p._ok = true; a.ok.textContent = "Registrar mesmo assim"; err.textContent = "Não tem o suficiente no estoque: " + f.join("; ") + ". Toque de novo para registrar mesmo assim."; err.hidden = false; return; }
       const body = { cliente: cli.value.trim(), tel: tel.value.trim(), tipoEvento: tipo.value, evento: ev.value.trim(), dataEvento: dEv.value, retirada: ret.value, retiradaHora: retH.value, devolucao: dev.value,
-        qtd: q, becasQtd, faixasQtd, itens: Object.fromEntries(its.map(([kk, c]) => [kk, c.checked])), tamanhos: tam.value.trim(), valor: C.num(val.value), pago: C.num(pago.value), caucao: C.num(cau.value), formaPag: fp.value, obs: obs.value.trim(), atualizadoEm: new Date().toISOString() };
+        qtd: q, becasQtd, faixasQtd, capelosQtd, tamanhos: tam.value.trim(), valor: C.num(val.value), pago: C.num(pago.value), caucao: C.num(cau.value), formaPag: fp.value, obs: obs.value.trim(), atualizadoEm: new Date().toISOString() };
       try {
         if (x) await FS.updateDoc(FS.doc(db, "becas", x.id), body);
         else await FS.addDoc(col, Object.assign(body, { status: "reservado", criadoEm: new Date().toISOString(), por: C.me || "" }));
