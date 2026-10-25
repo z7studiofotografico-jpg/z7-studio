@@ -124,7 +124,8 @@ console.log("Pedro (vendedor: Linha de Frente, Agendamento, Instituições):");
     "config/app": Object.assign({}, base["config/app"], { versaoDados: 3 }),
     "instituicoes/i1": Object.assign({}, base["instituicoes/i1"], { respEmail: PEDRO }),
     "formandos/f1": Object.assign({}, base["formandos/f1"], { respEmail: PEDRO, pagamentos: [{ data: dia(-40), valor: 85 }], proxVenc: dia(-10) }),
-    "ensaios/c1": Object.assign({}, base["ensaios/c1"], { titulo: "" }), "privado/c1": { titulo: "Consulta médica" }
+    "ensaios/c1": Object.assign({}, base["ensaios/c1"], { titulo: "" }), "privado/c1": { titulo: "Consulta médica" },
+    ["agenda/" + dia(20)]: { data: dia(20), kind: "formatura", status: "confirmado", instId: "i1", instNome: "COLEGIO ALFA", pedidoPor: "Pedro Vendedor", pedidoEmail: PEDRO, contato: { nome: "Rosa Diretora", tel: "21977770000", email: "" }, alunos: 90, onde: "Salão", local: "Espaço Festa" }
   });
   const { pg, erros, store } = await abrir(PEDRO, migrado);
   const vs = await visiveis(pg);
@@ -133,6 +134,14 @@ console.log("Pedro (vendedor: Linha de Frente, Agendamento, Instituições):");
   const ag = await pg.textContent("#viewAgenda");
   ok(/ocupado/.test(ag) && !/Consulta/.test(ag), "compromisso particular aparece só como ocupado");
   ok(!(await pg.getByRole("button", { name: "+ Marcar ensaio" }).count()), "não marca ensaio");
+  // data aprovada que ele agendou: aviso para mandar do WhatsApp dele
+  ok(/A Luciana aprovou\. Avise o colégio/.test(await pg.textContent("#agPend")), "data aprovada aparece para quem agendou avisar o colégio");
+  await pg.locator("#agPend .card").filter({ hasText: "Alfa" }).getByRole("button", { name: "📲 Avisar colégio" }).click(); await pg.waitForTimeout(200);
+  const msgAv = await pg.locator(".sheet").last().locator(".notes").textContent();
+  console.log("    mensagem:", JSON.stringify(msgAv));
+  ok(/Está confirmado/.test(msgAv) && /90 alunos/.test(msgAv) && /Espaço Festa/.test(msgAv), "mensagem confirmada com local e alunos");
+  await pg.locator(".sheet").last().getByRole("button", { name: /Enviar no WhatsApp/ }).click(); await pg.waitForTimeout(400);
+  ok((await store())["agenda/" + dia(20)].avisadoWhats === true, "marcado como avisado depois de abrir o WhatsApp");
   // Agendar colégio direto pela agenda (dia de fotos do PR)
   await pg.getByRole("button", { name: "+ Agendar colégio" }).click(); await pg.waitForTimeout(400);
   let sa = pg.locator(".sheet").last(); await sa.getByLabel("Colégio").fill("Colegio Beta"); await sa.locator("button[type=submit]").click(); await pg.waitForTimeout(300);

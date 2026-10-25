@@ -53,6 +53,11 @@ const parcAtrasadas = (await db.collection("formandos").where("proxVenc", ">", "
 const becasAbertas = (await db.collection("becas").where("status", "in", ["reservado", "retirado"]).get()).docs.map((d) => d.data());
 const becasAtr = becasAbertas.filter((b) => b.status === "retirado" && b.devolucao && b.devolucao < hoje).length;
 const becasRet = becasAbertas.filter((b) => b.status === "reservado" && b.retirada === amanha).length;
+// Datas aprovadas que quem agendou ainda não avisou o colégio pelo WhatsApp
+const paraAvisar = {};
+(await db.collection("agenda").where("status", "==", "confirmado").get()).docs.map((d) => d.data())
+  .filter((a) => a.data >= hoje && !a.avisadoWhats && a.pedidoEmail && a.contato && a.contato.tel)
+  .forEach((a) => { paraAvisar[a.pedidoEmail] = (paraAvisar[a.pedidoEmail] || 0) + 1; });
 const tokensSnap = await db.collection("tokens").get();
 console.log(`Hoje ${hoje}: ${vencidos.length} lead(s) com contato vencido, ${tokensSnap.size} aparelho(s).`);
 
@@ -82,8 +87,9 @@ for (const t of tokensSnap.docs) {
     const lembrar = souAdmin ? ensAmanha.length : 0;
     const ent = souAdmin ? entAtrasadas : 0, aval = souAdmin ? avaliacoes : 0, parc = souAdmin ? parcAtrasadas : 0;
     const bec = souAdmin || (mods && mods.includes("becas")) ? becasAtr + becasRet : 0;
-    if (!meus.length && !meusRep.length && !meusInst.length && !aprova && !lembrar && !ent && !aval && !parc && !bec) continue;
-    const total = meus.length + meusRep.length + meusInst.length + aprova + lembrar + ent + aval + parc + bec;
+    const avisar = paraAvisar[String(t.get("email") || "").toLowerCase()] || 0;
+    if (!meus.length && !meusRep.length && !meusInst.length && !aprova && !lembrar && !ent && !aval && !parc && !bec && !avisar) continue;
+    const total = meus.length + meusRep.length + meusInst.length + aprova + lembrar + ent + aval + parc + bec + avisar;
     const atrasados = meus.filter((l) => l.followup < hoje).length + meusRep.filter((r) => r.followup < hoje).length + meusInst.filter((x) => x.followup < hoje).length;
     const partes = [];
     if (meus.length) partes.push(`Funil: ${meus.slice(0, 3).map((l) => primeiro(l.nome)).join(", ")}${meus.length > 3 ? ` e mais ${meus.length - 3}` : ""}`);
@@ -92,6 +98,7 @@ for (const t of tokensSnap.docs) {
     if (lembrar) partes.push(`Lembrar ${lembrar} cliente${lembrar > 1 ? "s" : ""} do ensaio de amanhã`);
     if (ent) partes.push(`⚠️ ${ent} entrega${ent > 1 ? "s" : ""} de fotos atrasada${ent > 1 ? "s" : ""}`);
     if (aval) partes.push(`Pedir ${aval} avaliação${aval > 1 ? "ões" : ""} no Google`);
+    if (avisar) partes.push(`📲 Avisar ${avisar} colégio${avisar > 1 ? "s" : ""} da data aprovada`);
     if (bec && becasAtr) partes.push(`👘 ${becasAtr} devolução${becasAtr > 1 ? "ões" : ""} de becas atrasada${becasAtr > 1 ? "s" : ""}`);
     if (bec && becasRet) partes.push(`👘 ${becasRet} retirada${becasRet > 1 ? "s" : ""} de becas amanhã`);
     if (parc) partes.push(`${parc} parcela${parc > 1 ? "s" : ""} de turma atrasada${parc > 1 ? "s" : ""}`);

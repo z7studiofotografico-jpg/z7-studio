@@ -17,7 +17,7 @@ beforeEach(async () => {
   await env.clearFirestore();
   await semRegra(async db => {
     await setDoc(doc(db, "usuarios", PEDRO), { nome: "Pedro", papel: "equipe", ativo: true, modulos: ["lf", "agenda", "colegios"] });
-    await setDoc(doc(db, "usuarios", ANA), { nome: "Ana", papel: "equipe", ativo: true, modulos: ["becas"] });
+    await setDoc(doc(db, "usuarios", ANA), { nome: "Ana", papel: "equipe", ativo: true, modulos: ["becas", "agenda"] });
     await setDoc(doc(db, "usuarios", NOVO), { nome: "Novo", papel: "equipe", ativo: true });
     await setDoc(doc(db, "instituicoes", "i1"), { nome: "ALFA", etapa: "FECHADO", resp: "Pedro", respEmail: PEDRO });
     await setDoc(doc(db, "instituicoes", "i2"), { nome: "BETA", etapa: "A VISITAR", resp: "", respEmail: "" });
@@ -75,6 +75,10 @@ test("agenda: cada um mexe só no próprio pedido; a Luciana aprova", async () =
   await assertSucceeds(setDoc(doc(como(PEDRO), "agenda", "2099-11-11"), { data: "2099-11-11", status: "pendente", pedidoEmail: PEDRO }));
   await assertFails(setDoc(doc(como(PEDRO), "agenda", "2099-11-12"), { data: "2099-11-12", status: "confirmado", pedidoEmail: PEDRO }));
   await assertSucceeds(updateDoc(doc(como(LUCIANA), "agenda", "2099-11-10"), { status: "confirmado" }));
+  // depois de aprovado, quem pediu só marca que avisou o colégio
+  await assertSucceeds(updateDoc(doc(como(ANA), "agenda", "2099-11-10"), { avisadoWhats: true, avisadoEm: "x" }));
+  await assertFails(updateDoc(doc(como(ANA), "agenda", "2099-11-10"), { avisadoWhats: true, data: "2099-12-01" }));
+  await assertFails(updateDoc(doc(como(PEDRO), "agenda", "2099-11-10"), { avisadoWhats: true }));
 });
 test("assunto particular e resumo do dashboard só para admin", async () => {
   await assertFails(getDoc(doc(como(PEDRO), "privado", "p1")));

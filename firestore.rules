@@ -52,7 +52,10 @@ service cloud.firestore {
       allow read: if usaAgenda();
       allow create: if usaAgenda() && (aprovador() || admin() || (request.resource.data.status == 'pendente' && request.resource.data.pedidoEmail == email()));
       allow update: if aprovador() || admin() || (usaAgenda() && resource.data.status != 'confirmado'
-        && request.resource.data.status == 'pendente' && resource.data.get('pedidoEmail', email()) == email() && request.resource.data.pedidoEmail == email());
+        && request.resource.data.status == 'pendente' && resource.data.get('pedidoEmail', email()) == email() && request.resource.data.pedidoEmail == email())
+        // quem agendou marca que já avisou o colégio pelo WhatsApp (só esses campos)
+        || (usaAgenda() && resource.data.get('pedidoEmail', '') == email()
+          && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['avisadoWhats', 'avisadoEm']));
       allow delete: if aprovador() || admin() || (usaAgenda() && resource.data.status != 'confirmado' && resource.data.get('pedidoEmail', email()) == email());
     }
     // Ensaios no estúdio e compromissos: todos da agenda veem; só os donos marcam

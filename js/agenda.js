@@ -111,6 +111,11 @@ function render(){
   }
   if (C.aprovador && (filtro === "tudo" || filtro === "ensaio")) analisar.forEach(x => grade.append(cardAnalisar(x)));
   if (marco() && (filtro === "tudo" || filtro === "ensaio")) remarcar.forEach(x => grade.append(cardRemarcar(x)));
+  // Datas aprovadas que eu agendei e ainda não avisei o colégio
+  if (filtro === "tudo" || filtro === "colegio") items.filter(x => x.status === "confirmado" && !x.avisadoWhats && (x.pedidoEmail || "") === C.email && x.contato && x.contato.tel && !C.aprovador)
+    .forEach(x => { const e = el("article", "card today"); const top = el("div", "card-top"); top.append(el("h3", "name", title(x.instNome)), el("span", "stage", "APROVADO")); e.append(top);
+      e.append(el("div", "fu today", `${ICO[x.kind] || "📌"} ${nomeEvento(x.kind, x.instNome)}: ${diaTxt(x.data)}${x.hora ? " às " + x.hora : ""}`), el("p", "notes", "A Luciana aprovou. Avise o colégio pelo seu WhatsApp."));
+      const act = el("div", "actions"); act.append(C.mkBtn("📲 Avisar colégio", "btn-verde", () => avisar(x))); e.append(act); grade.append(e); });
   if (grade.children.length) { pend.append(el("h3", "grp", C.aprovador ? `Para você analisar (${grade.children.length})` : `Precisa de atenção (${grade.children.length})`), grade); }
   // Entregas das fotos (ensaios que já aconteceram)
   if (marco() && (filtro === "tudo" || filtro === "entrega")) {
@@ -252,9 +257,21 @@ function linhaColegio(x){
   if (x.status === "pendente") t.append(el("span", "wait", "⏳ Aguardando a Luciana aprovar"));
   if (x.contato && (x.contato.nome || x.contato.tel)) t.append(el("span", null, `👤 ${[x.contato.nome && title(x.contato.nome), x.contato.cargo].filter(Boolean).join(" · ")}${x.alunos ? ` · ~${x.alunos} alunos` : ""}`));
   const fim = el("div", "agact"); fim.append(el("span", "tag " + (x.status === "confirmado" ? "ok" : "svc"), x.status === "confirmado" ? "Confirmado" : "Aguardando"));
-  if (x.contato && x.contato.tel && C.pode("colegios")) fim.append(C.mkBtn("📲 Avisar", "btn-sm", () => painelAvisar(C, x.instNome, [x], x.contato, x.alunos)));
+  // A mensagem sai do WhatsApp de quem agendou: só essa pessoa tem o botão
+  const meu = (x.pedidoEmail || "") === C.email;
+  if (x.contato && x.contato.tel && meu) fim.append(C.mkBtn(x.status === "confirmado" && !x.avisadoWhats ? "📲 Avisar colégio" : "📲 Avisar", x.status === "confirmado" && !x.avisadoWhats ? "btn-verde btn-sm" : "btn-sm", () => avisar(x)));
+  else if (x.status === "confirmado" && x.contato && x.contato.tel && !x.avisadoWhats && x.pedidoPor) t.append(el("span", "wait", `📲 ${C.first(x.pedidoPor)} vai avisar o colégio`));
   r.append(t, fim);
   return r;
+}
+// Abre a mensagem pronta e, se a data já está confirmada, marca que o colégio foi avisado
+function avisar(arg, extra){
+  const lst = Array.isArray(arg) ? arg : [arg], x = lst[0];
+  painelAvisar(C, x.instNome, lst, x.contato, x.alunos, extra, async () => {
+    const conf = lst.filter(y => y.status === "confirmado"); if (!conf.length) return;
+    try { const b = FS.writeBatch(db); conf.forEach(y => b.update(FS.doc(db, "agenda", y.id), { avisadoWhats: true, avisadoEm: new Date().toISOString() })); await b.commit(); }
+    catch (e) { avisoErro(e, "marcar o colégio como avisado"); }
+  });
 }
 function cardPedido(gr){
   gr.sort((a, b) => a.data.localeCompare(b.data));
@@ -286,9 +303,10 @@ async function aprovarGrupo(gr){
     await b.commit();
     let n = 0; try { n = await avisarColegioPorEmail(gr[0].instId, C); } catch (e) { avisoErro(e, "preparar o e-mail para o colégio", C.toast); }
     const txt = `Aprovado ✅${n ? ` · e-mail com as datas vai para ${n} contato${n > 1 ? "s" : ""}` : " · o colégio não tem e-mail cadastrado"}`;
-    const ct = (gr.find(x => x.contato && x.contato.tel) || {}).contato;
-    if (ct) painelAvisar(C, gr[0].instNome, gr.map(x => Object.assign({}, x, { status: "confirmado" })), ct, (gr.find(x => x.alunos) || {}).alunos, txt);
-    else C.toast(txt);
+    // quem agendou recebe o aviso para mandar a confirmação do próprio WhatsApp
+    const meus = gr.filter(x => (x.pedidoEmail || "") === C.email && x.contato && x.contato.tel);
+    if (meus.length) avisar(meus.map(x => Object.assign({}, x, { status: "confirmado" })), txt);
+    else C.toast(txt + (gr[0].pedidoPor ? ` · ${C.first(gr[0].pedidoPor)} avisa o colégio pelo WhatsApp` : ""));
   } catch (e) { C.handleErr(e); }
 }
 

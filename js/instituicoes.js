@@ -170,7 +170,7 @@ export function msgWhatsColegio(instNome, eventos, contato, alunos, quem){
     "\nQualquer mudança, é só me avisar por aqui. Obrigado! 😊";
 }
 // Painel "avisar o colégio": botão do WhatsApp (precisa de um toque da pessoa) e aviso do e-mail
-export function painelAvisar(ctx, instNome, eventos, contato, alunos, extra){
+export function painelAvisar(ctx, instNome, eventos, contato, alunos, extra, aoEnviar){
   if (!C) init(ctx);
   if (!contato || !(contato.tel || contato.email)) { if (extra) C.toast(extra); return; }
   sheet("Avisar o colégio", (p, close) => {
@@ -180,10 +180,10 @@ export function painelAvisar(ctx, instNome, eventos, contato, alunos, extra){
     const a = el("div", "panel-actions"); const sp = el("span"); sp.style.flex = "1";
     const fechar = el("button", "btn", "Agora não"); fechar.type = "button"; fechar.onclick = close; a.append(sp, fechar);
     if (contato.tel) { const w = el("button", "btn btn-verde", "📲 Enviar no WhatsApp" + (contato.nome ? " de " + C.first(title(contato.nome)) : "")); w.type = "button";
-      w.onclick = () => { wa(contato.tel, msg, C.toast); close(); }; a.append(w); }
+      w.onclick = () => { wa(contato.tel, msg, C.toast); close(); if (aoEnviar) aoEnviar(); }; a.append(w); }
     p.append(a);
     p.append(el("p", "hint", eventos.every(e => e.status === "confirmado")
-      ? (contato.email ? `O e-mail de confirmação vai para ${contato.email}.` : "Sem e-mail cadastrado: só o WhatsApp avisa o colégio.")
+      ? (contato.email ? `O e-mail de confirmação vai para ${contato.email}.` : "Sem e-mail cadastrado: só o WhatsApp avisa o colégio.") + (contato.tel ? "" : " Sem WhatsApp cadastrado: o colégio é avisado só por e-mail.")
       : "Quando a Luciana aprovar, o colégio recebe o e-mail de confirmação" + (contato.email ? ` (${contato.email})` : " (cadastre o e-mail do responsável)") + "."));
   }, { div: true });
 }
@@ -462,7 +462,7 @@ function openEvento(it, kind){
     const novoC = el("div"); const rr1 = el("div", "row2"); rr1.append(field("Nome", nNome), field("Cargo", nCargo)); const rr2 = el("div", "row2"); rr2.append(field("WhatsApp", nTel), field("E-mail", nEmail)); novoC.append(rr1, rr2);
     const sync = () => { novoC.hidden = escolha.value !== "novo"; }; escolha.onchange = sync; sync();
     const alunos = inp(it.alunosConfirmados || it.mediaAlunos || "", "ex.: 120", 6); alunos.inputMode = "numeric";
-    resp.append(field("Combinado com", escolha), novoC, field(it.alunosConfirmados ? "Alunos (quantidade confirmada)" : "Média de alunos (obrigatório)", alunos),
+    resp.append(field("Combinado com", escolha), novoC, el("p", "hint", "Preencha o WhatsApp ou o e-mail (de preferência o WhatsApp). A mensagem sai do WhatsApp de quem agendou."), field(it.alunosConfirmados ? "Alunos (quantidade confirmada)" : "Média de alunos (obrigatório)", alunos),
       el("p", "hint", "Começamos com a média. Depois das fotos, a quantidade certa é confirmada na lista de formandos."));
     const errR = el("p", "err"); errR.hidden = true; resp.append(errR); p.append(resp);
     const contatoEscolhido = () => escolha.value === "novo" ? { nome: nNome.value.trim(), cargo: nCargo.value, tel: parseTel(nTel.value) || nTel.value.trim(), email: nEmail.value.trim().toLowerCase(), novo: true } : Object.assign({}, cs[Number(escolha.value)]);
@@ -480,8 +480,10 @@ function openEvento(it, kind){
       const ct = contatoEscolhido(), nAl = Number(String(alunos.value).replace(/\D/g, "")) || 0;
       errR.hidden = true;
       if (!nAl) { errR.textContent = "Coloque a média de alunos."; errR.hidden = false; alunos.focus(); return; }
-      if (!parseTel(ct.tel)) { errR.textContent = "Coloque o WhatsApp de quem combinou a data (com DDD)."; errR.hidden = false; (escolha.value === "novo" ? nTel : escolha).focus(); return; }
-      if (ct.email && !/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(ct.email)) { errR.textContent = "E-mail inválido."; errR.hidden = false; return; }
+      // basta um dos dois: WhatsApp (preferido) ou e-mail
+      const emailOk = /^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(ct.email || "");
+      if (ct.email && !emailOk) { errR.textContent = "E-mail inválido."; errR.hidden = false; return; }
+      if (!parseTel(ct.tel) && !emailOk) { errR.textContent = "Coloque o WhatsApp (de preferência) ou o e-mail de quem combinou a data."; errR.hidden = false; (escolha.value === "novo" ? nTel : escolha).focus(); return; }
       const contato = { nome: ct.nome || "", cargo: ct.cargo || "", tel: parseTel(ct.tel), email: ct.email || "" };
       f.contato = contato; f.alunos = nAl; if (fd) { fd.contato = contato; fd.alunos = nAl; }
       // Sugestão (não obrigatório): lembra o vendedor do dia de medir beca + ensaio
