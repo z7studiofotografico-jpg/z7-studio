@@ -1,4 +1,5 @@
-// Comissão do vendedor: depende da linha (PR ou Formatura) e da forma de pagamento.
+// Comissão do vendedor: depende da linha (PR ou Álbum de formatura) e da forma de pagamento.
+// Colação de grau: contrato individual pago no boleto, 20% de cada parcela paga (para quem fechou o colégio).
 // Os percentuais padrão abaixo podem ser mudados em Ajustes (ficam em config/app → comissao).
 export const FORMAS = ["Pix", "Cartão", "Recorrente", "Link", "Dinheiro", "Boleto"];
 export const PADRAO = {
@@ -16,8 +17,10 @@ export function formaDe(s){
   if (/boleto/.test(t)) return "Boleto";
   return "";
 }
+export const COLACAO_PADRAO = 20;
 export function taxa(P, linha, forma){
   const cfg = (P && P.comissao) || {};
+  if (linha === "colacao") return cfg.colacao != null && cfg.colacao !== "" ? Number(cfg.colacao) : COLACAO_PADRAO;
   const v = cfg[linha] && cfg[linha][forma];
   return v != null && v !== "" ? Number(v) : (PADRAO[linha] || {})[forma] || 0;
 }

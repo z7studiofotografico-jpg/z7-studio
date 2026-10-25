@@ -415,7 +415,7 @@ details.guide summary{cursor:pointer;font-family:var(--f-display);font-weight:70
       <div class="field"><label for="pAval">Link de avaliação no Google</label><input id="pAval" type="url" maxlength="300" placeholder="https://g.page/r/..."></div>
     </div>
     <h3>Comissão do vendedor (%)</h3>
-    <p class="hint">Calculada em cada venda, pela linha e pela forma de pagamento. Formatura = kits das turmas dos colégios.</p>
+    <p class="hint">PR: sobre a venda. Álbum de formatura (kits das turmas) e Colação de grau: sobre cada parcela paga. Só para a equipe de vendas.</p>
     <div class="comtab" id="comTab"></div>
     <h3>PR · Linha de Frente (ensaios deste ano)</h3>
     <div class="row2">
@@ -821,14 +821,17 @@ const COM_PADRAO = { pr: { "Cartão": 20, "Recorrente": 17, "Link": 17, "Dinheir
 function montarComissao(){
   const t = $("comTab"); t.innerHTML = "";
   const cfg = P.comissao || {};
-  ["", "PR", "Formatura"].forEach(h => { const s = document.createElement("span"); s.className = "th"; s.textContent = h; t.appendChild(s); });
+  ["", "PR", "Álbum de formatura"].forEach(h => { const s = document.createElement("span"); s.className = "th"; s.textContent = h; t.appendChild(s); });
   COM_FORMAS.forEach(f => {
     const s = document.createElement("span"); s.textContent = f; t.appendChild(s);
-    ["pr", "form"].forEach(l => { const i = document.createElement("input"); i.inputMode = "decimal"; i.dataset.l = l; i.dataset.f = f; i.setAttribute("aria-label", `Comissão ${l === "pr" ? "PR" : "Formatura"} no ${f}`);
+    ["pr", "form"].forEach(l => { const i = document.createElement("input"); i.inputMode = "decimal"; i.dataset.l = l; i.dataset.f = f; i.setAttribute("aria-label", `Comissão ${l === "pr" ? "PR" : "Álbum de formatura"} no ${f}`);
       const v = cfg[l] && cfg[l][f]; i.value = String(v != null && v !== "" ? v : COM_PADRAO[l][f]).replace(".", ","); t.appendChild(i); });
   });
+  const s = document.createElement("span"); s.textContent = "🎓 Colação de grau (boleto, por parcela paga)"; s.style.gridColumn = "1 / 3"; t.appendChild(s);
+  const ic = document.createElement("input"); ic.inputMode = "decimal"; ic.id = "comColacao"; ic.setAttribute("aria-label", "Comissão da colação de grau");
+  ic.value = String(cfg.colacao != null && cfg.colacao !== "" ? cfg.colacao : 20).replace(".", ","); t.appendChild(ic);
 }
-function lerComissao(){ const o = { pr: {}, form: {} }; document.querySelectorAll("#comTab input").forEach(i => { o[i.dataset.l][i.dataset.f] = num(i.value); }); return o; }
+function lerComissao(){ const o = { pr: {}, form: {} }; document.querySelectorAll("#comTab input[data-l]").forEach(i => { o[i.dataset.l][i.dataset.f] = num(i.value); }); o.colacao = num($("comColacao").value); return o; }
 $("pCancel").onclick = () => { $("sheetPrices").hidden = true; };
 $("pSair").onclick = async () => { $("sheetPrices").hidden = true; await signOut(auth); };
 $("pPush").onclick = () => enablePush(true);

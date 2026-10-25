@@ -58,7 +58,7 @@ async function buscar(){
   leads.forEach(l => vendas.push({ data: l.fechadoEm || String(l.criadoEm || "").slice(0, 10), valor: n0(l.valor), produto: l.servico || "Ensaio", origem: "Funil", resp: l.resp || "" }));
   prs.forEach(r => { const d = r.pagoEm || ""; vendas.push({ data: d, valor: n0(r.valor), produto: Number(r.ano) >= Number(d.slice(0, 4)) ? "Kit PR · Linha de Frente" : "Kit PR · Repasse", origem: "PR", resp: r.resp || "", linha: "pr", forma: formaDe(r.formaPag) }); });
   const instPorId = Object.fromEntries(insts.map(i => [i.id, i]));
-  forms.filter(f => f.status !== "desistiu").forEach(f => vendas.push({ data: f.vendidoEm || String(f.criadoEm || "").slice(0, 10), valor: n0(f.valor), produto: f.kit || "Kit formatura", origem: "Turmas", linha: "form", forma: formaDe(f.formaPag),
+  forms.filter(f => f.status !== "desistiu").forEach(f => vendas.push({ data: f.vendidoEm || String(f.criadoEm || "").slice(0, 10), valor: n0(f.valor), produto: f.contrato === "colacao" ? "Colação de grau" : f.kit || "Álbum de formatura", origem: "Turmas", linha: f.contrato === "colacao" ? "colacao" : "form", forma: f.contrato === "colacao" ? "Boleto" : formaDe(f.formaPag),
     resp: f.resp || (instPorId[f.instId] || {}).resp || "", recebido: n0(f.valor) * Math.min(n0(f.pagas), n0(f.parcelas) || 1) / (n0(f.parcelas) || 1) }));
   ens.filter(e => e.kind !== "pessoal" && !e.leadId && n0(e.valor) && e.status !== "faltou" && e.data <= C.todayStr())
     .forEach(e => vendas.push({ data: e.data, valor: n0(e.valor), produto: e.tipo || "Ensaio", origem: "Estúdio", resp: e.marcadoPor || "" }));
@@ -75,9 +75,10 @@ async function buscar(){
   const comissoes = [];
   prs.forEach(r => comissoes.push({ data: r.pagoEm || "", base: n0(r.valor), linha: "pr", forma: formaDe(r.formaPag), resp: r.resp || "" }));
   forms.filter(f => f.status !== "desistiu").forEach(f => {
-    const resp = f.resp || (instPorId[f.instId] || {}).resp || "", forma = formaDe(f.formaPag), pv = n0(f.valor) / (n0(f.parcelas) || 1);
+    const col = f.contrato === "colacao";
+    const resp = f.resp || (instPorId[f.instId] || {}).resp || "", forma = col ? "Boleto" : formaDe(f.formaPag), pv = n0(f.valor) / (n0(f.parcelas) || 1);
     const pags = Array.isArray(f.pagamentos) ? f.pagamentos : Array.from({ length: Math.min(n0(f.pagas), n0(f.parcelas) || 1) }, () => ({ data: f.vendidoEm || "", valor: pv }));
-    pags.forEach(p => comissoes.push({ data: p.data || f.vendidoEm || "", base: n0(p.valor), linha: "form", forma, resp }));
+    pags.forEach(p => comissoes.push({ data: p.data || f.vendidoEm || "", base: n0(p.valor), linha: col ? "colacao" : "form", forma, resp }));
   });
   return { vendas: vendas.filter(x => x.data), comissoes: comissoes.filter(x => x.data), visitas, marcadas, fechados, carregadoEm: new Date() };
 }
@@ -156,7 +157,7 @@ function equipe(corpo, fx, vs){
   const comDe = nm => cs.filter(x => x.resp === nm).reduce((a, x) => a + x.base * taxa(C.P, x.linha, x.forma) / 100, 0);
   const semForma = nm => cs.filter(x => x.resp === nm && !x.forma).length;
   const nomes = new Set([...(C.team() || []), ...vs.map(x => x.resp), ...dados.visitas.filter(x => dentro(x.data, fx)).map(x => x.por), ...dados.marcadas.map(x => x.por)].filter(Boolean));
-  const box = caixa(corpo, "Equipe", PERIODOS.find(p => p[0] === periodo)[1] + " · comissão: PR sobre a venda, Formatura sobre as parcelas pagas no período");
+  const box = caixa(corpo, "Equipe", PERIODOS.find(p => p[0] === periodo)[1] + " · comissão: PR sobre a venda; Álbum de formatura e Colação de grau sobre as parcelas pagas no período");
   const tb = el("div", "vdtab");
   const head = el("div", "vdtr th"); ["Pessoa", "Visitas feitas", "Visitas marcadas", "Colégios fechados", "Vendas", "Comissão"].forEach(t => head.append(el("span", null, t))); tb.append(head);
   [...nomes].sort((a, b) => a.localeCompare(b, "pt-BR")).forEach(nm => {

@@ -18,6 +18,15 @@ export function esperadas(f, hoje){
 }
 function vencDa(f, n){ const [y, m, d] = f.primeiroVenc.split("-").map(Number); const dt = new Date(y, m - 1 + n - 1, d); return `${dt.getFullYear()}-${C.pad(dt.getMonth() + 1)}-${C.pad(dt.getDate())}`; }
 const parcela = f => n0(f.valor) / (n0(f.parcelas) || 1);
+// Kits do contrato (opcionais), com valor total e parcelas; vencimento todo dia 5
+export const KITS_CONTRATO = [
+  { nome: "Kit 01 · Beca + canudo", valor: 65, parcelas: 1 },
+  { nome: "Kit 02 · Ensaio + fotos digitais + canudo", valor: 369, parcelas: 9 },
+  { nome: "Kit 03 · Quadro 30x40 + 2 porta-retratos", valor: 533, parcelas: 10 },
+  { nome: "Kit 04 · Álbum revista 21x30 (170g)", valor: 850, parcelas: 10 },
+  { nome: "Kit 05 · Álbum Layflat 21x30 (500g)", valor: 1350, parcelas: 10 }
+];
+const ehColacao = f => f.contrato === "colacao";
 // Histórico de parcelas pagas (data e valor): a comissão da formatura é paga sobre cada parcela recebida.
 // Quem já tinha parcelas pagas antes do histórico conta como pago na data da venda.
 function ajustaPag(f, novas, novoValor){
@@ -43,6 +52,8 @@ export function openTurma(ctx, inst, kits){
   const resumo = el("div", "kpis"); p.append(resumo);
   const bar = el("div", "actions");
   bar.append(C.mkBtn("+ Formando", "btn-primary", () => form()), C.mkBtn("Importar planilha", "", () => importar()));
+  const colTxt = () => inst.colacao && inst.colacao.valor ? `🎓 Colação: ${C.money(inst.colacao.valor)} em ${inst.colacao.parcelas || 1}x` : "🎓 Valor da colação";
+  if (C.isAdmin) { const bc = C.mkBtn(colTxt(), "", () => valorColacao(bc)); bar.append(bc); }
   p.append(bar);
   const chips = el("div", "chips"); p.append(chips);
   const q = inp("", "Buscar nome ou telefone"); q.type = "search"; q.className = "search"; q.oninput = () => { busca = norm(q.value); desenhar(); }; p.append(q);
@@ -60,9 +71,9 @@ export function openTurma(ctx, inst, kits){
     [["Formandos", String(ativos.length)], ["Vendido", C.money(Math.round(vendido))], ["Recebido", C.money(Math.round(recebido))], ["Em aberto", C.money(Math.round(vendido - recebido))], ["Atrasados", String(atr.length)]]
       .forEach(([t, v], i) => { const c = el("div", "kpi" + (i === 4 && atr.length ? " late" : "")); c.append(el("small", null, t), el("b", null, v)); resumo.append(c); });
     chips.innerHTML = "";
-    [["todos", "Todos", ativos.length], ["atrasados", "Atrasados", atr.length], ["aberto", "Em dia", ativos.filter(f => !quitado(f) && !atrasado(f)).length], ["quitados", "Quitados", ativos.filter(quitado).length], ["desistiu", "Desistiram", lista.length - ativos.length]]
+    [["todos", "Todos", ativos.length], ["atrasados", "Atrasados", atr.length], ["aberto", "Em dia", ativos.filter(f => !quitado(f) && !atrasado(f)).length], ["quitados", "Quitados", ativos.filter(quitado).length], ["album", "📘 Álbum", ativos.filter(f => !ehColacao(f)).length], ["colacao", "🎓 Colação", ativos.filter(ehColacao).length], ["desistiu", "Desistiram", lista.length - ativos.length]]
       .forEach(([k, t, n]) => { const b = el("button", "chip", t); b.type = "button"; b.setAttribute("aria-pressed", String(filtro === k)); b.append(el("span", "n", String(n))); b.onclick = () => { filtro = k; desenhar(); }; chips.append(b); });
-    let arr = lista.filter(f => filtro === "desistiu" ? f.status === "desistiu" : f.status !== "desistiu" && (filtro === "todos" || (filtro === "atrasados" && atrasado(f)) || (filtro === "quitados" && quitado(f)) || (filtro === "aberto" && !quitado(f) && !atrasado(f))));
+    let arr = lista.filter(f => filtro === "desistiu" ? f.status === "desistiu" : f.status !== "desistiu" && (filtro === "todos" || (filtro === "atrasados" && atrasado(f)) || (filtro === "quitados" && quitado(f)) || (filtro === "aberto" && !quitado(f) && !atrasado(f)) || (filtro === "album" && !ehColacao(f)) || (filtro === "colacao" && ehColacao(f))));
     if (busca) arr = arr.filter(f => norm(f.nome + " " + f.tel + " " + f.serie).includes(busca) || C.digits(f.tel).includes(busca.replace(/\D/g, "") || "x"));
     lst.innerHTML = "";
     if (!lista.length) { const e = el("div", "empty"); e.append(el("strong", null, "Nenhum formando ainda"), el("span", null, "Toque em “+ Formando” ou importe a planilha da turma.")); lst.append(e); return; }
@@ -74,7 +85,7 @@ export function openTurma(ctx, inst, kits){
     const at = atrasado(f), q0 = quitado(f);
     const e = el("article", "card " + (f.status === "desistiu" ? "" : at ? "late" : q0 ? "won" : ""));
     const top = el("div", "card-top"); top.append(el("h3", "name", title(f.nome)), el("span", "stage", f.status === "desistiu" ? "DESISTIU" : q0 ? "QUITADO" : at ? "ATRASADO" : "EM DIA")); e.append(top);
-    const meta = el("div", "meta"); [f.serie, f.kit, f.valor ? C.money(f.valor) : "", f.formaPag, f.tel].filter(Boolean).forEach((t, i) => meta.append(el("span", "tag" + (i === 1 ? " svc" : ""), t))); e.append(meta);
+    const meta = el("div", "meta"); [f.serie, ehColacao(f) ? "🎓 Colação de grau" : "📘 " + (f.kit || "Álbum de formatura"), f.valor ? C.money(f.valor) : "", ehColacao(f) ? "Boleto" : f.formaPag, f.tel].filter(Boolean).forEach((t, i) => meta.append(el("span", "tag" + (i === 1 ? " svc" : ""), t))); e.append(meta);
     if (n0(f.parcelas)) {
       const prox = n0(f.pagas) + 1;
       e.append(el("div", "fu " + (at ? "late" : ""), q0 ? `${f.parcelas}/${f.parcelas} parcelas pagas ✓` : `${n0(f.pagas)}/${f.parcelas} pagas · ${C.money(Math.round(parcela(f)))} por parcela` + (f.primeiroVenc ? ` · ${at ? "venceu" : "vence"} ${C.fmtDate(vencDa(f, prox))}` : "")));
@@ -103,10 +114,17 @@ export function openTurma(ctx, inst, kits){
     const nome = inp(f ? title(f.nome) : "", "nome do formando"); nome.required = true;
     const tel = inp(f ? f.tel : "", "WhatsApp do responsável", 30); tel.inputMode = "tel";
     const r1 = el("div", "row2"); r1.append(field("Nome", nome), field("WhatsApp", tel)); fp.append(r1);
+    const contrato = el("select"); [["album", "📘 Álbum de formatura (kit)"], ["colacao", "🎓 Colação de grau"]].forEach(([v, t]) => { const o = el("option", null, t); o.value = v; contrato.append(o); }); contrato.value = f && ehColacao(f) ? "colacao" : "album";
+    fp.append(field("Contrato", contrato));
     const serie = el("select"); ["", "Pré", "5º ano", "9º ano", "Ensino médio", "Outra"].forEach(t => { const o = el("option", null, t || "série"); o.value = t; serie.append(o); }); serie.value = f ? f.serie || "" : "";
     const kit = inp(f ? f.kit : "", "ex.: Kit Quadro + PR"); const dl = el("datalist"); dl.id = "tmKits" + (++fid); kit.setAttribute("list", dl.id);
+    KITS_CONTRATO.forEach(k => { const o = el("option"); o.value = k.nome; o.label = `${k.parcelas}x de ${C.money(k.valor / k.parcelas)} = ${C.money(k.valor)}`; dl.append(o); });
     (kits || []).forEach(k => { const o = el("option"); o.value = k.nome; dl.append(o); });
-    kit.addEventListener("change", () => { const k = (kits || []).find(x => x.nome === kit.value); if (k && k.preco && !valor.value) valor.value = k.preco; });
+    kit.addEventListener("change", () => {
+      const kc = KITS_CONTRATO.find(x => x.nome === kit.value);
+      if (kc) { valor.value = kc.valor; parc.value = kc.parcelas; venc.value = dia5(); return; }
+      const k = (kits || []).find(x => x.nome === kit.value); if (k && k.preco && !valor.value) valor.value = k.preco;
+    });
     const r2 = el("div", "row2"); r2.append(field("Série", serie), field("Kit", kit)); fp.append(r2, dl);
     const valor = inp(f ? f.valor || "" : "", "R$", 10); valor.inputMode = "decimal";
     const parc = inp(f ? f.parcelas || "" : "1", "1", 3); parc.inputMode = "numeric";
@@ -116,6 +134,16 @@ export function openTurma(ctx, inst, kits){
     const fpg = el("select"); [["", "forma de pagamento"], ...["Pix", "Cartão", "Link", "Recorrente", "Dinheiro", "Boleto"].map(x => [x, x])].forEach(([v, t]) => { const o = el("option", null, t); o.value = v; fpg.append(o); }); fpg.value = f ? f.formaPag || "" : "";
     const st = el("select"); [["ativo", "Comprou"], ["desistiu", "Desistiu"]].forEach(([v, t]) => { const o = el("option", null, t); o.value = v; st.append(o); }); st.value = f ? f.status || "ativo" : "ativo";
     const r4 = el("div", "row3"); r4.append(field("1º vencimento", venc), field("Pagamento", fpg), field("Situação", st)); fp.append(r4);
+    const colHint = el("p", "hint"); fp.append(colHint);
+    const syncC = () => {
+      const col = contrato.value === "colacao";
+      r2.querySelector(".field:last-child").hidden = col; fpg.disabled = col; if (col) fpg.value = "Boleto";
+      colHint.hidden = !col;
+      const cfg = inst.colacao || {};
+      colHint.textContent = cfg.valor ? `Colação de grau desta turma: ${C.money(cfg.valor)} em ${cfg.parcelas || 1}x no boleto.` : "O valor da colação de grau desta turma ainda não foi definido (o Adriano define no botão “🎓 Valor da colação”).";
+      if (col && !f && cfg.valor) { valor.value = cfg.valor; parc.value = cfg.parcelas || 1; if (cfg.primeiroVenc) venc.value = cfg.primeiroVenc; }
+    };
+    contrato.onchange = syncC; syncC();
     const obs = el("textarea"); obs.rows = 2; obs.maxLength = 500; obs.value = f ? f.obs || "" : ""; fp.append(field("Observação", obs));
     const err = el("p", "err"); err.hidden = true; fp.append(err);
     const a = el("div", "panel-actions");
@@ -126,7 +154,8 @@ export function openTurma(ctx, inst, kits){
       ev.preventDefault();
       const P = n0(parc.value) || 1, pg = n0(pagas.value);
       if (pg > P) { err.textContent = "Já pagas não pode ser maior que o número de parcelas."; err.hidden = false; return; }
-      const body = { nome: nome.value.trim(), tel: tel.value.trim(), serie: serie.value, kit: kit.value.trim(), valor: C.num(valor.value), parcelas: P, pagas: pg, primeiroVenc: venc.value, formaPag: fpg.value, status: st.value, obs: obs.value.trim(), atualizadoEm: new Date().toISOString() };
+      const ehCol = contrato.value === "colacao";
+      const body = { contrato: ehCol ? "colacao" : "album", nome: nome.value.trim(), tel: tel.value.trim(), serie: serie.value, kit: ehCol ? "" : kit.value.trim(), valor: C.num(valor.value), parcelas: P, pagas: pg, primeiroVenc: venc.value, formaPag: ehCol ? "Boleto" : fpg.value, status: st.value, obs: obs.value.trim(), atualizadoEm: new Date().toISOString() };
       try {
         if (f) body.pagamentos = ajustaPag(Object.assign({}, f, { parcelas: P }), pg, body.valor);
         else body.pagamentos = Array.from({ length: pg }, () => ({ data: C.todayStr(), valor: body.valor / P }));
@@ -137,10 +166,33 @@ export function openTurma(ctx, inst, kits){
     });
   }
 
+  // Vencimento padrão do contrato: dia 5 do próximo mês
+  function dia5(){ const t = new Date(); const d = new Date(t.getFullYear(), t.getMonth() + (t.getDate() > 5 ? 1 : 0), 5); return `${d.getFullYear()}-${C.pad(d.getMonth() + 1)}-05`; }
+  // Valor da colação de grau desta turma (só o administrador define)
+  function valorColacao(btn){
+    const s2 = el("div", "sheet"); const fp = el("form", "panel"); s2.append(fp);
+    const fechar = () => s2.remove(); s2.addEventListener("click", ev => { if (ev.target === s2) fechar(); });
+    const cfg = inst.colacao || {};
+    fp.append(el("h2", null, "Colação de grau · " + title(inst.nome)), el("p", "hint", "Contrato individual por aluno, pago no boleto. Quem fechou o colégio recebe a comissão sobre cada parcela paga."));
+    const v = inp(cfg.valor || "", "ex.: 400", 10); v.inputMode = "decimal";
+    const pc = inp(cfg.parcelas || "", "ex.: 10", 3); pc.inputMode = "numeric";
+    const vc = el("input"); vc.type = "date"; vc.value = cfg.primeiroVenc || dia5();
+    const r = el("div", "row3"); r.append(field("Valor total por aluno", v), field("Parcelas", pc), field("1º vencimento", vc)); fp.append(r);
+    const info = el("p", "hint"); const upd = () => { const t = C.num(v.value), n = n0(pc.value) || 1; info.textContent = t ? `${n}x de ${C.money(Math.round(t / n * 100) / 100)} no boleto` : ""; }; v.oninput = upd; pc.oninput = upd; upd(); fp.append(info);
+    const a = el("div", "panel-actions"); const sp = el("span"); sp.style.flex = "1"; const c = el("button", "btn", "Cancelar"); c.type = "button"; c.onclick = fechar; const ok = el("button", "btn btn-primary", "Salvar"); ok.type = "submit"; a.append(sp, c, ok); fp.append(a);
+    document.body.append(s2);
+    fp.addEventListener("submit", async ev => {
+      ev.preventDefault();
+      const novo = { valor: C.num(v.value), parcelas: n0(pc.value) || 1, primeiroVenc: vc.value };
+      try { await FS.updateDoc(FS.doc(db, "instituicoes", inst.id), { colacao: novo, atualizadoEm: new Date().toISOString() }); inst.colacao = novo; btn.textContent = colTxt(); fechar(); C.toast("Valor da colação salvo"); }
+      catch (e) { C.handleErr(e); }
+    });
+  }
+
   function importar(){
     const s2 = el("div", "sheet"); const fp = el("form", "panel"); s2.append(fp);
     const fechar = () => s2.remove(); s2.addEventListener("click", ev => { if (ev.target === s2) fechar(); });
-    fp.append(el("h2", null, "Importar formandos"), el("p", "hint", "Planilha do Excel com as colunas (os nomes podem variar): NOME, TELEFONE, SÉRIE, KIT, VALOR, PARCELAS, PAGAS, VENCIMENTO, PAGAMENTO. Só o nome é obrigatório."));
+    fp.append(el("h2", null, "Importar formandos"), el("p", "hint", "Planilha do Excel com as colunas (os nomes podem variar): NOME, TELEFONE, SÉRIE, KIT, VALOR, PARCELAS, PAGAS, VENCIMENTO, PAGAMENTO e CONTRATO (escreva COLAÇÃO para quem é da colação de grau). Só o nome é obrigatório."));
     const file = el("input"); file.type = "file"; file.accept = ".xlsx,.xls,.csv"; fp.append(file);
     const prev = el("div", "imp"); fp.append(prev);
     const a = el("div", "panel-actions"); const sp = el("span"); sp.style.flex = "1"; const c = el("button", "btn", "Cancelar"); c.type = "button"; c.onclick = fechar; const ok = el("button", "btn btn-primary", "Importar"); ok.type = "submit"; ok.disabled = true; a.append(sp, c, ok); fp.append(a);
@@ -153,10 +205,11 @@ export function openTurma(ctx, inst, kits){
         const rows = XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]], { defval: "" });
         const pega = (r, ...ks) => { const e = Object.entries(r).find(([k]) => ks.some(x => norm(k).includes(x))); return e ? e[1] : ""; };
         const iso = v => v instanceof Date ? `${v.getFullYear()}-${C.pad(v.getMonth() + 1)}-${C.pad(v.getDate())}` : /^(\d{2})\/(\d{2})\/(\d{4})$/.test(String(v).trim()) ? String(v).trim().replace(/^(\d{2})\/(\d{2})\/(\d{4})$/, "$3-$2-$1") : "";
-        const ja = new Set(lista.map(f => norm(f.nome)));
+        const ja = new Set(lista.map(f => norm(f.nome) + "|" + (ehColacao(f) ? "colacao" : "album")));
         linhas = rows.map(r => ({ nome: String(pega(r, "nome", "formando", "aluno")).trim(), tel: String(pega(r, "telefone", "celular", "whats", "tel")).trim(), serie: String(pega(r, "serie", "turma", "ano")).trim(),
-          kit: String(pega(r, "kit", "produto", "pacote")).trim(), valor: C.num(String(pega(r, "valor", "preco", "total"))), parcelas: n0(pega(r, "parcela")) || 1, pagas: n0(pega(r, "paga")), primeiroVenc: iso(pega(r, "venc")), formaPag: String(pega(r, "pagamento", "forma")).trim() }))
-          .filter(x => x.nome && !ja.has(norm(x.nome)));
+          kit: String(pega(r, "kit", "produto", "pacote")).trim(), valor: C.num(String(pega(r, "valor", "preco", "total"))), parcelas: n0(pega(r, "parcela")) || 1, pagas: n0(pega(r, "paga")), primeiroVenc: iso(pega(r, "venc")), formaPag: String(pega(r, "pagamento", "forma")).trim(), contrato: /cola/.test(norm(pega(r, "contrato", "colacao", "tipo"))) ? "colacao" : "album" }))
+          .map(x => x.contrato === "colacao" ? Object.assign(x, { kit: "", formaPag: "Boleto", valor: x.valor || n0((inst.colacao || {}).valor), parcelas: x.parcelas > 1 ? x.parcelas : n0((inst.colacao || {}).parcelas) || x.parcelas }) : x)
+          .filter(x => x.nome && !ja.has(norm(x.nome) + "|" + x.contrato));
         prev.textContent = linhas.length ? `${linhas.length} formando${linhas.length > 1 ? "s" : ""} novo${linhas.length > 1 ? "s" : ""}: ${linhas.slice(0, 5).map(x => title(x.nome)).join(", ")}${linhas.length > 5 ? "…" : ""}` : "Nenhum formando novo na planilha.";
         ok.disabled = !linhas.length;
       } catch (e) { console.warn(e); prev.textContent = "Não consegui ler a planilha."; }
