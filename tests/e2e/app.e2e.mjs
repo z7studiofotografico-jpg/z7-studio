@@ -409,6 +409,26 @@ console.log("Adriano (admin), com os dados já atualizados no servidor:");
     /Kit 04.*6x de R\$ 183,33/.test(decodeURIComponent(await pg.evaluate(() => window.__aberto || ""))),
     "mensagem oferece o Kit 04 a 6x de R$ 183,33"
   );
+  // prévia: todas as fotos do kit (35 fotos = 2 páginas) e prévia do álbum, montadas no aparelho
+  await pg.locator("#fmCorpo .card").filter({ hasText: "Caio" }).getByText("🖼️ Prévia").click();
+  await pg.waitForTimeout(500);
+  const foto = fs.readFileSync(RAIZ + "icons/icon-512.png");
+  await pg
+    .locator(".panel.mock input[type=file]")
+    .setInputFiles(Array.from({ length: 35 }, (_, i) => ({ name: `f${i}.png`, mimeType: "image/png", buffer: foto })));
+  await pg
+    .waitForFunction(() => /35 fotos em 2 páginas/.test(document.querySelector(".panel.mock .hint")?.textContent || ""), null, {
+      timeout: 8000
+    })
+    .catch(() => {});
+  ok(/35 fotos em 2 páginas/.test(await pg.textContent(".panel.mock")), "prévia: 35 fotos do kit em 2 páginas");
+  if (process.env.FOTOS) await pg.locator(".panel.mock canvas").screenshot({ path: process.env.FOTOS + "/folha.png" });
+  await pg.locator(".panel.mock").getByRole("button", { name: "📘 Prévia do álbum" }).click();
+  await pg.waitForTimeout(600);
+  ok((await pg.evaluate(() => document.querySelector(".panel.mock canvas").width)) === 1600, "prévia do álbum desenhada");
+  if (process.env.FOTOS) await pg.locator(".panel.mock canvas").screenshot({ path: process.env.FOTOS + "/album.png" });
+  await pg.locator(".panel.mock").getByRole("button", { name: "Fechar" }).click();
+  await pg.waitForTimeout(200);
   await pg.locator("#fmCorpo .card").filter({ hasText: "Caio" }).getByText("Abrir turma").click();
   await pg.waitForTimeout(500);
   if (process.env.FOTOS) await pg.locator(".panel.wide").screenshot({ path: process.env.FOTOS + "/turma.png" });

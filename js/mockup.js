@@ -527,3 +527,6 @@ function alertMsg(p, t) {
   }
   n.textContent = t;
 }
+// usados também pela prévia da formatura (js/previa.js)
+export { cover, marca, prep, loadImg };
+export const logoAtual = () => logoImg;

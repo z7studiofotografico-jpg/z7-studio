@@ -5,7 +5,7 @@
 //  - 📋 Kits e preços: tabela do contrato (antecipado) e preço depois das fotos
 //  - Turmas: colégios fechados, com acesso à lista de formandos
 // Quem não é administrador vê só as turmas dos colégios que fechou.
-import { setCtx, openTurma, cobrarWa, registrarPagamento, atrasado, oferecerKit } from "./turma.js";
+import { setCtx, openTurma, cobrarWa, registrarPagamento, atrasado, oferecerKit, abrirPrevia } from "./turma.js";
 import { kitsPadrao, candidatosPosFoto } from "./contrato.js";
 import {
   ativo,
@@ -467,16 +467,7 @@ function renderPosFoto(corpo) {
     e.append(meta);
     const act = el("div", "actions");
     if (f.tel) act.append(U.mkBtn("💬 Oferecer kit", "btn-primary", () => oferecerKit(C, inst, f)));
-    act.append(
-      U.mkBtn("🖼️ Prévia", "", async () => {
-        try {
-          const { openMockup } = await import("./mockup.js");
-          openMockup({ nome: title(f.nome), escola: title(f.instNome), toast: U.toast });
-        } catch (er) {
-          avisoErro(er, "abrir a prévia", U.toast);
-        }
-      })
-    );
+    act.append(U.mkBtn("🖼️ Prévia", "", () => abrirPrevia(C, inst, f)));
     if (insts.find(i => i.id === f.instId)) act.append(U.mkBtn("Abrir turma", "", () => abrirTurma(inst)));
     e.append(act);
     g.append(e);

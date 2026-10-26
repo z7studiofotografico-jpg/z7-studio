@@ -214,3 +214,4 @@ details.tamtipo{border:1px solid var(--line,#ddd);border-radius:10px;padding:6px
 .vdareas{grid-template-columns:repeat(4,1fr);margin-bottom:8px}
 .vdareas .seg{align-items:center;text-align:center;font-weight:700;padding:10px 6px;font-size:.92rem}
 @media (max-width:520px){.vdareas{grid-template-columns:1fr 1fr}}
+.panel.mock > *{flex-shrink:0}

@@ -106,6 +106,30 @@ export function cobrarWa(f) {
   wa(f.tel, msg, U.toast);
 }
 // Mensagem para quem tem só o Kit 01: as fotos ficaram prontas, kits no preço depois das fotos (tabela da turma)
+// Kits no preço depois das fotos (tabela da turma), uma linha por kit
+export function linhasKitsPos(P, inst) {
+  return kitsDe(P, inst)
+    .filter(k => !ehAdesao(k.id) && k.pos && Number(k.pos.valor))
+    .map(k => {
+      const n = Math.max(1, Number(k.pos.parcelas) || 1);
+      return `• ${k.nome}: ${n > 1 ? `${n}x de ${brl(dividir(k.pos.valor, n)[n - 1])} (${brl(k.pos.valor)})` : brl(k.pos.valor)}`;
+    });
+}
+// Prévia da formatura (todas as fotos do kit e prévia do álbum), com os kits na mensagem
+export async function abrirPrevia(ctx, inst, f) {
+  setCtx(ctx);
+  try {
+    const { openPrevia } = await import("./previa.js");
+    openPrevia({
+      nome: title(f.nome),
+      escola: title(inst.nome || f.instNome || ""),
+      kits: linhasKitsPos(C.P, inst).join("\n"),
+      toast: U.toast
+    });
+  } catch (e) {
+    avisoErro(e, "abrir a prévia", U.toast);
+  }
+}
 export function oferecerKit(ctx, inst, f) {
   setCtx(ctx);
   const ks = kitsDe(C.P, inst).filter(k => !ehAdesao(k.id) && k.pos && Number(k.pos.valor));
@@ -415,6 +439,7 @@ export function openTurma(ctx, inst, kits, aoFechar) {
           );
         // venda depois das fotos: quem tem só o Kit 01, quando as fotos ficaram prontas
         if (cand && prontas && f.tel) act.append(U.mkBtn("💬 Oferecer kit", "btn-primary", () => oferecerKit(C, inst, f)));
+        if (cand && prontas) act.append(U.mkBtn("🖼️ Prévia", "", () => abrirPrevia(C, inst, f)));
         if (cand && prontas)
           act.append(U.mkBtn("🛒 Comprou kit", "btn-ok", () => (sem ? form(f, { venda: "pos" }) : form(null, { venda: "pos", base: f }))));
         act.append(U.mkBtn("Editar", "", () => form(f)));
