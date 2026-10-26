@@ -138,11 +138,11 @@ details.guide summary{cursor:pointer;font-family:var(--f-display);font-weight:70
 .passos span.on{background:var(--ok-soft);color:var(--ok);font-weight:600}
 .kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:8px;margin:10px 0}
 .kpi{background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:12px 14px;display:flex;flex-direction:column;gap:2px;border-top:3px solid #2563eb}
-.kpi small{color:var(--muted);font-size:.8rem}
+.kpi small{color:var(--muted);font-size:.88rem;font-weight:600}
 .kpi b{font-size:1.35rem;font-variant-numeric:tabular-nums}
 .kpi.late{border-top-color:var(--late)}
 .vdbox{background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:14px;margin:10px 0}
-.vdbox h3{margin:0;font-size:1rem}
+.vdbox h3{margin:0;font-size:1.15rem;font-weight:800}
 .vdbox>small{color:var(--muted);font-size:.8rem}
 .vdchart{position:relative;margin-top:10px;width:100%}
 .vdlist{display:flex;flex-direction:column;margin-top:8px}
@@ -194,9 +194,9 @@ details.guide summary{cursor:pointer;font-family:var(--f-display);font-weight:70
 @media (min-width:700px){.sheet{align-items:center}.panel{border-radius:14px}}
 .panel h2{font-family:var(--f-display);text-transform:uppercase;letter-spacing:.04em;margin:0;font-size:1.4rem}
 .panel h3{font-family:var(--f-display);text-transform:uppercase;letter-spacing:.04em;margin:6px 0 0;font-size:1.05rem;color:var(--muted)}
-.hint{margin:0;color:var(--muted);font-size:.88rem}
+.hint{margin:0;color:var(--muted);font-size:1rem}
 .field{display:flex;flex-direction:column;gap:4px;min-width:0}
-.field label{font-size:.78rem;text-transform:uppercase;letter-spacing:.06em;font-weight:600;color:var(--muted)}
+.field > label:not(.chk){font-size:.95rem;text-transform:uppercase;letter-spacing:.04em;font-weight:800;color:var(--fg)}
 .field input,.field select,.field textarea{font:inherit;font-size:16px;padding:9px 10px;border-radius:8px;border:1px solid var(--line);background:var(--bg);color:var(--fg);width:100%}
 .row2{display:grid;grid-template-columns:1fr 1fr;gap:10px}
 @media (max-width:420px){.row2{grid-template-columns:1fr}}
@@ -208,7 +208,7 @@ details.guide summary{cursor:pointer;font-family:var(--f-display);font-weight:70
 .toast{position:fixed;left:50%;transform:translateX(-50%);bottom:calc(16px + env(safe-area-inset-bottom,0px));background:var(--fg);color:var(--bg);padding:8px 14px;border-radius:8px;font-weight:600;z-index:30;max-width:90%;text-align:center}
 @media (prefers-reduced-motion:no-preference){.card{transition:border-color .2s}}
 .mostrar-mais{display:block;width:100%;margin:8px 0 4px}
-details.tamtipo{border:1px solid var(--line,#ddd);border-radius:10px;padding:6px 10px;margin:6px 0}details.tamtipo summary{cursor:pointer;font-weight:600;font-size:14px;padding:4px 0}details.tamtipo .estgrid{margin-top:8px}
+details.tamtipo{border:1px solid var(--line,#ddd);border-radius:10px;padding:6px 10px;margin:6px 0}details.tamtipo summary{cursor:pointer;font-weight:800;font-size:1rem;padding:4px 0}details.tamtipo .estgrid{margin-top:8px}
 .lote.lote-aviso{border-left-color:#d97706}#rLoteAviso{margin:6px 0 0;font-size:13px}
 /* Dashboard: um card por vez (Geral, PR, Formaturas, Funil) */
 .vdareas{grid-template-columns:repeat(4,1fr);margin-bottom:8px}
