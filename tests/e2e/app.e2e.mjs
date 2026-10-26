@@ -31,6 +31,8 @@ const base = {
   "ensaios/c1": { kind: "pessoal", titulo: "Consulta médica", obs: "", particular: true, deQuem: "Luciana", data: dia(2), diaInteiro: true, status: "confirmado" },
   ["agenda/" + dia(9)]: { data: dia(9), kind: "fotos", status: "pendente", instId: "i1", instNome: "COLEGIO ALFA", pedidoPor: "Pedro Vendedor" }
 };
+// fila da Linha de Frente: 30 contatos para separar
+for (let i = 0; i < 30; i++) base["repasse/fila" + String(i).padStart(2, "0")] = { nome: "ALUNO " + i, ano: hoje.getFullYear(), etapa: "NA FILA", escola: "COLEGIO ALFA", contatos: [{ tipo: "Mãe", tel: "2199999" + String(1000 + i) }] };
 async function abrir(email, dados){
   const ctx = await browser.newContext({ viewport: { width: 420, height: 900 }, serviceWorkers: "block" });
   const pg = await ctx.newPage(); const erros = [];
@@ -192,6 +194,12 @@ console.log("Pedro (vendedor: Linha de Frente, Agendamento, Instituições):");
   await sa.getByText("Cancelar").click();
   await ir(pg, "#pr"); await pg.waitForTimeout(600);
   ok((await pg.textContent("#viewRepasse")).length > 50, "PR (Linha de Frente) abre");
+  // lote do dia: não trava, avisa depois de 25
+  for (let i = 0; i < 3; i++) { await pg.locator("#rLoteBtn").click(); await pg.waitForTimeout(700); }
+  const sepS = await store(); const sep = Object.values(sepS).filter(x => x.separadoEm && x.respEmail === PEDRO).length;
+  ok(sep === 30, "separou 30 contatos sem travar no limite: " + sep);
+  ok(await pg.locator("#rLoteAviso").isVisible() && /já separou 30 contatos hoje \(o combinado é até 25\)/.test(await pg.textContent("#rLoteAviso")), "mostra o aviso depois de 25 na Linha de Frente");
+  ok(await pg.locator("#rLoteBtn").isEnabled(), "botão continua liberado");
   await ir(pg, "#inst-particular"); await pg.waitForTimeout(400);
   await pg.locator("#iChips").getByText("Todas").click(); await pg.waitForTimeout(200);
   // visita num colégio sem responsável: ele assume (por e-mail) e a visita guarda quem foi

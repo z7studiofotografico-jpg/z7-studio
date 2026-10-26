@@ -171,11 +171,11 @@ function mount(){
   const g = el("details", "guide"); g.id = "rGuide";
   g.innerHTML = `<summary>Como funciona o PR</summary><ol>
     <li><b>Linha de Frente</b> são os ensaios deste ano; <b>Repasse</b> são os dos anos anteriores. Em 1º de janeiro tudo vira sozinho: a Linha de Frente do ano que acabou passa para o Repasse.</li>
-    <li><b>Separe o seu lote do dia</b> no quadro abaixo. Começamos com poucos contatos por dia para o WhatsApp não bloquear o número.</li>
+    <li><b>Separe o seu lote do dia</b> no quadro abaixo. O app não trava: separa 10 por vez e avisa quando você passar de 25 no dia na Linha de Frente ou de 20 no Repasse (os números mudam em ⚙️ Ajustes), para o WhatsApp não bloquear o número.</li>
     <li>Cada cartão mostra <b>para quem mandar</b> (mãe, pai ou formando) e a mensagem pronta. O 1º contato só pede permissão para mandar a prévia.</li>
     <li>Respondeu que quer ver? Toque em <b>Quer ver a prévia</b>, depois em <b>🖼️ Prévia</b>: arraste a foto do formando e o app monta o kit pronto para enviar.</li>
     <li><b>Pagou?</b> Toque em <b>Pagou</b>. O cartão pede para <b>confirmar o endereço</b> (ou agendar a retirada no estúdio) e vai para <b>Entregas</b>, separado por cidade e bairro para montar a rota.</li>
-    <li>Cada frente tem o <b>seu próprio número de WhatsApp</b> e o seu limite de contatos por dia (em ⚙️ Ajustes). Nunca use o número do funil.</li></ol>`;
+    <li>Cada frente tem o <b>seu próprio número de WhatsApp</b> e o seu aviso de contatos por dia (em ⚙️ Ajustes). Nunca use o número do funil.</li></ol>`;
   v.append(g);
 
   const st = el("section", "stats");
@@ -186,7 +186,7 @@ function mount(){
   v.append(st);
 
   const lote = el("div", "lote"); lote.id = "rLote";
-  lote.innerHTML = `<div><b>Seu lote de hoje</b><span id="rLoteTxt">…</span><small class="lnum" id="rLoteNum" hidden></small></div>
+  lote.innerHTML = `<div><b>Seu lote de hoje</b><span id="rLoteTxt">…</span><small class="lnum" id="rLoteNum" hidden></small><p class="wait" id="rLoteAviso" hidden></p></div>
     <div class="quick"><select id="rLoteEscola" aria-label="Escola do lote"><option value="">Turmas mais recentes primeiro</option></select>
     <button class="btn btn-primary btn-sm" id="rLoteBtn" type="button">Separar contatos</button></div>`;
   v.append(lote);
@@ -586,21 +586,28 @@ function anosRepasse(){
   const de = conhecidos.length ? Math.min(...conhecidos) : ANO_MIN;
   const out = []; for (let a = Y - 1; a >= de; a--) out.push(a); return out;
 }
-const limiteSeg = () => (seg === "lf" ? C.P.lfLoteDia : C.P.loteDia) || 20;
+// Não há limite: o app só avisa quando a pessoa passa do número de Ajustes (padrão: Linha de Frente 25, Repasse 20 por dia)
+const avisoSeg = () => (seg === "lf" ? C.P.lfAvisoDia || 25 : C.P.avisoDia || 20);
+const POR_VEZ = 10; // quantos contatos cada toque separa
 const numeroSeg = () => (seg === "lf" ? C.P.lfNumero : C.P.repNumero) || "";
 async function refreshLote(){
-  const lim = limiteSeg();
+  const av = avisoSeg();
   try {
     const c = await FS.getCountFromServer(FS.query(col, FS.where("resp", "==", C.me), FS.where("separadoEm", "==", C.todayStr()), FS.where("separadoSeg", "==", seg), ...(seg === "lf" ? baseLF() : [])));
-    const n = c.data().count, falta = Math.max(0, lim - n);
-    $("rLoteTxt").textContent = n ? ` ${n} de ${lim} separados hoje.` + (falta ? ` Ainda pode separar ${falta}.` : " Lote completo ✓") : ` Separe até ${lim} contatos novos hoje.`;
-    $("rLoteBtn").disabled = !falta; $("rLoteBtn").textContent = falta ? `Separar ${falta} contato${falta > 1 ? "s" : ""}` : "Lote completo";
-    $("rLoteBtn").dataset.falta = falta;
+    const n = c.data().count;
+    $("rLoteTxt").textContent = n ? ` ${n} separado${n > 1 ? "s" : ""} hoje.` : ` Separe os contatos novos de hoje (o ideal é até ${av} por dia).`;
+    const alerta = $("rLoteAviso"); alerta.hidden = n < av;
+    alerta.textContent = `⚠️ Você já separou ${n} contatos hoje (o combinado é até ${av}). Mandar muitas mensagens novas no mesmo dia pode fazer o WhatsApp bloquear o número. Pode continuar, mas vá com calma.`;
+    $("rLote").classList.toggle("lote-aviso", n >= av);
+    $("rLoteBtn").disabled = false; $("rLoteBtn").textContent = n ? `Separar mais ${POR_VEZ}` : `Separar ${POR_VEZ} contatos`;
+    $("rLoteBtn").dataset.n = n;
     const n0 = numeroSeg(); $("rLoteNum").textContent = n0 ? `📱 Use o WhatsApp ${n0}` : ""; $("rLoteNum").hidden = !n0;
   } catch (e) { console.warn(e); $("rLoteTxt").textContent = " Não foi possível contar agora."; }
 }
 async function separarLote(){
-  let falta = Number($("rLoteBtn").dataset.falta || 0); if (!falta || !C.me) return;
+  if (!C.me) return;
+  const ja = Number($("rLoteBtn").dataset.n || 0), av = avisoSeg();
+  let falta = POR_VEZ;
   const esc = $("rLoteEscola").value;
   const anos = seg === "lf" ? [ANO()] : anosRepasse(); // Repasse: do ano mais recente para o mais antigo
   $("rLoteBtn").disabled = true;
@@ -616,7 +623,8 @@ async function separarLote(){
     const b = FS.writeBatch(db), hoje = C.todayStr();
     pegos.forEach(d => b.update(d.ref, { etapa: "SEPARADO", resp: C.me, respEmail: C.email || "", separadoEm: hoje, separadoSeg: seg, followup: hoje, atualizadoEm: new Date().toISOString() }));
     await b.commit();
-    C.toast(`${pegos.length} contato${pegos.length > 1 ? "s" : ""} separado${pegos.length > 1 ? "s" : ""} para você hoje`);
+    const total = ja + pegos.length;
+    C.toast(`${pegos.length} contato${pegos.length > 1 ? "s" : ""} separado${pegos.length > 1 ? "s" : ""} para você hoje` + (total >= av ? ` · ⚠️ já são ${total} hoje (combinado: até ${av})` : ""));
     refreshLote(); refreshStats(); if (tab !== "hoje") openTab("hoje");
   } catch (e) { C.handleErr(e); } finally { $("rLoteBtn").disabled = false; }
 }

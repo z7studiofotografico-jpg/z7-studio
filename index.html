@@ -238,7 +238,7 @@
       <div class="field"><label for="pLfParc">Parcelas no cartão · Linha de Frente (até)</label><input id="pLfParc" inputmode="numeric" placeholder="5"></div>
     </div>
     <div class="row2">
-      <div class="field"><label for="pLfLote">Contatos novos por pessoa, por dia</label><input id="pLfLote" inputmode="numeric" placeholder="20"></div>
+      <div class="field"><label for="pLfLote">Avisar quando passar de (contatos por pessoa, por dia)</label><input id="pLfLote" inputmode="numeric" placeholder="25"></div>
       <div class="field"><label for="pLfNum">WhatsApp usado</label><input id="pLfNum" maxlength="30" placeholder="(21) 9xxxx-xxxx"></div>
     </div>
     <h3>PR · Repasse (anos anteriores)</h3>
@@ -251,7 +251,7 @@
       <div class="field"><label for="pKitFinal">Última oferta, Pix ou cartão (R$)</label><input id="pKitFinal" inputmode="decimal" placeholder="250"></div>
     </div>
     <div class="row2">
-      <div class="field"><label for="pLote">Contatos novos por pessoa, por dia</label><input id="pLote" inputmode="numeric" placeholder="20"></div>
+      <div class="field"><label for="pLote">Avisar quando passar de (contatos por pessoa, por dia)</label><input id="pLote" inputmode="numeric" placeholder="20"></div>
       <div class="field"><label for="pRepNum">WhatsApp usado</label><input id="pRepNum" maxlength="30" placeholder="(21) 3774-0000"></div>
     </div>
     <div class="row2">
@@ -409,7 +409,7 @@ function mkBtn(text, cls, fn){ const b = document.createElement("button"); b.typ
 $("btnPrices").onclick = () => {
   $("pInd").value = P.individual || ""; $("pSinal").value = P.sinal || ""; $("pG36").value = P.g36 || ""; $("pG7").value = P.g7 || "";
   $("pFotos").value = P.fotos || ""; $("pPrazo").value = P.prazo || "";
-  $("pLfLote").value = P.lfLoteDia || ""; $("pLfNum").value = P.lfNumero || ""; $("pRepNum").value = P.repNumero || ""; $("pLfParc").value = P.lfParcelas || ""; $("pLfPix").value = P.lfPix || ""; $("pLfCartao").value = P.lfCartao || ""; $("pKit").value = P.kitPreco || ""; $("pKitPromo").value = P.kitPromo || ""; $("pKitCartao").value = P.kitCartao || ""; $("pKitFinal").value = P.kitFinal || ""; $("pLote").value = P.loteDia || ""; $("pEntrega").value = P.entrega || ""; $("pPix").value = P.pix || ""; $("pParc").value = P.parcelas || ""; $("pPixLF").value = P.pixLF || ""; $("pPixRep").value = P.pixRep || ""; $("pPixFinal").value = P.pixFinal || ""; $("pPixSinal").value = P.pixSinal || ""; $("pLink").value = P.linkCartao || ""; $("pLinkFinal").value = P.linkCartaoFinal || ""; $("pLinkLF").value = P.linkCartaoLF || ""; $("pAval").value = P.linkAvaliacao || ""; $("pEquipes").value = String(P.equipesDia || 1); $("pFeriados").value = P.feriadosExtras || ""; feriadosExtras(P.feriadosExtras); listarFeriados(); montarComissao(); formatarCampos($("sheetPrices"));
+  $("pLfLote").value = P.lfAvisoDia || ""; $("pLfNum").value = P.lfNumero || ""; $("pRepNum").value = P.repNumero || ""; $("pLfParc").value = P.lfParcelas || ""; $("pLfPix").value = P.lfPix || ""; $("pLfCartao").value = P.lfCartao || ""; $("pKit").value = P.kitPreco || ""; $("pKitPromo").value = P.kitPromo || ""; $("pKitCartao").value = P.kitCartao || ""; $("pKitFinal").value = P.kitFinal || ""; $("pLote").value = P.avisoDia || ""; $("pEntrega").value = P.entrega || ""; $("pPix").value = P.pix || ""; $("pParc").value = P.parcelas || ""; $("pPixLF").value = P.pixLF || ""; $("pPixRep").value = P.pixRep || ""; $("pPixFinal").value = P.pixFinal || ""; $("pPixSinal").value = P.pixSinal || ""; $("pLink").value = P.linkCartao || ""; $("pLinkFinal").value = P.linkCartaoFinal || ""; $("pLinkLF").value = P.linkCartaoLF || ""; $("pAval").value = P.linkAvaliacao || ""; $("pEquipes").value = String(P.equipesDia || 1); $("pFeriados").value = P.feriadosExtras || ""; feriadosExtras(P.feriadosExtras); listarFeriados(); montarComissao(); formatarCampos($("sheetPrices"));
   ["pInd","pSinal","pG36","pG7","pFotos","pPrazo","pLfLote","pLfNum","pRepNum","pLfParc","pLfPix","pLfCartao","pKit","pKitPromo","pKitCartao","pKitFinal","pLote","pEntrega","pPix","pParc","pPixLF","pPixRep","pPixFinal","pPixSinal","pLink","pLinkFinal","pLinkLF","pAval","pEquipes","pFeriados"].forEach(id => $(id).disabled = !isAdmin); document.querySelectorAll("#comTab input").forEach(i => i.disabled = !isAdmin);
   $("pSave").hidden = !isAdmin;
   $("pricesHint").textContent = isAdmin ? "Os valores entram automaticamente nas mensagens prontas." : "Só administradores mudam os preços.";
@@ -449,7 +449,7 @@ $("formPrices").addEventListener("submit", async e => {
   if (!isAdmin) return;
   const body = { individual: num($("pInd").value), sinal: num($("pSinal").value), g36: num($("pG36").value), g7: num($("pG7").value),
     fotos: num($("pFotos").value) || 30, prazo: num($("pPrazo").value) || 15,
-    lfLoteDia: num($("pLfLote").value) || 20, lfNumero: $("pLfNum").value.trim(), repNumero: $("pRepNum").value.trim(), lfParcelas: num($("pLfParc").value), lfPix: num($("pLfPix").value), lfCartao: num($("pLfCartao").value), kitPreco: num($("pKit").value), kitPromo: num($("pKitPromo").value), kitCartao: num($("pKitCartao").value), kitFinal: num($("pKitFinal").value), loteDia: num($("pLote").value) || 20, entrega: $("pEntrega").value.trim(),
+    lfAvisoDia: num($("pLfLote").value) || 25, lfNumero: $("pLfNum").value.trim(), repNumero: $("pRepNum").value.trim(), lfParcelas: num($("pLfParc").value), lfPix: num($("pLfPix").value), lfCartao: num($("pLfCartao").value), kitPreco: num($("pKit").value), kitPromo: num($("pKitPromo").value), kitCartao: num($("pKitCartao").value), kitFinal: num($("pKitFinal").value), avisoDia: num($("pLote").value) || 20, entrega: $("pEntrega").value.trim(),
     pix: $("pPix").value.trim(), parcelas: num($("pParc").value), pixLF: $("pPixLF").value.trim(), pixRep: $("pPixRep").value.trim(), pixFinal: $("pPixFinal").value.trim(), pixSinal: $("pPixSinal").value.trim(), linkCartao: $("pLink").value.trim(), linkCartaoFinal: $("pLinkFinal").value.trim(), linkCartaoLF: $("pLinkLF").value.trim(), linkAvaliacao: $("pAval").value.trim(), equipesDia: Number($("pEquipes").value) || 1, feriadosExtras: $("pFeriados").value.trim(), comissao: lerComissao() };
   try {
     await setDoc(doc(db, "config", "app"), body, { merge: true });
