@@ -30,7 +30,7 @@ self.addEventListener("activate", (e) => {
 });
 
 // Bibliotecas de fora (Firebase, gráficos, planilha): têm a versão no endereço, então podem ficar guardadas.
-const ehCDN = (u) => /^(www\.gstatic\.com|cdn\.jsdelivr\.net)$/.test(u.hostname);
+const ehCDN = (u) => /^(www\.gstatic\.com|cdn\.jsdelivr\.net|unpkg\.com)$/.test(u.hostname);
 // Arquivos do próprio app: busca na internet primeiro (sem cache do navegador) e usa a cópia guardada se estiver sem sinal.
 self.addEventListener("fetch", (e) => {
   const url = new URL(e.request.url);

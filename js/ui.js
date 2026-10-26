@@ -42,10 +42,14 @@ const carregando = {};
 export function carregarLib(nome){
   const L = LIBS[nome];
   if (window[L.global]) return Promise.resolve(window[L.global]);
-  return carregando[nome] = carregando[nome] || new Promise((res, rej) => {
-    const s = document.createElement("script"); s.src = L.url; s.integrity = L.sri; s.crossOrigin = "anonymous";
-    s.onload = () => res(window[L.global]); s.onerror = e => { delete carregando[nome]; rej(e); }; document.head.append(s);
+  // se o jsDelivr falhar, tenta o unpkg (mesmo arquivo do npm, mesma conferência)
+  const tentar = (url) => new Promise((res, rej) => {
+    const s = document.createElement("script"); s.src = url; s.integrity = L.sri; s.crossOrigin = "anonymous";
+    s.onload = () => res(window[L.global]); s.onerror = e => { s.remove(); rej(e); }; document.head.append(s);
   });
+  return carregando[nome] = carregando[nome] || tentar(L.url)
+    .catch(() => tentar(L.url.replace("https://cdn.jsdelivr.net/npm/", "https://unpkg.com/")))
+    .catch(e => { delete carregando[nome]; throw e; });
 }
 
 // Lista longa: mostra os primeiros itens e um botão "Mostrar mais" (o celular não trava com centenas de cartões)
