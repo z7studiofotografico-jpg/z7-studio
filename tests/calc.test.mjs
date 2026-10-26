@@ -35,3 +35,26 @@ test("venda de PR 'a conferir' entra no total, mas a comissão só depois de con
   const c = comissaoDe(pedro, (l, fp) => taxa({}, l, fp));
   assert.equal(c.total, 1275 + 2667); // sem os R$ 70 do PR
 });
+
+test("cada card tem os seus números: PR, Formaturas e Funil separados", () => {
+  const f = Object.assign({}, fontes, {
+    leads: [
+      { etapa: "FECHADO", valor: 450, fechadoEm: "2026-10-02", criadoEm: "2026-10-01T10:00:00Z", origem: "Meta Ads", servico: "Retrato", respEmail: "adr@x.com" },
+      { etapa: "NOVO LEAD", valor: 300, criadoEm: "2026-10-05T10:00:00Z", origem: "Meta Ads", followup: "2026-10-10" },
+      { etapa: "PERDIDO", criadoEm: "2026-10-03T10:00:00Z", atualizadoEm: "2026-10-08T10:00:00Z", origem: "Instagram" }
+    ],
+    separados: [{ separadoEm: "2026-10-03", separadoSeg: "lf", respEmail: "pedro@x.com" }, { separadoEm: "2026-10-04", separadoSeg: "lf", respEmail: "pedro@x.com" }]
+  });
+  const r = resumir(f, "2026-10-20"), p = periodo(r, ["2026-10"]);
+  // Funil
+  assert.equal(p.funil.criados, 3); assert.equal(p.funil.fechados, 1); assert.equal(p.funil.perdidos, 1); assert.equal(p.funil.v, 45000);
+  assert.equal(p.funil.origem["Meta Ads"].criados, 2); assert.equal(p.funil.origem["Meta Ads"].fechados, 1);
+  assert.equal(r.agora.funil.abertos, 1); assert.equal(r.agora.funil.atrasados, 1); assert.equal(r.agora.funil.emNegociacao, 30000);
+  // PR
+  assert.equal(p.pr.v, 35000); assert.equal(p.pr.n, 1); assert.equal(p.pr.separados, 2); assert.equal(p.pr.lf.sep, 2);
+  assert.equal(p.pr.pessoas["pedro@x.com"].sep, 2); assert.equal(p.pr.forma.Pix.v, 35000);
+  // Formaturas
+  assert.equal(p.form.colegios, 1); assert.equal(p.form.vendAlb.v, 85000); assert.equal(p.form.vendCol.v, 40000);
+  assert.equal(p.form.recAlb, 8500); assert.equal(p.form.recCol, 13334);
+  assert.equal(r.agora.form.aReceberAlb, 76500); assert.equal(r.agora.form.aReceberCol, 26666);
+});

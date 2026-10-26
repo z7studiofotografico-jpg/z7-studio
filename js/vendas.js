@@ -5,7 +5,8 @@
 import { resumir, periodo as somaPeriodo, comissaoDe } from "./calc.js";
 import { brl, reais, taxa } from "./regras.js";
 import { el, title, carregarLib } from "./ui.js";
-let C, FS, db, resumo = null, periodo = "mes", charts = [];
+let C, FS, db, resumo = null, periodo = "mes", area = "geral", charts = [];
+const AREAS = [["geral", "Geral"], ["pr", "🖼️ PR"], ["form", "🎓 Formaturas"], ["funil", "💬 Funil"]];
 const $ = (id) => document.getElementById(id);
 const MESES_C = ["jan", "fev", "mar", "abr", "mai", "jun", "jul", "ago", "set", "out", "nov", "dez"];
 const PERIODOS = [["mes", "Este mês"], ["passado", "Mês passado"], ["ano", "Este ano"], ["12m", "Últimos 12 meses"]];
@@ -20,6 +21,10 @@ export async function show(){
   const v = $("viewVendas"); v.innerHTML = "";
   const head = el("div", "vhead"); head.append(el("h2", null, "Dashboard"));
   const bt = C.mkBtn("↻ Atualizar agora", "btn-sm", () => atualizar(bt)); head.append(bt); v.append(head);
+  // um card de cada vez: cada área tem os seus números, gráfico e equipe
+  const abas = el("div", "segs vdareas"); abas.setAttribute("role", "tablist"); v.append(abas);
+  AREAS.forEach(([k, t]) => { const b = el("button", "seg", t); b.type = "button"; b.setAttribute("role", "tab"); b.setAttribute("aria-selected", String(area === k));
+    b.onclick = () => { area = k; abas.querySelectorAll("button").forEach(x => x.setAttribute("aria-selected", String(x === b))); desenhar(); }; abas.append(b); });
   const chips = el("div", "chips"); v.append(chips);
   PERIODOS.forEach(([k, t]) => { const b = el("button", "chip", t); b.type = "button"; b.setAttribute("aria-pressed", String(periodo === k)); b.onclick = () => { periodo = k; chips.querySelectorAll("button").forEach(x => x.setAttribute("aria-pressed", String(x === b))); desenhar(); }; chips.append(b); });
   const corpo = el("div"); corpo.id = "vdCorpo"; corpo.append(el("div", "empty", "Carregando…")); v.append(corpo);
@@ -41,16 +46,17 @@ async function atualizar(bt){
   try {
     const get = async (q) => (await FS.getDocs(q)).docs.map(d => Object.assign({ id: d.id }, d.data()));
     const col = n => FS.collection(db, n);
-    const [leads, prs, forms, insts, ens, becas] = await Promise.all([
-      get(FS.query(col("leads"), FS.where("etapa", "==", "FECHADO"))),
+    const [leads, prs, forms, insts, ens, becas, separados] = await Promise.all([
+      get(FS.query(col("leads"))),
       get(FS.query(col("repasse"), FS.where("etapa", "in", ["PAGO", "ENTREGUE"]))),
       get(FS.query(col("formandos"))),
       get(FS.query(col("instituicoes"))),
       get(FS.query(col("ensaios"), FS.where("data", ">=", C.addDays(-730)))),
-      get(FS.query(col("becas")))
+      get(FS.query(col("becas"))),
+      get(FS.query(col("repasse"), FS.where("separadoEm", ">=", C.addDays(-730))))
     ]);
     const porNome = Object.fromEntries(Object.entries(C.usuarios || {}).filter(([, u]) => u.nome).map(([em, u]) => [u.nome, em]));
-    resumo = resumir({ leads, prs, forms, insts, ens, becas }, C.todayStr(), porNome);
+    resumo = resumir({ leads, prs, forms, insts, ens, becas, separados }, C.todayStr(), porNome);
     await FS.setDoc(FS.doc(db, "resumos", "dashboard"), resumo);
     await carregarChart().catch(() => {});
     desenhar();
@@ -73,6 +79,10 @@ function desenhar(){
   const corpo = $("vdCorpo"); if (!corpo || !resumo) return; corpo.innerHTML = "";
   const nomeP = PERIODOS.find(p => p[0] === periodo)[1];
   const p = somaPeriodo(resumo, mesesDoPeriodo());
+  if (!resumo.agora && area !== "geral") { corpo.append(el("p", "wait", "Toque em ↻ Atualizar agora para calcular os números de cada card.")); return; }
+  if (area === "pr") return areaPR(corpo, p, nomeP);
+  if (area === "form") return areaForm(corpo, p, nomeP);
+  if (area === "funil") return areaFunil(corpo, p, nomeP);
   const k = el("div", "kpis");
   [["Total de vendas", moeda(p.total)], ["Pedidos", String(p.n)], ["Ticket médio", p.n ? moeda(Math.round(p.total / p.n)) : "—"], ["A receber das formaturas", brl(resumo.aReceber || 0)]]
     .forEach(([t, v]) => { const c = el("div", "kpi"); c.append(el("small", null, t), el("b", null, v)); k.append(c); });
@@ -141,4 +151,74 @@ function equipe(corpo, p, nomeP){
   marcadas.filter(x => x.data >= C.todayStr()).slice(0, 15).forEach(x => { const r = el("div", "vdrow"); r.append(el("span", null, `${C.fmtDate(x.data)}${x.hora ? " " + x.hora : ""} · ${title(x.inst)}`), el("b", null, x.por ? C.first(nomeDe(x.por)) : "—")); l.append(r); });
   if (!l.children.length) l.append(el("p", "hint", "Nenhuma visita marcada. Quando o vendedor registra “Voltar para visita” com data, ela aparece aqui."));
   vb.append(l);
+}
+
+// ---------- números de cada card ----------
+const pct = (a, b) => b ? Math.round(a * 100 / b) + "%" : "—";
+function kpis(corpo, lista){ const k = el("div", "kpis"); lista.forEach(([t, v, cls]) => { const c = el("div", "kpi" + (cls ? " " + cls : "")); c.append(el("small", null, t), el("b", null, v)); k.append(c); }); corpo.append(k); }
+// Gráfico de barras dos 12 meses de uma área (ou lista, se o Chart.js não carregou)
+function evolucao(corpo, titulo, sub, valorDoMes, ehDinheiro){
+  const doze = (() => { const s0 = periodo; periodo = "12m"; const r = mesesDoPeriodo(); periodo = s0; return r; })();
+  const dados = doze.map(m => valorDoMes(resumo.meses[m] || {}));
+  const box = caixa(corpo, titulo, sub), Chart = window.Chart, rot = doze.map(m => MESES_C[Number(m.slice(5)) - 1] + "/" + m.slice(2, 4));
+  if (Chart) {
+    charts.push(new Chart(canvas(box), { type: "bar", data: { labels: rot, datasets: [{ data: dados.map(v => ehDinheiro ? reais(v) : v), backgroundColor: dados.map((_, i) => i === dados.length - 1 ? AZUL : GRAFITE), borderRadius: 5 }] },
+      options: { maintainAspectRatio: false, plugins: { legend: { display: false }, tooltip: { callbacks: { label: c => " " + (ehDinheiro ? brl(c.parsed.y) : c.parsed.y) } } }, scales: { y: { beginAtZero: true, ticks: ehDinheiro ? { callback: v => "R$ " + v.toLocaleString("pt-BR") } : { precision: 0 } }, x: { grid: { display: false } } } } }));
+  } else { const l = el("div", "vdlist"); rot.forEach((r, i) => { const x = el("div", "vdrow"); x.append(el("span", null, r), el("b", null, ehDinheiro ? moeda(dados[i]) : String(dados[i]))); l.append(x); }); box.append(l); }
+}
+function lista(box, linhas, vazio){
+  const l = el("div", "vdlist"); linhas.forEach(([a, b]) => { const r = el("div", "vdrow"); r.append(el("span", null, a), el("b", null, b)); l.append(r); });
+  if (!linhas.length) l.append(el("p", "hint", vazio || "Sem dados no período.")); box.append(l);
+}
+function tabela(box, cols, linhas, vazio){
+  const tb = el("div", "vdtab"); const h = el("div", "vdtr th"); cols.forEach(t => h.append(el("span", null, t))); tb.append(h);
+  linhas.forEach(cs => { const r = el("div", "vdtr"); cs.forEach((t, i) => { const s0 = el("span", null, String(t)); s0.dataset.l = i ? cols[i] : ""; r.append(s0); }); tb.append(r); });
+  if (!linhas.length) tb.append(el("p", "hint", vazio || "Sem movimento no período.")); box.append(tb);
+}
+const ordemNome = (a, b) => nomeDe(a[0]).localeCompare(nomeDe(b[0]), "pt-BR");
+const comissaoLinhas = (x, linhas) => { const so = { com: Object.fromEntries(Object.entries(x.com || {}).filter(([k]) => linhas.includes(k.split("|")[0]))) }; return comissaoDe(so, (l, f) => taxa(C.P, l, f)).total; };
+
+function areaPR(corpo, p, nomeP){
+  const R = p.pr || {}, lf = R.lf || {}, rp = R.rep || {};
+  if (resumo.aConferir) corpo.append(el("p", "wait", `⏳ ${resumo.aConferir} venda${resumo.aConferir > 1 ? "s" : ""} do PR a conferir: a comissão delas entra depois da conferência (PR → A conferir).`));
+  kpis(corpo, [["Vendido no PR", moeda(R.v || 0)], ["Kits vendidos", String(R.n || 0)], ["Ticket médio", R.n ? moeda(Math.round(R.v / R.n)) : "—"],
+    ["Contatos separados", String(R.separados || 0)], ["Conversão (vendas ÷ separados)", pct(R.n || 0, R.separados || 0)]]);
+  const b1 = caixa(corpo, "Linha de Frente × Repasse", nomeP);
+  lista(b1, [[`Linha de Frente · ${lf.n || 0} kit${lf.n === 1 ? "" : "s"} · ${lf.sep || 0} separados · conversão ${pct(lf.n || 0, lf.sep || 0)}`, moeda(lf.v || 0)],
+    [`Repasse · ${rp.n || 0} kit${rp.n === 1 ? "" : "s"} · ${rp.sep || 0} separados · conversão ${pct(rp.n || 0, rp.sep || 0)}`, moeda(rp.v || 0)]]);
+  const b2 = caixa(corpo, "Forma de pagamento", nomeP);
+  lista(b2, Object.entries(R.forma || {}).sort((a, b) => b[1].v - a[1].v).map(([f, x]) => [`${f} · ${x.n}`, moeda(x.v)]));
+  evolucao(corpo, "PR mês a mês", "Últimos 12 meses, em R$", m => (m.pr || {}).v || 0, true);
+  const b3 = caixa(corpo, "Equipe no PR", nomeP + " · comissão sobre a venda conferida");
+  const vend = new Set((C.vendedoresEmails || []).map(e => e.toLowerCase()));
+  tabela(b3, ["Pessoa", "Separados", "Kits", "Vendido", "Conversão", "Comissão"], Object.entries(R.pessoas || {}).sort(ordemNome).map(([k, x]) =>
+    [C.first(nomeDe(k)), x.sep || 0, x.n || 0, moeda(x.v || 0), pct(x.n || 0, x.sep || 0), vend.has(k) ? moeda(comissaoLinhas(p.pessoas[k] || {}, ["pr"])) : "—"]));
+}
+
+function areaForm(corpo, p, nomeP){
+  const F = p.form || {}, A = (resumo.agora || {}).form || {}, vc = F.vendCol || {}, va = F.vendAlb || {};
+  kpis(corpo, [["Colégios fechados", String(F.colegios || 0)], ["Vendido · colação", `${moeda(vc.v || 0)} (${vc.n || 0})`], ["Vendido · álbum", `${moeda(va.v || 0)} (${va.n || 0})`],
+    ["Recebido no período", moeda((F.recCol || 0) + (F.recAlb || 0))]]);
+  kpis(corpo, [["A receber · colação", moeda(A.aReceberCol || 0)], ["A receber · álbum", moeda(A.aReceberAlb || 0)], ["Formandos com parcela atrasada", String(A.atrasados || 0), A.atrasados ? "late" : ""], ["Em aberto desses atrasados", moeda(A.atrasadoValor || 0)]]);
+  corpo.append(el("p", "hint", "A receber e atrasados são de hoje (não dependem do período)."));
+  const b1 = caixa(corpo, "Recebido por contrato", nomeP);
+  lista(b1, [["🎓 Colação de grau (parcelas pagas)", moeda(F.recCol || 0)], ["📘 Álbum de formatura (parcelas pagas)", moeda(F.recAlb || 0)]]);
+  evolucao(corpo, "Parcelas recebidas mês a mês", "Últimos 12 meses, colação + álbum", m => ((m.form || {}).recCol || 0) + ((m.form || {}).recAlb || 0), true);
+  const b2 = caixa(corpo, "Equipe nas formaturas", nomeP + " · comissão sobre as parcelas pagas");
+  const vend = new Set((C.vendedoresEmails || []).map(e => e.toLowerCase()));
+  tabela(b2, ["Pessoa", "Colégios fechados", "Vendido", "Recebido", "Comissão"], Object.entries(F.pessoas || {}).sort(ordemNome).map(([k, x]) =>
+    [C.first(nomeDe(k)), x.colegios || 0, moeda(x.vend || 0), moeda(x.rec || 0), vend.has(k) ? moeda(comissaoLinhas(p.pessoas[k] || {}, ["form", "colacao"])) : "—"]));
+}
+
+function areaFunil(corpo, p, nomeP){
+  const F = p.funil || {}, A = (resumo.agora || {}).funil || {};
+  kpis(corpo, [["Leads novos", String(F.criados || 0)], ["Vendas fechadas", String(F.fechados || 0)], ["Conversão", pct(F.fechados || 0, F.criados || 0)], ["Vendido", moeda(F.v || 0)], ["Perdidos", String(F.perdidos || 0)]]);
+  kpis(corpo, [["Em aberto agora", String(A.abertos || 0)], ["Contatos atrasados", String(A.atrasados || 0), A.atrasados ? "late" : ""], ["Em negociação", moeda(A.emNegociacao || 0)]]);
+  const b1 = caixa(corpo, "De onde vêm os leads", nomeP + " · conversão por origem");
+  lista(b1, Object.entries(F.origem || {}).sort((a, b) => (b[1].criados || 0) - (a[1].criados || 0)).map(([o, x]) => [`${o} · ${x.criados || 0} lead${x.criados === 1 ? "" : "s"} · ${x.fechados || 0} venda${x.fechados === 1 ? "" : "s"} · ${pct(x.fechados || 0, x.criados || 0)}`, moeda(x.v || 0)]));
+  const b2 = caixa(corpo, "O que mais vende", nomeP);
+  lista(b2, Object.entries(F.servico || {}).sort((a, b) => b[1].v - a[1].v).map(([sv, x]) => [`${sv} · ${x.n}`, moeda(x.v)]));
+  evolucao(corpo, "Leads novos mês a mês", "Últimos 12 meses", m => (m.funil || {}).criados || 0, false);
+  const b3 = caixa(corpo, "Equipe no Funil", nomeP);
+  tabela(b3, ["Pessoa", "Vendas", "Vendido", "Ticket médio"], Object.entries(F.pessoas || {}).sort(ordemNome).map(([k, x]) => [C.first(nomeDe(k)), x.fechados || 0, moeda(x.v || 0), x.fechados ? moeda(Math.round(x.v / x.fechados)) : "—"]));
 }

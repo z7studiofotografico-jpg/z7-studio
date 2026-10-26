@@ -14,16 +14,17 @@ const hoje = new Intl.DateTimeFormat("en-CA", { timeZone: "America/Sao_Paulo" })
 const atual = (await db.collection("resumos").doc("dashboard").get()).data();
 if (atual && atual.hoje === hoje && !process.env.FORCAR) { console.log("Resumo de hoje já existe; nada a fazer."); process.exit(0); }
 const ler = async (q) => (await q.get()).docs.map((d) => Object.assign({ id: d.id }, d.data()));
-const [leads, prs, forms, insts, ens, becas] = await Promise.all([
-  ler(db.collection("leads").where("etapa", "==", "FECHADO")),
+const [leads, prs, forms, insts, ens, becas, separados] = await Promise.all([
+  ler(db.collection("leads")),
   ler(db.collection("repasse").where("etapa", "in", ["PAGO", "ENTREGUE"])),
   ler(db.collection("formandos")),
   ler(db.collection("instituicoes")),
   ler(db.collection("ensaios").where("data", ">=", somaDias(hoje, -730))),
-  ler(db.collection("becas"))
+  ler(db.collection("becas")),
+  ler(db.collection("repasse").where("separadoEm", ">=", somaDias(hoje, -730)))
 ]);
 const porNome = Object.fromEntries((await ler(db.collection("usuarios"))).filter((u) => u.nome).map((u) => [u.nome, u.id]));
-const r = resumir({ leads, prs, forms, insts, ens, becas }, hoje, porNome);
+const r = resumir({ leads, prs, forms, insts, ens, becas, separados }, hoje, porNome);
 // só grava se mudou alguma coisa (além do horário)
 const semHora = (x) => JSON.stringify(Object.assign({}, x, { geradoEm: null, hoje: null }));
 if (atual && semHora(atual) === semHora(r)) { await db.collection("resumos").doc("dashboard").update({ hoje: r.hoje, geradoEm: r.geradoEm }); console.log("Nada mudou nos números."); process.exit(0); }

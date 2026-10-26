@@ -210,3 +210,7 @@ details.guide summary{cursor:pointer;font-family:var(--f-display);font-weight:70
 .mostrar-mais{display:block;width:100%;margin:8px 0 4px}
 details.tamtipo{border:1px solid var(--line,#ddd);border-radius:10px;padding:6px 10px;margin:6px 0}details.tamtipo summary{cursor:pointer;font-weight:600;font-size:14px;padding:4px 0}details.tamtipo .estgrid{margin-top:8px}
 .lote.lote-aviso{border-left-color:#d97706}#rLoteAviso{margin:6px 0 0;font-size:13px}
+/* Dashboard: um card por vez (Geral, PR, Formaturas, Funil) */
+.vdareas{grid-template-columns:repeat(4,1fr);margin-bottom:8px}
+.vdareas .seg{align-items:center;text-align:center;font-weight:700;padding:10px 6px;font-size:.92rem}
+@media (max-width:520px){.vdareas{grid-template-columns:1fr 1fr}}
