@@ -1,6 +1,6 @@
 // Card Aluguel de becas: para os nossos eventos e para outros eventos.
 // Coleção "becas": { cliente, tel, tipoEvento ("nosso" | "outro"), evento, dataEvento, retirada, retiradaHora, devolucao,
-//   qtd (total de becas), becasQtd: { pelerineAzul, infAzul, infPreta, tradPreta, americana }, faixasQtd: { azul, branca, ... }, capelosQtd: { capelo }, tamanhos (o jabor já vai com a beca), valor, caucao, pago, formaPag, status, obs }
+//   qtd (total de becas), becasQtd: { pelerineAzul, infAzul, infPreta, tradPreta, americana }, faixasQtd: { azul, branca, ... }, capelosQtd: { capelo }, tamanhosQtd: { PPP, PP, P, M, G, GG, XG, XXG, EXG }, tamanhos (texto, ex.: "3 P, 5 M"; o jabor já vai com a beca), valor, caucao, pago, formaPag, status, obs }
 // Status: reservado → retirado → devolvido (ou cancelado). Retirada e devolução aparecem no Agendamento.
 import { el, title, field, inp, inpReais, sheet, botoes, wa as abrirWa, avisoErro } from "./ui.js";
 import { ENDERECO, ESTUDIO } from "./mensagens.js";
@@ -10,6 +10,8 @@ const $ = (id) => document.getElementById(id);
 const n0 = v => Number(v) || 0;
 const ITENS = [["capelo", "Capelo"], ["jabor", "Jabor"]]; // só para aluguéis antigos
 export const CAPELOS = [["capelo", "Capelo"]];
+// Tamanhos de beca que o estúdio tem
+export const TAMANHOS = ["PPP", "PP", "P", "M", "G", "GG", "XG", "XXG", "EXG"].map(t => [t, t]);
 // Tipos de beca e cores de faixa: cada um tem o seu estoque (definido no botão "📦 Estoque")
 export const BECAS = [["pelerineAzul", "Beca pelerine azul"], ["infAzul", "Beca infantil azul"], ["infPreta", "Beca infantil preta"], ["tradPreta", "Beca tradicional preta"], ["americana", "Beca americana"]];
 export const FAIXAS = [["azul", "Azul"], ["branca", "Branca"], ["amarela", "Amarela"], ["lilas", "Lilás"], ["verde", "Verde"], ["laranja", "Laranja"], ["rosa", "Rosa"], ["vermelha", "Vermelha"]];
@@ -177,7 +179,12 @@ export function form(x, pre){
     const qC = grade("Capelos", CAPELOS, x ? x.capelosQtd || (x.itens && x.itens.capelo ? { capelo: totBecas(x) } : {}) : pre.capelosQtd, " (quantidade)");
     p.append(el("p", "hint", "O jabor já vai com a beca. Capelo tem estoque próprio e pode ser alugado sozinho."));
     const valObj = ins => Object.fromEntries(ins.map(([k, q]) => [k, n0(q.value)]).filter(([, v]) => v));
-    const tam = inp(x ? x.tamanhos : "", "ex.: 3 P, 5 M, 2 G", 200); p.append(field("Tamanhos", tam));
+    // Tamanhos: quantas becas de cada tamanho (a soma tem que bater com o total de becas)
+    const qT = grade("Tamanhos das becas", TAMANHOS, x ? x.tamanhosQtd : pre.tamanhosQtd, " (tamanho)");
+    const somaTam = el("p", "hint"); p.append(somaTam);
+    if (x && x.tamanhos && !x.tamanhosQtd) p.append(el("p", "hint", "Anotado antes: " + x.tamanhos));
+    const contaTam = () => { const t = somaObj(valObj(qT)), b = somaObj(valObj(qB)); somaTam.textContent = b ? `${t} de ${b} beca${b > 1 ? "s" : ""} com tamanho${t === b ? " ✅" : ""}` : ""; };
+    [...qB, ...qT].forEach(([, q]) => q.addEventListener("input", contaTam)); contaTam();
     const val = inpReais(x ? x.valor : ""), pago = inpReais(x ? x.pago : ""), cau = inpReais(x ? x.caucao : "");
     const r6 = el("div", "row3"); r6.append(field("Valor total", val), field("Já pago", pago), field("Caução", cau)); p.append(r6);
     const fp = el("select"); [["", "forma de pagamento"], ...FORMAS.map(f => [f, f])].forEach(([v, t]) => { const o = el("option", null, t); o.value = v; fp.append(o); }); fp.value = x ? x.formaPag || "" : "";
@@ -211,10 +218,12 @@ export function form(x, pre){
       if (dev.value < ret.value) { err.textContent = "A devolução precisa ser depois da retirada."; err.hidden = false; return; }
       const becasQtd = valObj(qB), faixasQtd = valObj(qF), capelosQtd = valObj(qC), q = somaObj(becasQtd);
       if (!q && !somaObj(faixasQtd) && !somaObj(capelosQtd)) { err.textContent = "Coloque a quantidade de becas, faixas ou capelos."; err.hidden = false; return; }
+      const tamanhosQtd = valObj(qT), nt = somaObj(tamanhosQtd);
+      if (nt > q) { err.textContent = `Os tamanhos somam ${nt}, mas são ${q} beca${q !== 1 ? "s" : ""}.`; err.hidden = false; return; }
       const f = faltas();
       if (f.length && !p._ok) { p._ok = true; a.ok.textContent = "Registrar mesmo assim"; err.textContent = "Não tem o suficiente no estoque: " + f.join("; ") + ". Toque de novo para registrar mesmo assim."; err.hidden = false; return; }
       const body = { cliente: cli.value.trim(), tel: tel.value.trim(), tipoEvento: tipo.value, evento: ev.value.trim(), dataEvento: dEv.value, retirada: ret.value, retiradaHora: retH.value, devolucao: dev.value,
-        qtd: q, becasQtd, faixasQtd, capelosQtd, tamanhos: tam.value.trim(), valor: lerReais(val.value), pago: lerReais(pago.value), caucao: lerReais(cau.value), formaPag: fp.value, obs: obs.value.trim(), atualizadoEm: new Date().toISOString() };
+        qtd: q, becasQtd, faixasQtd, capelosQtd, tamanhosQtd, tamanhos: nt ? TAMANHOS.filter(([k]) => tamanhosQtd[k]).map(([k]) => `${tamanhosQtd[k]} ${k}`).join(", ") : (x && x.tamanhos) || "", valor: lerReais(val.value), pago: lerReais(pago.value), caucao: lerReais(cau.value), formaPag: fp.value, obs: obs.value.trim(), atualizadoEm: new Date().toISOString() };
       try {
         if (x) await FS.updateDoc(FS.doc(db, "becas", x.id), body);
         else await FS.addDoc(col, Object.assign(body, { status: "reservado", criadoEm: new Date().toISOString(), por: C.me || "", porEmail: C.email || "" }));

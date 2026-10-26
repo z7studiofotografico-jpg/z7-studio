@@ -70,7 +70,8 @@ console.log("Adriano (admin), com dados antigos:");
   // Funil: valor no formato brasileiro
   await ir(pg, "#funil");
   ok(await pg.locator("#list .card").count() === 1, "Funil abre (módulo novo) com o lead");
-  await pg.locator("#list .card").getByText("Editar").click(); await pg.fill("#fValor", "1.350,50"); await pg.click("#btnSave"); await pg.waitForTimeout(300);
+  await pg.locator("#list .card").getByText("Editar").click(); await pg.fill("#fValor", "1.350,50"); await pg.click("#btnSave");
+  await pg.waitForFunction(() => (window.__store.get("leads/l1") || {}).valor === 1350.5, null, { timeout: 3000 }).catch(() => {});
   s = await store(); ok(s["leads/l1"].valor === 1350.5, "valor R$ 1.350,50 gravado como 1350.5");
   // Formaturas: registrar parcela (transação)
   await ir(pg, "#formaturas");
@@ -121,11 +122,12 @@ console.log("Adriano (admin), com dados antigos:");
   await pg.getByRole("button", { name: "+ Aluguel" }).click(); await pg.waitForTimeout(200);
   sh = pg.locator(".sheet").last();
   await sh.getByLabel("Cliente").fill("Igreja Central"); await sh.getByLabel("Data do evento").fill(dia(10)); await sh.getByLabel("Data do evento").dispatchEvent("change");
-  await sh.getByLabel("Beca tradicional preta", { exact: true }).fill("12"); await sh.getByLabel("Valor total").fill("1.200,00"); await sh.getByLabel("Já pago").fill("300");
+  await sh.getByLabel("Beca tradicional preta", { exact: true }).fill("12"); await sh.getByLabel("M (tamanho)", { exact: true }).fill("7"); await sh.getByLabel("G (tamanho)", { exact: true }).fill("5"); await sh.getByLabel("Valor total").fill("1.200,00"); await sh.getByLabel("Já pago").fill("300");
   await sh.locator("button[type=submit]").click(); await pg.waitForTimeout(200);
   if (await pg.locator(".sheet").count()) { await pg.locator(".sheet").last().locator("button[type=submit]").click(); await pg.waitForTimeout(300); }
   s = await store(); const bc = Object.values(s).find(x => x.cliente === "Igreja Central");
   ok(bc && bc.valor === 1200 && bc.pago === 300 && bc.qtd === 12 && bc.porEmail === ADRIANO, "aluguel de becas com R$ 1.200,00 e 12 becas");
+  ok(bc && bc.tamanhosQtd && bc.tamanhosQtd.M === 7 && bc.tamanhosQtd.G === 5 && bc.tamanhos === "7 M, 5 G", "tamanhos separados: 7 M e 5 G");
   ok(/Falta receber R\$ 900/.test(await pg.textContent("#bcLista")), "falta receber R$ 900 (conta em centavos)");
   ok(erros.length === 0, "sem erros no console" + (erros.length ? ": " + erros.slice(0, 3).join(" | ") : ""));
 }

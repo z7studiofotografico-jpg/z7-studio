@@ -64,4 +64,5 @@ test("feriados", () => {
   assert.equal(feriado("2027-02-08"), "Carnaval");
   assert.equal(feriado("2026-04-23"), "São Jorge (RJ)");
   assert.equal(feriado("2026-10-26"), "");
+  assert.match(feriado("2026-02-18"), /Cinzas/); assert.match(feriado("2026-10-15"), /Professor/); assert.match(feriado("2026-12-31"), /Ano Novo/);
 });

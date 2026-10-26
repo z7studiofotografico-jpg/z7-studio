@@ -1,11 +1,14 @@
-// Feriados em que o estúdio não trabalha: nacionais, Carnaval, os do estado do RJ e os de Nilópolis.
+// Feriados em que o estúdio não trabalha: nacionais, Carnaval, os do estado do RJ, os de Nilópolis e alguns pontos facultativos.
 // Outros dias (recesso, feriado de outra cidade) entram em Ajustes → "Outros feriados" e chegam aqui por definirExtras().
 const FIXOS = {
   "01-01": "Confraternização Universal", "04-21": "Tiradentes", "04-23": "São Jorge (RJ)", "05-01": "Dia do Trabalho",
   "09-07": "Independência do Brasil", "10-12": "Nossa Senhora Aparecida", "11-02": "Finados", "11-15": "Proclamação da República",
   "11-20": "Consciência Negra", "12-25": "Natal",
   // Nilópolis (municipais)
-  "08-21": "Aniversário de Nilópolis", "12-08": "Imaculada Conceição (Nilópolis)"
+  "08-21": "Aniversário de Nilópolis", "12-08": "Imaculada Conceição (Nilópolis)",
+  // Pontos facultativos que o estúdio também bloqueia (escolas e repartições costumam fechar)
+  "10-15": "Dia do Professor (escolas fechadas)", "10-28": "Dia do Servidor Público (ponto facultativo)",
+  "12-24": "Véspera de Natal (ponto facultativo à tarde)", "12-31": "Véspera de Ano Novo (ponto facultativo à tarde)"
 };
 const cache = {};
 let extras = {}; // "MM-DD" (todo ano) ou "AAAA-MM-DD" (só aquele dia) → nome
@@ -32,7 +35,7 @@ export function feriadosDoAno(y){
   const r = {}; Object.entries(FIXOS).forEach(([md, n]) => { r[`${y}-${md}`] = n; });
   Object.entries(extras).forEach(([k, n]) => { if (k.length === 5) r[`${y}-${k}`] = n; else if (k.startsWith(y + "-")) r[k] = n; });
   const P = pascoa(y); const mais = (n) => { const d = new Date(P); d.setDate(d.getDate() + n); return iso(d); };
-  r[mais(-48)] = "Carnaval"; r[mais(-47)] = "Carnaval"; r[mais(-2)] = "Sexta-feira Santa"; r[mais(60)] = "Corpus Christi";
+  r[mais(-48)] = "Carnaval"; r[mais(-47)] = "Carnaval"; r[mais(-46)] = "Quarta-feira de Cinzas (ponto facultativo até 14h)"; r[mais(-2)] = "Sexta-feira Santa"; r[mais(60)] = "Corpus Christi";
   return (cache[y] = r);
 }
 // Nome do feriado no dia (AAAA-MM-DD), ou "" se não for feriado
