@@ -142,7 +142,7 @@ details.guide summary{cursor:pointer;font-family:var(--f-display);font-weight:70
 .kpi b{font-size:1.35rem;font-variant-numeric:tabular-nums}
 .kpi.late{border-top-color:var(--late)}
 .vdbox{background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:14px;margin:10px 0}
-.vdbox h3{margin:0;font-size:1.15rem;font-weight:800}
+.vdbox h3{margin:0;font-size:1.15rem;font-weight:800;text-decoration:underline;text-decoration-thickness:2px;text-underline-offset:4px;text-decoration-color:var(--accent)}
 .vdbox>small{color:var(--muted);font-size:.8rem}
 .vdchart{position:relative;margin-top:10px;width:100%}
 .vdlist{display:flex;flex-direction:column;margin-top:8px}
@@ -196,7 +196,7 @@ details.guide summary{cursor:pointer;font-family:var(--f-display);font-weight:70
 .panel h3{font-family:var(--f-display);text-transform:uppercase;letter-spacing:.04em;margin:6px 0 0;font-size:1.05rem;color:var(--muted)}
 .hint{margin:0;color:var(--muted);font-size:1rem}
 .field{display:flex;flex-direction:column;gap:4px;min-width:0}
-.field > label:not(.chk){font-size:.95rem;text-transform:uppercase;letter-spacing:.04em;font-weight:800;color:var(--fg)}
+.field > label:not(.chk){font-size:.95rem;text-transform:uppercase;letter-spacing:.04em;font-weight:800;color:var(--fg);text-decoration:underline;text-decoration-thickness:2px;text-underline-offset:4px;text-decoration-color:var(--accent)}
 .field input,.field select,.field textarea{font:inherit;font-size:16px;padding:9px 10px;border-radius:8px;border:1px solid var(--line);background:var(--bg);color:var(--fg);width:100%}
 .row2{display:grid;grid-template-columns:1fr 1fr;gap:10px}
 @media (max-width:420px){.row2{grid-template-columns:1fr}}
