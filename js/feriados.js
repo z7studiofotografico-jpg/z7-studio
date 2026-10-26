@@ -1,11 +1,24 @@
-// Feriados em que o estúdio não trabalha: nacionais, Carnaval e os do estado do RJ.
-// Para um feriado da cidade ou um recesso, marque um compromisso "dia inteiro" na agenda.
+// Feriados em que o estúdio não trabalha: nacionais, Carnaval, os do estado do RJ e os de Nilópolis.
+// Outros dias (recesso, feriado de outra cidade) entram em Ajustes → "Outros feriados" e chegam aqui por definirExtras().
 const FIXOS = {
   "01-01": "Confraternização Universal", "04-21": "Tiradentes", "04-23": "São Jorge (RJ)", "05-01": "Dia do Trabalho",
   "09-07": "Independência do Brasil", "10-12": "Nossa Senhora Aparecida", "11-02": "Finados", "11-15": "Proclamação da República",
-  "11-20": "Consciência Negra", "12-25": "Natal"
+  "11-20": "Consciência Negra", "12-25": "Natal",
+  // Nilópolis (municipais)
+  "08-21": "Aniversário de Nilópolis", "12-08": "Imaculada Conceição (Nilópolis)"
 };
 const cache = {};
+let extras = {}; // "MM-DD" (todo ano) ou "AAAA-MM-DD" (só aquele dia) → nome
+// Lê o texto de Ajustes: uma data por linha, "dd/mm Nome" ou "dd/mm/aaaa Nome"
+export function definirExtras(texto){
+  extras = {};
+  String(texto || "").split(/\n|;/).map(l => l.trim()).filter(Boolean).forEach(l => {
+    const m = l.match(/^(\d{1,2})\/(\d{1,2})(?:\/(\d{4}))?\s*[-–:]?\s*(.*)$/); if (!m) return;
+    const md = `${m[2].padStart(2, "0")}-${m[1].padStart(2, "0")}`;
+    extras[m[3] ? `${m[3]}-${md}` : md] = m[4] || "Feriado";
+  });
+  for (const k in cache) delete cache[k];
+}
 function pascoa(y){ // algoritmo de Meeus/Jones/Butcher
   const a = y % 19, b = Math.floor(y / 100), c = y % 100, d = Math.floor(b / 4), e = b % 4, f = Math.floor((b + 8) / 25), g = Math.floor((b - f + 1) / 3);
   const h = (19 * a + b - d - g + 15) % 30, i = Math.floor(c / 4), k = c % 4, l = (32 + 2 * e + 2 * i - h - k) % 7, m = Math.floor((a + 11 * h + 22 * l) / 451);
@@ -17,6 +30,7 @@ const iso = d => `${d.getFullYear()}-${p2(d.getMonth() + 1)}-${p2(d.getDate())}`
 export function feriadosDoAno(y){
   if (cache[y]) return cache[y];
   const r = {}; Object.entries(FIXOS).forEach(([md, n]) => { r[`${y}-${md}`] = n; });
+  Object.entries(extras).forEach(([k, n]) => { if (k.length === 5) r[`${y}-${k}`] = n; else if (k.startsWith(y + "-")) r[k] = n; });
   const P = pascoa(y); const mais = (n) => { const d = new Date(P); d.setDate(d.getDate() + n); return iso(d); };
   r[mais(-48)] = "Carnaval"; r[mais(-47)] = "Carnaval"; r[mais(-2)] = "Sexta-feira Santa"; r[mais(60)] = "Corpus Christi";
   return (cache[y] = r);

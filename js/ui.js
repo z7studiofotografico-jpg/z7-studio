@@ -32,3 +32,30 @@ export function avisoErro(e, onde, toast){
   console.warn("[Z7] " + (onde || "erro"), e);
   if (toast) toast(e && e.code === "permission-denied" ? "Sem permissão para " + (onde || "isso") : "Não foi possível " + (onde || "concluir") + ". Tente de novo.");
 }
+
+// Bibliotecas de fora, com conferência de integridade (se o arquivo for adulterado, o navegador recusa)
+const LIBS = {
+  xlsx: { url: "https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js", sri: "sha384-vtjasyidUo0kW94K5MXDXntzOJpQgBKXmE7e2Ga4LG0skTTLeBi97eFAXsqewJjw", global: "XLSX" },
+  chart: { url: "https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.js", sri: "sha384-dug+JxfBvklEQdJ4AYuBBAIScUz0bVN73xpy273gcAwHjb3qI0fXmuYNaNfdyYJG", global: "Chart" }
+};
+const carregando = {};
+export function carregarLib(nome){
+  const L = LIBS[nome];
+  if (window[L.global]) return Promise.resolve(window[L.global]);
+  return carregando[nome] = carregando[nome] || new Promise((res, rej) => {
+    const s = document.createElement("script"); s.src = L.url; s.integrity = L.sri; s.crossOrigin = "anonymous";
+    s.onload = () => res(window[L.global]); s.onerror = e => { delete carregando[nome]; rej(e); }; document.head.append(s);
+  });
+}
+
+// Lista longa: mostra os primeiros itens e um botão "Mostrar mais" (o celular não trava com centenas de cartões)
+export function emPartes(box, itens, desenhar, passo){
+  passo = passo || 40; let n = 0;
+  const mais = el("button", "btn mostrar-mais"); mais.type = "button";
+  const lote = () => {
+    itens.slice(n, n + passo).forEach(x => { const c = desenhar(x); if (c) box.append(c); }); n += passo;
+    const resta = itens.length - n; mais.remove();
+    if (resta > 0) { mais.textContent = `Mostrar mais (${resta})`; box.append(mais); }
+  };
+  mais.onclick = lote; lote();
+}

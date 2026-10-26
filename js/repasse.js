@@ -5,7 +5,8 @@
 // Trabalha com milhares de contatos, então nunca carrega a coleção inteira:
 // cada aba busca só o que precisa (hoje, interessados, pagos, busca).
 import { openMockup, textoEscolha } from "./mockup.js";
-import { el, title } from "./ui.js";
+import { ESTUDIO } from "./mensagens.js";
+import { el, title, carregarLib, emPartes } from "./ui.js";
 // Assumir o contato: quem não é admin só assume o que está sem responsável (ou já é seu)
 const assumir = it => (!C.isAdmin && it.respEmail && it.respEmail !== C.email) ? {} : { resp: C.me, respEmail: C.email || "" };
 
@@ -84,7 +85,7 @@ function passo(it, c){
   const F = C.first(title(it.nome));
   const cn = c && c.nome ? C.first(title(c.nome)) : "";
   const oi = cn ? `Olá, ${cn}!` : "Olá!";
-  const souEu = `Aqui é ${eu()}, do Z7 Studio Fotográfico 📸`;
+  const souEu = `Aqui é ${eu()}, do ${ESTUDIO.nome} 📸`;
   const quem = c && c.tipo === "Formando" ? "o seu ensaio de formatura" : `o ensaio de formatura de ${F}`;
   const onde = segDe(it) === "lf" ? title(it.escola) + ", este ano" : [title(it.escola), it.ano].filter(Boolean).join(", ");
   const t = it.tentativas || 0;
@@ -115,11 +116,11 @@ function passo(it, c){
     }
     case "PAGO":
       if (!it.entregaTipo || it.entregaTipo.startsWith("A combinar")) return { title: "Perguntar como prefere receber",
-        msg: `${cn || "Oi"}, pagamento confirmado, muito obrigado! 💛 Como você prefere receber o kit ${c && c.tipo === "Formando" ? "" : "de " + F + " "}?\n1️⃣ Entregamos na sua casa (me confirma o endereço completo)\n2️⃣ Você retira aqui no estúdio, no dia e horário que for melhor (Estrada Dr. Rufino Gonçalves Ferreira, 290, Centro, Nilópolis, seg. a sáb., das 9h às 19h)`, then: null };
+        msg: `${cn || "Oi"}, pagamento confirmado, muito obrigado! 💛 Como você prefere receber o kit ${c && c.tipo === "Formando" ? "" : "de " + F + " "}?\n1️⃣ Entregamos na sua casa (me confirma o endereço completo)\n2️⃣ Você retira aqui no estúdio, no dia e horário que for melhor (${ESTUDIO.endereco}, ${ESTUDIO.horario})`, then: null };
       if ((it.entregaTipo || "").startsWith("Retirada")) {
         if (it.entregaData) return null;
         return { title: "Agendar a retirada no estúdio",
-          msg: `${cn || "Oi"}, pagamento confirmado, muito obrigado! 💛 O kit ${c && c.tipo === "Formando" ? "" : "de " + F + " "}fica pronto em poucos dias. Qual dia e horário fica melhor para você retirar aqui no estúdio? Estamos na Estrada Dr. Rufino Gonçalves Ferreira, 290, Centro, Nilópolis (seg. a sáb., das 9h às 19h).`, then: null };
+          msg: `${cn || "Oi"}, pagamento confirmado, muito obrigado! 💛 O kit ${c && c.tipo === "Formando" ? "" : "de " + F + " "}fica pronto em poucos dias. Qual dia e horário fica melhor para você retirar aqui no estúdio? Estamos na ${ESTUDIO.endereco} (${ESTUDIO.horario}).`, then: null };
       }
       if (it.enderecoConfirmado) return null;
       return { title: "Confirmar o endereço de entrega",
@@ -217,7 +218,7 @@ function renderSegs(){
 function renderChips(){
   const c = $("rChips"); c.innerHTML = "";
   const tabs = [["hoje", "Para hoje"], ["interessados", "Interessados"], ["entregas", "Entregas"], ["buscar", "Buscar"]];
-  if (C.isAdmin) tabs.push(["incompletos", "Incompletos"]);
+  if (C.isAdmin) tabs.push(["conferir", "A conferir"], ["incompletos", "Incompletos"]);
   tabs.forEach(([k, t]) => {
     const b = el("button", "chip", t); b.type = "button"; b.setAttribute("aria-pressed", String(tab === k));
     b.onclick = () => openTab(k); c.append(b);
@@ -241,6 +242,7 @@ function openTab(k){
     if (k === "entregas") q = FS.query(col, FS.where("etapa", "==", "PAGO"), FS.limit(300));
   }
   if (k === "incompletos") q = FS.query(col, FS.where("etapa", "==", "INCOMPLETO"), FS.limit(200));
+  if (k === "conferir") q = FS.query(col, FS.where("conferido", "==", false), FS.limit(300));
   if (q) unsubList = FS.onSnapshot(q, snap => { items = snap.docs.map(d => Object.assign({ id: d.id }, d.data())); renderList(); },
     err => { console.warn(err); C.showNotice("Não foi possível carregar o Repasse. Verifique a internet."); });
   if (k === "buscar") { $("rQ").focus(); buscar(); }
@@ -282,7 +284,7 @@ function renderList(loading, emptyMsg){
   if (tab === "hoje") { const t0 = C.todayStr(); arr = arr.filter(it => (ABERTAS.includes(it.etapa) || it.etapa === "ENTREGUE") && it.followup && it.followup <= t0); }
   if (!arr.length) {
     const e = el("div", "empty"); e.style.gridColumn = "1/-1";
-    const msgs = { hoje: ["Nada para hoje", "Separe o seu lote do dia no quadro acima para começar."], interessados: ["Nenhum interessado ainda", "Quem responder que quer ver a prévia aparece aqui."], entregas: ["Nenhuma entrega pendente", "Os kits pagos aparecem aqui, separados por cidade e bairro."], incompletos: ["Nenhum cadastro incompleto", "Quem não tiver colégio, ano, nome do aluno, responsável ou telefone aparece aqui para completar."], buscar: ["Nada encontrado", emptyMsg || "Tente outro nome ou telefone."] };
+    const msgs = { conferir: ["Nenhuma venda para conferir ✓", "As vendas registradas pela equipe aparecem aqui até você conferir o comprovante."], hoje: ["Nada para hoje", "Separe o seu lote do dia no quadro acima para começar."], interessados: ["Nenhum interessado ainda", "Quem responder que quer ver a prévia aparece aqui."], entregas: ["Nenhuma entrega pendente", "Os kits pagos aparecem aqui, separados por cidade e bairro."], incompletos: ["Nenhum cadastro incompleto", "Quem não tiver colégio, ano, nome do aluno, responsável ou telefone aparece aqui para completar."], buscar: ["Nada encontrado", emptyMsg || "Tente outro nome ou telefone."] };
     const [a, b] = msgs[tab] || ["Nada aqui", ""]; e.append(el("strong", null, a), el("span", null, emptyMsg || b)); list.append(e); return;
   }
   if (tab === "hoje") { const rank = { late: 0, today: 1, later: 2, none: 3, won: 4 }; arr.sort((a, b) => rank[status(a)] - rank[status(b)] || (a.followup || "").localeCompare(b.followup || "")); }
@@ -297,7 +299,7 @@ function renderList(loading, emptyMsg){
     });
     return;
   }
-  arr.forEach(it => list.append(card(it)));
+  emPartes(list, arr, card);
 }
 
 function card(it){
@@ -306,7 +308,7 @@ function card(it){
   const top = el("div", "card-top"); top.append(el("h3", "name", title(it.nome) || "Sem nome"), el("span", "stage", it.etapa)); e.append(top);
 
   const meta = el("div", "meta");
-  [[tab === "buscar" && segDe(it) ? segNome(segDe(it)) : "", "svc"], [it.resp ? "👤 " + C.first(it.resp) : "", ""], [title(it.escola), "svc"], [[it.curso, it.turma].filter(Boolean).join(" · "), ""], [it.ano ? String(it.ano) : "", ""], [it.valor ? C.money(it.valor) : "", ""]]
+  [[tab === "buscar" && segDe(it) ? segNome(segDe(it)) : "", "svc"], [C.nomeDe(it) ? "👤 " + C.first(C.nomeDe(it)) : "", ""], [title(it.escola), "svc"], [[it.curso, it.turma].filter(Boolean).join(" · "), ""], [it.ano ? String(it.ano) : "", ""], [it.valor ? C.money(it.valor) : "", ""]]
     .forEach(([v, c]) => { if (v) meta.append(el("span", "tag " + c, v)); });
   e.append(meta);
 
@@ -414,6 +416,10 @@ function card(it){
     act.append(C.mkBtn("Não quer", "", () => save(it, { etapa: "NÃO QUER", followup: null, atendendo: null }, "Contato encerrado")));
     act.append(C.mkBtn("Número errado", "", () => save(it, { etapa: "SEM CONTATO", followup: null, atendendo: null }, "Marcado como sem contato")));
   }
+  if ((it.etapa === "PAGO" || it.etapa === "ENTREGUE") && it.conferido === false) {
+    e.append(el("p", "wait", `⏳ Venda a conferir: ${C.money(it.valor)} · ${it.formaPag || ""}${it.valorForaTabela ? " · valor fora da tabela" : ""}${it.comprovante ? " · " + it.comprovante : ""}`));
+    if (C.isAdmin) act.append(C.mkBtn("✔ Conferir venda", "btn-verde", () => save(it, { conferido: true, conferidoPor: C.email || "", conferidoEm: C.todayStr() }, "Venda conferida ✔")));
+  }
   if (it.etapa === "PAGO") act.append(C.mkBtn("📍 Endereço e data", "", () => openEntrega(it)));
   if (it.etapa === "PAGO") act.append(C.mkBtn("Entregue ✓", "btn-ok", () => save(it, { etapa: "ENTREGUE", entregueEm: C.todayStr(), followup: C.addDays(2) }, "Entrega registrada 🎉")));
   if (["NÃO QUER", "SEM CONTATO"].includes(it.etapa)) act.append(C.mkBtn("Reabrir", "", () => save(it, { etapa: "SEPARADO", followup: C.todayStr(), tentativas: 0, tentInteresse: 0, ...assumir(it) }, "Contato reaberto")));
@@ -439,14 +445,31 @@ function actions(close, okTxt){ const a = el("div", "panel-actions"); a.append(e
 function openPago(it){
   sheet("Registrar venda", (p, close) => {
     p.append(el("p", "hint", title(it.nome) + " · " + title(it.escola)));
-    const v = el("input"); v.inputMode = "decimal"; v.value = it.valor || (segDe(it) === "lf" ? (C.P.lfPix || C.P.kitPreco) : ((it.tentInteresse >= 2 && C.P.kitFinal) || C.P.kitPromo || C.P.kitPreco)) || "";
+    // Valor sai da tabela de preços (Ajustes); "outro valor" fica marcado para conferência
+    const P = C.P, lf = segDe(it) === "lf";
+    const tabela = (lf ? [["Pix", P.lfPix], ["Cartão", P.lfCartao]] : [["Pix", P.kitPromo || P.kitPreco], ["Cartão", P.kitCartao], ["Última oferta", P.kitFinal], ["Preço cheio", P.kitPreco]])
+      .filter(([, x]) => Number(x)).map(([t, x]) => [String(x), `${C.money(x)} · ${t}`]);
+    const vs = el("select"); [...tabela, ["outro", "Outro valor…"]].forEach(([val, t]) => { const o = el("option", null, t); o.value = val; vs.append(o); });
+    const sugerido = String(it.valor || (lf ? (P.lfPix || P.kitPreco) : ((it.tentInteresse >= 2 && P.kitFinal) || P.kitPromo || P.kitPreco)) || "");
+    vs.value = tabela.some(([x]) => x === sugerido) ? sugerido : (tabela[0] ? tabela[0][0] : "outro");
+    const v = el("input"); v.inputMode = "decimal"; v.placeholder = "R$"; v.hidden = vs.value !== "outro";
+    vs.onchange = () => { v.hidden = vs.value !== "outro"; if (!v.hidden) v.focus(); };
     const fp = el("select"); ["Pix", "Cartão", "Link", "Recorrente", "Dinheiro", "Boleto", "Outro"].forEach(x => { const o = el("option", null, x); o.value = x; fp.append(o); });
-    const r = el("div", "row2"); r.append(field("Valor (R$)", v), field("Pagamento", fp)); p.append(r);
+    const vbox = el("div"); vbox.append(vs, v);
+    const r = el("div", "row2"); r.append(field("Valor", vbox), field("Pagamento", fp)); p.append(r);
+    const comp = el("input"); comp.maxLength = 120; comp.placeholder = "ex.: Pix de Maria às 14h, ou nº do comprovante";
+    p.append(field("Comprovante", comp));
+    if (!C.isAdmin) p.append(el("p", "hint", "A venda entra como “a conferir”. A comissão conta depois que o Adriano ou a Luciana conferem o comprovante."));
     p.append(entregaCampos(p, it));
     p.append(actions(close, "Salvar venda"));
     p.addEventListener("submit", ev => {
-      ev.preventDefault(); close();
-      save(it, Object.assign({ etapa: "PAGO", valor: C.num(v.value), formaPag: fp.value, pagoEm: C.todayStr(), followup: null, atendendo: null, ...(it.resp || it.respEmail ? {} : assumir(it)) }, p._entrega()), "Venda registrada 🎉");
+      ev.preventDefault();
+      const valor = vs.value === "outro" ? C.num(v.value) : Number(vs.value);
+      if (!valor) { v.hidden = false; v.focus(); return; }
+      close();
+      save(it, Object.assign({ etapa: "PAGO", valor, formaPag: fp.value, comprovante: comp.value.trim(), valorForaTabela: vs.value === "outro",
+        conferido: !!C.isAdmin, ...(C.isAdmin ? { conferidoPor: C.email || "", conferidoEm: C.todayStr() } : {}),
+        pagoEm: C.todayStr(), followup: null, atendendo: null, ...(it.resp || it.respEmail ? {} : assumir(it)) }, p._entrega()), C.isAdmin ? "Venda registrada 🎉" : "Venda registrada 🎉 · aguardando conferência");
     });
   });
 }
@@ -619,10 +642,7 @@ const MAPA = { ESCOLAFAC: "escola", ESCOLA: "escola", CURSO: "curso", TURMA: "tu
   BAIRRO: "bairro", CIDADE: "cidade", OBS: "obs", OBSERVACAO: "obs", OBSERVACOES: "obs" };
 const hkey = h => String(h || "").normalize("NFKD").replace(/[̀-ͯ]/g, "").toUpperCase().replace(/[^A-Z0-9]/g, "");
 
-function loadXLSX(){
-  if (window.XLSX) return Promise.resolve(window.XLSX);
-  return new Promise((res, rej) => { const s = document.createElement("script"); s.src = "https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"; s.onload = () => res(window.XLSX); s.onerror = rej; document.head.append(s); });
-}
+function loadXLSX(){ return carregarLib("xlsx"); }
 function parseTel(v, tipo){
   if (v == null || v === "") return null;
   const raw = String(v);

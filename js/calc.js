@@ -26,10 +26,12 @@ export function resumir(fontes, hoje, emailPorNome){
   const instPorId = Object.fromEntries(insts.map(i => [i.id, i]));
 
   leads.filter(l => l.etapa === LEAD.FECHADO).forEach(l => venda(l.fechadoEm || String(l.criadoEm || "").slice(0, 10), l.valor, l.servico || "Ensaio", "Funil", quem(l.respEmail, l.resp)));
+  let aConferir = 0;
   prs.filter(r => r.etapa === PR.PAGO || r.etapa === PR.ENTREGUE).forEach(r => {
     const d = r.pagoEm || "", pessoa = quem(r.respEmail, r.resp);
     venda(d, r.valor, Number(r.ano) >= Number(d.slice(0, 4)) ? "Kit PR · Linha de Frente" : "Kit PR · Repasse", "PR", pessoa);
-    comissao(d, r.valor, "pr", formaDe(r.formaPag), pessoa);
+    // comissão só depois da conferência do comprovante (vendas antigas, sem o campo, contam)
+    if (r.conferido !== false) comissao(d, r.valor, "pr", formaDe(r.formaPag), pessoa); else aConferir++;
   });
   let aReceber = 0;
   forms.filter(f => f.status !== "desistiu").forEach(f => {
@@ -54,7 +56,7 @@ export function resumir(fontes, hoje, emailPorNome){
   // guarda só os últimos 24 meses
   const corte = mes(hoje).replace(/^(\d{4})/, y => String(Number(y) - 2));
   Object.keys(meses).forEach(m => { if (m < corte) delete meses[m]; });
-  return { meses, aReceber: reais(aReceber), marcadas: marcadas.slice(0, 40), geradoEm: new Date().toISOString(), hoje };
+  return { meses, aReceber: reais(aReceber), aConferir, marcadas: marcadas.slice(0, 40), geradoEm: new Date().toISOString(), hoje };
 }
 
 // Soma os meses de um período (lista de "AAAA-MM")

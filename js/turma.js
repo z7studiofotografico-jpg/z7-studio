@@ -4,7 +4,8 @@
 // Regras de parcela e dinheiro: js/regras.js. Só o administrador registra pagamento e muda valores.
 import { lerReais, brl, dividir, pagamentosDe, pagasDe, nParcelas, quitado, atrasado as atrasadoEm, vencDa, valorParcela,
   recebido, emAberto, somar, proxVenc, ehColacao, FORMAS } from "./regras.js";
-import { el, title, norm, field, inp, inpReais, sel, sheet, botoes, wa, avisoErro } from "./ui.js";
+import { ESTUDIO } from "./mensagens.js";
+import { el, title, norm, field, inp, inpReais, sel, sheet, botoes, wa, avisoErro, carregarLib, emPartes } from "./ui.js";
 let C, FS, db, unsub = null;
 const n0 = v => Number(v) || 0;
 const hoje = () => C.todayStr();
@@ -54,8 +55,8 @@ export function cobrarWa(f){
   const pagar = col ? "\nO pagamento é pelo boleto." : (C.P.pix ? `\nChave Pix: ${C.P.pix}` : "");
   const valor = brl(valorParcela(f, prox)), nome = C.first(title(f.nome));
   const msg = atrasado(f)
-    ? `Oi, ${nome}! Aqui é do Z7 Studio Fotográfico 📸 Passando para lembrar da parcela ${prox}/${nParcelas(f)} ${item}, de ${valor}, que venceu ${venc ? "dia " + C.fmtDate(venc) : "este mês"}.${pagar}\nPode me mandar o comprovante por aqui? Se já pagou, é só desconsiderar 😊`
-    : `Oi, ${nome}! Aqui é do Z7 Studio Fotográfico 📸 Só lembrando que a parcela ${prox}/${nParcelas(f)} ${item}, de ${valor}, vence ${venc ? "dia " + C.fmtDate(venc) : "em breve"}.${pagar}\nQualquer dúvida, estou por aqui 😊`;
+    ? `Oi, ${nome}! Aqui é do ${ESTUDIO.nome} 📸 Passando para lembrar da parcela ${prox}/${nParcelas(f)} ${item}, de ${valor}, que venceu ${venc ? "dia " + C.fmtDate(venc) : "este mês"}.${pagar}\nPode me mandar o comprovante por aqui? Se já pagou, é só desconsiderar 😊`
+    : `Oi, ${nome}! Aqui é do ${ESTUDIO.nome} 📸 Só lembrando que a parcela ${prox}/${nParcelas(f)} ${item}, de ${valor}, vence ${venc ? "dia " + C.fmtDate(venc) : "em breve"}.${pagar}\nQualquer dúvida, estou por aqui 😊`;
   wa(f.tel, msg, C.toast);
 }
 // Vencimento padrão do contrato: dia 5 (deste mês se ainda não passou, senão do próximo)
@@ -80,8 +81,8 @@ export function openTurma(ctx, inst, kits){
     const chips = el("div", "chips"); p.append(chips);
     const q = inp("", "Buscar nome ou telefone"); q.type = "search"; q.className = "search"; q.oninput = () => { busca = norm(q.value); desenhar(); }; p.append(q);
     const lst = el("div", "grid"); p.append(lst);
-    unsub = FS.onSnapshot(FS.query(col, FS.where("instId", "==", inst.id), FS.limit(2000)), snap => {
-      lista = snap.docs.map(d => Object.assign({ id: d.id }, d.data())).sort((a, b) => (a.nome || "").localeCompare(b.nome || "", "pt-BR")); desenhar();
+    unsub = FS.onSnapshot(C.isAdmin ? FS.query(col, FS.where("instId", "==", inst.id), FS.limit(2000)) : C.carteira("formandos"), snap => {
+      lista = snap.docs.map(d => Object.assign({ id: d.id }, d.data())).filter(f => f.instId === inst.id).sort((a, b) => (a.nome || "").localeCompare(b.nome || "", "pt-BR")); desenhar();
     }, e => { avisoErro(e, "carregar os formandos"); lst.innerHTML = ""; lst.append(el("div", "empty", e.code === "permission-denied" ? "Cole as regras novas do Firebase para usar a lista de formandos." : "Não foi possível carregar.")); });
 
     function desenhar(){
@@ -111,7 +112,7 @@ export function openTurma(ctx, inst, kits){
       lst.innerHTML = "";
       if (!lista.length) { const e = el("div", "empty"); e.append(el("strong", null, "Nenhum formando ainda"), el("span", null, "Toque em “+ Formando”" + (C.isAdmin ? " ou importe a planilha da turma." : "."))); lst.append(e); return; }
       if (!arr.length) { lst.append(el("div", "empty", "Ninguém nesse filtro.")); return; }
-      arr.forEach(f => lst.append(card(f)));
+      emPartes(lst, arr, card);
     }
     function card(f){
       const at = atrasado(f), q0 = quitado(f), pg = pagasDe(f), np = nParcelas(f);
@@ -278,7 +279,4 @@ export function openTurma(ctx, inst, kits){
   }, { div: true, wide: true, onClose: () => { if (unsub) { unsub(); unsub = null; } } });
   return close;
 }
-function loadXLSX(){
-  if (window.XLSX) return Promise.resolve(window.XLSX);
-  return new Promise((res, rej) => { const s = document.createElement("script"); s.src = "https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"; s.onload = () => res(window.XLSX); s.onerror = rej; document.head.append(s); });
-}
+function loadXLSX(){ return carregarLib("xlsx"); }

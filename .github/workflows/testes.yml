@@ -16,6 +16,26 @@ jobs:
       - name: Regras de negócio, cálculo e arquivos do app
         run: node --test tests/*.test.mjs
 
+  app-no-navegador:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - name: Instalar
+        working-directory: tests/e2e
+        run: |
+          npm install --no-audit --no-fund
+          npx playwright install --with-deps chromium
+      - name: Abrir o app num navegador e usar como o Adriano e o vendedor
+        run: |
+          node tests/e2e/app.e2e.mjs > saida.txt 2>&1 && { cat saida.txt; exit 0; }
+          cat saida.txt
+          grep -E "✗|Error|Erros" saida.txt | head -10 | sed 's/%/%25/g' | while IFS= read -r l; do echo "::error::$l"; done
+          exit 1
+
   regras-firebase:
     runs-on: ubuntu-latest
     timeout-minutes: 10

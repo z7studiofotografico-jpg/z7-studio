@@ -4,9 +4,11 @@
 //  - Turmas: colégios fechados, com acesso à lista de formandos
 // Quem não é administrador vê só as turmas dos colégios que fechou.
 import { setCtx, openTurma, cobrarWa, registrarPagamento, atrasado } from "./turma.js";
-import { brl, somar, recebido as recebidoDe, emAberto, pagasDe, nParcelas, quitado, vencDa, valorParcela, esperadas, ehColacao, pagamentosDe, fimDoMes } from "./regras.js";
+import { brl, somar, recebido as recebidoDe, emAberto, pagasDe, nParcelas, quitado, vencDa, valorParcela, esperadas, ehColacao, fimDoMes } from "./regras.js";
 import { el, title, avisoErro } from "./ui.js";
-let C, FS, db, unsubs = [], forms = [], insts = [], aba = "cobrancas";
+// Leitura sob demanda: ao abrir, só as parcelas que vencem até o fim do mês (campo proxVenc);
+// a lista completa de formandos só é lida quando alguém abre as abas Colação, Álbum ou Turmas.
+let C, FS, db, unsubs = [], forms = [], cobr = [], insts = [], aba = "cobrancas", tudoCarregado = false, erroFn = () => {};
 const $ = (id) => document.getElementById(id);
 const moeda = brl;
 
@@ -20,31 +22,42 @@ export function show(){
   const k = el("div", "kpis"); k.id = "fmKpis"; v.append(k);
   const chips = el("div", "chips"); chips.id = "fmChips"; v.append(chips);
   const corpo = el("div"); corpo.id = "fmCorpo"; corpo.append(el("div", "empty", "Carregando…")); v.append(corpo);
-  hide(); forms = []; insts = [];
+  hide(); forms = []; cobr = []; insts = []; tudoCarregado = false; aba = "cobrancas";
   const erro = e => { avisoErro(e, "carregar as formaturas"); if (e.code === "permission-denied") { corpo.innerHTML = ""; corpo.append(el("div", "empty", "Cole as regras novas do Firebase para usar o card Formaturas.")); } };
-  unsubs.push(FS.onSnapshot(FS.query(FS.collection(db, "formandos"), FS.limit(5000)), s => { forms = s.docs.map(d => Object.assign({ id: d.id }, d.data())); render(); }, erro));
-  unsubs.push(FS.onSnapshot(FS.query(FS.collection(db, "instituicoes"), FS.where("etapa", "==", "FECHADO"), FS.limit(500)), s => { insts = s.docs.map(d => Object.assign({ id: d.id }, d.data())); render(); }, erro));
+  const mapa = s => s.docs.map(d => Object.assign({ id: d.id }, d.data()));
+  if (C.isAdmin) unsubs.push(FS.onSnapshot(FS.query(FS.collection(db, "formandos"), FS.where("proxVenc", ">", ""), FS.where("proxVenc", "<=", fimDoMes(C.todayStr())), FS.limit(3000)), s => { cobr = mapa(s); render(); }, erro));
+  else unsubs.push(FS.onSnapshot(C.carteira("formandos"), s => { forms = mapa(s); cobr = forms.filter(f => f.proxVenc && f.proxVenc <= fimDoMes(C.todayStr())); tudoCarregado = true; render(); }, erro));
+  unsubs.push(FS.onSnapshot(C.carteira("instituicoes", FS.where("etapa", "==", "FECHADO"), FS.limit(500)), s => { insts = mapa(s).filter(i => i.etapa === "FECHADO"); render(); }, erro));
+  erroFn = erro;
+}
+// Abas que precisam de todos os formandos: carrega uma vez, na hora
+function carregarTudo(){
+  if (tudoCarregado || !C.isAdmin) return;
+  tudoCarregado = true;
+  unsubs.push(FS.onSnapshot(FS.query(FS.collection(db, "formandos"), FS.limit(5000)), s => { forms = s.docs.map(d => Object.assign({ id: d.id }, d.data())); render(); }, erroFn));
 }
 
 // Só as turmas que a pessoa pode ver
-function minhasInsts(){ return C.isAdmin ? insts : insts.filter(i => i.respEmail ? i.respEmail === C.email : i.resp === C.me); }
-function meusForms(){ const ids = new Set(minhasInsts().map(i => i.id)); return forms.filter(f => f.status !== "desistiu" && (C.isAdmin || ids.has(f.instId) || f.respEmail === C.email)); }
+function minhasInsts(){ return C.isAdmin ? insts : insts.filter(i => C.ehMeu(i)); }
+function meusForms(lista){ return (lista || forms).filter(f => f.status !== "desistiu" && (C.isAdmin || f.respEmail === C.email)); }
 
 function render(){
   const k = $("fmKpis"), chips = $("fmChips"), corpo = $("fmCorpo"); if (!k) return;
-  const fs = meusForms(), hoje = C.todayStr(), mes = hoje.slice(0, 7);
+  const fs = meusForms(), cf = meusForms(cobr);
   const col = fs.filter(ehColacao), alb = fs.filter(f => !ehColacao(f));
-  const recMes = somar(fs.flatMap(f => pagamentosDe(f).filter(p => String(p.data || "").slice(0, 7) === mes).map(p => p.valor)));
-  const atr = fs.filter(atrasado);
+  const atr = cf.filter(atrasado), aVencer = cf.filter(f => !atrasado(f));
+  const doMes = somar(cf.map(f => valorParcela(f, pagasDe(f) + 1)));
   k.innerHTML = "";
-  [["Recebido no mês", moeda(recMes)], ["🎓 Colação a receber", moeda(somar(col.map(emAberto)))], ["📘 Álbum a receber", moeda(somar(alb.map(emAberto)))], ["Parcelas atrasadas", String(atr.length)]]
-    .forEach(([t, v], i) => { const c = el("div", "kpi" + (i === 3 && atr.length ? " late" : "")); c.append(el("small", null, t), el("b", null, v)); k.append(c); });
-  const cob = cobrancas(fs);
+  const kp = [["Parcelas atrasadas", String(atr.length)], ["Vencem até o fim do mês", String(aVencer.length)], ["Para receber neste mês", moeda(doMes)]];
+  if (tudoCarregado) kp.push(["🎓 Colação a receber", moeda(somar(col.map(emAberto)))], ["📘 Álbum a receber", moeda(somar(alb.map(emAberto)))]);
+  kp.forEach(([t, v], i) => { const c = el("div", "kpi" + (i === 0 && atr.length ? " late" : "")); c.append(el("small", null, t), el("b", null, v)); k.append(c); });
+  const cob = cobrancas(cf);
   chips.innerHTML = "";
-  [["cobrancas", "Cobranças", cob.length], ["colacao", "🎓 Colação", col.length], ["album", "📘 Álbum", alb.length], ["turmas", "Turmas", minhasInsts().length]].forEach(([kk, t, n]) => {
-    const b = el("button", "chip", t); b.type = "button"; b.setAttribute("aria-pressed", String(aba === kk)); b.append(el("span", "n", String(n))); b.onclick = () => { aba = kk; render(); }; chips.append(b);
+  [["cobrancas", "Cobranças", cob.length], ["colacao", "🎓 Colação", tudoCarregado ? col.length : ""], ["album", "📘 Álbum", tudoCarregado ? alb.length : ""], ["turmas", "Turmas", minhasInsts().length]].forEach(([kk, t, n]) => {
+    const b = el("button", "chip", t); b.type = "button"; b.setAttribute("aria-pressed", String(aba === kk)); if (n !== "") b.append(el("span", "n", String(n))); b.onclick = () => { aba = kk; if (kk !== "cobrancas") carregarTudo(); render(); }; chips.append(b);
   });
   corpo.innerHTML = "";
+  if (aba !== "cobrancas" && !tudoCarregado) { corpo.append(el("div", "empty", "Carregando…")); return; }
   if (aba === "cobrancas") renderCobrancas(corpo, cob);
   else if (aba === "turmas") renderTurmas(corpo);
   else renderContrato(corpo, aba);
@@ -110,7 +123,7 @@ function renderTurmas(corpo){
     const e = el("article", "card" + (r.atr ? " late" : ""));
     const top = el("div", "card-top"); top.append(el("h3", "name", title(i.nome)), el("span", "stage", `${r.n} formando${r.n !== 1 ? "s" : ""}`)); e.append(top);
     const meta = el("div", "meta");
-    [`🎓 ${fs.filter(ehColacao).length} colação`, `📘 ${fs.filter(f => !ehColacao(f)).length} álbum`, i.resp ? "👤 " + C.first(i.resp) : "", i.fechadoEm ? "Fechado em " + C.fmtDate(i.fechadoEm) : ""].filter(Boolean).forEach(t => meta.append(el("span", "tag", t)));
+    [`🎓 ${fs.filter(ehColacao).length} colação`, `📘 ${fs.filter(f => !ehColacao(f)).length} álbum`, C.nomeDe(i) ? "👤 " + C.first(C.nomeDe(i)) : "", i.fechadoEm ? "Fechado em " + C.fmtDate(i.fechadoEm) : ""].filter(Boolean).forEach(t => meta.append(el("span", "tag", t)));
     e.append(meta);
     e.append(el("div", "fu" + (r.atr ? " late" : ""), `Vendido ${moeda(r.vend)} · recebido ${moeda(r.rec)} · em aberto ${moeda(r.aberto)}`));
     const act = el("div", "actions"); act.append(C.mkBtn("👥 Formandos e parcelas", "btn-primary", () => openTurma(C, i, []))); e.append(act);

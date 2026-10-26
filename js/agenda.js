@@ -9,9 +9,10 @@
 // - Feriados: o estúdio não trabalha (bloqueia ensaio e colégio).
 // - Entregas: depois do ensaio, acompanha a edição até entregar, com o prazo, e pede a avaliação no Google.
 import { avisarColegioPorEmail, nomeEvento, agendarColegio, painelAvisar } from "./instituicoes.js";
+import { ENDERECO, ESTUDIO } from "./mensagens.js";
 import { feriado, feriadosEntre } from "./feriados.js";
-import { el, title, field, sheet, botoes, inpReais, wa, avisoErro } from "./ui.js";
-import { lerReais, brl } from "./regras.js";
+import { el, title, field, sheet, botoes, wa, avisoErro } from "./ui.js";
+import { lerReais } from "./regras.js";
 let C, FS, db, col, colE, privados = {};
 let unsubs = [], items = [], ensaios = [], passados = [], comps = [], visitas = [], becas = [], filtro = "tudo", mesVis = "", selDia = "";
 export const ETAPAS_ENTREGA = ["Ensaio feito", "Fotos escolhidas", "Em edição", "Pronto", "Entregue"];
@@ -22,7 +23,6 @@ const MESES = ["janeiro", "fevereiro", "março", "abril", "maio", "junho", "julh
 const SEMANA = ["dom", "seg", "ter", "qua", "qui", "sex", "sáb"];
 export const TIPOS_ENSAIO = ["Formatura individual", "Formatura em grupo", "Corporativo", "Retrato", "Infantil", "Gestante", "Família", "Outro"];
 const DURACOES = [[30, "30 min"], [60, "1 hora"], [90, "1h30"], [120, "2 horas"], [180, "3 horas"], [240, "4 horas"]];
-const ENDERECO = "Estrada Dr. Rufino Gonçalves Ferreira, 290, Centro, Nilópolis";
 
 function diaTxt(d){ const [y, m, dd] = d.split("-").map(Number); const dt = new Date(y, m - 1, dd); return `${SEMANA[dt.getDay()]}, ${C.pad(dd)}/${C.pad(m)}`; }
 const min = h => { const [a, b] = String(h || "").split(":").map(Number); return isNaN(a) ? null : a * 60 + (b || 0); };
@@ -74,9 +74,9 @@ export function show(){
   if (C.pode("becas")) unsubs.push(FS.onSnapshot(FS.query(FS.collection(db, "becas"), FS.where("devolucao", ">=", hoje), FS.orderBy("devolucao"), FS.limit(400)), snap => {
     becas = snap.docs.map(d => Object.assign({ id: d.id }, d.data())).filter(x => x.status !== "cancelado" && x.status !== "devolvido"); render();
   }, e => avisoErro(e, "carregar as becas")));
-  if (vejoVisitas()) unsubs.push(FS.onSnapshot(FS.query(FS.collection(db, "instituicoes"), FS.where("followup", ">=", hoje), FS.orderBy("followup"), FS.limit(400)), snap => {
+  if (vejoVisitas()) unsubs.push(FS.onSnapshot(C.isAdmin ? FS.query(FS.collection(db, "instituicoes"), FS.where("followup", ">=", hoje), FS.orderBy("followup"), FS.limit(400)) : C.carteira("instituicoes"), snap => {
     visitas = snap.docs.map(d => Object.assign({ id: d.id }, d.data()))
-      .filter(x => x.etapa !== "FECHADO" && x.etapa !== "NÃO FECHOU" && (x.proximoPasso === "Voltar para visita" || x.followupHora || x.etapa === "AGENDAR VISITA"));
+      .filter(x => x.followup && x.followup >= hoje && x.etapa !== "FECHADO" && x.etapa !== "NÃO FECHOU" && (x.proximoPasso === "Voltar para visita" || x.followupHora || x.etapa === "AGENDAR VISITA"));
     render();
   }, e => erro(e, "visitas")));
 }
@@ -209,7 +209,6 @@ function renderMes(box, ent){
 // ---------- Entregas das fotos ----------
 function etapaEntrega(x){ return (x.entrega && x.entrega.etapa) || "Ensaio feito"; }
 function entregasAbertas(){
-  const hoje = C.todayStr();
   return passados.filter(x => etapaEntrega(x) !== "Entregue" || (C.P.linkAvaliacao && !x.avaliacaoPedida && x.entrega.em && x.entrega.em <= C.addDays(-3)))
     .sort((a, b) => prazoDe(a).localeCompare(prazoDe(b)));
 }
@@ -341,7 +340,7 @@ function recusar(arg){
 function linhaVisita(x){
   const r = el("div", "agrow");
   const t = el("div", "agtxt"); t.append(el("b", null, `🚗 ${x.proximoPasso === "Voltar para visita" || x.etapa === "AGENDAR VISITA" ? "Visita" : x.proximoPasso || "Retorno"}: ${title(x.nome)}`));
-  const det = [x.followupHora, x.resp && "👤 " + C.first(x.resp), x.proximoPasso && x.proximoPasso !== "Voltar para visita" ? x.proximoPasso : ""].filter(Boolean).join(" · ");
+  const det = [x.followupHora, C.nomeDe(x) && "👤 " + C.first(C.nomeDe(x)), x.proximoPasso && x.proximoPasso !== "Voltar para visita" ? x.proximoPasso : ""].filter(Boolean).join(" · ");
   if (det) t.append(el("span", null, det));
   r.append(t, el("span", "tag", "Visita"));
   return r;
@@ -422,7 +421,7 @@ function cardRemarcar(x){
 function msgLembrete(x){
   const q = quando(x.data);
   const dia = q ? `${q} (${diaTxt(x.data)})` : diaTxt(x.data);
-  return `Olá, ${C.first(title(x.cliente))}! Aqui é do Z7 Studio Fotográfico 📸\nPassando para lembrar do seu ensaio ${dia}${x.hora ? " às " + x.hora : ""}, aqui no estúdio: ${ENDERECO}.\nSe tiver algum imprevisto, é só me avisar por aqui. Até lá! 😊`;
+  return `Olá, ${C.first(title(x.cliente))}! Aqui é do ${ESTUDIO.nome} 📸\nPassando para lembrar do seu ensaio ${dia}${x.hora ? " às " + x.hora : ""}, aqui no estúdio: ${ENDERECO}.\nSe tiver algum imprevisto, é só me avisar por aqui. Até lá! 😊`;
 }
 async function lembrar(x){
   const tel = C.digits(x.tel);

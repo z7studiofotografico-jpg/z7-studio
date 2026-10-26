@@ -4,10 +4,9 @@
 // Valores em centavos até a hora de mostrar. Gráficos com Chart.js, carregado só aqui.
 import { resumir, periodo as somaPeriodo, comissaoDe } from "./calc.js";
 import { brl, reais, taxa } from "./regras.js";
-import { el, title } from "./ui.js";
+import { el, title, carregarLib } from "./ui.js";
 let C, FS, db, resumo = null, periodo = "mes", charts = [];
 const $ = (id) => document.getElementById(id);
-const CHART_URL = "https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js";
 const MESES_C = ["jan", "fev", "mar", "abr", "mai", "jun", "jul", "ago", "set", "out", "nov", "dez"];
 const PERIODOS = [["mes", "Este mês"], ["passado", "Mês passado"], ["ano", "Este ano"], ["12m", "Últimos 12 meses"]];
 const AZUL = "#2563eb", AZUL_CLARO = "rgba(37,99,235,.14)", GRAFITE = "#3f4652";
@@ -15,10 +14,7 @@ const moeda = c => brl(reais(c)); // recebe centavos
 
 export function init(ctx){ C = ctx; FS = ctx.FS; db = ctx.db; }
 export function hide(){ charts.forEach(c => c.destroy()); charts = []; }
-function carregarChart(){
-  if (window.Chart) return Promise.resolve(window.Chart);
-  return new Promise((res, rej) => { const s = document.createElement("script"); s.src = CHART_URL; s.onload = () => res(window.Chart); s.onerror = rej; document.head.append(s); });
-}
+function carregarChart(){ return carregarLib("chart"); }
 
 export async function show(){
   const v = $("viewVendas"); v.innerHTML = "";
@@ -121,6 +117,7 @@ function canvas(box, h){ const w = el("div", "vdchart"); w.style.height = (h || 
 function equipe(corpo, p, nomeP){
   const comiss = new Set((C.vendedoresEmails || []).map(e => e.toLowerCase()));
   const nomesVend = new Set(C.vendedores || []);
+  if (resumo.aConferir) corpo.append(el("p", "wait", `⏳ ${resumo.aConferir} venda${resumo.aConferir > 1 ? "s" : ""} do PR a conferir: a comissão delas entra depois da conferência (PR → A conferir).`));
   const box = caixa(corpo, "Equipe", nomeP + " · comissão: PR sobre a venda; Álbum de formatura e Colação de grau sobre as parcelas pagas no período");
   const tb = el("div", "vdtab");
   const head = el("div", "vdtr th"); ["Pessoa", "Visitas feitas", "Visitas marcadas", "Colégios fechados", "Vendas", "Comissão"].forEach(t => head.append(el("span", null, t))); tb.append(head);

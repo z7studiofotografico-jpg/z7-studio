@@ -3,7 +3,8 @@
 //   qtd (total de becas), becasQtd: { pelerineAzul, infAzul, infPreta, tradPreta, americana }, faixasQtd: { azul, branca, ... }, capelosQtd: { capelo }, tamanhos (o jabor já vai com a beca), valor, caucao, pago, formaPag, status, obs }
 // Status: reservado → retirado → devolvido (ou cancelado). Retirada e devolução aparecem no Agendamento.
 import { el, title, field, inp, inpReais, sheet, botoes, wa as abrirWa, avisoErro } from "./ui.js";
-import { lerReais, centavos, reais, brl, BECA } from "./regras.js";
+import { ENDERECO, ESTUDIO } from "./mensagens.js";
+import { lerReais, centavos, reais, brl } from "./regras.js";
 let C, FS, db, col, unsubs = [], lista = [], aba = "proximas";
 const $ = (id) => document.getElementById(id);
 const n0 = v => Number(v) || 0;
@@ -16,7 +17,6 @@ const estoque = () => (C.P.estoque || {});
 const somaObj = o => Object.values(o || {}).reduce((a, v) => a + n0(v), 0);
 const totBecas = x => x.becasQtd ? somaObj(x.becasQtd) : n0(x.qtd);
 const FORMAS = ["Pix", "Cartão", "Link", "Dinheiro", "Boleto"];
-const ENDERECO = "Estrada Dr. Rufino Gonçalves Ferreira, 290, Centro, Nilópolis";
 const ativo = b => b.status !== "devolvido" && b.status !== "cancelado";
 export const atrasada = (b, hoje) => b.status === "retirado" && b.devolucao && b.devolucao < hoje;
 
@@ -90,13 +90,13 @@ function card(x){
   const act = el("div", "actions");
   if (x.status === "reservado") {
     act.append(C.mkBtn("📦 Retirou", "btn-ok", () => salvar(x, { status: "retirado", retiradoEm: C.todayStr() }, "Marcado como retirado")));
-    if (x.tel) act.append(C.mkBtn("📲 Lembrar retirada", "", () => wa(x, `Oi, ${C.first(title(x.cliente))}! Aqui é do Z7 Studio Fotográfico 📸 Passando para lembrar da retirada ${totBecas(x) > 1 ? "das " + totBecas(x) + " becas" : "da beca"} ${x.retirada === hoje ? "hoje" : "dia " + C.fmtDate(x.retirada)}${x.retiradaHora ? " às " + x.retiradaHora : ""}, aqui no estúdio: ${ENDERECO}.${pend ? ` Fica faltando ${brl(pend)}.` : ""} Até lá! 😊`)));
+    if (x.tel) act.append(C.mkBtn("📲 Lembrar retirada", "", () => wa(x, `Oi, ${C.first(title(x.cliente))}! Aqui é do ${ESTUDIO.nome} 📸 Passando para lembrar da retirada ${totBecas(x) > 1 ? "das " + totBecas(x) + " becas" : "da beca"} ${x.retirada === hoje ? "hoje" : "dia " + C.fmtDate(x.retirada)}${x.retiradaHora ? " às " + x.retiradaHora : ""}, aqui no estúdio: ${ENDERECO}.${pend ? ` Fica faltando ${brl(pend)}.` : ""} Até lá! 😊`)));
   }
   if (x.status === "retirado") {
     act.append(C.mkBtn("↩️ Devolveu", "btn-ok", () => devolver(x)));
     if (x.tel) act.append(C.mkBtn(at ? "💬 Cobrar devolução" : "📲 Lembrar devolução", at ? "btn-primary" : "", () => wa(x, at
-      ? `Oi, ${C.first(title(x.cliente))}! Aqui é do Z7 Studio Fotográfico 📸 A devolução ${totBecas(x) > 1 ? "das becas" : "da beca"} era dia ${C.fmtDate(x.devolucao)}. Consegue trazer hoje no estúdio? Endereço: ${ENDERECO}. Obrigado! 😊`
-      : `Oi, ${C.first(title(x.cliente))}! Aqui é do Z7 Studio Fotográfico 📸 Só lembrando que a devolução ${totBecas(x) > 1 ? "das becas" : "da beca"} é dia ${C.fmtDate(x.devolucao)}, aqui no estúdio: ${ENDERECO}. Obrigado! 😊`)));
+      ? `Oi, ${C.first(title(x.cliente))}! Aqui é do ${ESTUDIO.nome} 📸 A devolução ${totBecas(x) > 1 ? "das becas" : "da beca"} era dia ${C.fmtDate(x.devolucao)}. Consegue trazer hoje no estúdio? Endereço: ${ENDERECO}. Obrigado! 😊`
+      : `Oi, ${C.first(title(x.cliente))}! Aqui é do ${ESTUDIO.nome} 📸 Só lembrando que a devolução ${totBecas(x) > 1 ? "das becas" : "da beca"} é dia ${C.fmtDate(x.devolucao)}, aqui no estúdio: ${ENDERECO}. Obrigado! 😊`)));
   }
   act.append(C.mkBtn("Editar", "", () => form(x)));
   e.append(act); return e;
@@ -157,7 +157,7 @@ export function form(x, pre){
     const r1 = el("div", "row2"); r1.append(field("Cliente", cli), field("WhatsApp", tel)); p.append(r1);
     const tipo = el("select"); [["outro", "Outro evento"], ["nosso", "Nosso evento (Z7)"]].forEach(([v, t]) => { const o = el("option", null, t); o.value = v; tipo.append(o); }); tipo.value = x ? x.tipoEvento || "outro" : pre.tipoEvento || "outro";
     const ev = inp(x ? x.evento : pre.evento || "", "ex.: Colação Colégio Alfa, Igreja X"); const dl = el("datalist"); dl.id = "bcEv" + Date.now(); ev.setAttribute("list", dl.id);
-    if (C.pode("colegios")) FS.getDocs(FS.query(FS.collection(db, "instituicoes"), FS.where("etapa", "==", "FECHADO"), FS.limit(300))).then(s => s.docs.forEach(d => { const o = el("option"); o.value = title(d.data().nome); dl.append(o); })).catch(e => avisoErro(e, "listar os colégios"));
+    if (C.pode("colegios")) FS.getDocs(C.carteira("instituicoes", FS.where("etapa", "==", "FECHADO"), FS.limit(300))).then(s => s.docs.filter(d => d.data().etapa === "FECHADO").forEach(d => { const o = el("option"); o.value = title(d.data().nome); dl.append(o); })).catch(e => avisoErro(e, "listar os colégios"));
     const r2 = el("div", "row2"); r2.append(field("Tipo", tipo), field("Evento / local", ev)); p.append(r2, dl);
     const dEv = el("input"); dEv.type = "date"; dEv.value = x ? x.dataEvento || "" : pre.dataEvento || "";
     const ret = el("input"); ret.type = "date"; ret.required = true; ret.value = x ? x.retirada || "" : pre.retirada || "";

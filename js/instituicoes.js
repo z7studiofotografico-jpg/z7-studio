@@ -1,5 +1,6 @@
 import { feriado } from "./feriados.js";
-import { el, title, field, inp, sel, sheet, botoes as actions, avisoErro, wa } from "./ui.js";
+import { ASSINATURA_EMAIL, ESTUDIO, assuntoDatas } from "./mensagens.js";
+import { el, title, field, inp, sel, sheet, botoes as actions, avisoErro, wa, carregarLib, emPartes } from "./ui.js";
 // Módulo Instituições: colégio particular, colégio público, colégio profissionalizante e faculdade.
 // Primeira versão comum aos 4 tipos: lista, cadastro, registro de visita, próximo passo com data
 // (aparece em "Para hoje" e no lembrete das 9h) e importação da planilha.
@@ -80,29 +81,37 @@ async function reservarVarios(it, pares){
     if (bl.length) { const e = new Error("bloqueado"); e.code = "bloqueado"; e.ocupado = { data: d }; e.bloqueio = bl[0]; throw e; }
   }
   const status = C.aprovador ? "confirmado" : "pendente", grupo = it.id + "_" + Date.now(), agora = new Date().toISOString();
+  // Vagas por dia = equipes (Ajustes). Cada vaga é um documento: AAAA-MM-DD, AAAA-MM-DD_2, AAAA-MM-DD_3.
+  const vagas = Math.max(1, Math.min(3, Number(C.P.equipesDia) || 1));
+  const idsDoDia = d => Array.from({ length: vagas }, (_, i) => i ? `${d}_${i + 1}` : d);
+  const ehMeu = (sx, kind) => sx.exists() && sx.data().instId === it.id && sx.data().kind === kind;
+  const slots = {};
   await FS.runTransaction(db, async tx => {
     const leit = [];
     for (const [kind, f] of pares) {
       const atual = it[KINDS[kind].campo];
-      const novo = FS.doc(db, "agenda", f.data);
-      const antigo = atual && atual.data && atual.data !== f.data && atual.status !== "recusado" ? FS.doc(db, "agenda", atual.data) : null;
-      leit.push({ kind, f, novo, antigo, s0: await tx.get(novo), s1: antigo ? await tx.get(antigo) : null });
+      const lidos = []; for (const id of idsDoDia(f.data)) lidos.push([id, await tx.get(FS.doc(db, "agenda", id))]);
+      // a vaga que já é deste colégio, ou a primeira livre
+      const vaga = lidos.find(([, sx]) => ehMeu(sx, kind)) || lidos.find(([, sx]) => !sx.exists());
+      if (!vaga) { const e = new Error("ocupado"); e.code = "ocupado"; e.ocupado = lidos[0][1].data(); throw e; }
+      const antigoId = atual && atual.data && atual.status !== "recusado" ? (atual.agendaId || atual.data) : null;
+      const antigo = antigoId && antigoId !== vaga[0] ? FS.doc(db, "agenda", antigoId) : null;
+      leit.push({ kind, f, novo: FS.doc(db, "agenda", vaga[0]), id: vaga[0], antigo, s1: antigo ? await tx.get(antigo) : null });
     }
-    for (const x of leit) if (x.s0.exists() && !(x.s0.data().instId === it.id && x.s0.data().kind === x.kind)) { const e = new Error("ocupado"); e.code = "ocupado"; e.ocupado = x.s0.data(); throw e; }
     for (const x of leit) {
-      if (x.s1 && x.s1.exists() && x.s1.data().instId === it.id && x.s1.data().kind === x.kind) tx.delete(x.antigo);
+      if (x.s1 && ehMeu(x.s1, x.kind)) tx.delete(x.antigo);
+      slots[x.kind] = x.id; x.f.agendaId = x.id;
       tx.set(x.novo, { data: x.f.data, hora: x.f.hora || "", kind: x.kind, tipo: nomeEvento(x.kind, it.nome), local: x.f.local || "", onde: x.f.onde || "", obs: x.f.obs || "", status, grupo,
         contato: x.f.contato || null, alunos: x.f.alunos || null,
         instId: it.id, instNome: it.nome, instTipo: it.tipo, pedidoPor: C.me || "", pedidoEmail: C.email || "", em: agora,
         ...(status === "confirmado" ? { aprovadoPor: C.me || "", aprovadoEm: agora } : {}) });
     }
   });
-  return { status, grupo };
+  return { status, grupo, slots };
 }
-async function reservar(it, kind, f){ return (await reservarVarios(it, [[kind, f]])).status; }
 async function liberar(it, kind){
   const ev = it[KINDS[kind].campo]; if (!ev || !ev.data || ev.status === "recusado") return;
-  const ref = FS.doc(db, "agenda", ev.data);
+  const ref = FS.doc(db, "agenda", ev.agendaId || ev.data);
   await FS.runTransaction(db, async tx => { const s0 = await tx.get(ref); if (s0.exists() && s0.data().instId === it.id && s0.data().kind === kind) tx.delete(ref); });
 }
 function msgErroData(e){
@@ -152,8 +161,9 @@ export async function avisarColegioPorEmail(instId, ctx){
   const nome = title(it.nome);
   await F.addDoc(F.collection(c.db, "emails"), {
     para, instId, instNome: it.nome, status: "pendente", criadoEm: new Date().toISOString(), por: c.me || "",
-    assunto: `Z7 Studio · Datas confirmadas · ${nome}`,
-    texto: `Olá!\n\nConfirmamos com o ${nome} as datas das fotos de formatura:\n\n${lin.join("\n")}${it.mediaAlunos ? `\n\nPrevisão de ${it.alunosConfirmados || it.mediaAlunos} alunos${it.alunosConfirmados ? "" : " (depois das fotos informamos a quantidade certa)"}.` : ""}\n\nQualquer dúvida, é só responder este e-mail.\n\nAtenciosamente,\nZ7 Studio Fotográfico\nEstrada Dr. Rufino Gonçalves Ferreira, 290, Centro, Nilópolis/RJ`
+    datas: [it.diaFotos && it.diaFotos.status === "confirmado" ? it.diaFotos.data : "", it.formatura && it.formatura.status === "confirmado" ? it.formatura.data : ""].filter(Boolean),
+    assunto: assuntoDatas(nome),
+    texto: `Olá!\n\nConfirmamos com o ${nome} as datas das fotos de formatura:\n\n${lin.join("\n")}${it.mediaAlunos ? `\n\nPrevisão de ${it.alunosConfirmados || it.mediaAlunos} alunos${it.alunosConfirmados ? "" : " (depois das fotos informamos a quantidade certa)"}.` : ""}\n\nQualquer dúvida, é só responder este e-mail.\n\n${ASSINATURA_EMAIL}`
   });
   await F.updateDoc(F.doc(c.db, "instituicoes", instId), { avisoEmail: { para, em: new Date().toISOString() } }).catch(e => avisoErro(e, "anotar o aviso por e-mail"));
   return para.length;
@@ -164,7 +174,7 @@ export function msgWhatsColegio(instNome, eventos, contato, alunos, quem){
   const nome = contato && contato.nome ? C.first(title(contato.nome)) : "";
   const conf = eventos.every(e => e.status === "confirmado");
   const lin = eventos.map(e => `${KINDS[e.kind].ico} ${nomeEvento(e.kind, instNome)}: ${diaLongo(e.data)}${e.hora ? " às " + e.hora : ""}${e.kind === "formatura" && e.onde ? " · " + (e.onde === "Salão" ? "no salão" + (e.local ? " (" + e.local + ")" : "") : "no colégio") : ""}`);
-  return `Olá${nome ? ", " + nome : ""}! Aqui é ${quem ? quem + ", do" : "do"} Z7 Studio Fotográfico 📸\n` +
+  return `Olá${nome ? ", " + nome : ""}! Aqui é ${quem ? quem + ", do" : "do"} ${ESTUDIO.nome} 📸\n` +
     (conf ? "Está confirmado:\n" : "Deixei pré-agendado (te confirmo em seguida):\n") + lin.join("\n") +
     (alunos ? `\nPrevisão de ${alunos} alunos (depois das fotos atualizamos a quantidade certa).` : "") +
     "\nQualquer mudança, é só me avisar por aqui. Obrigado! 😊";
@@ -205,11 +215,11 @@ function mensagem(it, c){
   const ult = (it.visitas || [])[0];
   const apres = ult && ult.apresentou && ult.apresentou.length ? ` (${ult.apresentou.map(p => p.nome.replace(/ \(.*\)$/, "")).join(", ")})` : "";
   if (it.etapa === "A VISITAR" || it.etapa === "AGENDAR VISITA")
-    return `${oi} Aqui é ${eu()}, do Z7 Studio Fotográfico 📸 Trabalhamos com fotos de formatura em escolas da região há mais de 15 anos. Gostaria de agendar uma visita rápida ${it.tipo === "faculdade" ? "com a comissão de formatura" : "ao " + nome} para apresentar os nossos kits. Qual o melhor dia e horário?`;
+    return `${oi} Aqui é ${eu()}, do ${ESTUDIO.nome} 📸 Trabalhamos com fotos de formatura em escolas da região há mais de 15 anos. Gostaria de agendar uma visita rápida ${it.tipo === "faculdade" ? "com a comissão de formatura" : "ao " + nome} para apresentar os nossos kits. Qual o melhor dia e horário?`;
   if (it.etapa === "VISITADO" || it.etapa === "PROPOSTA ENVIADA")
-    return `${oi} Aqui é ${eu()}, do Z7 Studio Fotográfico. Passando para saber se conseguiram conversar sobre a proposta das fotos de formatura${apres}. Posso ajudar com alguma dúvida? 😊`;
+    return `${oi} Aqui é ${eu()}, do ${ESTUDIO.nome}. Passando para saber se conseguiram conversar sobre a proposta das fotos de formatura${apres}. Posso ajudar com alguma dúvida? 😊`;
   if (it.etapa === "NÃO FECHOU")
-    return `${oi} Aqui é ${eu()}, do Z7 Studio Fotográfico. Já conversamos sobre as fotos de formatura${nome ? " do " + nome : ""}. Estamos organizando a agenda de ${new Date().getFullYear() + (new Date().getMonth() >= 8 ? 1 : 0)}: podemos marcar uma visita rápida para mostrar as novidades?`;
+    return `${oi} Aqui é ${eu()}, do ${ESTUDIO.nome}. Já conversamos sobre as fotos de formatura${nome ? " do " + nome : ""}. Estamos organizando a agenda de ${new Date().getFullYear() + (new Date().getMonth() >= 8 ? 1 : 0)}: podemos marcar uma visita rápida para mostrar as novidades?`;
   return "";
 }
 
@@ -234,7 +244,7 @@ export function init(ctx){ C = ctx; FS = ctx.FS; db = ctx.db; col = FS.collectio
 export async function agendarColegio(ctx){
   if (!C) init(ctx);
   let lista = [];
-  try { lista = (await FS.getDocs(FS.query(col, FS.limit(3000)))).docs.map(d => Object.assign({ id: d.id }, d.data())).sort((a, b) => (a.nome || "").localeCompare(b.nome || "", "pt-BR")); }
+  try { lista = (await FS.getDocs(C.carteira("instituicoes", FS.limit(3000)))).docs.map(d => Object.assign({ id: d.id }, d.data())).sort((a, b) => (a.nome || "").localeCompare(b.nome || "", "pt-BR")); }
   catch (e) { C.handleErr(e); return; }
   sheet("Agendar colégio", (p, close) => {
     p.append(el("p", "hint", "Para o dia de fotos no colégio (medir beca e fazer o ensaio do PR) ou para a formatura. A data fica segurada até a Luciana aprovar."));
@@ -309,8 +319,9 @@ export function show(t){
   renderChips();
   list.append(Object.assign(el("div", "empty"), { innerHTML: "<strong>Carregando…</strong>" }));
   if (unsub) unsub();
-  unsub = FS.onSnapshot(FS.query(col, FS.where("tipo", "==", t), FS.limit(1500)), snap => {
-    items = snap.docs.map(d => Object.assign({ id: d.id }, d.data())); renderChips(); renderStats(); renderList();
+  // carteira: o vendedor recebe os colégios livres e os dele (o tipo é filtrado aqui)
+  unsub = FS.onSnapshot(C.carteira("instituicoes", FS.where("tipo", "==", t), FS.limit(1500)), snap => {
+    items = snap.docs.map(d => Object.assign({ id: d.id }, d.data())).filter(x => x.tipo === t); renderChips(); renderStats(); renderList();
   }, err => { console.warn(err); C.showNotice(err.code === "permission-denied" ? "Você não tem acesso às Instituições." : "Não foi possível carregar. Verifique a internet."); });
 }
 export function hide(){ if (unsub) { unsub(); unsub = null; } }
@@ -323,7 +334,7 @@ function pendFotos(it){
 function filtra(i, k){
   if (k === "hoje") return ["late", "today"].includes(status(i)) || pendFotos(i);
   if (k === "pend") return pendFotos(i);
-  if (k === "meus") return i.resp === C.me && (ABERTAS.includes(i.etapa) || pendFotos(i));
+  if (k === "meus") return C.ehMeu(i) && (ABERTAS.includes(i.etapa) || pendFotos(i));
   if (k === "todos") return true;
   return i.etapa === k;
 }
@@ -356,7 +367,7 @@ function renderList(){
       el("span", null, items.length ? "Troque o filtro acima." : "Toque em “+ Nova instituição” ou importe a planilha."));
     list.append(e); return;
   }
-  arr.slice(0, 300).forEach(i => list.append(card(i)));
+  emPartes(list, arr, card);
 }
 
 function card(it){
@@ -366,7 +377,7 @@ function card(it){
   const meta = el("div", "meta");
   const ps = it.alunosPorSerie || {};
   const segs = SEGMENTOS.filter(([k]) => (it.segmentos || {})[k] || (k === "pre" && (it.segmentos || {}).infantil)).map(([k, t]) => ps[k] ? `${t}: ${ps[k]}` : t);
-  [[it.resp ? "👤 " + C.first(it.resp) : "", ""], [[title(it.endereco?.bairro), title(it.endereco?.cidade)].filter(Boolean).join(" · "), "svc"],
+  [[C.nomeDe(it) ? "👤 " + C.first(C.nomeDe(it)) : "", ""], [[title(it.endereco?.bairro), title(it.endereco?.cidade)].filter(Boolean).join(" · "), "svc"],
    [segs.join(", "), ""], [it.alunosConfirmados ? `${it.alunosConfirmados} alunos (confirmado)` : it.mediaAlunos ? `~${it.mediaAlunos} alunos (média)` : "", ""], [it.fotografoHoje || "", ""], [it.motivo ? "Motivo: " + it.motivo : "", ""]]
     .forEach(([v, c]) => { if (v) meta.append(el("span", "tag " + c, v)); });
   e.append(meta);
@@ -562,7 +573,12 @@ function openForm(it){
     const hor = inp(it && it.horario, "ex.: só funciona à tarde"); p.append(field("Melhor horário para contato", hor));
     const nota = el("textarea"); nota.rows = 3; nota.maxLength = 2000; nota.value = (it && it.notas) || ""; p.append(field("Anotações gerais", nota));
     if (it && C.isAdmin) { const del = el("button", "btn btn-danger btn-sm", "Apagar instituição"); del.type = "button";
-      del.onclick = async () => { if (del.dataset.ok) { try { await liberar(it, "formatura"); await liberar(it, "fotos"); await FS.deleteDoc(FS.doc(db, "instituicoes", it.id)); C.toast("Apagada"); close(); } catch (e) { C.handleErr(e); } } else { del.dataset.ok = 1; del.textContent = "Toque de novo para apagar de vez"; } }; p.append(del); }
+      del.onclick = async () => { if (del.dataset.ok) { try { await liberar(it, "formatura"); await liberar(it, "fotos");
+        // apaga junto os formandos (e parcelas) da turma, para nada ficar solto no Dashboard
+        const fs = (await FS.getDocs(FS.query(FS.collection(db, "formandos"), FS.where("instId", "==", it.id)))).docs;
+        for (let i = 0; i < fs.length; i += 400) { const b = FS.writeBatch(db); fs.slice(i, i + 400).forEach(d => b.delete(d.ref)); if (i + 400 >= fs.length) b.delete(FS.doc(db, "instituicoes", it.id)); await b.commit(); }
+        if (!fs.length) await FS.deleteDoc(FS.doc(db, "instituicoes", it.id));
+        C.toast(fs.length ? `Apagada, com ${fs.length} formando${fs.length > 1 ? "s" : ""}` : "Apagada"); close(); } catch (e) { C.handleErr(e); } } else { del.dataset.ok = 1; del.textContent = "Toque de novo: apaga o colégio e os formandos dele"; } }; p.append(del); }
     p.append(actions(close, "Salvar"));
     p.addEventListener("submit", async ev => {
       ev.preventDefault(); if (!nome.value.trim()) return;
@@ -680,10 +696,7 @@ const MAPA = { PRE: "pre", PREESCOLA: "pre", INSTITUICAO: "nome", ESCOLA: "nome"
   BAIRRO: "bairro", CIDADE: "cidade", DATADAVISITA: "dataVisita", STATUS: "status", MEDIADEALUNOS: "media", RESPONSAVEL: "responsavel",
   TEMFOTOSDEFORMATURA: "temFotos", DATADAFOTO: "dataFoto", OBSERVACAO: "obs", OBSERVACOES: "obs", OBS: "obs" };
 const hkey = h => String(h || "").normalize("NFKD").replace(/[̀-ͯ]/g, "").toUpperCase().replace(/[^A-Z0-9]/g, "").replace(/^(\d)O?ANO$/, "$1ANO");
-function loadXLSX(){
-  if (window.XLSX) return Promise.resolve(window.XLSX);
-  return new Promise((res, rej) => { const s = document.createElement("script"); s.src = "https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"; s.onload = () => res(window.XLSX); s.onerror = rej; document.head.append(s); });
-}
+function loadXLSX(){ return carregarLib("xlsx"); }
 function dataISO(v, X){
   if (!v) return "";
   if (v instanceof Date && !isNaN(v)) return C.ds(v);

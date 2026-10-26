@@ -8,7 +8,8 @@ const SHELL = ["./", "./index.html", "./config.js", "./manifest.webmanifest",
   "./icons/icon-192.png", "./icons/icon-512.png", "./icons/apple-touch-icon.png",
   "./js/ui.js", "./js/regras.js", "./js/calc.js", "./js/feriados.js",
   "./js/repasse.js", "./js/mockup.js", "./js/instituicoes.js", "./js/agenda.js", "./js/vendas.js",
-  "./js/turma.js", "./js/formaturas.js", "./js/becas.js", "./js/funil.js"];
+  "./js/turma.js", "./js/formaturas.js", "./js/becas.js", "./js/funil.js",
+  "./js/equipe.js", "./js/mensagens.js", "./css/app.css"];
 
 importScripts("./config.js");
 importScripts(
@@ -29,7 +30,7 @@ self.addEventListener("activate", (e) => {
 });
 
 // Bibliotecas de fora (Firebase, gráficos, planilha): têm a versão no endereço, então podem ficar guardadas.
-const ehCDN = (u) => /^(www\.gstatic\.com|cdnjs\.cloudflare\.com)$/.test(u.hostname);
+const ehCDN = (u) => /^(www\.gstatic\.com|cdn\.jsdelivr\.net)$/.test(u.hostname);
 // Arquivos do próprio app: busca na internet primeiro (sem cache do navegador) e usa a cópia guardada se estiver sem sinal.
 self.addEventListener("fetch", (e) => {
   const url = new URL(e.request.url);

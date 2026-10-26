@@ -1,6 +1,7 @@
 // Funil de vendas: leads do WhatsApp, mensagens prontas, follow-ups e venda.
 // Antes ficava dentro do index.html; agora é um módulo como os outros.
-import { el, avisoErro } from "./ui.js";
+import { avisoErro, emPartes } from "./ui.js";
+import { ESTUDIO } from "./mensagens.js";
 let C, leads = [], filter = "ABERTOS", editing = null;
 const $ = (id) => document.getElementById(id);
 // atalhos para as funções do app (vêm do index.html)
@@ -45,7 +46,7 @@ function nextStep(l){
   const t = l.tentativas || 0;
   switch (l.etapa) {
     case "NOVO LEAD": return { title: "Qualificar: descobrir o que a pessoa precisa",
-      msg: `Olá, ${n}! Que bom ter você aqui 😊 Sou ${first(C.me) ? (/a$/i.test(first(C.me)) ? "a " : "o ") + first(C.me) : "do time"}, do Z7 Studio.\nO orçamento é só para você ou para a sua turma? E qual a data da sua colação?`,
+      msg: `Olá, ${n}! Que bom ter você aqui 😊 Sou ${first(C.me) ? (/a$/i.test(first(C.me)) ? "a " : "o ") + first(C.me) : "do time"}, do ${ESTUDIO.curto}.\nO orçamento é só para você ou para a sua turma? E qual a data da sua colação?`,
       then: { etapa: "QUALIFICADO", days: 1 } };
     case "QUALIFICADO":
       if (turma) return { title: "Coletar dados da turma",
@@ -87,7 +88,7 @@ function claim(l){
 
 function renderChips(){
   const c = $("chips"); c.innerHTML = "";
-  const counts = { ABERTOS: leads.filter(l => OPEN.includes(l.etapa)).length, TODOS: leads.length, MEUS: leads.filter(l => C.me && l.resp === C.me && OPEN.includes(l.etapa)).length };
+  const counts = { ABERTOS: leads.filter(l => OPEN.includes(l.etapa)).length, TODOS: leads.length, MEUS: leads.filter(l => C.ehMeu(l) && OPEN.includes(l.etapa)).length };
   STAGES.forEach(s => counts[s] = leads.filter(l => l.etapa === s).length);
   ["ABERTOS","MEUS",...STAGES,"TODOS"].forEach(k => {
     const b = document.createElement("button"); b.type = "button"; b.className = "chip"; b.setAttribute("aria-pressed", String(filter === k));
@@ -115,7 +116,7 @@ function card(l){
   top.append(h, sg); el.appendChild(top);
 
   const meta = document.createElement("div"); meta.className = "meta";
-  [[l.resp ? "👤 " + first(l.resp) : "", ""], [l.servico, "svc"], [l.origem, ""], [l.valor ? money(l.valor) : "", ""], [l.tentativas ? l.tentativas + "º follow-up feito" : "", ""]]
+  [[C.nomeDe(l) ? "👤 " + first(C.nomeDe(l)) : "", ""], [l.servico, "svc"], [l.origem, ""], [l.valor ? money(l.valor) : "", ""], [l.tentativas ? l.tentativas + "º follow-up feito" : "", ""]]
     .forEach(([v, c]) => { if (v) { const t = document.createElement("span"); t.className = "tag " + c; t.textContent = v; meta.appendChild(t); } });
   el.appendChild(meta);
   if (l.telefone) { const p = document.createElement("div"); p.className = "phone"; p.textContent = l.telefone; el.appendChild(p); }
@@ -196,7 +197,7 @@ export function render(){
   if (!$("list")) return;
   renderChips(); renderStats();
   const q = $("q").value.trim().toLowerCase();
-  let arr = leads.filter(l => filter === "TODOS" ? true : filter === "ABERTOS" ? OPEN.includes(l.etapa) : filter === "MEUS" ? (C.me && l.resp === C.me && OPEN.includes(l.etapa)) : l.etapa === filter);
+  let arr = leads.filter(l => filter === "TODOS" ? true : filter === "ABERTOS" ? OPEN.includes(l.etapa) : filter === "MEUS" ? (C.ehMeu(l) && OPEN.includes(l.etapa)) : l.etapa === filter);
   if (q) arr = arr.filter(l => [l.nome, l.telefone, l.notas, l.servico, l.origem, l.resp].join(" ").toLowerCase().includes(q));
   const rank = { late: 0, today: 1, later: 2, none: 3, won: 4 };
   arr.sort((a, b) => (rank[status(a)] - rank[status(b)]) || ((a.followup || "9") < (b.followup || "9") ? -1 : (a.followup || "9") > (b.followup || "9") ? 1 : 0) || ((b.criadoEm || "") > (a.criadoEm || "") ? 1 : -1));
@@ -207,7 +208,7 @@ export function render(){
     const p = document.createElement("span"); p.textContent = leads.length ? "Troque o filtro acima ou cadastre um contato novo." : "Toque em “+ Novo lead” quando alguém chamar no WhatsApp pedindo orçamento.";
     e.append(s, p); list.appendChild(e); return;
   }
-  arr.forEach(l => list.appendChild(card(l)));
+  emPartes(list, arr, card);
 }
 
 // ---------- formulário de lead ----------
@@ -229,12 +230,21 @@ function closeForm(){ $("sheet").hidden = true; editing = null; }
 
 
 // O funil só é carregado para quem tem permissão.
+// Para não ler o histórico inteiro: os leads em aberto + os mexidos nos últimos 60 dias.
 let unsubLeads = null;
+export const DIAS_HISTORICO = 60;
 export function syncLeads(){
   const ok = C.pode("funil");
-  if (ok && !unsubLeads) unsubLeads = onSnapshot(collection(db, "leads"), snap => {
-    leads = snap.docs.map(d => Object.assign({ id: d.id }, d.data())); render(); C.aoMudarLeads();
-  }, err => { if (err.code !== "permission-denied") C.showNotice("A conexão caiu. Feche e abra o app de novo."); });
+  if (ok && !unsubLeads) {
+    const { query, where, limit } = C.FS, c = collection(db, "leads"), partes = { abertos: [], recentes: [] };
+    const juntar = () => { const m = new Map(); [...partes.abertos, ...partes.recentes].forEach(l => m.set(l.id, l)); leads = [...m.values()]; render(); C.aoMudarLeads(); };
+    const ouvir = (nome, q) => onSnapshot(q, snap => { partes[nome] = snap.docs.map(d => Object.assign({ id: d.id }, d.data())); juntar(); },
+      err => { if (err.code !== "permission-denied") C.showNotice("A conexão caiu. Feche e abra o app de novo."); });
+    const desde = new Date(Date.now() - DIAS_HISTORICO * 864e5).toISOString();
+    const u1 = ouvir("abertos", query(c, where("etapa", "in", OPEN), limit(2000)));
+    const u2 = ouvir("recentes", query(c, where("atualizadoEm", ">=", desde), limit(2000)));
+    unsubLeads = () => { u1(); u2(); };
+  }
   if (!ok && unsubLeads) { unsubLeads(); unsubLeads = null; leads = []; render(); }
 }
 

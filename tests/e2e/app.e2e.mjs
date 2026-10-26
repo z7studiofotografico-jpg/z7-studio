@@ -8,7 +8,9 @@ const srv = http.createServer((q, r) => { const f = path.join(RAIZ, decodeURICom
   if (!fs.existsSync(f) || fs.statSync(f).isDirectory()) { r.writeHead(404); return r.end(); }
   r.writeHead(200, { "content-type": tipos[path.extname(f)] || "application/octet-stream" }); fs.createReadStream(f).pipe(r); }).listen(8790);
 const URLAPP = "http://localhost:8790/index.html";
-const browser = await chromium.launch({ executablePath: process.env.CHROMIUM || "/opt/pw-browsers/chromium", args: ["--headless=new"], headless: false });
+// No GitHub usa o Chromium que o Playwright instala; aqui, o que já vem na máquina (se houver)
+const exe = process.env.CHROMIUM || (fs.existsSync("/opt/pw-browsers/chromium") ? "/opt/pw-browsers/chromium" : undefined);
+const browser = await chromium.launch({ executablePath: exe, args: ["--headless=new"], headless: false });
 let falhas = 0; const ok = (cond, msg) => { console.log((cond ? "  ✓ " : "  ✗ ") + msg); if (!cond) falhas++; };
 const ADRIANO = "z7studiofotografico@gmail.com", PEDRO = "pedro@vendas.com", NOVO = "novo@equipe.com";
 const hoje = new Date(), iso = d => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
@@ -23,6 +25,8 @@ const base = {
   "instituicoes/i1": { nome: "COLEGIO ALFA", tipo: "particular", etapa: "FECHADO", fechadoEm: dia(-20), resp: "Pedro Vendedor", contatos: [], visitas: [{ data: dia(-20), por: "Pedro Vendedor", como: "Visita presencial" }] },
   "formandos/f1": { instId: "i1", instNome: "COLEGIO ALFA", nome: "LUCAS SILVA", tel: "21977776666", contrato: "album", kit: "Kit 04", valor: 850, parcelas: 10, pagas: 1, primeiroVenc: dia(-40), formaPag: "Cartão", status: "ativo", resp: "Pedro Vendedor", vendidoEm: dia(-40) },
   "instituicoes/i2": { nome: "COLEGIO BETA", tipo: "particular", etapa: "A VISITAR", resp: "", respEmail: "", contatos: [], visitas: [] },
+  "instituicoes/i3": { nome: "COLEGIO GAMA", tipo: "publico", etapa: "A VISITAR", contatos: [], visitas: [] },
+  "repasse/r2": { nome: "BRUNO", ano: hoje.getFullYear(), etapa: "PAGO", valor: 200, formaPag: "Pix", pagoEm: dia(0), respEmail: PEDRO, conferido: false },
   "repasse/r1": { nome: "ANA", ano: hoje.getFullYear(), etapa: "PAGO", valor: 350, formaPag: "Pix", pagoEm: dia(0), resp: "Pedro Vendedor" },
   "ensaios/c1": { kind: "pessoal", titulo: "Consulta médica", obs: "", particular: true, deQuem: "Luciana", data: dia(2), diaInteiro: true, status: "confirmado" },
   ["agenda/" + dia(9)]: { data: dia(9), kind: "fotos", status: "pendente", instId: "i1", instNome: "COLEGIO ALFA", pedidoPor: "Pedro Vendedor" }
@@ -32,8 +36,8 @@ async function abrir(email, dados){
   const pg = await ctx.newPage(); const erros = [];
   pg.on("pageerror", e => erros.push(e.message)); pg.on("console", m => { if (m.type() === "error" && !/Failed to load resource/.test(m.text())) erros.push(m.text()); });
   await ctx.route(/gstatic\.com\/firebasejs\/10\.12\.2\/(firebase-\w+)\.js/, (rt, rq) => rt.fulfill({ path: AQUI + "fake/" + rq.url().match(/(firebase-\w+)\.js/)[1] + ".js", contentType: "text/javascript" }));
-  await ctx.route(/cdnjs\.cloudflare\.com\/ajax\/libs\/Chart\.js/, rt => rt.fulfill({ path: AQUI + "node_modules/chart.js/dist/chart.umd.js", contentType: "text/javascript" }));
-  await ctx.route(/cdnjs\.cloudflare\.com\/ajax\/libs\/xlsx/, rt => rt.fulfill({ path: AQUI + "node_modules/xlsx/dist/xlsx.full.min.js", contentType: "text/javascript" }));
+  await ctx.route(/cdn\.jsdelivr\.net\/npm\/chart\.js@4\.4\.1/, rt => rt.fulfill({ path: AQUI + "node_modules/chart.js/dist/chart.umd.js", contentType: "text/javascript", headers: { "access-control-allow-origin": "*" } }));
+  await ctx.route(/cdn\.jsdelivr\.net\/npm\/xlsx@0\.18\.5/, rt => rt.fulfill({ path: AQUI + "node_modules/xlsx/dist/xlsx.full.min.js", contentType: "text/javascript", headers: { "access-control-allow-origin": "*" } }));
   await pg.addInitScript(([em, d]) => { window.__EMAIL = em; window.__store = new Map(Object.entries(d)); window.open = u => { window.__aberto = u; return null; }; }, [email, dados]);
   await pg.goto(URLAPP);
   try { await pg.waitForSelector("#viewHome:not([hidden])", { timeout: 8000 }); } catch (e) { console.log("Não abriu a tela inicial. Erros:", erros.join("\n")); throw e; }
@@ -48,8 +52,9 @@ console.log("Adriano (admin), com dados antigos:");
   const { pg, erros, store } = await abrir(ADRIANO, base);
   await pg.waitForTimeout(800);
   let s = await store();
-  ok(s["config/app"].versaoDados === 3, "migração rodou (versaoDados 3)");
+  ok(s["config/app"].versaoDados === 4, "migração rodou (versaoDados 4)");
   ok(s["instituicoes/i1"].respEmail === PEDRO, "colégio ganhou o e-mail do responsável");
+  ok(s["instituicoes/i3"].respEmail === "", "colégio antigo sem responsável ganhou respEmail vazio (aparece na carteira da equipe)");
   ok(Array.isArray(s["formandos/f1"].pagamentos) && s["formandos/f1"].pagamentos.length === 1 && s["formandos/f1"].respEmail === PEDRO, "formando: pagamentos e responsável migrados");
   ok(s["formandos/f1"].proxVenc === dia(-40).replace(/-(\d\d)$/, "") || /^\d{4}-\d{2}-\d{2}$/.test(s["formandos/f1"].proxVenc), "formando: próximo vencimento gravado (" + s["formandos/f1"].proxVenc + ")");
   ok(s["repasse/r1"].respEmail === PEDRO && s["agenda/" + dia(9)].pedidoEmail === PEDRO, "PR e agenda com e-mail");
@@ -59,8 +64,9 @@ console.log("Adriano (admin), com dados antigos:");
   ok(/atrasad/.test(await pg.textContent("#tFormaturas")), "card Formaturas mostra parcela atrasada");
   // Ajustes: 9.5 não pode virar 95
   await pg.click("#btnPrices"); await pg.waitForTimeout(200);
-  await pg.fill('#comTab input[data-l="pr"][data-f="Boleto"]', "9.5"); await pg.click("#pSave"); await pg.waitForTimeout(300);
+  await pg.fill('#comTab input[data-l="pr"][data-f="Boleto"]', "9.5"); await pg.fill("#pFeriados", "24/12 Recesso de Natal"); await pg.click("#pSave"); await pg.waitForTimeout(300);
   s = await store(); ok(s["config/app"].comissao.pr.Boleto === 9.5, "comissão 9.5 grava 9,5% (antes virava 95%) → " + s["config/app"].comissao.pr.Boleto);
+  ok(s["config/app"].feriadosExtras === "24/12 Recesso de Natal", "feriado extra da cidade gravado em Ajustes");
   // Funil: valor no formato brasileiro
   await ir(pg, "#funil");
   ok(await pg.locator("#list .card").count() === 1, "Funil abre (módulo novo) com o lead");
@@ -86,7 +92,13 @@ console.log("Adriano (admin), com dados antigos:");
   await ir(pg, "#vendas"); await pg.waitForTimeout(1500);
   s = await store(); ok(!!s["resumos/dashboard"], "Dashboard gravou o resumo (abre lendo 1 documento)");
   const tab = await pg.textContent(".vdtab"); ok((tab.match(/Pedro/g) || []).length === 1 && /R\$ 82,75/.test(tab), "Pedro aparece uma vez, comissão R$ 70 (PR Pix 20%) + R$ 12,75 (parcela 85 × 15%): " + tab.replace(/\s+/g, " ").slice(0, 160));
-  ok(await pg.locator("#viewVendas canvas").count() === 2, "gráficos desenhados");
+  ok(await pg.locator("#viewVendas canvas").count() === 2, "gráficos desenhados (Chart.js com conferência de integridade)");
+  ok(/1 venda do PR a conferir/.test(await pg.textContent("#viewVendas")), "Dashboard avisa a venda do PR a conferir");
+  // PR: admin confere a venda feita pelo vendedor
+  await ir(pg, "#pr"); await pg.waitForTimeout(400);
+  await pg.locator("#rChips").getByText("A conferir").click(); await pg.waitForTimeout(400);
+  await pg.locator(".card").filter({ hasText: "Bruno" }).getByRole("button", { name: "✔ Conferir venda" }).click(); await pg.waitForTimeout(300);
+  s = await store(); ok(s["repasse/r2"].conferido === true && s["repasse/r2"].conferidoPor === ADRIANO, "admin conferiu a venda do PR");
   // Agenda: admin vê o assunto particular, marca ensaio e compromisso particular
   await ir(pg, "#agenda"); await pg.waitForTimeout(400);
   ok(/Consulta médica/.test(await pg.textContent("#viewAgenda")), "admin vê o assunto do compromisso particular");
@@ -121,7 +133,7 @@ console.log("Adriano (admin), com dados antigos:");
 console.log("Pedro (vendedor: Linha de Frente, Agendamento, Instituições):");
 {
   const migrado = Object.assign({}, base, {
-    "config/app": Object.assign({}, base["config/app"], { versaoDados: 3 }),
+    "config/app": Object.assign({}, base["config/app"], { versaoDados: 4 }),
     "instituicoes/i1": Object.assign({}, base["instituicoes/i1"], { respEmail: PEDRO }),
     "formandos/f1": Object.assign({}, base["formandos/f1"], { respEmail: PEDRO, pagamentos: [{ data: dia(-40), valor: 85 }], proxVenc: dia(-10) }),
     "ensaios/c1": Object.assign({}, base["ensaios/c1"], { titulo: "" }), "privado/c1": { titulo: "Consulta médica" },
@@ -191,7 +203,7 @@ console.log("Pedro (vendedor: Linha de Frente, Agendamento, Instituições):");
 
 console.log("Cadastro sem módulos:");
 {
-  const { pg } = await abrir(NOVO, Object.assign({}, base, { "config/app": { versaoDados: 3 } }));
+  const { pg } = await abrir(NOVO, Object.assign({}, base, { "config/app": { versaoDados: 4 } }));
   ok((await visiveis(pg)).length === 0, "não vê nenhum card");
 }
 await browser.close(); srv.close();

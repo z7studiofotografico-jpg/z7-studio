@@ -26,3 +26,12 @@ test("resume vendas, a receber e comissão em centavos", () => {
   // 350*20% + 85*15% + 133,34*20% = 70 + 12,75 + 26,67
   assert.equal(c.total, 7000 + 1275 + 2667);
 });
+
+test("venda de PR 'a conferir' entra no total, mas a comissão só depois de conferida", () => {
+  const f = Object.assign({}, fontes, { prs: [{ etapa: "PAGO", valor: 350, pagoEm: "2026-10-03", formaPag: "Pix", respEmail: "pedro@x.com", conferido: false }] });
+  const r = resumir(f, "2026-10-20");
+  assert.equal(r.aConferir, 1);
+  const pedro = periodo(r, ["2026-10"]).pessoas["pedro@x.com"];
+  const c = comissaoDe(pedro, (l, fp) => taxa({}, l, fp));
+  assert.equal(c.total, 1275 + 2667); // sem os R$ 70 do PR
+});

@@ -14,216 +14,7 @@
 <link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@500;600;700&family=Source+Sans+3:wght@400;600;700&display=swap">
-<style>
-:root{
-  --bg:#f3f2f1; --surface:#ffffff; --fg:#1c1b1d; --muted:#6b6670; --line:#dedadb;
-  --accent:#b3202a; --accent-fg:#ffffff; --accent-soft:#f6e3e4;
-  --ok:#1f7a4d; --ok-soft:#e1f1e8; --warn:#9a5b00; --warn-soft:#fbeed6; --late:#b3202a; --late-soft:#f8e1e2;
-  --chip:#ebe8e9; --next:#f7f5f2; --bar:#141315; --bar-fg:#f0eef0;
-  --f-display:"Barlow Condensed","Arial Narrow",Arial,sans-serif;
-  --f-body:"Source Sans 3","Segoe UI",Roboto,Arial,sans-serif;
-  --r:10px; color-scheme:light;
-}
-@media (prefers-color-scheme: dark){:root{
-  --bg:#141315; --surface:#1e1d20; --fg:#f0eef0; --muted:#a39fa6; --line:#34313a;
-  --accent:#e0525b; --accent-fg:#160709; --accent-soft:#3a1d20;
-  --ok:#5fc492; --ok-soft:#17301f; --warn:#e8b25a; --warn-soft:#352812; --late:#ff7a82; --late-soft:#3b1b1e;
-  --chip:#2a282e; --next:#252328; color-scheme:dark}}
-*{box-sizing:border-box}
-[hidden]{display:none!important}
-html,body{margin:0}
-body{background:var(--bg);color:var(--fg);font-family:var(--f-body);font-size:15px;line-height:1.45;-webkit-tap-highlight-color:transparent}
-.topbar{position:sticky;top:0;z-index:10;background:var(--bar);color:var(--bar-fg);padding-top:env(safe-area-inset-top,0px)}
-.topbar-in{max-width:1100px;margin:0 auto;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));padding-block:10px;display:flex;align-items:center;gap:10px;flex-wrap:wrap}
-.brand{font-family:var(--f-display);font-weight:700;font-size:1.6rem;letter-spacing:.03em;text-transform:uppercase;margin:0;line-height:1;flex:1;min-width:0}
-.brand span{color:#e0525b}
-.brand img{width:30px;height:30px;border-radius:7px;vertical-align:middle;margin-right:8px}
-.who{font-size:.85rem;opacity:.85;white-space:nowrap}
-.topbar .back{padding-inline:10px}
-.view{display:flex;flex-direction:column;gap:16px}
-.vhead{display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap}
-.vhead h2{font-family:var(--f-display);text-transform:uppercase;letter-spacing:.03em;margin:0;font-size:1.7rem;line-height:1}
-.hello{font-family:var(--f-display);font-weight:700;text-transform:uppercase;letter-spacing:.02em;margin:4px 0 0;font-size:2rem;line-height:1.05;text-wrap:balance}
-.tiles{display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:12px}
-.tile{position:relative;display:flex;flex-direction:column;gap:4px;background:var(--surface);border:1px solid var(--line);border-radius:14px;padding:16px 16px 14px;color:var(--fg);text-decoration:none;min-height:150px;transition:border-color .15s,transform .15s}
-.tile:hover{border-color:var(--accent)}
-.tile:active{transform:scale(.99)}
-.tile-ico{font-size:1.8rem;line-height:1}
-.tile b{font-family:var(--f-display);font-size:1.45rem;text-transform:uppercase;letter-spacing:.03em;margin-top:6px}
-.tile small{color:var(--muted);font-size:.9rem}
-.tile-n{margin-top:auto;padding-top:10px;font-weight:700;font-size:.9rem;color:var(--accent)}
-.tile.soon{opacity:.7}
-.tile.soon .tile-n{color:var(--muted)}
-.segs{display:grid;grid-template-columns:1fr 1fr;gap:8px}
-.seg{display:flex;flex-direction:column;gap:2px;align-items:flex-start;text-align:left;border:1px solid var(--line);background:var(--surface);color:var(--fg);border-radius:12px;padding:12px 14px}
-.seg b{font-family:var(--f-display);text-transform:uppercase;letter-spacing:.03em;font-size:1.2rem;line-height:1.1}
-.seg small{color:var(--muted);font-size:.82rem}
-.seg[aria-selected="true"]{background:var(--fg);color:var(--bg);border-color:var(--fg)}
-.seg[aria-selected="true"] small{color:inherit;opacity:.75}
-.fu.ok{color:var(--ok)}
-.series{display:flex;flex-direction:column;gap:6px}
-.prow{display:flex;align-items:center;justify-content:space-between;gap:8px}
-.prow .preco{width:90px;font:inherit;font-size:16px;padding:6px 8px;border-radius:8px;border:1px solid var(--line);background:var(--bg);color:var(--fg);text-align:right}
-details.hist summary{cursor:pointer;font-size:.85rem;color:var(--accent);font-weight:600}
-.lote{display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;background:var(--surface);border:1px solid var(--line);border-left:4px solid var(--accent);border-radius:var(--r);padding:12px 14px}
-.lote b{display:block}
-.lote .lnum{display:block;margin-top:4px;font-weight:700;color:var(--accent)}
-.lote span{color:var(--muted);font-size:.9rem}
-.lote select,.rbusca select{font:inherit;font-size:15px;padding:7px 8px;border-radius:8px;border:1px solid var(--line);background:var(--bg);color:var(--fg);max-width:100%}
-.row3{display:grid;grid-template-columns:1fr 1.3fr 1.3fr;gap:8px}
-@media (max-width:520px){.row3{grid-template-columns:1fr 1fr}.row3 .field:last-child{grid-column:1/-1}}
-.rbusca{display:grid;grid-template-columns:1fr 1fr;gap:8px}
-@media (max-width:520px){.rbusca{grid-template-columns:1fr}}
-.grp{font-family:var(--f-display);text-transform:uppercase;letter-spacing:.04em;font-size:1.1rem;margin:8px 0 0;color:var(--muted)}
-.quem{display:flex;gap:6px;flex-wrap:wrap;align-items:center}
-.quem small{color:var(--muted);font-size:.8rem;font-weight:600}
-.chip-sm{padding:3px 9px;font-size:.82rem}
-.chk{display:inline-flex;gap:6px;align-items:center;font-size:.9rem;background:var(--chip);border-radius:6px;padding:5px 9px;cursor:pointer}
-.imp{display:flex;flex-direction:column;gap:8px}
-.panel.mock{max-width:720px}
-.drop{display:flex;flex-direction:column;gap:4px;align-items:center;text-align:center;border:2px dashed var(--line);border-radius:12px;padding:18px;cursor:pointer;color:var(--muted)}
-.drop b{color:var(--fg)}
-.drop.on{border-color:var(--accent);background:var(--accent-soft)}
-.thumbs{display:flex;gap:8px;flex-wrap:wrap}
-.thumb{border:1px solid var(--line);background:var(--surface);color:var(--fg);border-radius:8px;padding:4px;display:flex;flex-direction:column;align-items:center;gap:2px}
-.thumb canvas{width:64px;height:64px;border-radius:4px}
-.thumb small{font-size:.7rem;color:var(--muted)}
-.mock-cv{width:100%;max-width:100%;height:auto;border-radius:8px;border:1px solid var(--line);background:var(--chip)}
-.ulist{display:flex;flex-direction:column;gap:8px}
-.urow{display:flex;gap:8px;align-items:center;justify-content:space-between;flex-wrap:wrap;border:1px solid var(--line);border-radius:8px;padding:8px 10px}
-.urow .u{min-width:0;overflow-wrap:anywhere}
-.urow .u b{display:block}
-.urow .u small{color:var(--muted)}
-.urow.off{opacity:.55}
-.pill{font-size:.72rem;font-weight:700;text-transform:uppercase;letter-spacing:.05em;padding:1px 7px;border-radius:4px;background:var(--chip);color:var(--muted)}
-.pill.admin{background:var(--accent-soft);color:var(--accent)}
-.topbar .btn{background:transparent;color:var(--bar-fg);border-color:#4a464f}
-.topbar .btn-primary{background:#e0525b;border-color:#e0525b;color:#160709}
-.wrap{max-width:1100px;margin:0 auto;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));padding-block:16px calc(48px + env(safe-area-inset-bottom,0px));display:flex;flex-direction:column;gap:16px}
-button{font:inherit;cursor:pointer}
-.btn{border:1px solid var(--line);background:var(--surface);color:var(--fg);border-radius:8px;padding:8px 12px;font-weight:600;text-decoration:none;display:inline-flex;align-items:center;gap:4px;min-height:38px}
-.btn:hover{border-color:var(--muted)}
-.btn-primary{background:var(--accent);border-color:var(--accent);color:var(--accent-fg)}
-.btn-sm{padding:5px 9px;font-size:.85rem;min-height:32px}
-.btn-danger{color:var(--late);border-color:var(--late)}
-.btn-ok{color:var(--ok);border-color:var(--ok)}
-.btn-verde{background:#1f7a4d;border-color:#1f7a4d;color:#fff}
-.btn-amarelo{background:#f5b301;border-color:#f5b301;color:#1c1b1d}
-.btn[disabled]{opacity:.5;cursor:default}
-:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
-
-details.guide{background:var(--surface);border:1px solid var(--line);border-radius:var(--r);padding:12px 14px}
-details.guide summary{cursor:pointer;font-family:var(--f-display);font-weight:700;text-transform:uppercase;letter-spacing:.05em;font-size:1.1rem}
-.guide ol{margin:10px 0 4px;padding-left:22px;display:flex;flex-direction:column;gap:8px;max-width:70ch}
-.stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:10px}
-.stat{background:var(--surface);border:1px solid var(--line);border-radius:var(--r);padding:10px 12px;display:flex;flex-direction:column;gap:2px}
-.stat b{font-family:var(--f-display);font-size:1.7rem;line-height:1;font-variant-numeric:tabular-nums}
-.stat small{color:var(--muted);text-transform:uppercase;letter-spacing:.06em;font-size:.72rem;font-weight:600}
-.stat.late b{color:var(--late)} .stat.today b{color:var(--warn)} .stat.won b{color:var(--ok)}
-.chips{display:flex;gap:6px;overflow-x:auto;padding-bottom:4px;scrollbar-width:thin}
-.chip{flex:none;border:1px solid transparent;background:var(--chip);color:var(--fg);border-radius:999px;padding:6px 12px;font-family:var(--f-display);font-weight:600;letter-spacing:.05em;font-size:.95rem;text-transform:uppercase}
-.chip[aria-pressed="true"]{background:var(--fg);color:var(--bg)}
-.chip .n{font-variant-numeric:tabular-nums;opacity:.7;margin-left:4px}
-.search{width:100%;padding:9px 12px;border-radius:8px;border:1px solid var(--line);background:var(--surface);color:var(--fg);font:inherit}
-.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(320px,1fr));gap:12px}
-@media (max-width:420px){.grid{grid-template-columns:1fr}}
-.card{background:var(--surface);border:1px solid var(--line);border-radius:var(--r);padding:12px 14px;display:flex;flex-direction:column;gap:8px;min-width:0;border-left:4px solid var(--line)}
-.card.late{border-left-color:var(--late)} .card.today{border-left-color:var(--warn)} .card.won{border-left-color:var(--ok)}
-.card-top{display:flex;justify-content:space-between;gap:8px;align-items:flex-start}
-.name{font-weight:700;font-size:1.05rem;margin:0;overflow-wrap:anywhere}
-.stage{flex:none;font-family:var(--f-display);font-weight:600;letter-spacing:.05em;font-size:.8rem;text-transform:uppercase;padding:2px 8px;border-radius:4px;background:var(--chip)}
-.meta{display:flex;flex-wrap:wrap;gap:6px;font-size:.82rem}
-.tag{background:var(--chip);border-radius:4px;padding:1px 7px;color:var(--muted)}
-.tag.svc{background:var(--accent-soft);color:var(--accent)}
-.tag.ok{background:var(--ok-soft);color:var(--ok)}
-.seg2{display:flex;gap:6px;margin:-4px 0 8px}
-.calnav{display:flex;align-items:center;justify-content:space-between;gap:8px}
-.calnav .grp{margin:0}
-.cal{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));gap:4px;margin:8px 0}
-.cal .wd{text-align:center;font-size:.75rem;color:var(--muted);text-transform:uppercase}
-.cal .d{display:flex;flex-direction:column;align-items:flex-start;gap:1px;min-height:58px;background:var(--surface);border:1px solid var(--line);border-radius:8px;padding:4px;font:inherit;font-size:.78rem;color:var(--fg);cursor:pointer;overflow:hidden}
-.cal .d b{font-size:.85rem}
-.cal .d .ic{font-size:.72rem;line-height:1.15;white-space:nowrap}
-.cal .d.out{visibility:hidden}
-.cal .d.pas{opacity:.5}
-.cal .d.fer{background:var(--late-soft)}
-.cal .d.hoje{border:2px solid var(--warn)}
-.cal .d.sel{border:2px solid var(--fg)}
-.passos{display:flex;flex-wrap:wrap;gap:4px;margin:6px 0}
-.passos span{font-size:.75rem;padding:2px 7px;border-radius:999px;background:var(--chip);color:var(--muted)}
-.passos span.on{background:var(--ok-soft);color:var(--ok);font-weight:600}
-.kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:8px;margin:10px 0}
-.kpi{background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:12px 14px;display:flex;flex-direction:column;gap:2px;border-top:3px solid #2563eb}
-.kpi small{color:var(--muted);font-size:.8rem}
-.kpi b{font-size:1.35rem;font-variant-numeric:tabular-nums}
-.kpi.late{border-top-color:var(--late)}
-.vdbox{background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:14px;margin:10px 0}
-.vdbox h3{margin:0;font-size:1rem}
-.vdbox>small{color:var(--muted);font-size:.8rem}
-.vdchart{position:relative;margin-top:10px;width:100%}
-.vdlist{display:flex;flex-direction:column;margin-top:8px}
-.vdrow{display:flex;justify-content:space-between;gap:8px;padding:7px 0;border-top:1px solid var(--line);font-size:.9rem}
-.vdrow:first-child{border-top:0}
-.vdtab{display:flex;flex-direction:column;margin-top:8px;font-size:.88rem}
-.vdtr{display:grid;grid-template-columns:1.3fr repeat(5,1fr);gap:6px;padding:7px 0;border-top:1px solid var(--line);font-variant-numeric:tabular-nums}
-.vdtr.th{border-top:0;color:var(--muted);font-size:.78rem}
-@media (max-width:620px){.vdtr{grid-template-columns:1fr 1fr}.vdtr.th{display:none}.vdtr span:first-child{grid-column:1/-1;font-weight:700}.vdtr span[data-l]:not([data-l=""])::before{content:attr(data-l) ": ";color:var(--muted)}}
-.panel.wide{max-width:760px;width:100%}
-.estgrid{display:grid;grid-template-columns:repeat(auto-fit,minmax(210px,1fr));gap:6px 14px}
-.comtab{display:grid;grid-template-columns:1fr 90px 90px;gap:6px 10px;align-items:center}
-.comtab .th{font-size:.8rem;color:var(--muted);text-transform:uppercase}
-.comtab input{font:inherit;font-size:16px;padding:6px 8px;border-radius:8px;border:1px solid var(--line);background:var(--bg);color:var(--fg);text-align:right;width:100%}
-.tag.late{background:var(--late-soft);color:var(--late)}
-.agrow{display:flex;gap:8px;align-items:center;justify-content:space-between;padding:9px 0;border-top:1px solid var(--line)}
-.agrow:first-of-type{border-top:0}
-.agtxt{display:flex;flex-direction:column;gap:2px;min-width:0;font-size:.92rem}
-.agtxt span{color:var(--muted);font-size:.86rem}
-.agtxt .wait{color:var(--warn)}
-.agact{display:flex;gap:6px;flex-wrap:wrap;justify-content:flex-end;flex:none}
-.phone{font-variant-numeric:tabular-nums;font-size:.9rem}
-.fu{font-size:.88rem;font-weight:600;font-variant-numeric:tabular-nums}
-.fu.late{color:var(--late)} .fu.today{color:var(--warn)} .fu.none{color:var(--muted);font-weight:400}
-.notes{font-size:.88rem;color:var(--muted);margin:0;white-space:pre-wrap;overflow-wrap:anywhere}
-.last{font-size:.82rem;color:var(--muted)}
-.next{background:var(--next);border:1px solid var(--line);border-radius:8px;padding:10px;display:flex;flex-direction:column;gap:6px}
-.next small{font-size:.72rem;text-transform:uppercase;letter-spacing:.06em;font-weight:700;color:var(--accent)}
-.next p{margin:0;font-size:.9rem;white-space:pre-wrap;overflow-wrap:anywhere}
-.next .row{display:flex;gap:6px;flex-wrap:wrap}
-.wait{font-size:.88rem;color:var(--warn);font-weight:600;margin:0}
-.lock{border-radius:8px;padding:8px 10px;font-size:.88rem;font-weight:600;display:flex;gap:8px;align-items:center;flex-wrap:wrap;justify-content:space-between}
-.lock.other{background:var(--warn-soft);color:var(--warn)}
-.lock.mine{background:var(--ok-soft);color:var(--ok)}
-.actions{display:flex;flex-wrap:wrap;gap:6px;border-top:1px solid var(--line);padding-top:8px}
-.empty{background:var(--surface);border:1px dashed var(--line);border-radius:var(--r);padding:28px 20px;text-align:center;color:var(--muted);display:flex;flex-direction:column;gap:10px;align-items:center}
-.empty strong{color:var(--fg);font-size:1.05rem}
-.notice{background:var(--warn-soft);color:var(--warn);border-radius:8px;padding:10px 12px;font-size:.9rem;display:flex;gap:8px;align-items:center;justify-content:space-between;flex-wrap:wrap}
-
-.login{min-height:100vh;min-height:100dvh;display:flex;align-items:center;justify-content:center;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));padding-block:calc(24px + env(safe-area-inset-top,0px)) calc(24px + env(safe-area-inset-bottom,0px))}
-.login form{width:100%;max-width:380px;background:var(--surface);border:1px solid var(--line);border-radius:14px;padding:22px;display:flex;flex-direction:column;gap:12px}
-.login img{width:72px;height:72px;border-radius:16px;align-self:center}
-.login h1{font-family:var(--f-display);text-transform:uppercase;letter-spacing:.04em;margin:0;text-align:center;font-size:1.8rem}
-.login p{margin:0;text-align:center;color:var(--muted);font-size:.9rem}
-.err{color:var(--late);font-size:.9rem;font-weight:600;text-align:center;margin:0}
-
-.sheet{position:fixed;inset:0;background:rgba(10,8,10,.55);display:flex;align-items:flex-end;justify-content:center;z-index:20;padding:env(safe-area-inset-top,0px) env(safe-area-inset-right,0px) 0 env(safe-area-inset-left,0px)}
-.panel{background:var(--surface);color:var(--fg);width:100%;max-width:560px;max-height:92%;overflow:auto;border-radius:14px 14px 0 0;padding:18px 18px calc(18px + env(safe-area-inset-bottom,0px));display:flex;flex-direction:column;gap:12px}
-@media (min-width:700px){.sheet{align-items:center}.panel{border-radius:14px}}
-.panel h2{font-family:var(--f-display);text-transform:uppercase;letter-spacing:.04em;margin:0;font-size:1.4rem}
-.panel h3{font-family:var(--f-display);text-transform:uppercase;letter-spacing:.04em;margin:6px 0 0;font-size:1.05rem;color:var(--muted)}
-.hint{margin:0;color:var(--muted);font-size:.88rem}
-.field{display:flex;flex-direction:column;gap:4px;min-width:0}
-.field label{font-size:.78rem;text-transform:uppercase;letter-spacing:.06em;font-weight:600;color:var(--muted)}
-.field input,.field select,.field textarea{font:inherit;font-size:16px;padding:9px 10px;border-radius:8px;border:1px solid var(--line);background:var(--bg);color:var(--fg);width:100%}
-.row2{display:grid;grid-template-columns:1fr 1fr;gap:10px}
-@media (max-width:420px){.row2{grid-template-columns:1fr}}
-.quick{display:flex;gap:6px;flex-wrap:wrap}
-.panel-actions{display:flex;justify-content:space-between;gap:8px;flex-wrap:wrap}
-.confirm{background:var(--late-soft);color:var(--late);border-radius:8px;padding:10px;display:flex;gap:8px;align-items:center;flex-wrap:wrap;font-size:.9rem}
-.me-btns{display:flex;gap:10px;flex-wrap:wrap}
-.me-btns .btn{font-size:1.05rem;padding:12px 18px}
-.toast{position:fixed;left:50%;transform:translateX(-50%);bottom:calc(16px + env(safe-area-inset-bottom,0px));background:var(--fg);color:var(--bg);padding:8px 14px;border-radius:8px;font-weight:600;z-index:30;max-width:90%;text-align:center}
-@media (prefers-reduced-motion:no-preference){.card{transition:border-color .2s}}
-</style>
+<link rel="stylesheet" href="css/app.css">
 </head>
 <body>
 
@@ -430,7 +221,10 @@ details.guide summary{cursor:pointer;font-family:var(--f-display);font-weight:70
     </div>
     <div class="row2">
       <div class="field"><label for="pAval">Link de avaliação no Google</label><input id="pAval" type="url" maxlength="300" placeholder="https://g.page/r/..."></div>
+      <div class="field"><label for="pEquipes">Equipes para colégio no mesmo dia</label><select id="pEquipes"><option value="1">1 (um colégio por dia)</option><option value="2">2</option><option value="3">3</option></select></div>
     </div>
+    <div class="field"><label for="pFeriados">Outros feriados ou recessos (um por linha: dd/mm Nome, ou dd/mm/aaaa)</label><textarea id="pFeriados" rows="3" maxlength="1500" placeholder="20/01 São Sebastião&#10;26/12/2026 Recesso"></textarea>
+      <p class="hint">Já estão inclusos os nacionais, o Carnaval, São Jorge (RJ), 21/08 (Aniversário de Nilópolis) e 08/12 (Imaculada Conceição).</p></div>
     <h3>Comissão do vendedor (%)</h3>
     <p class="hint">PR: sobre a venda. Álbum de formatura (kits das turmas) e Colação de grau: sobre cada parcela paga. Só para a equipe de vendas.</p>
     <div class="comtab" id="comTab"></div>
@@ -528,6 +322,8 @@ import { getMessaging, getToken, onMessage, isSupported } from "https://www.gsta
 import { brl, lerReais, COMISSAO_PADRAO, FORMAS, proxVenc, pagamentosDe } from "./js/regras.js";
 import { avisoErro } from "./js/ui.js";
 import * as Funil from "./js/funil.js";
+import * as Equipe from "./js/equipe.js";
+import { definirExtras as feriadosExtras } from "./js/feriados.js";
 
 const $ = (id) => document.getElementById(id);
 const CFG = self.Z7_CONFIG || {};
@@ -597,7 +393,8 @@ function applyProfile(){
 
 function handleErr(e){
   console.warn("[Z7]", e);
-  if (e && e.code === "permission-denied") toast("Você não tem permissão para fazer isso. Fale com o Adriano.");
+  if (!navigator.onLine || (e && (e.code === "unavailable" || e.code === "failed-precondition" && /offline/i.test(e.message || "")))) toast("Sem internet agora. Isso precisa de conexão: tente de novo quando voltar o sinal.");
+  else if (e && e.code === "permission-denied") toast("Você não tem permissão para fazer isso. Fale com o Adriano.");
   else toast("Não salvou. Verifique a internet e tente de novo.");
 }
 
@@ -610,8 +407,8 @@ function mkBtn(text, cls, fn){ const b = document.createElement("button"); b.typ
 $("btnPrices").onclick = () => {
   $("pInd").value = P.individual || ""; $("pSinal").value = P.sinal || ""; $("pG36").value = P.g36 || ""; $("pG7").value = P.g7 || "";
   $("pFotos").value = P.fotos || ""; $("pPrazo").value = P.prazo || "";
-  $("pLfLote").value = P.lfLoteDia || ""; $("pLfNum").value = P.lfNumero || ""; $("pRepNum").value = P.repNumero || ""; $("pLfParc").value = P.lfParcelas || ""; $("pLfPix").value = P.lfPix || ""; $("pLfCartao").value = P.lfCartao || ""; $("pKit").value = P.kitPreco || ""; $("pKitPromo").value = P.kitPromo || ""; $("pKitCartao").value = P.kitCartao || ""; $("pKitFinal").value = P.kitFinal || ""; $("pLote").value = P.loteDia || ""; $("pEntrega").value = P.entrega || ""; $("pPix").value = P.pix || ""; $("pParc").value = P.parcelas || ""; $("pPixLF").value = P.pixLF || ""; $("pPixRep").value = P.pixRep || ""; $("pPixFinal").value = P.pixFinal || ""; $("pPixSinal").value = P.pixSinal || ""; $("pLink").value = P.linkCartao || ""; $("pLinkFinal").value = P.linkCartaoFinal || ""; $("pLinkLF").value = P.linkCartaoLF || ""; $("pAval").value = P.linkAvaliacao || ""; montarComissao();
-  ["pInd","pSinal","pG36","pG7","pFotos","pPrazo","pLfLote","pLfNum","pRepNum","pLfParc","pLfPix","pLfCartao","pKit","pKitPromo","pKitCartao","pKitFinal","pLote","pEntrega","pPix","pParc","pPixLF","pPixRep","pPixFinal","pPixSinal","pLink","pLinkFinal","pLinkLF","pAval"].forEach(id => $(id).disabled = !isAdmin); document.querySelectorAll("#comTab input").forEach(i => i.disabled = !isAdmin);
+  $("pLfLote").value = P.lfLoteDia || ""; $("pLfNum").value = P.lfNumero || ""; $("pRepNum").value = P.repNumero || ""; $("pLfParc").value = P.lfParcelas || ""; $("pLfPix").value = P.lfPix || ""; $("pLfCartao").value = P.lfCartao || ""; $("pKit").value = P.kitPreco || ""; $("pKitPromo").value = P.kitPromo || ""; $("pKitCartao").value = P.kitCartao || ""; $("pKitFinal").value = P.kitFinal || ""; $("pLote").value = P.loteDia || ""; $("pEntrega").value = P.entrega || ""; $("pPix").value = P.pix || ""; $("pParc").value = P.parcelas || ""; $("pPixLF").value = P.pixLF || ""; $("pPixRep").value = P.pixRep || ""; $("pPixFinal").value = P.pixFinal || ""; $("pPixSinal").value = P.pixSinal || ""; $("pLink").value = P.linkCartao || ""; $("pLinkFinal").value = P.linkCartaoFinal || ""; $("pLinkLF").value = P.linkCartaoLF || ""; $("pAval").value = P.linkAvaliacao || ""; $("pEquipes").value = String(P.equipesDia || 1); $("pFeriados").value = P.feriadosExtras || ""; montarComissao();
+  ["pInd","pSinal","pG36","pG7","pFotos","pPrazo","pLfLote","pLfNum","pRepNum","pLfParc","pLfPix","pLfCartao","pKit","pKitPromo","pKitCartao","pKitFinal","pLote","pEntrega","pPix","pParc","pPixLF","pPixRep","pPixFinal","pPixSinal","pLink","pLinkFinal","pLinkLF","pAval","pEquipes","pFeriados"].forEach(id => $(id).disabled = !isAdmin); document.querySelectorAll("#comTab input").forEach(i => i.disabled = !isAdmin);
   $("pSave").hidden = !isAdmin;
   $("pricesHint").textContent = isAdmin ? "Os valores entram automaticamente nas mensagens prontas." : "Só administradores mudam os preços.";
   renderPushState(); $("sheetPrices").hidden = false;
@@ -641,7 +438,7 @@ $("formPrices").addEventListener("submit", async e => {
   const body = { individual: num($("pInd").value), sinal: num($("pSinal").value), g36: num($("pG36").value), g7: num($("pG7").value),
     fotos: num($("pFotos").value) || 30, prazo: num($("pPrazo").value) || 15,
     lfLoteDia: num($("pLfLote").value) || 20, lfNumero: $("pLfNum").value.trim(), repNumero: $("pRepNum").value.trim(), lfParcelas: num($("pLfParc").value), lfPix: num($("pLfPix").value), lfCartao: num($("pLfCartao").value), kitPreco: num($("pKit").value), kitPromo: num($("pKitPromo").value), kitCartao: num($("pKitCartao").value), kitFinal: num($("pKitFinal").value), loteDia: num($("pLote").value) || 20, entrega: $("pEntrega").value.trim(),
-    pix: $("pPix").value.trim(), parcelas: num($("pParc").value), pixLF: $("pPixLF").value.trim(), pixRep: $("pPixRep").value.trim(), pixFinal: $("pPixFinal").value.trim(), pixSinal: $("pPixSinal").value.trim(), linkCartao: $("pLink").value.trim(), linkCartaoFinal: $("pLinkFinal").value.trim(), linkCartaoLF: $("pLinkLF").value.trim(), linkAvaliacao: $("pAval").value.trim(), comissao: lerComissao() };
+    pix: $("pPix").value.trim(), parcelas: num($("pParc").value), pixLF: $("pPixLF").value.trim(), pixRep: $("pPixRep").value.trim(), pixFinal: $("pPixFinal").value.trim(), pixSinal: $("pPixSinal").value.trim(), linkCartao: $("pLink").value.trim(), linkCartaoFinal: $("pLinkFinal").value.trim(), linkCartaoLF: $("pLinkLF").value.trim(), linkAvaliacao: $("pAval").value.trim(), equipesDia: Number($("pEquipes").value) || 1, feriadosExtras: $("pFeriados").value.trim(), comissao: lerComissao() };
   try {
     await setDoc(doc(db, "config", "app"), body, { merge: true });
     $("sheetPrices").hidden = true; toast("Preços salvos");
@@ -691,9 +488,19 @@ const ctx = {
   get vendedores(){ return Object.entries(USERS).filter(([em, u]) => u.nome && u.ativo !== false && u.papel !== "admin" && !isDono(em)).map(([, u]) => u.nome); },
   get vendedoresEmails(){ return Object.entries(USERS).filter(([em, u]) => u.ativo !== false && u.papel !== "admin" && !isDono(em)).map(([em]) => em); },
   get email(){ return (user && user.email || "").toLowerCase(); }, get usuarios(){ return USERS; },
+  // Nome do responsável sai do e-mail (que não muda); o nome gravado só vale para registros antigos
+  nomeDe(x){ const em = x && x.respEmail; return (em && ((USERS[em] && USERS[em].nome) || DONOS[em])) || (x && x.resp) || ""; },
+  ehMeu(x){ return !!x && (x.respEmail ? x.respEmail === ctx.email : !!me && x.resp === me); },
   // Funil → Agenda: abre o ensaio já preenchido
   async abrirEnsaio(pre){ if (!agendaMod) { agendaMod = await import("./js/agenda.js"); agendaMod.init(ctx); } agendaMod.openEnsaio(null, pre); },
   aoMudarLeads(){ if (curView === "home") renderHome(); },
+  // Carteira: o admin consulta com os filtros pedidos; quem não é admin só pode ler os colégios livres e os seus
+  // (formandos: só os seus). Nesse caso a consulta vai só pela carteira e quem chama filtra o resto na tela.
+  carteira(nomeCol, ...filtros){
+    const c = collection(db, nomeCol);
+    if (isAdmin) return query(c, ...filtros);
+    return nomeCol === "formandos" ? query(c, where("respEmail", "==", ctx.email), FS.limit(3000)) : query(c, where("respEmail", "in", ["", ctx.email]), FS.limit(3000));
+  },
   goHome(){ location.hash = "#home"; }
 };
 Funil.init(ctx);
@@ -809,10 +616,14 @@ function contarInst(force){
   if (!pode("colegios")) return;
   if (!force && Date.now() - instCount.at < 120000 && instCount.por) return paintInst();
   instCount.at = Date.now();
-  Promise.all([
-    FS.getDocs(query(collection(db, "instituicoes"), where("followup", "<=", todayStr()), FS.limit(500))),
+  const hj = todayStr();
+  (isAdmin ? Promise.all([
+    FS.getDocs(query(collection(db, "instituicoes"), where("followup", "<=", hj), FS.limit(500))),
     FS.getDocs(query(collection(db, "instituicoes"), where("formatura.status", "in", ["pendente", "confirmado"]), FS.limit(500)))
-  ]).then(([s1, s2]) => {
+  ]) : FS.getDocs(ctx.carteira("instituicoes")).then(s => {
+    const docs = s.docs; const f = fn => ({ docs: docs.filter(d => fn(d.data())) });
+    return [f(x => x.followup && x.followup <= hj), f(x => x.formatura && ["pendente", "confirmado"].includes(x.formatura.status))];
+  })).then(([s1, s2]) => {
     const por = {}, vistos = new Set();
     s1.docs.forEach(d => { const x = d.data(); if (x.etapa !== "FECHADO") { por[x.tipo] = (por[x.tipo] || 0) + 1; vistos.add(d.id); } });
     // pendência: formatura sem o dia de medir beca + ensaio
@@ -842,77 +653,9 @@ $("lReset").onclick = async () => {
   catch (_) { $("lErr").textContent = "Não foi possível enviar. Confira o e-mail."; $("lErr").hidden = false; }
 };
 
-// ---------- equipe ----------
-function renderTeam(){
-  const box = $("uList"); box.innerHTML = "";
-  const rows = Object.entries(USERS).sort((a, b) => (a[1].nome || "").localeCompare(b[1].nome || "", "pt-BR"));
-  if (!rows.length) { const p = document.createElement("p"); p.className = "hint"; p.textContent = "Ninguém cadastrado ainda."; box.appendChild(p); }
-  rows.forEach(([em, u]) => {
-    const r = document.createElement("div"); r.className = "urow" + (u.ativo === false ? " off" : "");
-    const info = document.createElement("div"); info.className = "u";
-    const b = document.createElement("b"); b.textContent = u.nome || em;
-    const s = document.createElement("small"); s.textContent = em;
-    info.append(b, s);
-    const pill = document.createElement("span"); pill.className = "pill" + (u.papel === "admin" ? " admin" : ""); pill.textContent = u.ativo === false ? "Desativado" : u.papel === "admin" ? "Administrador" : "Equipe";
-    const acts = document.createElement("div"); acts.className = "quick";
-    if (isDono(em)) pill.textContent = "Dono";
-    if (!isDono(em) && em !== (user.email || "").toLowerCase()) {
-      acts.appendChild(mkBtn(u.papel === "admin" ? "Tornar equipe" : "Tornar admin", "", () => updUser(em, { papel: u.papel === "admin" ? "equipe" : "admin" })));
-      acts.appendChild(mkBtn(u.ativo === false ? "Reativar" : "Desativar", u.ativo === false ? "btn-ok" : "btn-danger", () => updUser(em, { ativo: u.ativo === false })));
-    }
-    if (u.ativo !== false) acts.appendChild(mkBtn("Reenviar convite", "", async () => { try { await sendPasswordResetEmail(auth, em); toast("Convite enviado para " + em); } catch (_) { toast("Não foi possível enviar o e-mail."); } }));
-    const head = document.createElement("div"); head.style.cssText = "display:flex;gap:8px;align-items:center;min-width:0"; head.append(info, pill);
-    r.append(head);
-    if (!isDono(em) && u.papel !== "admin" && u.ativo !== false) {
-      const mods = document.createElement("div"); mods.className = "quick";
-      const atuais = Array.isArray(u.modulos) ? u.modulos : []; // sem módulos marcados = sem acesso
-      MODULOS.forEach(([k, lbl]) => {
-        const l = document.createElement("label"); l.className = "chk"; const c = document.createElement("input"); c.type = "checkbox"; c.checked = atuais.includes(k);
-        c.onchange = () => { const novo = MODULOS.map(m => m[0]).filter(x => x === k ? c.checked : atuais.includes(x)); updUser(em, { modulos: novo }); };
-        l.append(c, document.createTextNode(" " + lbl)); mods.append(l);
-      });
-      r.append(mods);
-    }
-    r.append(acts); box.appendChild(r);
-  });
-}
-async function updUser(em, patch){ try { await updateDoc(doc(db, "usuarios", em), patch); toast("Equipe atualizada"); } catch (e) { handleErr(e); } }
-function paintModsForm(){
-  const box = $("uMods"); if (!box.childElementCount) MODULOS.forEach(([k, lbl]) => {
-    const l = document.createElement("label"); l.className = "chk"; const c = document.createElement("input"); c.type = "checkbox"; c.value = k; c.checked = k !== "rep" && k !== "funil";
-    l.append(c, document.createTextNode(" " + lbl)); box.append(l);
-  });
-  $("uModsBox").hidden = $("uPapel").value !== "equipe";
-}
-$("uPapel").addEventListener("change", paintModsForm);
-$("btnTeam").onclick = () => { renderTeam(); paintModsForm(); $("uErr").hidden = true; $("sheetTeam").hidden = false; };
-$("uClose").onclick = () => { $("sheetTeam").hidden = true; };
-$("sheetTeam").addEventListener("click", e => { if (e.target === $("sheetTeam")) $("sheetTeam").hidden = true; });
-$("formUser").addEventListener("submit", async e => {
-  e.preventDefault(); if (!isAdmin) return;
-  const nome = $("uNome").value.trim(), em = $("uEmail").value.trim().toLowerCase(), papel = $("uPapel").value;
-  const err = $("uErr"); err.hidden = true;
-  if (!nome || !/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(em)) { err.textContent = "Preencha o nome e um e-mail válido."; err.hidden = false; return; }
-  $("uSave").disabled = true;
-  try {
-    // 1) cria o login (com uma senha aleatória que ninguém conhece)
-    try {
-      const rnd = crypto.getRandomValues(new Uint32Array(4)).join("-") + "Aa!";
-      const a = cadastroAuth(); await createUserWithEmailAndPassword(a, em, rnd); await signOut(a);
-    } catch (ce) { if (ce.code !== "auth/email-already-in-use") throw ce; }
-    // 2) dá acesso ao app
-    const dados = { nome, papel, ativo: true, criadoEm: new Date().toISOString(), criadoPor: user.email || "" };
-    if (papel === "equipe") dados.modulos = [...$("uMods").querySelectorAll("input:checked")].map(c => c.value);
-    await setDoc(doc(db, "usuarios", em), dados);
-    // 3) manda o e-mail para a pessoa criar a própria senha
-    await sendPasswordResetEmail(auth, em);
-    $("uNome").value = ""; $("uEmail").value = ""; $("uPapel").value = "equipe";
-    toast("Pronto! " + first(nome) + " vai receber um e-mail para criar a senha.");
-  } catch (ex) {
-    err.textContent = ex.code === "permission-denied" ? "Só administradores cadastram pessoas." : ex.code === "auth/invalid-email" ? "E-mail inválido." : "Não foi possível cadastrar. Tente de novo.";
-    err.hidden = false; console.warn(ex);
-  } finally { $("uSave").disabled = false; }
-});
+// ---------- equipe (js/equipe.js) ----------
+Equipe.init({ db, auth, updateDoc, doc, setDoc, sendPasswordResetEmail, createUserWithEmailAndPassword, signOut, cadastroAuth,
+  mkBtn, toast, handleErr, first, isDono, MODULOS, usuarios: () => USERS, user: () => user, isAdmin: () => isAdmin });
 
 function startData(){
   unsub.forEach(f => f()); unsub = [];
@@ -930,10 +673,11 @@ function startData(){
     if (isAdmin && configLoaded) migrar();
     else if (curView === "home") renderHome();
     else { const md = { funil: "funil", pr: "pr", repasse: "pr", agenda: "agenda", vendas: "vendas", formaturas: "formaturas", becas: "becas" }[curView] || (curView === "instituicoes" || curView === "colegios" || INST_NOMES[curView] ? "colegios" : null); if (md && !pode(md)) route(); }
-    if (!$("sheetTeam").hidden) renderTeam();
+    if (Equipe.aberta()) Equipe.render();
   }, err => { if (err.code === "permission-denied") showNotice("Este e-mail não tem acesso ao app. Peça para um administrador cadastrar você."); }));
   unsub.push(onSnapshot(doc(db, "config", "app"), s => {
     if (s.exists()) P = Object.assign({}, P, s.data());
+    feriadosExtras(P.feriadosExtras);
     configLoaded = true; if (isAdmin && usersLoaded) migrar();
     Funil.render();
   }, e => avisoErro(e, "ler os ajustes")));
@@ -942,7 +686,7 @@ function startData(){
 // ---------- atualização dos dados antigos (roda uma vez, no aparelho de um administrador) ----------
 // v3: responsável guardado pelo e-mail (respEmail), parcelas pela lista de pagamentos + próximo vencimento (proxVenc),
 //     pedidos de data com o e-mail de quem pediu, assunto dos compromissos particulares na coleção "privado".
-const VERSAO_DADOS = 3;
+const VERSAO_DADOS = 4;
 let migrando = false;
 async function migrar(){
   if (migrando || !usersLoaded || (P.versaoDados || 0) >= VERSAO_DADOS) return;
@@ -952,13 +696,14 @@ async function migrar(){
     const emailDe = nm => porNome[nm] || "";
     const ops = [];
     const ler = async n => (await FS.getDocs(collection(db, n))).docs;
-    for (const d of await ler("instituicoes")) { const x = d.data(); if (x.resp && !x.respEmail && emailDe(x.resp)) ops.push(["u", d.ref, { respEmail: emailDe(x.resp) }]); }
-    const insts = Object.fromEntries((await ler("instituicoes")).map(d => [d.id, d.data()]));
+    // uma leitura só de cada coleção; todo documento ganha "respEmail" (mesmo vazio), senão a carteira da equipe não o encontra
+    const instDocs = await ler("instituicoes"); const insts = {};
+    for (const d of instDocs) { const x = d.data(); insts[d.id] = x; if (x.respEmail == null) { const re = emailDe(x.resp); x.respEmail = re; ops.push(["u", d.ref, { respEmail: re }]); } }
     for (const d of await ler("formandos")) {
       const f = d.data(), pags = pagamentosDe(f), patch = {};
       if (!Array.isArray(f.pagamentos)) { patch.pagamentos = pags; patch.pagas = pags.length; }
       const pv = proxVenc(Object.assign({}, f, { pagamentos: pags })); if (f.proxVenc !== pv) patch.proxVenc = pv;
-      const re = f.respEmail || (insts[f.instId] || {}).respEmail || emailDe(f.resp || (insts[f.instId] || {}).resp); if (re && !f.respEmail) patch.respEmail = re;
+      if (f.respEmail == null) patch.respEmail = emailDe(f.resp) || (insts[f.instId] || {}).respEmail || "";
       if (Object.keys(patch).length) ops.push(["u", d.ref, patch]);
     }
     for (const d of (await FS.getDocs(query(collection(db, "repasse"), where("resp", ">", "")))).docs) { const x = d.data(); if (!x.respEmail && emailDe(x.resp)) ops.push(["u", d.ref, { respEmail: emailDe(x.resp) }]); }
