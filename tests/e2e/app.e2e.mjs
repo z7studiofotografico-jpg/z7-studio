@@ -86,6 +86,15 @@ const base = {
     vendidoEm: dia(-40)
   },
   "instituicoes/i2": { nome: "COLEGIO BETA", tipo: "particular", etapa: "A VISITAR", resp: "", respEmail: "", contatos: [], visitas: [] },
+  "leads/l9": {
+    nome: "Rosana Antiga",
+    etapa: "FECHADO",
+    valor: 300,
+    fechadoEm: dia(-200),
+    criadoEm: dia(-210) + "T10:00:00Z",
+    atualizadoEm: dia(-200) + "T10:00:00Z",
+    origem: "Indicação"
+  },
   "instituicoes/i3": { nome: "COLEGIO GAMA", tipo: "publico", etapa: "A VISITAR", contatos: [], visitas: [] },
   "repasse/r2": {
     nome: "BRUNO",
@@ -134,6 +143,26 @@ for (let i = 0; i < 30; i++)
     escola: "COLEGIO ALFA",
     contatos: [{ tipo: "Mãe", tel: "2199999" + String(1000 + i) }]
   };
+// Os dados antigos são atualizados no servidor (scripts/migrar.mjs); aqui aplicamos o mesmo plano antes de abrir o app
+import { planejar } from "../../js/migracao.js";
+function migrar(dados) {
+  const out = JSON.parse(JSON.stringify(dados)),
+    cols = {};
+  for (const [k, v] of Object.entries(out)) {
+    const [c, id] = k.split("/");
+    (cols[c] = cols[c] || []).push({ id, ...v });
+  }
+  const nomes = Object.fromEntries(
+    Object.entries(out)
+      .filter(([k, v]) => k.startsWith("usuarios/") && v.nome)
+      .map(([k, v]) => [v.nome, k.slice(9)])
+  );
+  for (const o of planejar(cols, n => nomes[n] || "").ops) {
+    const k = o.col + "/" + o.id;
+    out[k] = o.tipo === "s" ? o.dados : Object.assign({}, out[k], o.dados);
+  }
+  return out;
+}
 async function abrir(email, dados) {
   const ctx = await browser.newContext({ viewport: { width: 420, height: 900 }, serviceWorkers: "block" });
   const pg = await ctx.newPage();
@@ -188,12 +217,11 @@ const ir = async (pg, h) => {
 };
 const visiveis = pg => pg.$$eval(".tile[data-mod]", ts => ts.filter(t => !t.hidden).map(t => t.dataset.mod));
 
-console.log("Adriano (admin), com dados antigos:");
+console.log("Adriano (admin), com os dados já atualizados no servidor:");
 {
-  const { pg, erros, store } = await abrir(ADRIANO, base);
+  const { pg, erros, store } = await abrir(ADRIANO, migrar(base));
   await pg.waitForTimeout(800);
   let s = await store();
-  ok(s["config/app"].versaoDados === 4, "migração rodou (versaoDados 4)");
   ok(s["instituicoes/i1"].respEmail === PEDRO, "colégio ganhou o e-mail do responsável");
   ok(s["instituicoes/i3"].respEmail === "", "colégio antigo sem responsável ganhou respEmail vazio (aparece na carteira da equipe)");
   ok(
@@ -238,6 +266,12 @@ console.log("Adriano (admin), com dados antigos:");
   await pg.fill("#fValor", "1.350,50");
   await pg.click("#btnSave");
   await pg.waitForFunction(() => (window.__store.get("leads/l1") || {}).valor === 1350.5, null, { timeout: 3000 }).catch(() => {});
+  // busca acha também lead antigo (fechado há mais de 60 dias, fora da lista carregada)
+  await pg.fill("#q", "rosana");
+  await pg.waitForTimeout(1200);
+  ok(/Rosana Antiga/.test(await pg.textContent("#list")), "busca acha lead antigo no servidor");
+  await pg.fill("#q", "");
+  await pg.waitForTimeout(200);
   s = await store();
   ok(s["leads/l1"].valor === 1350.5, "valor R$ 1.350,50 gravado como 1350.5 → " + JSON.stringify(s["leads/l1"].valor));
   // Formaturas: registrar parcela (transação)
@@ -405,8 +439,7 @@ console.log("Adriano (admin), com dados antigos:");
 
 console.log("Pedro (vendedor: Linha de Frente, Agendamento, Instituições):");
 {
-  const migrado = Object.assign({}, base, {
-    "config/app": Object.assign({}, base["config/app"], { versaoDados: 4 }),
+  const migrado = Object.assign(migrar(base), {
     "instituicoes/i1": Object.assign({}, base["instituicoes/i1"], { respEmail: PEDRO }),
     "formandos/f1": Object.assign({}, base["formandos/f1"], {
       respEmail: PEDRO,

@@ -1,6 +1,6 @@
 // Funil de vendas: leads do WhatsApp, mensagens prontas, follow-ups e venda.
 // Antes ficava dentro do index.html; agora é um módulo como os outros.
-import { avisoErro, emPartes } from "./ui.js";
+import { avisoErro, emPartes, norm } from "./ui.js";
 import { campoReais } from "./regras.js";
 import { ESTUDIO } from "./mensagens.js";
 import * as U from "./util.js";
@@ -431,13 +431,43 @@ async function marcarEnsaio(l) {
     avisoErro(e, "abrir a agenda", toast);
   }
 }
+// Busca pelo nome no servidor, para achar também leads fechados ou perdidos há mais de 60 dias
+const antigos = new Map();
+let ultimaBusca = "",
+  timerBusca = null;
+function buscarNoServidor(q) {
+  const nq = norm(q);
+  if (nq.length < 3 || nq === ultimaBusca) return;
+  clearTimeout(timerBusca);
+  timerBusca = setTimeout(async () => {
+    ultimaBusca = nq;
+    try {
+      const { query, where, limit, getDocs } = C.FS;
+      const s = await getDocs(
+        query(collection(db, "leads"), where("nomeBusca", ">=", nq), where("nomeBusca", "<=", nq + "\uf8ff"), limit(20))
+      );
+      let novos = 0;
+      s.docs.forEach(d => {
+        if (!antigos.has(d.id)) novos++;
+        antigos.set(d.id, Object.assign({ id: d.id }, d.data()));
+      });
+      if (novos) render();
+    } catch (e) {
+      avisoErro(e, "buscar leads antigos");
+    }
+  }, 400);
+}
 export function render() {
   if (!$("list")) return;
   renderChips();
   renderStats();
   const q = $("q").value.trim().toLowerCase();
-  let arr = leads.filter(l =>
-    filter === "TODOS"
+  buscarNoServidor(q);
+  // na busca entram também os leads antigos achados no servidor (a lista só carrega abertos + últimos 60 dias)
+  const base = q ? leads.concat([...antigos.values()].filter(a => !leads.some(l => l.id === a.id))) : leads;
+  // com busca, procura em todas as etapas (quem digita um nome quer achar a pessoa, esteja onde estiver)
+  let arr = base.filter(l =>
+    q || filter === "TODOS"
       ? true
       : filter === "ABERTOS"
         ? OPEN.includes(l.etapa)
@@ -445,7 +475,7 @@ export function render() {
           ? C.ehMeu(l) && OPEN.includes(l.etapa)
           : l.etapa === filter
   );
-  if (q) arr = arr.filter(l => [l.nome, l.telefone, l.notas, l.servico, l.origem, l.resp].join(" ").toLowerCase().includes(q));
+  if (q) arr = arr.filter(l => norm([l.nome, l.telefone, l.notas, l.servico, l.origem, l.resp].join(" ")).includes(norm(q)));
   const rank = { late: 0, today: 1, later: 2, none: 3, won: 4 };
   arr.sort(
     (a, b) =>
@@ -597,6 +627,7 @@ function ligar() {
       notas: $("fNotas").value.trim(),
       resp: $("fResp").value,
       respEmail: emailDe($("fResp").value),
+      nomeBusca: norm(nome),
       atualizadoEm: new Date().toISOString()
     };
     $("btnSave").disabled = true;

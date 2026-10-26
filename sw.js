@@ -29,6 +29,7 @@ const SHELL = [
   "./js/equipe.js",
   "./js/mensagens.js",
   "./js/eventos.js",
+  "./js/migracao.js",
   "./css/app.css"
 ];
 

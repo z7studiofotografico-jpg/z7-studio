@@ -320,7 +320,7 @@ import { getAuth, initializeAuth, onAuthStateChanged, signInWithEmailAndPassword
 import { initializeFirestore, persistentLocalCache, persistentMultipleTabManager, collection, doc, onSnapshot, updateDoc, setDoc, query, where, getCountFromServer } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
 import * as FS from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
 import { getMessaging, getToken, onMessage, isSupported } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-messaging.js";
-import { COMISSAO_PADRAO, FORMAS, proxVenc, pagamentosDe } from "./js/regras.js";
+import { COMISSAO_PADRAO, FORMAS } from "./js/regras.js";
 import { avisoErro, ligarCamposReais, formatarCampos } from "./js/ui.js";
 import { todayStr, addDays, num, first, toast, showNotice, mkBtn } from "./js/util.js";
 ligarCamposReais();
@@ -530,7 +530,7 @@ const ctx = {
   goHome(){ location.hash = "#home"; }
 };
 Funil.init(ctx);
-let usersLoaded = false, configLoaded = false;
+let usersLoaded = false;
 async function route(){
   if (!user || !usersLoaded) return;
   const r = (location.hash || "").slice(1);
@@ -696,7 +696,6 @@ function startData(){
     }
     applyProfile(); Funil.syncLeads(); Funil.render();
     if (!usersLoaded) { usersLoaded = true; route(); }
-    if (isAdmin && configLoaded) migrar();
     else if (curView === "home") renderHome();
     else { const md = { funil: "funil", pr: "pr", repasse: "pr", agenda: "agenda", vendas: "vendas", formaturas: "formaturas", becas: "becas" }[curView] || (curView === "instituicoes" || curView === "colegios" || INST_NOMES[curView] ? "colegios" : null); if (md && !pode(md)) route(); }
     if (Equipe.aberta()) Equipe.render();
@@ -704,44 +703,13 @@ function startData(){
   unsub.push(onSnapshot(doc(db, "config", "app"), s => {
     if (s.exists()) P = Object.assign({}, P, s.data());
     feriadosExtras(P.feriadosExtras);
-    configLoaded = true; if (isAdmin && usersLoaded) migrar();
+
     Funil.render();
   }, e => avisoErro(e, "ler os ajustes")));
 }
 
-// ---------- atualização dos dados antigos (roda uma vez, no aparelho de um administrador) ----------
-// v3: responsável guardado pelo e-mail (respEmail), parcelas pela lista de pagamentos + próximo vencimento (proxVenc),
-//     pedidos de data com o e-mail de quem pediu, assunto dos compromissos particulares na coleção "privado".
-const VERSAO_DADOS = 4;
-let migrando = false;
-async function migrar(){
-  if (migrando || !usersLoaded || (P.versaoDados || 0) >= VERSAO_DADOS) return;
-  migrando = true;
-  try {
-    const porNome = {}; Object.entries(USERS).forEach(([em, u]) => { if (u.nome) porNome[u.nome] = em; }); Object.entries(DONOS).forEach(([em, nm]) => { if (nm && !porNome[nm]) porNome[nm] = em; });
-    const emailDe = nm => porNome[nm] || "";
-    const ops = [];
-    const ler = async n => (await FS.getDocs(collection(db, n))).docs;
-    // uma leitura só de cada coleção; todo documento ganha "respEmail" (mesmo vazio), senão a carteira da equipe não o encontra
-    const instDocs = await ler("instituicoes"); const insts = {};
-    for (const d of instDocs) { const x = d.data(); insts[d.id] = x; if (x.respEmail == null) { const re = emailDe(x.resp); x.respEmail = re; ops.push(["u", d.ref, { respEmail: re }]); } }
-    for (const d of await ler("formandos")) {
-      const f = d.data(), pags = pagamentosDe(f), patch = {};
-      if (!Array.isArray(f.pagamentos)) { patch.pagamentos = pags; patch.pagas = pags.length; }
-      const pv = proxVenc(Object.assign({}, f, { pagamentos: pags })); if (f.proxVenc !== pv) patch.proxVenc = pv;
-      if (f.respEmail == null) patch.respEmail = emailDe(f.resp) || (insts[f.instId] || {}).respEmail || "";
-      if (Object.keys(patch).length) ops.push(["u", d.ref, patch]);
-    }
-    for (const d of (await FS.getDocs(query(collection(db, "repasse"), where("resp", ">", "")))).docs) { const x = d.data(); if (!x.respEmail && emailDe(x.resp)) ops.push(["u", d.ref, { respEmail: emailDe(x.resp) }]); }
-    for (const d of await ler("agenda")) { const x = d.data(); if (!x.pedidoEmail && emailDe(x.pedidoPor)) ops.push(["u", d.ref, { pedidoEmail: emailDe(x.pedidoPor) }]); }
-    for (const d of await ler("ensaios")) { const x = d.data(); if (x.kind === "pessoal" && x.particular && (x.titulo || x.obs)) { ops.push(["s", doc(db, "privado", d.id), { titulo: x.titulo || "", obs: x.obs || "", data: x.data || "" }]); ops.push(["u", d.ref, { titulo: "", obs: "" }]); } }
-    for (let i = 0; i < ops.length; i += 400) { const b = FS.writeBatch(db); ops.slice(i, i + 400).forEach(([t, r, v]) => t === "s" ? b.set(r, v) : b.update(r, v)); await b.commit(); }
-    await setDoc(doc(db, "config", "app"), { versaoDados: VERSAO_DADOS }, { merge: true });
-    if (ops.length) console.info(`[Z7] dados atualizados: ${ops.length} registros`);
-    fbCount.at = 0; agCount.at = 0; if (curView === "home") renderHome();
-  } catch (e) { avisoErro(e, "atualizar os dados antigos (cole as regras novas do Firebase)"); }
-  finally { migrando = false; }
-}
+// ---------- dados antigos ----------
+// A atualização de dados antigos roda no GitHub (scripts/migrar.mjs), não no celular de quem abre o app.
 
 onAuthStateChanged(auth, u => {
   user = u;

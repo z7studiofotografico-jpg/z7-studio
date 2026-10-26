@@ -1,0 +1,59 @@
+// Plano de atualização dos dados antigos (sem banco): recebe os documentos e devolve o que gravar.
+// Usado por scripts/migrar.mjs (no GitHub) e testado em tests/migracao.test.mjs.
+import { pagamentosDe, proxVenc } from "./regras.js";
+import { norm } from "./ui.js";
+export const VERSAO_DADOS = 5;
+
+// cols = { instituicoes, formandos, repasse, agenda, ensaios, leads }: listas de { id, ...dados }
+// emailDe(nome) → e-mail da pessoa com esse nome ("" se não achar)
+// devolve [{ col, id, tipo: "u" | "s", dados }] e a contagem por assunto
+export function planejar(cols, emailDe) {
+  const ops = [],
+    conta = {};
+  const muda = (assunto, col, id, dados, tipo = "u") => {
+    ops.push({ col, id, tipo, dados });
+    conta[assunto] = (conta[assunto] || 0) + 1;
+  };
+  const insts = {};
+  // todo documento tem "respEmail" (mesmo vazio), senão a carteira da equipe não o encontra
+  for (const x of cols.instituicoes || []) {
+    insts[x.id] = x;
+    if (x.respEmail == null) {
+      const re = emailDe(x.resp);
+      insts[x.id] = { ...x, respEmail: re };
+      muda("instituições", "instituicoes", x.id, { respEmail: re });
+    }
+  }
+  for (const f of cols.formandos || []) {
+    const pags = pagamentosDe(f),
+      patch = {};
+    if (!Array.isArray(f.pagamentos)) {
+      patch.pagamentos = pags;
+      patch.pagas = pags.length;
+    }
+    const pv = proxVenc({ ...f, pagamentos: pags });
+    if (f.proxVenc !== pv) patch.proxVenc = pv;
+    if (f.respEmail == null) patch.respEmail = emailDe(f.resp) || (insts[f.instId] || {}).respEmail || "";
+    if (Object.keys(patch).length) muda("formandos", "formandos", f.id, patch);
+  }
+  for (const x of cols.repasse || [])
+    if (x.resp && !x.respEmail && emailDe(x.resp)) muda("PR", "repasse", x.id, { respEmail: emailDe(x.resp) });
+  for (const x of cols.agenda || [])
+    if (!x.pedidoEmail && emailDe(x.pedidoPor)) muda("agenda", "agenda", x.id, { pedidoEmail: emailDe(x.pedidoPor) });
+  // compromisso particular: o assunto vai para "privado" (só admin lê)
+  for (const x of cols.ensaios || []) {
+    if (x.kind === "pessoal" && x.particular && (x.titulo || x.obs)) {
+      muda("compromissos particulares", "privado", x.id, { titulo: x.titulo || "", obs: x.obs || "", data: x.data || "" }, "s");
+      ops.push({ col: "ensaios", id: x.id, tipo: "u", dados: { titulo: "", obs: "" } });
+    }
+  }
+  // v5: nome para a busca no servidor e responsável por e-mail nos leads
+  for (const x of cols.leads || []) {
+    const patch = {};
+    if (x.nome && x.nomeBusca !== norm(x.nome)) patch.nomeBusca = norm(x.nome);
+    if (x.respEmail == null) patch.respEmail = emailDe(x.resp);
+    if (Object.keys(patch).length) muda("funil", "leads", x.id, patch);
+  }
+  return { ops, conta };
+}
+export { norm as normBusca };
