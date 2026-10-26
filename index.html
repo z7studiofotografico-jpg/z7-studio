@@ -321,7 +321,8 @@ import { initializeFirestore, persistentLocalCache, persistentMultipleTabManager
 import * as FS from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
 import { getMessaging, getToken, onMessage, isSupported } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-messaging.js";
 import { brl, lerReais, COMISSAO_PADRAO, FORMAS, proxVenc, pagamentosDe } from "./js/regras.js";
-import { avisoErro } from "./js/ui.js";
+import { avisoErro, ligarCamposReais, formatarCampos } from "./js/ui.js";
+ligarCamposReais();
 import * as Funil from "./js/funil.js";
 import * as Equipe from "./js/equipe.js";
 import { definirExtras as feriadosExtras, feriadosEntre } from "./js/feriados.js";
@@ -408,7 +409,7 @@ function mkBtn(text, cls, fn){ const b = document.createElement("button"); b.typ
 $("btnPrices").onclick = () => {
   $("pInd").value = P.individual || ""; $("pSinal").value = P.sinal || ""; $("pG36").value = P.g36 || ""; $("pG7").value = P.g7 || "";
   $("pFotos").value = P.fotos || ""; $("pPrazo").value = P.prazo || "";
-  $("pLfLote").value = P.lfLoteDia || ""; $("pLfNum").value = P.lfNumero || ""; $("pRepNum").value = P.repNumero || ""; $("pLfParc").value = P.lfParcelas || ""; $("pLfPix").value = P.lfPix || ""; $("pLfCartao").value = P.lfCartao || ""; $("pKit").value = P.kitPreco || ""; $("pKitPromo").value = P.kitPromo || ""; $("pKitCartao").value = P.kitCartao || ""; $("pKitFinal").value = P.kitFinal || ""; $("pLote").value = P.loteDia || ""; $("pEntrega").value = P.entrega || ""; $("pPix").value = P.pix || ""; $("pParc").value = P.parcelas || ""; $("pPixLF").value = P.pixLF || ""; $("pPixRep").value = P.pixRep || ""; $("pPixFinal").value = P.pixFinal || ""; $("pPixSinal").value = P.pixSinal || ""; $("pLink").value = P.linkCartao || ""; $("pLinkFinal").value = P.linkCartaoFinal || ""; $("pLinkLF").value = P.linkCartaoLF || ""; $("pAval").value = P.linkAvaliacao || ""; $("pEquipes").value = String(P.equipesDia || 1); $("pFeriados").value = P.feriadosExtras || ""; feriadosExtras(P.feriadosExtras); listarFeriados(); montarComissao();
+  $("pLfLote").value = P.lfLoteDia || ""; $("pLfNum").value = P.lfNumero || ""; $("pRepNum").value = P.repNumero || ""; $("pLfParc").value = P.lfParcelas || ""; $("pLfPix").value = P.lfPix || ""; $("pLfCartao").value = P.lfCartao || ""; $("pKit").value = P.kitPreco || ""; $("pKitPromo").value = P.kitPromo || ""; $("pKitCartao").value = P.kitCartao || ""; $("pKitFinal").value = P.kitFinal || ""; $("pLote").value = P.loteDia || ""; $("pEntrega").value = P.entrega || ""; $("pPix").value = P.pix || ""; $("pParc").value = P.parcelas || ""; $("pPixLF").value = P.pixLF || ""; $("pPixRep").value = P.pixRep || ""; $("pPixFinal").value = P.pixFinal || ""; $("pPixSinal").value = P.pixSinal || ""; $("pLink").value = P.linkCartao || ""; $("pLinkFinal").value = P.linkCartaoFinal || ""; $("pLinkLF").value = P.linkCartaoLF || ""; $("pAval").value = P.linkAvaliacao || ""; $("pEquipes").value = String(P.equipesDia || 1); $("pFeriados").value = P.feriadosExtras || ""; feriadosExtras(P.feriadosExtras); listarFeriados(); montarComissao(); formatarCampos($("sheetPrices"));
   ["pInd","pSinal","pG36","pG7","pFotos","pPrazo","pLfLote","pLfNum","pRepNum","pLfParc","pLfPix","pLfCartao","pKit","pKitPromo","pKitCartao","pKitFinal","pLote","pEntrega","pPix","pParc","pPixLF","pPixRep","pPixFinal","pPixSinal","pLink","pLinkFinal","pLinkLF","pAval","pEquipes","pFeriados"].forEach(id => $(id).disabled = !isAdmin); document.querySelectorAll("#comTab input").forEach(i => i.disabled = !isAdmin);
   $("pSave").hidden = !isAdmin;
   $("pricesHint").textContent = isAdmin ? "Os valores entram automaticamente nas mensagens prontas." : "Só administradores mudam os preços.";
@@ -432,11 +433,11 @@ function montarComissao(){
   ["", "PR", "Álbum de formatura"].forEach(h => { const s = document.createElement("span"); s.className = "th"; s.textContent = h; t.appendChild(s); });
   COM_FORMAS.forEach(f => {
     const s = document.createElement("span"); s.textContent = f; t.appendChild(s);
-    ["pr", "form"].forEach(l => { const i = document.createElement("input"); i.inputMode = "decimal"; i.dataset.l = l; i.dataset.f = f; i.setAttribute("aria-label", `Comissão ${l === "pr" ? "PR" : "Álbum de formatura"} no ${f}`);
+    ["pr", "form"].forEach(l => { const i = document.createElement("input"); i.inputMode = "decimal"; i.dataset.pct = "1"; i.dataset.l = l; i.dataset.f = f; i.setAttribute("aria-label", `Comissão ${l === "pr" ? "PR" : "Álbum de formatura"} no ${f}`);
       const v = cfg[l] && cfg[l][f]; i.value = String(v != null && v !== "" ? v : COM_PADRAO[l][f]).replace(".", ","); t.appendChild(i); });
   });
   const s = document.createElement("span"); s.textContent = "🎓 Colação de grau (boleto, por parcela paga)"; s.style.gridColumn = "1 / 3"; t.appendChild(s);
-  const ic = document.createElement("input"); ic.inputMode = "decimal"; ic.id = "comColacao"; ic.setAttribute("aria-label", "Comissão da colação de grau");
+  const ic = document.createElement("input"); ic.inputMode = "decimal"; ic.dataset.pct = "1"; ic.id = "comColacao"; ic.setAttribute("aria-label", "Comissão da colação de grau");
   ic.value = String(cfg.colacao != null && cfg.colacao !== "" ? cfg.colacao : COM_PADRAO.colacao).replace(".", ","); t.appendChild(ic);
 }
 function lerComissao(){ const o = { pr: {}, form: {} }; document.querySelectorAll("#comTab input[data-l]").forEach(i => { o[i.dataset.l][i.dataset.f] = num(i.value); }); o.colacao = num($("comColacao").value); return o; }

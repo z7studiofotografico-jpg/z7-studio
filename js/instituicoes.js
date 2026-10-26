@@ -521,7 +521,7 @@ function openPrecos(){
   sheet("Preços mínimos · " + TIPOS[tipo].nome, (p, close) => {
     p.append(el("p", "hint", `Valor mínimo de cada kit para ${TIPOS[tipo].nome.toLowerCase()}. Na visita, o vendedor pode colocar um valor mais alto, mas não mais baixo.`));
     const atual = precosDo(tipo);
-    const ins = PRODUTOS_PADRAO.map(x => { const i = inp(atual[x.nome] || "", "R$", 10); i.inputMode = "decimal"; p.append(field(x.nome, i)); return [x.nome, i]; });
+    const ins = PRODUTOS_PADRAO.map(x => { const i = inp(atual[x.nome] || "", "R$", 12); i.inputMode = "decimal"; p.append(field(x.nome, i)); return [x.nome, i]; });
     p.append(actions(close, "Salvar preços"));
     p.addEventListener("submit", async ev => {
       ev.preventDefault();
@@ -623,7 +623,7 @@ function openVisita(it){
     const prodBox = el("div", "imp"); const prods = [];
     produtos().forEach(pr => {
       const r = el("div", "prow"); const l = el("label", "chk"); const c = el("input"); c.type = "checkbox"; l.append(c, document.createTextNode(" " + pr.nome));
-      const v = inp(pr.preco, pr.preco ? "mín. " + pr.preco : "R$", 10); v.inputMode = "decimal"; v.className = "preco"; v.setAttribute("aria-label", "Preço de " + pr.nome);
+      const v = inp(pr.preco, pr.preco ? "mín. " + C.money(pr.preco) : "R$", 12); v.inputMode = "decimal"; v.className = "preco"; v.setAttribute("aria-label", "Preço de " + pr.nome);
       v.addEventListener("input", () => { if (v.value) c.checked = true; });
       r.append(l, v); prodBox.append(r); prods.push({ nome: pr.nome, c, v, formatura: pr.formatura, min: Number(pr.preco) || 0 });
     });

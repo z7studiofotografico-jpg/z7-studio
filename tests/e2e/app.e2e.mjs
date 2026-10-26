@@ -64,6 +64,10 @@ console.log("Adriano (admin), com dados antigos:");
   ok(/atrasad/.test(await pg.textContent("#tFormaturas")), "card Formaturas mostra parcela atrasada");
   // Ajustes: 9.5 não pode virar 95
   await pg.click("#btnPrices"); await pg.waitForTimeout(200);
+  ok(await pg.inputValue("#pInd") === "450,00", "valor salvo aparece com centavos (450,00): " + await pg.inputValue("#pInd"));
+  await pg.fill("#pSinal", "120"); await pg.locator("#pSinal").blur();
+  ok(await pg.inputValue("#pSinal") === "120,00", "digitou 120, completou para 120,00");
+  ok(await pg.inputValue('#comTab input[data-l="pr"][data-f="Boleto"]') !== "" && !/,00$/.test(await pg.inputValue('#comTab input[data-l="pr"][data-f="Pix"]')), "comissão (%) não ganha ,00");
   await pg.fill('#comTab input[data-l="pr"][data-f="Boleto"]', "9.5"); await pg.fill("#pFeriados", "24/12 Recesso de Natal"); await pg.click("#pSave"); await pg.waitForTimeout(300);
   s = await store(); ok(s["config/app"].comissao.pr.Boleto === 9.5, "comissão 9.5 grava 9,5% (antes virava 95%) → " + s["config/app"].comissao.pr.Boleto);
   ok(s["config/app"].feriadosExtras === "24/12 Recesso de Natal", "feriado extra da cidade gravado em Ajustes");

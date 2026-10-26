@@ -22,10 +22,16 @@ export function centavos(v){
 export const reais = c => Math.round(Number(c) || 0) / 100;
 // Lê o valor digitado e devolve reais já arredondados ao centavo
 export const lerReais = v => reais(centavos(v));
-// Formata: R$ 1.350,50 · R$ 400 (sem ",00" quando é valor redondo)
+// Formata sempre com centavos: R$ 1.350,50 · R$ 400,00
 export function brl(v){
   const c = Math.round((Number(v) || 0) * 100);
-  return "R$ " + (c / 100).toLocaleString("pt-BR", { minimumFractionDigits: c % 100 ? 2 : 0, maximumFractionDigits: 2 });
+  return "R$ " + (c / 100).toLocaleString("pt-BR", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+}
+// Valor digitado num campo → "1.350,50" (completa os centavos). Texto que não é número fica como está.
+export function campoReais(v){
+  const t = String(v ?? "").trim(); if (!t) return "";
+  if (!/^-?(R\$)?\s*[\d.,\s]+$/i.test(t) || !/\d/.test(t)) return t;
+  return (centavos(t) / 100).toLocaleString("pt-BR", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 }
 // Divide um total em n parcelas sem perder centavo: 400,00 em 3x → [133,34; 133,33; 133,33]
 export function dividir(totalReais, n){

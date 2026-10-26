@@ -18,7 +18,7 @@ test("lê valores no padrão brasileiro em centavos", () => {
   assert.equal(R.lerReais("133,335"), 133.34);
 });
 test("formata em reais", () => {
-  assert.equal(R.brl(400), "R$ 400");
+  assert.equal(R.brl(400), "R$ 400,00"); assert.equal(R.campoReais("500"), "500,00"); assert.equal(R.campoReais("1350,5"), "1.350,50"); assert.equal(R.campoReais("abc"), "abc");
   assert.equal(R.brl(1350.5), "R$ 1.350,50");
   assert.equal(R.brl(0.1 + 0.2), "R$ 0,30");
 });

@@ -1,6 +1,7 @@
 // Funil de vendas: leads do WhatsApp, mensagens prontas, follow-ups e venda.
 // Antes ficava dentro do index.html; agora é um módulo como os outros.
 import { avisoErro, emPartes } from "./ui.js";
+import { campoReais } from "./regras.js";
 import { ESTUDIO } from "./mensagens.js";
 let C, leads = [], filter = "ABERTOS", editing = null;
 const $ = (id) => document.getElementById(id);
@@ -215,7 +216,7 @@ export function render(){
 function openForm(l, preset){
   editing = l || null; preset = preset || {};
   $("formTitle").textContent = preset.etapa === "FECHADO" ? "Registrar venda" : l ? "Editar lead" : "Novo lead";
-  $("fNome").value = l?.nome || ""; $("fTel").value = l?.telefone || ""; $("fValor").value = l?.valor || "";
+  $("fNome").value = l?.nome || ""; $("fTel").value = l?.telefone || ""; $("fValor").value = campoReais(l?.valor ? String(l.valor).replace(".", ",") : "");
   $("fServ").value = l?.servico || SERVS[0]; $("fOrig").value = l?.origem || "WhatsApp";
   $("fEtapa").value = preset.etapa || l?.etapa || "NOVO LEAD"; $("fFu").value = l ? l.followup || "" : todayStr();
   $("fNotas").value = l?.notas || "";

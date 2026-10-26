@@ -1,3 +1,4 @@
+import { campoReais } from "./regras.js";
 // Peças de tela usadas por todos os módulos (antes cada arquivo tinha a sua cópia).
 export function el(tag, cls, text){ const e = document.createElement(tag); if (cls) e.className = cls; if (text != null) e.textContent = text; return e; }
 export function title(s){ return String(s || "").toLowerCase().replace(/(^|[\s(-])(\p{L})/gu, (m, a, b) => a + b.toUpperCase()).replace(/\b(Da|De|Do|Das|Dos|E)\b/g, w => w.toLowerCase()); }
@@ -6,7 +7,7 @@ let fid = 0;
 export function field(lbl, i){ const f = el("div", "field"); const l = el("label", null, lbl); i.id = i.id || "f" + (++fid); l.htmlFor = i.id; f.append(l, i); return f; }
 export function inp(v, ph, max){ const i = el("input"); i.value = v == null ? "" : v; i.placeholder = ph || ""; i.maxLength = max || 120; return i; }
 // Campo de dinheiro: teclado numérico com vírgula
-export function inpReais(v, ph){ const i = inp(v == null || v === "" ? "" : String(v).replace(".", ","), ph || "R$", 12); i.inputMode = "decimal"; return i; }
+export function inpReais(v, ph){ const i = inp(v == null || v === "" ? "" : campoReais(typeof v === "number" ? v.toFixed(2).replace(".", ",") : v), ph || "R$", 14); i.inputMode = "decimal"; return i; }
 export function sel(opts, v, vazio){ const s = el("select"); if (vazio != null) { const o = el("option", null, vazio); o.value = ""; s.append(o); } opts.forEach(x => { const [val, txt] = Array.isArray(x) ? x : [x, x]; const o = el("option", null, txt); o.value = val; s.append(o); }); s.value = v || ""; return s; }
 // Painel que sobe por cima da tela (formulário). Devolve a função de fechar.
 export function sheet(tit, build, opts){
@@ -62,4 +63,18 @@ export function emPartes(box, itens, desenhar, passo){
     if (resta > 0) { mais.textContent = `Mostrar mais (${resta})`; box.append(mais); }
   };
   mais.onclick = lote; lote();
+}
+
+// Todo campo de dinheiro (teclado decimal, que não seja porcentagem) mostra e completa os centavos: 500 → 500,00
+const ehDinheiro = i => i && i.tagName === "INPUT" && i.inputMode === "decimal" && !i.dataset.pct;
+export function formatarCampos(raiz){
+  (raiz || document).querySelectorAll('input[inputmode="decimal"]').forEach(i => { if (ehDinheiro(i) && i !== document.activeElement) i.value = campoReais(i.value); });
+}
+let ligado = false;
+export function ligarCamposReais(){
+  if (ligado || typeof document === "undefined") return; ligado = true;
+  document.addEventListener("focusout", e => { if (ehDinheiro(e.target)) e.target.value = campoReais(e.target.value); });
+  // campos criados depois (formulários que abrem) já aparecem com ",00"
+  new MutationObserver(ms => ms.forEach(m => m.addedNodes.forEach(n => { if (n.nodeType === 1) { if (ehDinheiro(n)) n.value = campoReais(n.value); else formatarCampos(n); } })))
+    .observe(document.body, { childList: true, subtree: true });
 }
