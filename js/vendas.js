@@ -352,11 +352,7 @@ function equipe(corpo, p, nomeP) {
         `⏳ ${resumo.aConferir} venda${resumo.aConferir > 1 ? "s" : ""} do PR a conferir: a comissão delas entra depois da conferência (PR → A conferir).`
       )
     );
-  const box = caixa(
-    corpo,
-    "Equipe",
-    nomeP + " · comissão: PR sobre a venda; Álbum de formatura e Colação de grau sobre as parcelas pagas no período"
-  );
+  const box = caixa(corpo, "Equipe", nomeP + " · comissão: PR sobre a venda; kits da formatura sobre as parcelas pagas no período");
   const tb = el("div", "vdtab");
   const head = el("div", "vdtr th");
   ["Pessoa", "Visitas feitas", "Visitas marcadas", "Colégios fechados", "Vendas", "Comissão"].forEach(t =>
@@ -569,26 +565,33 @@ function areaForm(corpo, p, nomeP) {
     va = F.vendAlb || {};
   kpis(corpo, [
     ["Colégios fechados", String(F.colegios || 0)],
-    ["Vendido · colação", `${moeda(vc.v || 0)} (${vc.n || 0})`],
-    ["Vendido · álbum", `${moeda(va.v || 0)} (${va.n || 0})`],
+    ["Vendido · adesão (Kit 01)", `${moeda(vc.v || 0)} (${vc.n || 0})`],
+    ["Vendido · kits 02 a 05", `${moeda(va.v || 0)} (${va.n || 0})`],
     ["Recebido no período", moeda((F.recCol || 0) + (F.recAlb || 0))]
   ]);
   kpis(corpo, [
-    ["A receber · colação", moeda(A.aReceberCol || 0)],
-    ["A receber · álbum", moeda(A.aReceberAlb || 0)],
+    ["A receber · adesão", moeda(A.aReceberCol || 0)],
+    ["A receber · kits", moeda(A.aReceberAlb || 0)],
     ["Formandos com parcela atrasada", String(A.atrasados || 0), A.atrasados ? "late" : ""],
     ["Em aberto desses atrasados", moeda(A.atrasadoValor || 0)]
   ]);
   corpo.append(el("p", "hint", "A receber e atrasados são de hoje (não dependem do período)."));
+  const vAnt = F.vendAnt || {},
+    vPos = F.vendPos || {};
+  const b0 = caixa(corpo, "Antecipado × depois das fotos", nomeP + " · vendas de kits");
+  lista(b0, [
+    [`Antecipado (contrato) · ${vAnt.n || 0}`, moeda(vAnt.v || 0)],
+    [`Depois das fotos · ${vPos.n || 0}`, moeda(vPos.v || 0)]
+  ]);
   const b1 = caixa(corpo, "Recebido por contrato", nomeP);
   lista(b1, [
-    ["🎓 Colação de grau (parcelas pagas)", moeda(F.recCol || 0)],
-    ["📘 Álbum de formatura (parcelas pagas)", moeda(F.recAlb || 0)]
+    ["🎓 Adesão · Kit 01 (parcelas pagas)", moeda(F.recCol || 0)],
+    ["📘 Kits 02 a 05 (parcelas pagas)", moeda(F.recAlb || 0)]
   ]);
   evolucao(
     corpo,
     "Parcelas recebidas mês a mês",
-    "Últimos 12 meses, colação + álbum",
+    "Últimos 12 meses, adesão + kits",
     m => ((m.form || {}).recCol || 0) + ((m.form || {}).recAlb || 0),
     true
   );

@@ -1,10 +1,14 @@
 // Card Formaturas: tudo dos colégios fechados, separado do PR.
 //  - Cobranças: parcelas vencidas e do mês, de todas as turmas, numa lista só
-//  - 🎓 Colação de grau e 📘 Álbum de formatura: resumo por colégio
+//  - 🎓 Adesão (Kit 01) e 📘 Kits 02 a 05: resumo por colégio
+//  - 📸 Depois das fotos: quem ainda não comprou, com a mensagem e a prévia para vender
+//  - 📋 Kits e preços: tabela do contrato (antecipado) e preço depois das fotos
 //  - Turmas: colégios fechados, com acesso à lista de formandos
 // Quem não é administrador vê só as turmas dos colégios que fechou.
-import { setCtx, openTurma, cobrarWa, registrarPagamento, atrasado } from "./turma.js";
+import { setCtx, openTurma, cobrarWa, registrarPagamento, atrasado, oferecerKit } from "./turma.js";
+import { kitsDe } from "./contrato.js";
 import {
+  ativo,
   brl,
   somar,
   recebido as recebidoDe,
@@ -16,9 +20,12 @@ import {
   valorParcela,
   esperadas,
   ehColacao,
-  fimDoMes
+  fimDoMes,
+  somaDias,
+  lerReais,
+  dividir
 } from "./regras.js";
-import { el, title, avisoErro } from "./ui.js";
+import { el, title, avisoErro, sheet, botoes, inp, inpReais } from "./ui.js";
 import * as Ev from "./eventos.js";
 import * as U from "./util.js";
 // Leitura sob demanda: ao abrir, só as parcelas que vencem até o fim do mês (campo proxVenc);
@@ -56,10 +63,15 @@ export function show() {
   head.append(el("h2", null, "Formaturas"));
   // preços mínimos dos kits e da formatura (antes ficavam em Instituições)
   const hb = el("div", "agact");
-  hb.append(U.mkBtn("💲 Preços mínimos", "btn-sm", () => Ev.openPrecos()));
+  hb.append(
+    U.mkBtn("📋 Kits e preços", "btn-sm", () => openKits()),
+    U.mkBtn("💲 Preços mínimos", "btn-sm", () => Ev.openPrecos())
+  );
   head.append(hb);
   v.append(head);
-  v.append(el("p", "hint", "Colação de grau e álbum de formatura dos colégios fechados. O PR fica no card próprio."));
+  v.append(
+    el("p", "hint", "Kits do contrato de formatura (venda antecipada e depois das fotos) dos colégios fechados. O PR fica no card próprio.")
+  );
   const k = el("div", "kpis");
   k.id = "fmKpis";
   v.append(k);
@@ -155,7 +167,7 @@ function minhasInsts() {
   return C.isAdmin ? insts : insts.filter(i => C.ehMeu(i));
 }
 function meusForms(lista) {
-  return (lista || forms).filter(f => f.status !== "desistiu" && (C.isAdmin || f.respEmail === C.email));
+  return (lista || forms).filter(f => ativo(f) && (C.isAdmin || f.respEmail === C.email));
 }
 
 function render() {
@@ -177,7 +189,7 @@ function render() {
     ["Para receber neste mês", moeda(doMes)]
   ];
   if (tudoCarregado)
-    kp.push(["🎓 Colação a receber", moeda(somar(col.map(emAberto)))], ["📘 Álbum a receber", moeda(somar(alb.map(emAberto)))]);
+    kp.push(["🎓 Adesão a receber", moeda(somar(col.map(emAberto)))], ["📘 Kits a receber", moeda(somar(alb.map(emAberto)))]);
   kp.forEach(([t, v], i) => {
     const c = el("div", "kpi" + (i === 0 && atr.length ? " late" : ""));
     c.append(el("small", null, t), el("b", null, v));
@@ -187,8 +199,9 @@ function render() {
   chips.innerHTML = "";
   [
     ["cobrancas", "Cobranças", cob.length],
-    ["colacao", "🎓 Colação", tudoCarregado ? col.length : ""],
-    ["album", "📘 Álbum", tudoCarregado ? alb.length : ""],
+    ["colacao", "🎓 Adesão (Kit 01)", tudoCarregado ? col.length : ""],
+    ["album", "📘 Kits 02 a 05", tudoCarregado ? alb.length : ""],
+    ["posfoto", "📸 Depois das fotos", tudoCarregado ? semKit().length : ""],
     ["turmas", "Turmas", minhasInsts().length]
   ].forEach(([kk, t, n]) => {
     const b = el("button", "chip", t);
@@ -209,6 +222,7 @@ function render() {
   }
   if (aba === "cobrancas") renderCobrancas(corpo, cob);
   else if (aba === "turmas") renderTurmas(corpo);
+  else if (aba === "posfoto") renderPosFoto(corpo);
   else renderContrato(corpo, aba);
 }
 
@@ -238,7 +252,7 @@ function renderCobrancas(corpo, cob) {
     top.append(el("h3", "name", title(f.nome)), el("span", "stage", at ? "ATRASADO" : "VENCE " + U.fmtDate(venc)));
     e.append(top);
     const meta = el("div", "meta");
-    [title(f.instNome), ehColacao(f) ? "🎓 Colação de grau" : "📘 " + (f.kit || "Álbum de formatura"), f.serie]
+    [title(f.instNome), (ehColacao(f) ? "🎓 " : "📘 ") + (f.kit || (ehColacao(f) ? "Kit 01 · adesão" : "Kit")), f.serie]
       .filter(Boolean)
       .forEach((t, i) => meta.append(el("span", "tag" + (i === 1 ? " svc" : ""), t)));
     e.append(meta);
@@ -279,8 +293,8 @@ function renderContrato(corpo, tipo) {
       "p",
       "hint",
       colacao
-        ? "Contrato individual por aluno, pago no boleto. O valor de cada turma é definido pelo Adriano dentro da turma (🎓 Valor da colação)."
-        : "Kits do álbum de formatura (Kit 01 a Kit 05 e outros)."
+        ? "Kit 01 (beca + canudo) é a adesão da formatura. Comissão de 20% sobre cada parcela paga."
+        : "Kits 02 a 05 do contrato (e outros kits). Preços em “📋 Kits e preços”."
     )
   );
   const g = el("div", "grid");
@@ -323,7 +337,7 @@ function renderContrato(corpo, tipo) {
   if (!algum) {
     const e = el("div", "empty");
     e.append(
-      el("strong", null, colacao ? "Nenhuma colação de grau ainda" : "Nenhum álbum vendido ainda"),
+      el("strong", null, colacao ? "Nenhuma adesão (Kit 01) ainda" : "Nenhum kit vendido ainda"),
       el("span", null, "Abra a turma do colégio fechado (aba Turmas) e inclua os formandos.")
     );
     corpo.append(e);
@@ -355,8 +369,8 @@ function renderTurmas(corpo) {
       e.append(top);
       const meta = el("div", "meta");
       [
-        `🎓 ${fs.filter(ehColacao).length} colação`,
-        `📘 ${fs.filter(f => !ehColacao(f)).length} álbum`,
+        `🎓 ${fs.filter(ehColacao).length} adesão`,
+        `📘 ${fs.filter(f => !ehColacao(f)).length} kits`,
         C.nomeDe(i) ? "👤 " + U.first(C.nomeDe(i)) : "",
         i.fechadoEm ? "Fechado em " + U.fmtDate(i.fechadoEm) : ""
       ]
@@ -381,4 +395,130 @@ function renderTurmas(corpo) {
       g.append(e);
     });
   corpo.append(g);
+}
+
+// ---------- venda depois das fotos ----------
+// Quem ainda não comprou (situação "semkit"), das turmas que a pessoa vê
+function semKit() {
+  return forms.filter(f => f.status === "semkit" && (C.isAdmin || f.respEmail === C.email));
+}
+function renderPosFoto(corpo) {
+  corpo.append(
+    el(
+      "p",
+      "hint",
+      "Quem fotografou e ainda não comprou: mande a prévia e a condição com o preço depois das fotos. Quando comprar, toque em “Abrir turma” → 🛒 Comprou."
+    )
+  );
+  const lst = semKit().sort((a, b) => (a.instNome || "").localeCompare(b.instNome || "") || (a.nome || "").localeCompare(b.nome || ""));
+  if (!lst.length) {
+    const e = el("div", "empty");
+    e.append(
+      el("strong", null, "Ninguém esperando para comprar"),
+      el("span", null, "Na turma, cadastre quem fotografou e ainda não comprou como “Ainda não comprou”.")
+    );
+    corpo.append(e);
+    return;
+  }
+  const g = el("div", "grid");
+  lst.forEach(f => {
+    const inst = insts.find(i => i.id === f.instId) || { id: f.instId, nome: f.instNome };
+    const ct = inst.contratoTurma || {},
+      fotos = inst.diaFotos && inst.diaFotos.data,
+      ate = fotos ? somaDias(fotos, Number(ct.posFotoDias) || 30) : "";
+    const venceu = ate && ate < U.todayStr();
+    const e = el("article", "card " + (venceu ? "late" : "today"));
+    const top = el("div", "card-top");
+    top.append(
+      el("h3", "name", title(f.nome)),
+      el("span", "stage", ate ? (venceu ? "PRAZO PASSOU" : "ATÉ " + U.fmtDate(ate)) : "SEM DATA DE FOTOS")
+    );
+    e.append(top);
+    const meta = el("div", "meta");
+    [title(f.instNome), f.serie, f.tel].filter(Boolean).forEach(t => meta.append(el("span", "tag", t)));
+    e.append(meta);
+    const act = el("div", "actions");
+    if (f.tel) act.append(U.mkBtn("💬 Oferecer kit", "btn-primary", () => oferecerKit(C, inst, f)));
+    act.append(
+      U.mkBtn("🖼️ Prévia", "", async () => {
+        try {
+          const { openMockup } = await import("./mockup.js");
+          openMockup({ nome: title(f.nome), escola: title(f.instNome), toast: U.toast });
+        } catch (er) {
+          avisoErro(er, "abrir a prévia", U.toast);
+        }
+      })
+    );
+    if (insts.find(i => i.id === f.instId)) act.append(U.mkBtn("Abrir turma", "", () => abrirTurma(inst)));
+    e.append(act);
+    g.append(e);
+  });
+  corpo.append(g);
+}
+
+// ---------- tabela de kits (contrato) ----------
+function openKits() {
+  const kits = kitsDe(C.P);
+  sheet("Kits e preços", (p, close) => {
+    p.append(
+      el(
+        "p",
+        "hint",
+        "Antecipado = preço do contrato (parcelas todo dia 05). Depois das fotos = preço para quem quis ver o material antes; deixe em branco o kit que não é oferecido depois."
+      )
+    );
+    const linhas = kits.map(k => {
+      const f = el("div", "field");
+      f.append(el("label", null, k.nome));
+      const av = inpReais(k.ant.valor || ""),
+        an = inp(k.ant.parcelas || "", "1", 3),
+        pv = inpReais(k.pos.valor || ""),
+        pn = inp(k.pos.parcelas || "", "1", 3);
+      [an, pn].forEach(i => (i.inputMode = "numeric"));
+      av.setAttribute("aria-label", k.nome + " · valor antecipado");
+      pv.setAttribute("aria-label", k.nome + " · valor depois das fotos");
+      an.setAttribute("aria-label", k.nome + " · parcelas antecipado");
+      pn.setAttribute("aria-label", k.nome + " · parcelas depois das fotos");
+      [av, an, pv, pn].forEach(i => (i.disabled = !C.isAdmin));
+      const r = el("div", "row2");
+      const a = el("div", "field"),
+        b = el("div", "field");
+      a.append(el("small", null, "Antecipado: valor total e parcelas"), av, an);
+      b.append(el("small", null, "Depois das fotos: valor total e parcelas"), pv, pn);
+      r.append(a, b);
+      const info = el("p", "hint");
+      const upd = () => {
+        const t = (v, n) =>
+          lerReais(v) ? `${Math.max(1, Number(n) || 1)}x de ${brl(dividir(lerReais(v), Math.max(1, Number(n) || 1)).pop())}` : "—";
+        const dif = lerReais(av.value) && lerReais(pv.value) ? Math.round((lerReais(pv.value) / lerReais(av.value) - 1) * 100) : null;
+        info.textContent = `Antecipado ${t(av.value, an.value)} · depois das fotos ${t(pv.value, pn.value)}${dif != null ? ` (${dif >= 0 ? "+" : ""}${dif}%)` : ""}`;
+      };
+      [av, an, pv, pn].forEach(i => i.addEventListener("input", upd));
+      upd();
+      f.append(r, info);
+      p.append(f);
+      return { k, av, an, pv, pn };
+    });
+    const a = botoes(close, "Salvar tabela");
+    if (!C.isAdmin) a.ok.hidden = true;
+    p.append(a);
+    p.addEventListener("submit", async ev => {
+      ev.preventDefault();
+      if (!C.isAdmin) return;
+      const nova = linhas.map(({ k, av, an, pv, pn }) => ({
+        id: k.id,
+        nome: k.nome,
+        ant: { valor: lerReais(av.value), parcelas: Math.max(1, parseInt(an.value, 10) || 1) },
+        pos: { valor: lerReais(pv.value), parcelas: lerReais(pv.value) ? Math.max(1, parseInt(pn.value, 10) || 1) : 0 }
+      }));
+      try {
+        await FS.setDoc(FS.doc(db, "config", "app"), { kitsFormatura: nova }, { merge: true });
+        C.P.kitsFormatura = nova;
+        close();
+        U.toast("Tabela de kits salva");
+      } catch (e) {
+        C.handleErr(e);
+      }
+    });
+  });
 }

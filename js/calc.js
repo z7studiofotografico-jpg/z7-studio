@@ -1,7 +1,7 @@
 // Cálculo do Dashboard de vendas, sem tela: usado pelo app ("Atualizar agora") e pelo
 // script noturno do GitHub, que grava o resumo pronto em resumos/dashboard.
 // Assim o Dashboard abre lendo 1 documento em vez de milhares.
-import { centavos, reais, pagamentosDe, formaDe, ehColacao, emAberto, atrasado, LEAD, PR, INST, BECA, ENSAIO } from "./regras.js";
+import { centavos, reais, pagamentosDe, formaDe, ehColacao, emAberto, atrasado, ativo, LEAD, PR, INST, BECA, ENSAIO } from "./regras.js";
 
 const mes = d => {
   const m = String(d || "").slice(0, 7);
@@ -14,7 +14,7 @@ const soma = (o, k, campo, v) => {
 };
 // Números de cada card, por mês (valores em centavos)
 const novoPR = () => ({ v: 0, n: 0, separados: 0, lf: {}, rep: {}, forma: {}, pessoas: {} });
-const novoForm = () => ({ vendCol: {}, vendAlb: {}, recCol: 0, recAlb: 0, colegios: 0, pessoas: {} });
+const novoForm = () => ({ vendCol: {}, vendAlb: {}, vendAnt: {}, vendPos: {}, recCol: 0, recAlb: 0, colegios: 0, pessoas: {} });
 const novoFunil = () => ({ criados: 0, fechados: 0, perdidos: 0, v: 0, origem: {}, servico: {}, pessoas: {} });
 // fontes = { leads, prs, forms, insts, ens, becas } (listas de documentos); hoje = "AAAA-MM-DD"
 // emailPorNome: { "Pedro Vendedor": "pedro@..." } para juntar registros antigos (só com o nome) na mesma pessoa
@@ -132,40 +132,41 @@ export function resumir(fontes, hoje, emailPorNome) {
   });
   let aReceber = 0;
   const agoraForm = { aReceberCol: 0, aReceberAlb: 0, atrasados: 0, atrasadoValor: 0, alunos: 0 };
-  forms
-    .filter(f => f.status !== "desistiu")
-    .forEach(f => {
-      const inst = instPorId[f.instId] || {},
-        pessoa = quem(f.respEmail || inst.respEmail, f.resp || inst.resp),
-        col = ehColacao(f);
-      const dv = f.vendidoEm || String(f.criadoEm || "").slice(0, 10),
-        cv = centavos(f.valor),
-        ab = centavos(emAberto(f));
-      venda(dv, f.valor, col ? "Colação de grau" : f.kit || "Álbum de formatura", "Formaturas", pessoa);
-      aReceber += ab;
-      agoraForm[col ? "aReceberCol" : "aReceberAlb"] += ab;
-      agoraForm.alunos++;
-      if (atrasado(f, hoje)) {
-        agoraForm.atrasados++;
-        agoraForm.atrasadoValor += ab;
+  forms.filter(ativo).forEach(f => {
+    const inst = instPorId[f.instId] || {},
+      pessoa = quem(f.respEmail || inst.respEmail, f.resp || inst.resp),
+      col = ehColacao(f);
+    const dv = f.vendidoEm || String(f.criadoEm || "").slice(0, 10),
+      cv = centavos(f.valor),
+      ab = centavos(emAberto(f));
+    venda(dv, f.valor, col ? "Colação de grau" : f.kit || "Álbum de formatura", "Formaturas", pessoa);
+    aReceber += ab;
+    agoraForm[col ? "aReceberCol" : "aReceberAlb"] += ab;
+    agoraForm.alunos++;
+    if (atrasado(f, hoje)) {
+      agoraForm.atrasados++;
+      agoraForm.atrasadoValor += ab;
+    }
+    if (mes(dv)) {
+      const Fo = M(mes(dv)).form;
+      soma(Fo, col ? "vendCol" : "vendAlb", "v", cv);
+      soma(Fo, col ? "vendCol" : "vendAlb", "n", 1);
+      // venda antecipada (contrato) × depois das fotos (preço maior)
+      soma(Fo, f.venda === "pos" ? "vendPos" : "vendAnt", "v", cv);
+      soma(Fo, f.venda === "pos" ? "vendPos" : "vendAnt", "n", 1);
+      if (pessoa) soma(Fo.pessoas, pessoa, "vend", cv);
+    }
+    pagamentosDe(f).forEach(p => {
+      comissao(p.data || f.vendidoEm, p.valor, col ? "colacao" : "form", col ? "Boleto" : formaDe(f.formaPag), pessoa);
+      const mpg = mes(p.data || f.vendidoEm);
+      if (mpg) {
+        const Fo = M(mpg).form,
+          c = centavos(p.valor);
+        Fo[col ? "recCol" : "recAlb"] += c;
+        if (pessoa) soma(Fo.pessoas, pessoa, "rec", c);
       }
-      if (mes(dv)) {
-        const Fo = M(mes(dv)).form;
-        soma(Fo, col ? "vendCol" : "vendAlb", "v", cv);
-        soma(Fo, col ? "vendCol" : "vendAlb", "n", 1);
-        if (pessoa) soma(Fo.pessoas, pessoa, "vend", cv);
-      }
-      pagamentosDe(f).forEach(p => {
-        comissao(p.data || f.vendidoEm, p.valor, col ? "colacao" : "form", col ? "Boleto" : formaDe(f.formaPag), pessoa);
-        const mpg = mes(p.data || f.vendidoEm);
-        if (mpg) {
-          const Fo = M(mpg).form,
-            c = centavos(p.valor);
-          Fo[col ? "recCol" : "recAlb"] += c;
-          if (pessoa) soma(Fo.pessoas, pessoa, "rec", c);
-        }
-      });
     });
+  });
   ens
     .filter(e => e.kind !== "pessoal" && !e.leadId && centavos(e.valor) && e.status !== ENSAIO.FALTOU && e.data <= hoje)
     .forEach(e => venda(e.data, e.valor, e.tipo || "Ensaio", "Estúdio", quem(e.marcadoEmail, e.marcadoPor)));

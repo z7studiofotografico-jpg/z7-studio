@@ -271,6 +271,13 @@ console.log("Adriano (admin), com os dados já atualizados no servidor:");
   ok((await pg.locator("#list .card").count()) === 1, "Funil abre (módulo novo) com o lead");
   await pg.locator("#list .card").getByText("Editar").click();
   await pg.fill("#fValor", "1.350,50");
+  if (process.env.DEBUG)
+    console.log(
+      "DEBUG antes de salvar:",
+      await pg.inputValue("#fValor"),
+      await pg.isDisabled("#fValor"),
+      await pg.textContent("#formTitle")
+    );
   await pg.click("#btnSave");
   await pg.waitForFunction(() => (window.__store.get("leads/l1") || {}).valor === 1350.5, null, { timeout: 3000 }).catch(() => {});
   // busca acha também lead antigo (fechado há mais de 60 dias, fora da lista carregada)
@@ -300,6 +307,8 @@ console.log("Adriano (admin), com os dados já atualizados no servidor:");
   await pg.waitForTimeout(200);
   const f = pg.locator(".sheet").last();
   await f.getByLabel("Nome").fill("Julia Costa");
+  await f.getByLabel("Kit", { exact: true }).selectOption("outro");
+  await f.getByLabel("Qual kit").fill("Kit especial");
   await f.getByLabel("Valor total").fill("400");
   await f.getByLabel("Parcelas", { exact: true }).fill("3");
   await f.getByLabel("Parcelas", { exact: true }).dispatchEvent("input");
@@ -309,7 +318,80 @@ console.log("Adriano (admin), com os dados já atualizados no servidor:");
   s = await store();
   const ju = Object.values(s).find(x => x.nome === "Julia Costa");
   ok(ju && ju.valor === 400 && ju.respEmail === PEDRO && ju.proxVenc, "formando novo com responsável do colégio e próximo vencimento");
+  // contrato: Kit 04 antecipado preenche valor e parcelas pela tabela
+  await pg.locator(".panel.wide").getByRole("button", { name: "+ Formando" }).click();
+  await pg.waitForTimeout(200);
+  let fk = pg.locator(".sheet").last();
+  await fk.getByLabel("Nome").fill("Bia Antecipada");
+  await fk.getByLabel("Kit", { exact: true }).selectOption("k04");
+  await pg.waitForTimeout(150);
+  ok(
+    (await fk.getByLabel("Valor total").inputValue()) === "850,00" &&
+      (await fk.getByLabel("Parcelas", { exact: true }).inputValue()) === "10",
+    "Kit 04 antecipado: R$ 850,00 em 10x (tabela do contrato)"
+  );
+  await fk.locator("button[type=submit]").click();
+  await pg.waitForTimeout(300);
+  // quem ainda não comprou
+  await pg.locator(".panel.wide").getByRole("button", { name: "+ Formando" }).click();
+  await pg.waitForTimeout(200);
+  fk = pg.locator(".sheet").last();
+  await fk.getByLabel("Nome").fill("Caio Sem Kit");
+  await fk.getByLabel("WhatsApp").fill("21966665555");
+  await fk.locator("button[type=submit]").click();
+  await pg.waitForTimeout(300);
+  s = await store();
+  const bia = Object.values(s).find(x => x.nome === "Bia Antecipada"),
+    caio = Object.values(s).find(x => x.nome === "Caio Sem Kit");
+  ok(
+    bia && bia.kitId === "k04" && bia.venda === "ant" && bia.valor === 850 && bia.contrato === "album",
+    "venda antecipada gravada com o kit do contrato"
+  );
+  ok(caio && caio.status === "semkit" && caio.valor === 0 && !caio.proxVenc, "quem ainda não comprou fica fora das cobranças");
   await pg.locator(".panel.wide").getByRole("button", { name: "Fechar" }).click();
+  await pg.waitForTimeout(300);
+  // tabela: preço depois das fotos do Kit 04
+  await pg.getByRole("button", { name: "📋 Kits e preços" }).click();
+  await pg.waitForTimeout(200);
+  fk = pg.locator(".sheet").last();
+  if (process.env.FOTOS) await fk.screenshot({ path: process.env.FOTOS + "/kits.png" });
+  await fk.getByLabel(/Kit 04.* · valor depois das fotos$/).fill("1.100,00");
+  await fk.getByLabel(/Kit 04.* · parcelas depois das fotos$/).fill("6");
+  await fk.locator("button[type=submit]").click();
+  await pg.waitForTimeout(300);
+  s = await store();
+  const k4 = (s["config/app"].kitsFormatura || []).find(k => k.id === "k04");
+  ok(k4 && k4.pos.valor === 1100 && k4.pos.parcelas === 6 && k4.ant.valor === 850, "tabela: Kit 04 depois das fotos R$ 1.100,00 em 6x");
+  // aba Depois das fotos → abrir turma → Comprou (preço depois das fotos)
+  await pg.locator("#fmChips").getByText("📸 Depois das fotos").click();
+  await pg.waitForTimeout(400);
+  ok(/Caio Sem Kit/.test(await pg.textContent("#fmCorpo")), "Caio aparece em Depois das fotos");
+  await pg.locator("#fmCorpo .card").filter({ hasText: "Caio" }).getByText("💬 Oferecer kit").click();
+  await pg.waitForTimeout(200);
+  ok(
+    /Kit 04.*6x de R\$ 183,33/.test(decodeURIComponent(await pg.evaluate(() => window.__aberto || ""))),
+    "mensagem oferece o Kit 04 a 6x de R$ 183,33"
+  );
+  await pg.locator("#fmCorpo .card").filter({ hasText: "Caio" }).getByText("Abrir turma").click();
+  await pg.waitForTimeout(500);
+  if (process.env.FOTOS) await pg.locator(".panel.wide").screenshot({ path: process.env.FOTOS + "/turma.png" });
+  await pg.locator(".panel.wide .card").filter({ hasText: "Caio" }).getByText("🛒 Comprou").click();
+  await pg.waitForTimeout(200);
+  fk = pg.locator(".sheet").last();
+  await fk.getByLabel("Kit", { exact: true }).selectOption("k04");
+  await pg.waitForTimeout(150);
+  ok(
+    (await fk.getByLabel("Valor total").inputValue()) === "1.100,00" &&
+      (await fk.getByLabel("Parcelas", { exact: true }).inputValue()) === "6",
+    "depois das fotos: R$ 1.100,00 em 6x"
+  );
+  await fk.locator("button[type=submit]").click();
+  await pg.waitForTimeout(300);
+  s = await store();
+  const caio2 = s[Object.keys(s).find(k => s[k].nome === "Caio Sem Kit")];
+  ok(caio2.status === "ativo" && caio2.venda === "pos" && caio2.valor === 1100 && caio2.vendidoEm, "venda depois das fotos registrada");
+  await pg.locator(".panel.wide").getByRole("button", { name: "Fechar" }).click();
+  await pg.waitForTimeout(200);
   // Dashboard
   await ir(pg, "#vendas");
   await pg.waitForTimeout(1500);
@@ -335,7 +417,7 @@ console.log("Adriano (admin), com os dados já atualizados no servidor:");
   vt = await pg.textContent("#vdCorpo");
   if (process.env.FOTOS) await pg.screenshot({ path: process.env.FOTOS + "/dash-form.png", fullPage: true });
   ok(
-    /A receber · álbum/.test(vt) && /Formandos com parcela atrasada/.test(vt) && /Equipe nas formaturas/.test(vt),
+    /A receber · kits/.test(vt) && /Formandos com parcela atrasada/.test(vt) && /Equipe nas formaturas/.test(vt),
     "Dashboard · Formaturas separado (vendido, recebido, a receber, atrasados)"
   );
   await pg.locator(".vdareas").getByText("💬 Funil").click();
@@ -447,10 +529,20 @@ console.log("Adriano (admin), com os dados já atualizados no servidor:");
 console.log("Botão voltar do celular:");
 {
   const { pg, erros } = await abrir(ADRIANO, migrar(base));
-  const voltar = async () => { await pg.evaluate(() => history.back()); await pg.waitForTimeout(500); };
-  await pg.locator('.tile[data-mod="colegios"]').click(); await pg.waitForTimeout(500);
-  await pg.locator("#viewInst .card, #viewInst a, #viewInst button").filter({ hasText: /Colégio particular/i }).first().click(); await pg.waitForTimeout(600);
-  await pg.getByRole("button", { name: "+ Nova instituição" }).click(); await pg.waitForTimeout(300);
+  const voltar = async () => {
+    await pg.evaluate(() => history.back());
+    await pg.waitForTimeout(500);
+  };
+  await pg.locator('.tile[data-mod="colegios"]').click();
+  await pg.waitForTimeout(500);
+  await pg
+    .locator("#viewInst .card, #viewInst a, #viewInst button")
+    .filter({ hasText: /Colégio particular/i })
+    .first()
+    .click();
+  await pg.waitForTimeout(600);
+  await pg.getByRole("button", { name: "+ Nova instituição" }).click();
+  await pg.waitForTimeout(300);
   ok((await pg.locator(".sheet:visible").count()) === 1, "abriu a janela de nova instituição");
   await voltar();
   ok((await pg.locator(".sheet:visible").count()) === 0 && /inst-particular/.test(pg.url()), "voltar fecha a janela e fica na mesma tela");
@@ -459,7 +551,10 @@ console.log("Botão voltar do celular:");
   await voltar();
   ok(/#home$/.test(pg.url()) && (await pg.locator("#viewHome").isVisible()), "voltar sobe para o Início");
   await voltar();
-  ok((await pg.locator("#viewHome").isVisible()) && /voltar de novo para sair/.test(await pg.textContent("#toast")), "no Início, pede um segundo toque para sair (não fecha o app)");
+  ok(
+    (await pg.locator("#viewHome").isVisible()) && /voltar de novo para sair/.test(await pg.textContent("#toast")),
+    "no Início, pede um segundo toque para sair (não fecha o app)"
+  );
   ok(erros.length === 0, "sem erros no console" + (erros.length ? ": " + erros.slice(0, 3).join(" | ") : ""));
 }
 

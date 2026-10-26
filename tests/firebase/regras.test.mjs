@@ -207,3 +207,35 @@ test("PR: equipe não apaga venda paga", async () => {
   await assertSucceeds(deleteDoc(doc(como(ANA), "repasse", "r2")));
   await assertSucceeds(deleteDoc(doc(como(ADRIANO), "repasse", "r1")));
 });
+
+test("formatura: a equipe registra a venda depois das fotos de quem ainda não comprou, mas não mexe em quem já comprou", async () => {
+  const db = como(PEDRO);
+  await semRegra(d =>
+    setDoc(doc(d, "formandos", "f5"), {
+      instId: "i1",
+      nome: "SEM KIT",
+      status: "semkit",
+      valor: 0,
+      parcelas: 1,
+      pagas: 0,
+      pagamentos: [],
+      respEmail: PEDRO
+    })
+  );
+  await assertSucceeds(
+    updateDoc(doc(db, "formandos", "f5"), {
+      status: "ativo",
+      kitId: "k04",
+      kit: "Kit 04",
+      venda: "pos",
+      valor: 1100,
+      parcelas: 6,
+      primeiroVenc: "2026-11-05",
+      proxVenc: "2026-11-05",
+      vendidoEm: "2026-10-26"
+    })
+  );
+  await assertFails(updateDoc(doc(db, "formandos", "f5"), { valor: 1 })); // agora já comprou
+  await assertFails(updateDoc(doc(db, "formandos", "f1"), { entregueEm: "2026-10-26" }));
+  await assertFails(updateDoc(doc(db, "formandos", "f1"), { devolucao: { valor: 10 } }));
+});

@@ -84,9 +84,12 @@ service cloud.firestore {
       // a equipe cadastra o formando (na própria carteira), mas sem parcelas pagas
       allow create: if admin() || ((pode('colegios') || pode('formaturas')) && request.resource.data.get('pagamentos', []).size() == 0
         && request.resource.data.get('pagas', 0) == 0 && request.resource.data.get('respEmail', '') == email());
-      // depois de cadastrado, a equipe só corrige contato e observação
-      allow update: if admin() || ((pode('colegios') || pode('formaturas')) && minha()
-        && !mudou(['valor', 'parcelas', 'pagas', 'pagamentos', 'formaPag', 'contrato', 'kit', 'resp', 'respEmail', 'primeiroVenc', 'instId', 'status', 'vendidoEm', 'proxVenc']));
+      // depois de cadastrado, a equipe só corrige contato e observação;
+      // quem ainda não comprou ("semkit"), a equipe pode registrar a venda depois das fotos (sem pagamento)
+      allow update: if admin() || ((pode('colegios') || pode('formaturas')) && minha() && (
+        !mudou(['valor', 'parcelas', 'pagas', 'pagamentos', 'formaPag', 'contrato', 'kit', 'kitId', 'venda', 'resp', 'respEmail', 'primeiroVenc', 'instId', 'status', 'vendidoEm', 'proxVenc', 'entregueEm', 'devolucao'])
+        || (resource.data.get('status', '') == 'semkit' && request.resource.data.get('pagamentos', []).size() == 0
+          && request.resource.data.get('status', '') in ['semkit', 'ativo'] && !mudou(['resp', 'respEmail', 'instId', 'entregueEm', 'devolucao']))));
       // a equipe só apaga formando da própria conta e sem nenhuma parcela paga
       allow delete: if admin() || ((pode('colegios') || pode('formaturas')) && minha()
         && resource.data.get('pagas', 0) == 0 && resource.data.get('pagamentos', []).size() == 0);

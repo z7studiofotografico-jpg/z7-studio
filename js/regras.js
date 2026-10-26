@@ -95,7 +95,9 @@ export function esperadas(f, hoje) {
   while (k < nParcelas(f) && vencDa(f, k + 1) < hoje) k++;
   return k;
 }
-export const ativo = f => f.status !== "desistiu";
+// Situação do formando: "ativo" = comprou; "semkit" = ainda não comprou (venda depois das fotos); "desistiu"; "reprovou"
+export const SITUACOES = { ativo: "Comprou", semkit: "Ainda não comprou", desistiu: "Desistiu", reprovou: "Reprovou" };
+export const ativo = f => !["desistiu", "reprovou", "semkit"].includes(f.status);
 export const atrasado = (f, hoje) => ativo(f) && !quitado(f) && esperadas(f, hoje) > pagasDe(f);
 // Próximo vencimento em aberto ("" quando quitado ou desistiu): fica gravado para buscas rápidas
 export const proxVenc = f => (!ativo(f) || quitado(f) || !f.primeiroVenc ? "" : vencDa(f, pagasDe(f) + 1));
