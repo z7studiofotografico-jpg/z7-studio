@@ -210,6 +210,8 @@ export function form(x, pre){
     });
     if (x && x.tamanhos && !Object.keys(atualT).length) p.append(el("p", "hint", "Anotado antes: " + x.tamanhos));
     const val = inpReais(x ? x.valor : ""), pago = inpReais(x ? x.pago : ""), cau = inpReais(x ? x.caucao : "");
+    // depois de registrado, só o admin muda valor e caução (o "já pago" a equipe só aumenta)
+    if (x && !C.isAdmin) { val.disabled = true; cau.disabled = true; }
     const r6 = el("div", "row3"); r6.append(field("Valor total", val), field("Já pago", pago), field("Caução", cau)); p.append(r6);
     const fp = el("select"); [["", "forma de pagamento"], ...FORMAS.map(f => [f, f])].forEach(([v, t]) => { const o = el("option", null, t); o.value = v; fp.append(o); }); fp.value = x ? x.formaPag || "" : "";
     p.append(field("Pagamento", fp));
@@ -243,6 +245,7 @@ export function form(x, pre){
     p.append(a);
     p.addEventListener("submit", async ev2 => {
       ev2.preventDefault();
+      if (x && !C.isAdmin && lerReais(pago.value) < (Number(x.pago) || 0)) { err.textContent = "O valor já pago não pode diminuir. Peça para um administrador corrigir."; err.hidden = false; return; }
       if (dev.value < ret.value) { err.textContent = "A devolução precisa ser depois da retirada."; err.hidden = false; return; }
       const becasQtd = valObj(qB), faixasQtd = valObj(qF), capelosQtd = valObj(qC), q = somaObj(becasQtd);
       if (!q && !somaObj(faixasQtd) && !somaObj(capelosQtd)) { err.textContent = "Coloque a quantidade de becas, faixas ou capelos."; err.hidden = false; return; }

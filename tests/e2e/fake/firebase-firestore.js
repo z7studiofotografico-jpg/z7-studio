@@ -40,7 +40,7 @@ export function onSnapshot(q, cb){
   return () => { const i = listeners.indexOf(L); if (i >= 0) listeners.splice(i, 1); };
 }
 export const getDocs = async q => run(q.t === "col" ? { c: q, k: [] } : q);
-export const getDoc = async r => { const v = store.get(r.n + "/" + r.id); return { exists: () => !!v, data: () => clone(v), id: r.id }; };
+export const getDoc = async r => { const v = store.get(r.n + "/" + r.id); return { exists: () => !!v, data: () => clone(v), id: r.id, ref: r }; };
 export const getCountFromServer = async q => ({ data: () => ({ count: run(q).size }) });
 function aplica(o, p){ for (const [kk, vv] of Object.entries(clone(p))) { if (kk.includes(".")) { const ps = kk.split("."); let t = o; ps.slice(0, -1).forEach(x => { t[x] = Object.assign({}, t[x] || {}); t = t[x]; }); t[ps[ps.length - 1]] = vv; } else o[kk] = vv; } return o; }
 export async function setDoc(r, d, opt){ const k = r.n + "/" + r.id; store.set(k, opt && opt.merge ? aplica(clone(store.get(k)) || {}, d) : clone(d)); fire(); }

@@ -6,7 +6,7 @@
 // cada aba busca só o que precisa (hoje, interessados, pagos, busca).
 import { openMockup, textoEscolha } from "./mockup.js";
 import { ESTUDIO } from "./mensagens.js";
-import { el, title, carregarLib, emPartes } from "./ui.js";
+import { el, title, carregarLib, emPartes, avisoErro } from "./ui.js";
 // Assumir o contato: quem não é admin só assume o que está sem responsável (ou já é seu)
 const assumir = it => (!C.isAdmin && it.respEmail && it.respEmail !== C.email) ? {} : { resp: C.me, respEmail: C.email || "" };
 
@@ -163,7 +163,7 @@ function mount(){
   const head = el("div", "vhead");
   head.append(el("h2", null, "PR"));
   const hb = el("div", "quick");
-  hb.append(C.mkBtn("🖼️ Prévia e fotos", "", () => openMockup({ preco: precoTxt() })));
+  hb.append(C.mkBtn("🖼️ Prévia e fotos", "", () => openMockup({ preco: precoTxt(), toast: C.toast })));
   const imp = C.mkBtn("Importar planilha", "", () => openImport()); imp.id = "rImport"; imp.hidden = !C.isAdmin;
   hb.append(imp); head.append(hb); v.append(head);
 
@@ -373,7 +373,7 @@ function card(it){
     const d = escolhido ? C.digits(escolhido.tel) : "";
     if (d) { const a = el("a", "btn btn-sm btn-primary", "Abrir no WhatsApp"); a.href = "https://wa.me/" + d + "?text=" + encodeURIComponent(ns.msg); a.target = "_blank"; a.rel = "noopener"; a.addEventListener("click", () => claim(it)); row.append(a); }
     row.append(C.mkBtn("Copiar texto", "", async () => { claim(it); try { await navigator.clipboard.writeText(ns.msg); C.toast("Texto copiado"); } catch (_) { const r = document.createRange(); r.selectNodeContents(msg); const sel = getSelection(); sel.removeAllRanges(); sel.addRange(r); C.toast("Texto selecionado, copie com o dedo"); } }));
-    if (ns.mockup || it.etapa === "INTERESSADO") row.append(C.mkBtn("🖼️ Prévia", "", () => openMockup({ nome: title(it.nome), escola: title(it.escola), preco: precoTxt(it) })));
+    if (ns.mockup || it.etapa === "INTERESSADO") row.append(C.mkBtn("🖼️ Prévia", "", () => openMockup({ nome: title(it.nome), escola: title(it.escola), preco: precoTxt(it), toast: C.toast })));
     if (it.etapa === "INTERESSADO") row.append(C.mkBtn("📷 Fotos para escolher", "", () => openMockup({ nome: title(it.nome), escola: title(it.escola), preco: precoTxt(it), modo: "escolha" })));
     if (it.etapa === "INTERESSADO" && d) { const a3 = el("a", "btn btn-sm", "✍️ Pedir a escolha"); a3.href = "https://wa.me/" + d + "?text=" + encodeURIComponent(textoEscolha(F0)); a3.target = "_blank"; a3.rel = "noopener"; row.append(a3); }
     // Depois que a última oferta foi enviada (Repasse), o link do cartão passa a ser o da última oferta.
@@ -612,17 +612,24 @@ async function separarLote(){
   const anos = seg === "lf" ? [ANO()] : anosRepasse(); // Repasse: do ano mais recente para o mais antigo
   $("rLoteBtn").disabled = true;
   try {
-    const pegos = [];
+    // candidatos: um pouco mais que o necessário, porque outra pessoa pode pegar alguns ao mesmo tempo
+    const cand = [];
     for (const a of anos) {
-      if (falta <= 0) break;
+      if (cand.length >= falta * 2) break;
       const filtros = [FS.where("etapa", "==", "NA FILA"), FS.where("ano", "==", a)]; if (esc) filtros.push(FS.where("escola", "==", esc));
-      const s0 = await FS.getDocs(FS.query(col, ...filtros, FS.orderBy(FS.documentId()), FS.limit(falta)));
-      s0.docs.forEach(d => pegos.push(d)); falta -= s0.size;
+      const s0 = await FS.getDocs(FS.query(col, ...filtros, FS.orderBy(FS.documentId()), FS.limit(falta * 2 - cand.length)));
+      s0.docs.forEach(d => cand.push(d.ref));
     }
-    if (!pegos.length) { C.toast(esc ? "Essa escola não tem mais ninguém na fila." : "A fila acabou! 🎉"); return; }
-    const b = FS.writeBatch(db), hoje = C.todayStr();
-    pegos.forEach(d => b.update(d.ref, { etapa: "SEPARADO", resp: C.me, respEmail: C.email || "", separadoEm: hoje, separadoSeg: seg, followup: hoje, atualizadoEm: new Date().toISOString() }));
-    await b.commit();
+    if (!cand.length) { C.toast(esc ? "Essa escola não tem mais ninguém na fila." : "A fila acabou! 🎉"); return; }
+    // transação: só fica com quem ainda está NA FILA (dois vendedores nunca pegam o mesmo contato)
+    const hoje = C.todayStr(), agora = new Date().toISOString();
+    const pegos = await FS.runTransaction(db, async tx => {
+      const lidos = []; for (const r of cand) lidos.push(await tx.get(r));
+      const livres = lidos.filter(d => d.exists() && d.data().etapa === "NA FILA").slice(0, falta);
+      livres.forEach(d => tx.update(d.ref, { etapa: "SEPARADO", resp: C.me, respEmail: C.email || "", separadoEm: hoje, separadoSeg: seg, followup: hoje, atualizadoEm: agora }));
+      return livres;
+    });
+    if (!pegos.length) { C.toast("Outra pessoa separou esses contatos agora. Toque de novo."); refreshLote(); return; }
     const total = ja + pegos.length;
     C.toast(`${pegos.length} contato${pegos.length > 1 ? "s" : ""} separado${pegos.length > 1 ? "s" : ""} para você hoje` + (total >= av ? ` · ⚠️ já são ${total} hoje (combinado: até ${av})` : ""));
     refreshLote(); refreshStats(); if (tab !== "hoje") openTab("hoje");
@@ -640,7 +647,7 @@ async function loadMeta(){
       sel.value = cur;
     });
     const imp = $("rImport"); if (imp) imp.hidden = !C.isAdmin;
-  } catch (_) {}
+  } catch (e) { avisoErro(e, "carregar a lista de escolas", C.toast); }
 }
 
 // ---------- importar planilha ----------

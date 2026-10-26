@@ -221,7 +221,11 @@ function openForm(l, preset){
   $("fEtapa").value = preset.etapa || l?.etapa || "NOVO LEAD"; $("fFu").value = l ? l.followup || "" : todayStr();
   $("fNotas").value = l?.notas || "";
   renderResp(); $("fResp").value = l ? (l.resp || "") : (C.me || "");
-  $("btnDel").hidden = !l; $("confirmDel").hidden = true;
+  // a equipe não apaga lead, não troca o responsável de lead de outra pessoa e não mexe no valor de venda fechada
+  const fechado = !!l && l.etapa === "FECHADO", deOutro = !!l && !!l.respEmail && l.respEmail !== C.email;
+  $("fResp").disabled = !C.isAdmin && deOutro;
+  ["fValor", "fEtapa"].forEach(id => { $(id).disabled = !C.isAdmin && fechado; });
+  $("btnDel").hidden = !l || !C.isAdmin; $("confirmDel").hidden = true;
   $("sheet").hidden = false; setTimeout(() => (preset.etapa === "FECHADO" ? $("fValor") : $("fNome")).focus(), 30);
 }
 function closeForm(){ $("sheet").hidden = true; editing = null; }
@@ -266,7 +270,7 @@ $("form").addEventListener("submit", async e => {
     etapa, followup: OPEN.includes(etapa) ? $("fFu").value : "", notas: $("fNotas").value.trim(), resp: $("fResp").value, respEmail: emailDe($("fResp").value), atualizadoEm: new Date().toISOString() };
   $("btnSave").disabled = true;
   try {
-    if (editing) { if (etapa === "FECHADO") { body.fechadoEm = editing.fechadoEm || todayStr(); body.atendendo = null; } await updateDoc(doc(db, "leads", editing.id), body); }
+    if (editing) { if (etapa === "FECHADO") { if (editing.etapa !== "FECHADO" || C.isAdmin) body.fechadoEm = editing.fechadoEm || todayStr(); body.atendendo = null; } await updateDoc(doc(db, "leads", editing.id), body); }
     else { body.criadoEm = new Date().toISOString(); body.tentativas = 0; if (etapa === "FECHADO") body.fechadoEm = todayStr(); await addDoc(collection(db, "leads"), body); }
     toast(etapa === "FECHADO" ? "Venda registrada 🎉" : "Lead salvo"); closeForm();
   } catch (err) { handleErr(err); } finally { $("btnSave").disabled = false; }

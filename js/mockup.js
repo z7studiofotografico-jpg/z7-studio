@@ -2,7 +2,7 @@
 // - "Prévia do kit": quadro 30x40 (moldura preta) + 2 porta-retratos 15x10 em pé, com as fotos escolhidas.
 // - "Fotos para escolher": todas as fotos do ensaio numeradas, para o formando escolher o que vai em cada lugar.
 // Toda imagem sai com marca d'água repetida (um print não serve como foto final).
-import { el } from "./ui.js";
+import { el, avisoErro } from "./ui.js";
 const W = 1080, H = 1350;
 let logoImg = null;
 
@@ -115,7 +115,7 @@ async function desenharEscolha(cv, st){
 
 export const textoEscolha = (F) => `Aqui estão as fotos do ensaio${F ? " de " + F : ""}! 📸 Escolhe qual vai no quadro e quais vão nos 2 porta-retratos. É só responder com os números, por exemplo: Quadro 2, porta-retratos 1 e 4 😊`;
 
-export function openMockup({ nome = "", escola = "", preco = "", modo = "kit" } = {}){
+export function openMockup({ nome = "", escola = "", preco = "", modo = "kit", toast = null } = {}){
   const st = { fotos: [], slots: [0, 1, 2], nome, escola: escola || "", preco: /\[/.test(preco) ? "" : preco, modo };
   const sh = el("div", "sheet"); const p = el("div", "panel mock");
   sh.append(p); document.body.append(sh);
@@ -174,7 +174,8 @@ export function openMockup({ nome = "", escola = "", preco = "", modo = "kit" } 
   }
   async function addFiles(files){
     const imgs = [...files].filter(f => f.type.startsWith("image/")).slice(0, 8 - st.fotos.length);
-    for (const f of imgs) { try { st.fotos.push(await fileToImg(f)); } catch (_) {} }
+    let falhou = 0; for (const f of imgs) { try { st.fotos.push(await fileToImg(f)); } catch (_) { falhou++; } }
+    if (falhou) avisoErro(new Error("foto"), `abrir ${falhou} foto${falhou > 1 ? "s" : ""} (use JPG ou PNG)`, toast);
     paintThumbs(); paintSlots(); redraw();
   }
   function paintThumbs(){

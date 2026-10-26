@@ -46,7 +46,13 @@ service cloud.firestore {
       allow delete: if admin() || (membro() && resource.data.email == email());
       allow read: if admin();
     }
-    match /leads/{id} { allow read, write: if pode('funil'); }
+    // Funil: a equipe cadastra e atende; valor e data de um lead fechado (entram no Dashboard) e apagar, só o admin
+    match /leads/{id} {
+      allow read, create: if pode('funil');
+      allow update: if admin() || (pode('funil') && respOk()
+        && !(resource.data.get('etapa', '') == 'FECHADO' && mudou(['valor', 'fechadoEm', 'etapa'])));
+      allow delete: if admin();
+    }
 
     match /instituicoes/{id} {
       allow read: if admin() || (pode('colegios') && minhaOuLivre());
@@ -87,7 +93,10 @@ service cloud.firestore {
     }
     // Aluguel de becas
     match /becas/{id} {
-      allow read, create, update: if pode('becas');
+      allow read, create: if pode('becas');
+      // depois de registrado, a equipe não muda valor nem caução, e o "já pago" só aumenta (receber mais)
+      allow update: if admin() || (pode('becas') && !mudou(['valor', 'caucao'])
+        && request.resource.data.get('pago', 0) >= resource.data.get('pago', 0));
       allow delete: if admin();
     }
     // Fila de e-mails para os colégios (enviados pelo GitHub com o Gmail do estúdio)
@@ -103,7 +112,9 @@ service cloud.firestore {
         // a venda entra "a conferir": só o admin marca como conferida (a comissão só conta depois)
         && (!mudou(['conferido']) || request.resource.data.conferido == false)
         && !(resource.data.etapa in ['PAGO', 'ENTREGUE'] && mudou(['valor', 'formaPag', 'pagoEm', 'resp', 'respEmail'])));
-      allow create, delete: if pode('rep') || admin();
+      allow create: if pode('rep') || admin();
+      // venda paga ou entregue não some pela mão da equipe
+      allow delete: if admin() || (pode('rep') && !(resource.data.get('etapa', '') in ['PAGO', 'ENTREGUE']));
     }
   }
 }

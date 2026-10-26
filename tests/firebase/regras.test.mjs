@@ -17,7 +17,7 @@ beforeEach(async () => {
   await env.clearFirestore();
   await semRegra(async db => {
     await setDoc(doc(db, "usuarios", PEDRO), { nome: "Pedro", papel: "equipe", ativo: true, modulos: ["lf", "agenda", "colegios"] });
-    await setDoc(doc(db, "usuarios", ANA), { nome: "Ana", papel: "equipe", ativo: true, modulos: ["becas", "agenda"] });
+    await setDoc(doc(db, "usuarios", ANA), { nome: "Ana", papel: "equipe", ativo: true, modulos: ["becas", "agenda", "funil", "rep"] });
     await setDoc(doc(db, "usuarios", NOVO), { nome: "Novo", papel: "equipe", ativo: true });
     await setDoc(doc(db, "instituicoes", "i1"), { nome: "ALFA", etapa: "FECHADO", resp: "Pedro", respEmail: PEDRO });
     await setDoc(doc(db, "instituicoes", "i2"), { nome: "BETA", etapa: "A VISITAR", resp: "", respEmail: "" });
@@ -25,7 +25,9 @@ beforeEach(async () => {
     await setDoc(doc(db, "formandos", "f1"), { instId: "i1", nome: "LUCAS", valor: 850, parcelas: 10, pagas: 1, pagamentos: [{ data: "2026-10-05", valor: 85 }], formaPag: "Cartão", respEmail: PEDRO, tel: "" });
     await setDoc(doc(db, "repasse", "r1"), { nome: "BIA", ano: 2099, etapa: "PAGO", valor: 350, formaPag: "Boleto", resp: "Pedro", respEmail: PEDRO });
     await setDoc(doc(db, "repasse", "r2"), { nome: "CAIO", ano: 2099, etapa: "NA FILA", resp: "", respEmail: "" });
-    await setDoc(doc(db, "leads", "l1"), { nome: "Erica", etapa: "NOVO LEAD" });
+    await setDoc(doc(db, "leads", "l1"), { nome: "Erica", etapa: "NOVO LEAD", resp: "", respEmail: "" });
+    await setDoc(doc(db, "leads", "l2"), { nome: "Bia", etapa: "FECHADO", valor: 450, fechadoEm: "2026-10-01", resp: "Ana", respEmail: ANA });
+    await setDoc(doc(db, "becas", "b1"), { cliente: "Igreja", valor: 1200, pago: 300, caucao: 100, status: "reservado" });
     await setDoc(doc(db, "agenda", "2099-11-10"), { data: "2099-11-10", status: "pendente", pedidoEmail: ANA, kind: "fotos" });
     await setDoc(doc(db, "privado", "p1"), { titulo: "Consulta médica" });
     await setDoc(doc(db, "tokens", "t1"), { email: ANA });
@@ -115,12 +117,35 @@ test("assunto particular e resumo do dashboard só para admin", async () => {
 });
 test("becas: só quem tem o módulo", async () => {
   await assertFails(getDocs(query(collection(como(PEDRO), "becas"))));
-  await assertSucceeds(setDoc(doc(como(ANA), "becas", "b1"), { cliente: "X", status: "reservado" }));
-  await assertFails(deleteDoc(doc(como(ANA), "becas", "b1")));
+  await assertSucceeds(setDoc(doc(como(ANA), "becas", "b9"), { cliente: "X", status: "reservado" }));
+  await assertFails(deleteDoc(doc(como(ANA), "becas", "b9")));
 });
 test("aparelhos: cada um grava só o seu, ninguém lê os dos outros", async () => {
   await assertSucceeds(setDoc(doc(como(PEDRO), "tokens", "t2"), { email: PEDRO }));
   await assertFails(setDoc(doc(como(PEDRO), "tokens", "t3"), { email: ANA }));
   await assertFails(getDoc(doc(como(PEDRO), "tokens", "t1")));
   await assertFails(deleteDoc(doc(como(PEDRO), "tokens", "t1")));
+});
+
+test("funil: equipe não apaga lead, não mexe em venda fechada e não toma lead de outra pessoa", async () => {
+  const db = como(ANA);
+  await assertSucceeds(updateDoc(doc(db, "leads", "l1"), { respEmail: ANA, resp: "Ana", notas: "ok" }));
+  await assertFails(deleteDoc(doc(db, "leads", "l1")));
+  await assertFails(updateDoc(doc(db, "leads", "l2"), { valor: 9999 }));
+  await assertSucceeds(updateDoc(doc(db, "leads", "l2"), { notas: "entregue" }));
+  await semRegra(d => setDoc(doc(d, "leads", "l3"), { nome: "Caio", etapa: "FOLLOW-UP", respEmail: PEDRO, resp: "Pedro" }));
+  await assertFails(updateDoc(doc(db, "leads", "l3"), { respEmail: ANA, resp: "Ana" }));
+  await assertSucceeds(deleteDoc(doc(como(ADRIANO), "leads", "l2")));
+});
+test("becas: equipe não muda valor nem caução, e o já pago só aumenta", async () => {
+  const db = como(ANA);
+  await assertFails(updateDoc(doc(db, "becas", "b1"), { valor: 10 }));
+  await assertFails(updateDoc(doc(db, "becas", "b1"), { pago: 100 }));
+  await assertSucceeds(updateDoc(doc(db, "becas", "b1"), { pago: 600, status: "retirado" }));
+  await assertFails(deleteDoc(doc(db, "becas", "b1")));
+});
+test("PR: equipe não apaga venda paga", async () => {
+  await assertFails(deleteDoc(doc(como(ANA), "repasse", "r1")));
+  await assertSucceeds(deleteDoc(doc(como(ANA), "repasse", "r2")));
+  await assertSucceeds(deleteDoc(doc(como(ADRIANO), "repasse", "r1")));
 });

@@ -494,8 +494,22 @@ const VIEWS = { home: "viewHome", funil: "viewFunil", pr: "viewRepasse", repasse
 const INST_NOMES = { "inst-particular": "Colégio particular", "inst-publico": "Colégio público", "inst-profissionalizante": "Colégio profissionalizante", "inst-faculdade": "Faculdade" };
 let repasseMod = null, instMod = null, agendaMod = null, vendasMod = null, formMod = null, becasMod = null, curView = "home";
 const APROVADORES = (CFG.aprovadores || []).map(e => String(e).toLowerCase());
+// Firestore com aviso de limite: toda consulta com limit(n) que voltar cheia avisa que a lista pode estar incompleta
+// (antes os dados eram cortados em silêncio)
+const limites = new WeakMap();
+const FSv = Object.assign({}, FS, {
+  limit(n){ const c = FS.limit(n); limites.set(c, n); return c; },
+  query(q, ...cs){ const r = FS.query(q, ...cs); const n = cs.map(c => limites.get(c)).find(Boolean) || limites.get(q); if (n) limites.set(r, n); return r; },
+  onSnapshot(q, ...a){ const ok = a[0]; if (typeof ok === "function") a[0] = s => { confereLimite(q, s); ok(s); }; return FS.onSnapshot(q, ...a); },
+  async getDocs(q){ const s = await FS.getDocs(q); confereLimite(q, s); return s; }
+});
+function confereLimite(q, s){
+  const n = limites.get(q); if (!n || !s || s.size < n) return;
+  console.warn("[Z7] consulta chegou ao limite de " + n, q);
+  showNotice(`Uma das listas chegou ao limite de ${n} itens e pode estar incompleta. Use a busca ou os filtros, e avise o Adriano.`);
+}
 const ctx = {
-  db, FS, $, toast, mkBtn, money, num, digits, first, todayStr, addDays, fmtDate, hhmm, ds, pad, showNotice, handleErr,
+  db, FS: FSv, $, toast, mkBtn, money, num, digits, first, todayStr, addDays, fmtDate, hhmm, ds, pad, showNotice, handleErr,
   get me(){ return me; }, get isAdmin(){ return isAdmin; }, get aprovador(){ return APROVADORES.includes((user && user.email || "").toLowerCase()); }, get user(){ return user; }, get P(){ return P; }, team, pode,
   get vendedores(){ return Object.entries(USERS).filter(([em, u]) => u.nome && u.ativo !== false && u.papel !== "admin" && !isDono(em)).map(([, u]) => u.nome); },
   get vendedoresEmails(){ return Object.entries(USERS).filter(([em, u]) => u.ativo !== false && u.papel !== "admin" && !isDono(em)).map(([em]) => em); },
@@ -510,8 +524,8 @@ const ctx = {
   // (formandos: só os seus). Nesse caso a consulta vai só pela carteira e quem chama filtra o resto na tela.
   carteira(nomeCol, ...filtros){
     const c = collection(db, nomeCol);
-    if (isAdmin) return query(c, ...filtros);
-    return nomeCol === "formandos" ? query(c, where("respEmail", "==", ctx.email), FS.limit(3000)) : query(c, where("respEmail", "in", ["", ctx.email]), FS.limit(3000));
+    if (isAdmin) return FSv.query(c, ...filtros);
+    return nomeCol === "formandos" ? FSv.query(c, where("respEmail", "==", ctx.email), FSv.limit(3000)) : FSv.query(c, where("respEmail", "in", ["", ctx.email]), FSv.limit(3000));
   },
   goHome(){ location.hash = "#home"; }
 };
