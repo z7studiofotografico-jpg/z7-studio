@@ -4,12 +4,33 @@
 // A lista abaixo só garante que o app abra sem internet; um teste confere que nenhum arquivo ficou de fora.
 const CACHE = "z7-app";
 const CDN = "z7-cdn-v1";
-const SHELL = ["./", "./index.html", "./config.js", "./manifest.webmanifest",
-  "./icons/icon-192.png", "./icons/icon-512.png", "./icons/apple-touch-icon.png",
-  "./js/ui.js", "./js/regras.js", "./js/calc.js", "./js/feriados.js",
-  "./js/repasse.js", "./js/mockup.js", "./js/instituicoes.js", "./js/agenda.js", "./js/vendas.js",
-  "./js/turma.js", "./js/formaturas.js", "./js/becas.js", "./js/funil.js",
-  "./js/equipe.js", "./js/mensagens.js", "./js/eventos.js", "./css/app.css"];
+const SHELL = [
+  "./",
+  "./index.html",
+  "./config.js",
+  "./manifest.webmanifest",
+  "./icons/icon-192.png",
+  "./icons/icon-512.png",
+  "./icons/apple-touch-icon.png",
+  "./js/ui.js",
+  "./js/regras.js",
+  "./js/calc.js",
+  "./js/feriados.js",
+  "./js/repasse.js",
+  "./js/mockup.js",
+  "./js/instituicoes.js",
+  "./js/agenda.js",
+  "./js/vendas.js",
+  "./js/util.js",
+  "./js/turma.js",
+  "./js/formaturas.js",
+  "./js/becas.js",
+  "./js/funil.js",
+  "./js/equipe.js",
+  "./js/mensagens.js",
+  "./js/eventos.js",
+  "./css/app.css"
+];
 
 importScripts("./config.js");
 importScripts(
@@ -17,37 +38,54 @@ importScripts(
   "https://www.gstatic.com/firebasejs/10.12.2/firebase-messaging-compat.js"
 );
 
-self.addEventListener("install", (e) => {
-  e.waitUntil(caches.open(CACHE).then((c) => c.addAll(SHELL)).then(() => self.skipWaiting()));
+self.addEventListener("install", e => {
+  e.waitUntil(
+    caches
+      .open(CACHE)
+      .then(c => c.addAll(SHELL))
+      .then(() => self.skipWaiting())
+  );
 });
 
-self.addEventListener("activate", (e) => {
+self.addEventListener("activate", e => {
   e.waitUntil(
-    caches.keys()
-      .then((keys) => Promise.all(keys.filter((k) => k !== CACHE && k !== CDN).map((k) => caches.delete(k))))
+    caches
+      .keys()
+      .then(keys => Promise.all(keys.filter(k => k !== CACHE && k !== CDN).map(k => caches.delete(k))))
       .then(() => self.clients.claim())
   );
 });
 
 // Bibliotecas de fora (Firebase, gráficos, planilha): têm a versão no endereço, então podem ficar guardadas.
-const ehCDN = (u) => /^(www\.gstatic\.com|cdn\.jsdelivr\.net|unpkg\.com)$/.test(u.hostname);
+const ehCDN = u => /^(www\.gstatic\.com|cdn\.jsdelivr\.net|unpkg\.com)$/.test(u.hostname);
 // Arquivos do próprio app: busca na internet primeiro (sem cache do navegador) e usa a cópia guardada se estiver sem sinal.
-self.addEventListener("fetch", (e) => {
+self.addEventListener("fetch", e => {
   const url = new URL(e.request.url);
   if (e.request.method !== "GET") return;
   if (ehCDN(url)) {
-    e.respondWith(caches.open(CDN).then((c) => c.match(e.request).then((r) => r || fetch(e.request).then((res) => { if (res.ok) c.put(e.request, res.clone()); return res; }))));
+    e.respondWith(
+      caches.open(CDN).then(c =>
+        c.match(e.request).then(
+          r =>
+            r ||
+            fetch(e.request).then(res => {
+              if (res.ok) c.put(e.request, res.clone());
+              return res;
+            })
+        )
+      )
+    );
     return;
   }
   if (url.origin !== self.location.origin) return;
   e.respondWith(
     fetch(e.request, { cache: "no-cache" })
-      .then((res) => {
+      .then(res => {
         const copy = res.clone();
-        caches.open(CACHE).then((c) => c.put(e.request, copy));
+        caches.open(CACHE).then(c => c.put(e.request, copy));
         return res;
       })
-      .catch(() => caches.match(e.request).then((r) => r || caches.match("./index.html")))
+      .catch(() => caches.match(e.request).then(r => r || caches.match("./index.html")))
   );
 });
 
@@ -59,11 +97,13 @@ if (cfg && cfg.apiKey) {
   firebase.messaging();
 }
 
-self.addEventListener("notificationclick", (e) => {
+self.addEventListener("notificationclick", e => {
   e.notification.close();
   e.waitUntil(
-    self.clients.matchAll({ type: "window", includeUncontrolled: true }).then((list) => {
-      for (const c of list) { if ("focus" in c) return c.focus(); }
+    self.clients.matchAll({ type: "window", includeUncontrolled: true }).then(list => {
+      for (const c of list) {
+        if ("focus" in c) return c.focus();
+      }
       return self.clients.openWindow("./");
     })
   );

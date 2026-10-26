@@ -8,8 +8,8 @@ test("lê valores no padrão brasileiro em centavos", () => {
   assert.equal(R.centavos("1.350,50"), 135050);
   assert.equal(R.centavos("1350"), 135000);
   assert.equal(R.centavos("9,5"), 950);
-  assert.equal(R.centavos("9.5"), 950);          // antes virava 95!
-  assert.equal(R.centavos("41.5"), 4150);        // antes virava 415!
+  assert.equal(R.centavos("9.5"), 950); // antes virava 95!
+  assert.equal(R.centavos("41.5"), 4150); // antes virava 415!
   assert.equal(R.centavos("1.350"), 135000);
   assert.equal(R.centavos("R$ 85"), 8500);
   assert.equal(R.centavos(""), 0);
@@ -18,7 +18,10 @@ test("lê valores no padrão brasileiro em centavos", () => {
   assert.equal(R.lerReais("133,335"), 133.34);
 });
 test("formata em reais", () => {
-  assert.equal(R.brl(400), "R$ 400,00"); assert.equal(R.campoReais("500"), "500,00"); assert.equal(R.campoReais("1350,5"), "1.350,50"); assert.equal(R.campoReais("abc"), "abc");
+  assert.equal(R.brl(400), "R$ 400,00");
+  assert.equal(R.campoReais("500"), "500,00");
+  assert.equal(R.campoReais("1350,5"), "1.350,50");
+  assert.equal(R.campoReais("abc"), "abc");
   assert.equal(R.brl(1350.5), "R$ 1.350,50");
   assert.equal(R.brl(0.1 + 0.2), "R$ 0,30");
 });
@@ -35,11 +38,14 @@ test("vencimento no fim do mês não pula fevereiro", () => {
   assert.equal(R.somaMeses("2028-01-31", 1), "2028-02-29");
   assert.equal(R.somaMeses("2026-10-05", 3), "2027-01-05");
   const f = { primeiroVenc: "2026-01-31", parcelas: 4, valor: 400 };
-  assert.deepEqual([1, 2, 3, 4].map(n => R.vencDa(f, n)), ["2026-01-31", "2026-02-28", "2026-03-31", "2026-04-30"]);
+  assert.deepEqual(
+    [1, 2, 3, 4].map(n => R.vencDa(f, n)),
+    ["2026-01-31", "2026-02-28", "2026-03-31", "2026-04-30"]
+  );
 });
 test("parcelas atrasadas e próximo vencimento", () => {
   const f = { primeiroVenc: "2026-06-05", parcelas: 10, valor: 850, pagamentos: [{ data: "2026-06-05", valor: 85 }] };
-  assert.equal(R.esperadas(f, "2026-07-05"), 1);   // no dia do vencimento ainda não atrasou
+  assert.equal(R.esperadas(f, "2026-07-05"), 1); // no dia do vencimento ainda não atrasou
   assert.equal(R.esperadas(f, "2026-07-06"), 2);
   assert.equal(R.atrasado(f, "2026-07-06"), true);
   assert.equal(R.atrasado(f, "2026-07-05"), false);
@@ -64,5 +70,7 @@ test("feriados", () => {
   assert.equal(feriado("2027-02-08"), "Carnaval");
   assert.equal(feriado("2026-04-23"), "São Jorge (RJ)");
   assert.equal(feriado("2026-10-26"), "");
-  assert.match(feriado("2026-02-18"), /Cinzas/); assert.match(feriado("2026-10-15"), /Professor/); assert.match(feriado("2026-12-31"), /Ano Novo/);
+  assert.match(feriado("2026-02-18"), /Cinzas/);
+  assert.match(feriado("2026-10-15"), /Professor/);
+  assert.match(feriado("2026-12-31"), /Ano Novo/);
 });

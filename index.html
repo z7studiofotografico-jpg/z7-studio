@@ -320,8 +320,9 @@ import { getAuth, initializeAuth, onAuthStateChanged, signInWithEmailAndPassword
 import { initializeFirestore, persistentLocalCache, persistentMultipleTabManager, collection, doc, onSnapshot, updateDoc, setDoc, query, where, getCountFromServer } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
 import * as FS from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
 import { getMessaging, getToken, onMessage, isSupported } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-messaging.js";
-import { brl, lerReais, COMISSAO_PADRAO, FORMAS, proxVenc, pagamentosDe } from "./js/regras.js";
+import { COMISSAO_PADRAO, FORMAS, proxVenc, pagamentosDe } from "./js/regras.js";
 import { avisoErro, ligarCamposReais, formatarCampos } from "./js/ui.js";
+import { todayStr, addDays, num, first, toast, showNotice, mkBtn } from "./js/util.js";
 ligarCamposReais();
 import * as Funil from "./js/funil.js";
 import * as Equipe from "./js/equipe.js";
@@ -352,20 +353,7 @@ let secAuth = null;
 function cadastroAuth(){ if (!secAuth) secAuth = initializeAuth(initializeApp(CFG.firebase, "cadastro"), { persistence: inMemoryPersistence }); return secAuth; }
 
 // ---------- utilidades ----------
-const pad = n => String(n).padStart(2, "0");
-const ds = d => d.getFullYear() + "-" + pad(d.getMonth() + 1) + "-" + pad(d.getDate());
-const todayStr = () => ds(new Date());
-function addDays(n){ const d = new Date(); d.setDate(d.getDate() + n); return ds(d); }
-function fmtDate(s){ if (!s) return ""; const [, m, d] = s.split("-"); return d + "/" + m; }
-function hhmm(iso){ const d = new Date(iso); return pad(d.getHours()) + ":" + pad(d.getMinutes()); }
-// Dinheiro no padrão brasileiro (contas em centavos: js/regras.js)
-const money = brl;
-const num = lerReais;
-function digits(t){ let d = (t || "").replace(/\D/g, ""); if (d.length === 10 || d.length === 11) d = "55" + d; return d; }
-function first(n){ return (n || "").trim().split(/\s+/)[0] || ""; }
 const team = () => Object.values(USERS).filter(u => u.ativo !== false && u.nome).map(u => u.nome).sort((a, b) => a.localeCompare(b, "pt-BR"));
-function toast(msg){ const t = $("toast"); t.textContent = msg; t.hidden = false; clearTimeout(toast._t); toast._t = setTimeout(() => t.hidden = true, 2400); }
-function showNotice(t){ const n = $("notice"); n.textContent = t; n.hidden = !t; }
 
 // ---------- quem está usando (vem do login) ----------
 function renderMe(){
@@ -403,16 +391,28 @@ function handleErr(e){
 }
 
 // ---------- desenho da tela ----------
-function mkBtn(text, cls, fn){ const b = document.createElement("button"); b.type = "button"; b.className = "btn btn-sm " + (cls || ""); b.textContent = text; b.onclick = fn; return b; }
 
 
 
 // ---------- ajustes ----------
+// Campos de Ajustes: [id do campo, chave em config/app, tipo, padrão]. Um campo novo = uma linha aqui.
+const AJUSTES = [
+  ["pInd", "individual", "reais"], ["pSinal", "sinal", "reais"], ["pG36", "g36", "reais"],
+  ["pG7", "g7", "reais"], ["pFotos", "fotos", "int", 30], ["pPrazo", "prazo", "int", 15],
+  ["pLfLote", "lfAvisoDia", "int", 25], ["pLfParc", "lfParcelas", "int"], ["pLfPix", "lfPix", "reais"],
+  ["pLfCartao", "lfCartao", "reais"], ["pKit", "kitPreco", "reais"], ["pKitPromo", "kitPromo", "reais"],
+  ["pKitCartao", "kitCartao", "reais"], ["pKitFinal", "kitFinal", "reais"], ["pLote", "avisoDia", "int", 20],
+  ["pParc", "parcelas", "int"], ["pLfNum", "lfNumero", "texto"], ["pRepNum", "repNumero", "texto"],
+  ["pEntrega", "entrega", "texto"], ["pPix", "pix", "texto"], ["pPixLF", "pixLF", "texto"],
+  ["pPixRep", "pixRep", "texto"], ["pPixFinal", "pixFinal", "texto"], ["pPixSinal", "pixSinal", "texto"],
+  ["pLink", "linkCartao", "texto"], ["pLinkFinal", "linkCartaoFinal", "texto"], ["pLinkLF", "linkCartaoLF", "texto"],
+  ["pAval", "linkAvaliacao", "texto"], ["pFeriados", "feriadosExtras", "texto"]
+];
+const lerAjuste = { reais: v => num(v), int: v => parseInt(String(v).replace(/\D/g, ""), 10) || 0, texto: v => String(v || "").trim() };
 $("btnPrices").onclick = () => {
-  $("pInd").value = P.individual || ""; $("pSinal").value = P.sinal || ""; $("pG36").value = P.g36 || ""; $("pG7").value = P.g7 || "";
-  $("pFotos").value = P.fotos || ""; $("pPrazo").value = P.prazo || "";
-  $("pLfLote").value = P.lfAvisoDia || ""; $("pLfNum").value = P.lfNumero || ""; $("pRepNum").value = P.repNumero || ""; $("pLfParc").value = P.lfParcelas || ""; $("pLfPix").value = P.lfPix || ""; $("pLfCartao").value = P.lfCartao || ""; $("pKit").value = P.kitPreco || ""; $("pKitPromo").value = P.kitPromo || ""; $("pKitCartao").value = P.kitCartao || ""; $("pKitFinal").value = P.kitFinal || ""; $("pLote").value = P.avisoDia || ""; $("pEntrega").value = P.entrega || ""; $("pPix").value = P.pix || ""; $("pParc").value = P.parcelas || ""; $("pPixLF").value = P.pixLF || ""; $("pPixRep").value = P.pixRep || ""; $("pPixFinal").value = P.pixFinal || ""; $("pPixSinal").value = P.pixSinal || ""; $("pLink").value = P.linkCartao || ""; $("pLinkFinal").value = P.linkCartaoFinal || ""; $("pLinkLF").value = P.linkCartaoLF || ""; $("pAval").value = P.linkAvaliacao || ""; $("pEquipes").value = String(P.equipesDia || 1); $("pFeriados").value = P.feriadosExtras || ""; feriadosExtras(P.feriadosExtras); listarFeriados(); montarComissao(); formatarCampos($("sheetPrices"));
-  ["pInd","pSinal","pG36","pG7","pFotos","pPrazo","pLfLote","pLfNum","pRepNum","pLfParc","pLfPix","pLfCartao","pKit","pKitPromo","pKitCartao","pKitFinal","pLote","pEntrega","pPix","pParc","pPixLF","pPixRep","pPixFinal","pPixSinal","pLink","pLinkFinal","pLinkLF","pAval","pEquipes","pFeriados"].forEach(id => $(id).disabled = !isAdmin); document.querySelectorAll("#comTab input").forEach(i => i.disabled = !isAdmin);
+  AJUSTES.forEach(([id, k]) => { $(id).value = P[k] || ""; $(id).disabled = !isAdmin; });
+  $("pEquipes").value = String(P.equipesDia || 1); feriadosExtras(P.feriadosExtras); listarFeriados(); montarComissao(); formatarCampos($("sheetPrices"));
+  $("pEquipes").disabled = !isAdmin; document.querySelectorAll("#comTab input").forEach(i => { i.disabled = !isAdmin; });
   $("pSave").hidden = !isAdmin;
   $("pricesHint").textContent = isAdmin ? "Os valores entram automaticamente nas mensagens prontas." : "Só administradores mudam os preços.";
   renderPushState(); $("sheetPrices").hidden = false;
@@ -449,10 +449,8 @@ $("pPush").onclick = () => enablePush(true);
 $("formPrices").addEventListener("submit", async e => {
   e.preventDefault();
   if (!isAdmin) return;
-  const body = { individual: num($("pInd").value), sinal: num($("pSinal").value), g36: num($("pG36").value), g7: num($("pG7").value),
-    fotos: num($("pFotos").value) || 30, prazo: num($("pPrazo").value) || 15,
-    lfAvisoDia: num($("pLfLote").value) || 25, lfNumero: $("pLfNum").value.trim(), repNumero: $("pRepNum").value.trim(), lfParcelas: num($("pLfParc").value), lfPix: num($("pLfPix").value), lfCartao: num($("pLfCartao").value), kitPreco: num($("pKit").value), kitPromo: num($("pKitPromo").value), kitCartao: num($("pKitCartao").value), kitFinal: num($("pKitFinal").value), avisoDia: num($("pLote").value) || 20, entrega: $("pEntrega").value.trim(),
-    pix: $("pPix").value.trim(), parcelas: num($("pParc").value), pixLF: $("pPixLF").value.trim(), pixRep: $("pPixRep").value.trim(), pixFinal: $("pPixFinal").value.trim(), pixSinal: $("pPixSinal").value.trim(), linkCartao: $("pLink").value.trim(), linkCartaoFinal: $("pLinkFinal").value.trim(), linkCartaoLF: $("pLinkLF").value.trim(), linkAvaliacao: $("pAval").value.trim(), equipesDia: Number($("pEquipes").value) || 1, feriadosExtras: $("pFeriados").value.trim(), comissao: lerComissao() };
+  const body = Object.fromEntries(AJUSTES.map(([id, k, t, padrao]) => [k, lerAjuste[t]($(id).value) || padrao || lerAjuste[t]("")]));
+  Object.assign(body, { equipesDia: Number($("pEquipes").value) || 1, comissao: lerComissao() });
   try {
     await setDoc(doc(db, "config", "app"), body, { merge: true });
     $("sheetPrices").hidden = true; toast("Preços salvos");
@@ -511,7 +509,7 @@ function confereLimite(q, s){
   showNotice(`Uma das listas chegou ao limite de ${n} itens e pode estar incompleta. Use a busca ou os filtros, e avise o Adriano.`);
 }
 const ctx = {
-  db, FS: FSv, $, toast, mkBtn, money, num, digits, first, todayStr, addDays, fmtDate, hhmm, ds, pad, showNotice, handleErr,
+  db, FS: FSv, $, handleErr,
   get me(){ return me; }, get isAdmin(){ return isAdmin; }, get aprovador(){ return APROVADORES.includes((user && user.email || "").toLowerCase()); }, get user(){ return user; }, get P(){ return P; }, team, pode,
   get vendedores(){ return Object.entries(USERS).filter(([em, u]) => u.nome && u.ativo !== false && u.papel !== "admin" && !isDono(em)).map(([, u]) => u.nome); },
   get vendedoresEmails(){ return Object.entries(USERS).filter(([em, u]) => u.ativo !== false && u.papel !== "admin" && !isDono(em)).map(([em]) => em); },

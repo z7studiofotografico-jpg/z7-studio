@@ -16,6 +16,19 @@ jobs:
       - name: Regras de negócio, cálculo e arquivos do app
         run: node --test tests/*.test.mjs
 
+  estilo:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - name: Formatação (Prettier) e erros comuns (ESLint)
+        run: |
+          npx --yes prettier@3.3.3 --check "js/*.js" "scripts/*.mjs" sw.js
+          npx --yes eslint@8.57.0 --no-eslintrc -c .eslintrc.json --max-warnings 0 "js/*.js"
+
   app-no-navegador:
     runs-on: ubuntu-latest
     timeout-minutes: 10

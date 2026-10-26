@@ -1,1 +1,4 @@
-export const getMessaging = () => ({}), getToken = async () => "", onMessage = () => {}, isSupported = async () => false;
+export const getMessaging = () => ({}),
+  getToken = async () => "",
+  onMessage = () => {},
+  isSupported = async () => false;
