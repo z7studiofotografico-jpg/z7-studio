@@ -224,6 +224,7 @@
       <div class="field"><label for="pEquipes">Equipes para colégio no mesmo dia</label><select id="pEquipes"><option value="1">1 (um colégio por dia)</option><option value="2">2</option><option value="3">3</option></select></div>
     </div>
     <div class="field"><label for="pFeriados">Outros feriados ou recessos (um por linha: dd/mm Nome, ou dd/mm/aaaa)</label><textarea id="pFeriados" rows="3" maxlength="1500" placeholder="20/01 São Sebastião&#10;26/12/2026 Recesso"></textarea>
+      <details id="pFerLista"><summary>Ver todos os feriados (o app já bloqueia estes dias)</summary><div id="pFerDias" class="hint"></div></details>
       <p class="hint">Já estão inclusos os nacionais, o Carnaval, São Jorge (RJ), 21/08 (Aniversário de Nilópolis) e 08/12 (Imaculada Conceição).</p></div>
     <h3>Comissão do vendedor (%)</h3>
     <p class="hint">PR: sobre a venda. Álbum de formatura (kits das turmas) e Colação de grau: sobre cada parcela paga. Só para a equipe de vendas.</p>
@@ -323,7 +324,7 @@ import { brl, lerReais, COMISSAO_PADRAO, FORMAS, proxVenc, pagamentosDe } from "
 import { avisoErro } from "./js/ui.js";
 import * as Funil from "./js/funil.js";
 import * as Equipe from "./js/equipe.js";
-import { definirExtras as feriadosExtras } from "./js/feriados.js";
+import { definirExtras as feriadosExtras, feriadosEntre } from "./js/feriados.js";
 
 const $ = (id) => document.getElementById(id);
 const CFG = self.Z7_CONFIG || {};
@@ -407,7 +408,7 @@ function mkBtn(text, cls, fn){ const b = document.createElement("button"); b.typ
 $("btnPrices").onclick = () => {
   $("pInd").value = P.individual || ""; $("pSinal").value = P.sinal || ""; $("pG36").value = P.g36 || ""; $("pG7").value = P.g7 || "";
   $("pFotos").value = P.fotos || ""; $("pPrazo").value = P.prazo || "";
-  $("pLfLote").value = P.lfLoteDia || ""; $("pLfNum").value = P.lfNumero || ""; $("pRepNum").value = P.repNumero || ""; $("pLfParc").value = P.lfParcelas || ""; $("pLfPix").value = P.lfPix || ""; $("pLfCartao").value = P.lfCartao || ""; $("pKit").value = P.kitPreco || ""; $("pKitPromo").value = P.kitPromo || ""; $("pKitCartao").value = P.kitCartao || ""; $("pKitFinal").value = P.kitFinal || ""; $("pLote").value = P.loteDia || ""; $("pEntrega").value = P.entrega || ""; $("pPix").value = P.pix || ""; $("pParc").value = P.parcelas || ""; $("pPixLF").value = P.pixLF || ""; $("pPixRep").value = P.pixRep || ""; $("pPixFinal").value = P.pixFinal || ""; $("pPixSinal").value = P.pixSinal || ""; $("pLink").value = P.linkCartao || ""; $("pLinkFinal").value = P.linkCartaoFinal || ""; $("pLinkLF").value = P.linkCartaoLF || ""; $("pAval").value = P.linkAvaliacao || ""; $("pEquipes").value = String(P.equipesDia || 1); $("pFeriados").value = P.feriadosExtras || ""; montarComissao();
+  $("pLfLote").value = P.lfLoteDia || ""; $("pLfNum").value = P.lfNumero || ""; $("pRepNum").value = P.repNumero || ""; $("pLfParc").value = P.lfParcelas || ""; $("pLfPix").value = P.lfPix || ""; $("pLfCartao").value = P.lfCartao || ""; $("pKit").value = P.kitPreco || ""; $("pKitPromo").value = P.kitPromo || ""; $("pKitCartao").value = P.kitCartao || ""; $("pKitFinal").value = P.kitFinal || ""; $("pLote").value = P.loteDia || ""; $("pEntrega").value = P.entrega || ""; $("pPix").value = P.pix || ""; $("pParc").value = P.parcelas || ""; $("pPixLF").value = P.pixLF || ""; $("pPixRep").value = P.pixRep || ""; $("pPixFinal").value = P.pixFinal || ""; $("pPixSinal").value = P.pixSinal || ""; $("pLink").value = P.linkCartao || ""; $("pLinkFinal").value = P.linkCartaoFinal || ""; $("pLinkLF").value = P.linkCartaoLF || ""; $("pAval").value = P.linkAvaliacao || ""; $("pEquipes").value = String(P.equipesDia || 1); $("pFeriados").value = P.feriadosExtras || ""; feriadosExtras(P.feriadosExtras); listarFeriados(); montarComissao();
   ["pInd","pSinal","pG36","pG7","pFotos","pPrazo","pLfLote","pLfNum","pRepNum","pLfParc","pLfPix","pLfCartao","pKit","pKitPromo","pKitCartao","pKitFinal","pLote","pEntrega","pPix","pParc","pPixLF","pPixRep","pPixFinal","pPixSinal","pLink","pLinkFinal","pLinkLF","pAval","pEquipes","pFeriados"].forEach(id => $(id).disabled = !isAdmin); document.querySelectorAll("#comTab input").forEach(i => i.disabled = !isAdmin);
   $("pSave").hidden = !isAdmin;
   $("pricesHint").textContent = isAdmin ? "Os valores entram automaticamente nas mensagens prontas." : "Só administradores mudam os preços.";
@@ -415,6 +416,16 @@ $("btnPrices").onclick = () => {
 };
 // Tabela de comissão: PR e Formatura × forma de pagamento
 const COM_FORMAS = FORMAS, COM_PADRAO = COMISSAO_PADRAO;
+// Lista em Ajustes: todos os feriados deste ano e do próximo (nacionais, Carnaval, RJ, Nilópolis e os de "Outros feriados")
+function listarFeriados(){
+  const box = $("pFerDias"); box.textContent = ""; const y = new Date().getFullYear(), SEM = ["dom", "seg", "ter", "qua", "qui", "sex", "sáb"];
+  [y, y + 1].forEach(ano => {
+    const h = document.createElement("b"); h.textContent = String(ano); h.style.display = "block"; h.style.marginTop = "8px"; box.append(h);
+    feriadosEntre(`${ano}-01-01`, `${ano}-12-31`).forEach(f => { const [a, m, d] = f.data.split("-"); const l = document.createElement("div");
+      l.textContent = `${d}/${m} (${SEM[new Date(+a, m - 1, +d).getDay()]}) · ${f.nome}`; box.append(l); });
+  });
+}
+$("pFeriados").addEventListener("input", () => { feriadosExtras($("pFeriados").value); listarFeriados(); });
 function montarComissao(){
   const t = $("comTab"); t.innerHTML = "";
   const cfg = P.comissao || {};

@@ -572,10 +572,20 @@ function openForm(it){
     const email = inp(it && it.email, "e-mail da instituição (recebe as datas confirmadas)"); p.append(field("E-mail da instituição", email));
     const hor = inp(it && it.horario, "ex.: só funciona à tarde"); p.append(field("Melhor horário para contato", hor));
     const nota = el("textarea"); nota.rows = 3; nota.maxLength = 2000; nota.value = (it && it.notas) || ""; p.append(field("Anotações gerais", nota));
-    if (it && C.isAdmin) { const del = el("button", "btn btn-danger btn-sm", "Apagar instituição"); del.type = "button";
-      del.onclick = async () => { if (del.dataset.ok) { try { await liberar(it, "formatura"); await liberar(it, "fotos");
+    // Apagar: o administrador apaga qualquer uma; o vendedor só a que está na conta dele
+    if (it && (C.isAdmin || (it.respEmail && it.respEmail === C.email))) { const del = el("button", "btn btn-danger btn-sm", "Apagar instituição"); del.type = "button";
+      del.onclick = async () => { if (del.dataset.ok) { try {
         // apaga junto os formandos (e parcelas) da turma, para nada ficar solto no Dashboard
-        const fs = (await FS.getDocs(FS.query(FS.collection(db, "formandos"), FS.where("instId", "==", it.id)))).docs;
+        const q = C.isAdmin ? FS.query(FS.collection(db, "formandos"), FS.where("instId", "==", it.id))
+          : FS.query(FS.collection(db, "formandos"), FS.where("instId", "==", it.id), FS.where("respEmail", "==", C.email));
+        const fs = (await FS.getDocs(q)).docs;
+        if (!C.isAdmin) {
+          // dinheiro recebido e data confirmada com o colégio não somem pela mão da equipe
+          const pagos = fs.filter(d => { const f = d.data(); return (f.pagas || 0) > 0 || (f.pagamentos || []).length; }).length;
+          const confirmada = ["diaFotos", "formatura"].some(k => it[k] && it[k].status === "confirmado");
+          if (pagos || confirmada) { C.toast(pagos ? `Tem ${pagos} formando${pagos > 1 ? "s" : ""} com parcela paga: só o administrador pode apagar` : "Tem data confirmada com o colégio: só o administrador pode apagar"); return; }
+        }
+        await liberar(it, "formatura"); await liberar(it, "fotos");
         for (let i = 0; i < fs.length; i += 400) { const b = FS.writeBatch(db); fs.slice(i, i + 400).forEach(d => b.delete(d.ref)); if (i + 400 >= fs.length) b.delete(FS.doc(db, "instituicoes", it.id)); await b.commit(); }
         if (!fs.length) await FS.deleteDoc(FS.doc(db, "instituicoes", it.id));
         C.toast(fs.length ? `Apagada, com ${fs.length} formando${fs.length > 1 ? "s" : ""}` : "Apagada"); close(); } catch (e) { C.handleErr(e); } } else { del.dataset.ok = 1; del.textContent = "Toque de novo: apaga o colégio e os formandos dele"; } }; p.append(del); }

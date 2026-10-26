@@ -54,7 +54,8 @@ service cloud.firestore {
       // valor da colação e responsável: só admin (o responsável recebe a comissão da turma)
       allow update: if admin() || (pode('colegios') && minhaOuLivre() && respOk() && !mudou(['colacao'])
         && (!mudou(['resp']) || resource.data.get('respEmail', '') == ''));
-      allow delete: if admin();
+      // a equipe só apaga colégio que está na própria conta
+      allow delete: if admin() || (pode('colegios') && minha());
     }
     // Agenda: um documento por dia (AAAA-MM-DD), um compromisso de colégio por dia.
     // Qualquer um com acesso sugere a data (pendente); só quem aprova confirma; cada um mexe só no seu pedido.
@@ -80,7 +81,9 @@ service cloud.firestore {
       // depois de cadastrado, a equipe só corrige contato e observação
       allow update: if admin() || ((pode('colegios') || pode('formaturas')) && minha()
         && !mudou(['valor', 'parcelas', 'pagas', 'pagamentos', 'formaPag', 'contrato', 'kit', 'resp', 'respEmail', 'primeiroVenc', 'instId', 'status', 'vendidoEm', 'proxVenc']));
-      allow delete: if admin();
+      // a equipe só apaga formando da própria conta e sem nenhuma parcela paga
+      allow delete: if admin() || ((pode('colegios') || pode('formaturas')) && minha()
+        && resource.data.get('pagas', 0) == 0 && resource.data.get('pagamentos', []).size() == 0);
     }
     // Aluguel de becas
     match /becas/{id} {

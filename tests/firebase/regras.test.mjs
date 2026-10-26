@@ -48,7 +48,16 @@ test("vendedor não mexe em pagamento, valor nem responsável do formando", asyn
   await assertFails(updateDoc(doc(db, "formandos", "f1"), { formaPag: "Pix" }));
   await assertFails(setDoc(doc(db, "formandos", "f2"), { instId: "i1", nome: "X", pagas: 2, pagamentos: [{ valor: 1 }] }));
   await assertSucceeds(setDoc(doc(db, "formandos", "f3"), { instId: "i1", nome: "Y", pagas: 0, pagamentos: [], respEmail: PEDRO }));
-  await assertFails(deleteDoc(doc(db, "formandos", "f1")));
+  await assertFails(deleteDoc(doc(db, "formandos", "f1")));   // tem parcela paga
+});
+test("apagar: o vendedor só apaga o colégio da conta dele, e formando sem parcela paga", async () => {
+  const db = como(PEDRO);
+  await semRegra(d => setDoc(doc(d, "formandos", "f7"), { instId: "i1", nome: "SEM PAGAR", pagas: 0, pagamentos: [], respEmail: PEDRO }));
+  await assertFails(deleteDoc(doc(db, "instituicoes", "i3")));   // da Ana
+  await assertFails(deleteDoc(doc(db, "instituicoes", "i2")));   // sem responsável
+  await assertSucceeds(deleteDoc(doc(db, "formandos", "f7")));
+  await assertSucceeds(deleteDoc(doc(db, "instituicoes", "i1")));
+  await assertSucceeds(deleteDoc(doc(como(ADRIANO), "instituicoes", "i3")));
 });
 test("carteira: vendedor vê os colégios livres e os seus, e só os próprios formandos", async () => {
   const db = como(PEDRO);
