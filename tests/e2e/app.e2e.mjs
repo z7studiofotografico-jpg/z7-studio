@@ -110,6 +110,7 @@ console.log("Adriano (admin), com dados antigos:");
   ok(await pg.getByRole("button", { name: "+ Agendar colégio" }).count() === 1, "admin também tem o botão Agendar colégio");
   await pg.getByRole("button", { name: "+ Marcar ensaio" }).click(); await pg.waitForTimeout(200);
   let sh = pg.locator(".sheet").last();
+  ok(await sh.getByLabel("Valor do sinal").inputValue() === "", "sinal do ensaio começa vazio (sem preço fixo)");
   await sh.getByLabel("Cliente").fill("Rita Lima"); await sh.getByLabel("Tipo de ensaio").selectOption("Retrato");
   await sh.getByLabel("Dia").fill(dia(5)); await sh.getByLabel("Dia").dispatchEvent("change"); await sh.getByLabel("Horário").fill("10:00");
   await sh.getByLabel("Valor do ensaio").fill("280,50"); await sh.locator("button[type=submit]").click(); await pg.waitForTimeout(300);

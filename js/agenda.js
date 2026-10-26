@@ -481,8 +481,8 @@ export function openEnsaio(x, pre){
     data.addEventListener("change", () => { p._okc = false; mostraDia(); }); hora.addEventListener("change", () => { err.hidden = true; p._ok = false; p._okc = false; }); dur.addEventListener("change", () => { p._ok = false; });
     if (x || pre.data) mostraDia();
     const sinL = el("label", "chk"); const sinC = el("input"); sinC.type = "checkbox"; sinC.checked = x ? !!x.sinalPago : !!pre.sinalPago; sinL.append(sinC, document.createTextNode(" 💰 Sinal pago"));
-    const sinV = el("input"); sinV.inputMode = "decimal"; sinV.maxLength = 10; sinV.className = "preco"; sinV.placeholder = "R$"; sinV.setAttribute("aria-label", "Valor do sinal"); sinV.value = x ? x.sinalValor || "" : C.P.sinal || "";
-    const tot = el("input"); tot.inputMode = "decimal"; tot.maxLength = 10; tot.className = "preco"; tot.placeholder = "R$"; tot.setAttribute("aria-label", "Valor do ensaio"); tot.value = x ? x.valor || "" : pre.valor || "";
+    const sinV = el("input"); sinV.inputMode = "decimal"; sinV.maxLength = 12; sinV.className = "preco"; sinV.placeholder = "R$"; sinV.setAttribute("aria-label", "Valor do sinal"); sinV.value = x ? x.sinalValor || "" : "";
+    const tot = el("input"); tot.inputMode = "decimal"; tot.maxLength = 12; tot.className = "preco"; tot.placeholder = "R$"; tot.setAttribute("aria-label", "Valor do ensaio"); tot.value = x ? x.valor || "" : pre.valor || "";
     const rs = el("div", "prow"); rs.append(sinL, sinV); const rt = el("div", "prow"); rt.append(el("span", null, "Valor do ensaio"), tot);
     const fs0 = el("div", "field"); fs0.append(el("label", null, "Pagamento"), rs, rt); p.append(fs0);
     const obs = el("textarea"); obs.rows = 2; obs.maxLength = 1000; obs.placeholder = "ex.: vem com a mãe e o cachorro"; obs.value = x ? x.obs || "" : pre.obs || "";
