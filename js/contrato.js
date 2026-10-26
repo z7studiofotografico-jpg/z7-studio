@@ -8,6 +8,7 @@ import { feriado } from "./feriados.js";
 // O Kit 01 é a adesão (beca + canudo): entra na comissão da colação.
 export const KITS_PADRAO = [
   { id: "k01", nome: "Kit 01 · Beca + canudo (adesão)", ant: { valor: 65, parcelas: 1 }, pos: { valor: 0, parcelas: 0 } },
+  { id: "k01s", nome: "Kit 01 · Só beca, sem canudo (adesão)", ant: { valor: 0, parcelas: 1 }, pos: { valor: 0, parcelas: 0 } },
   { id: "k02", nome: "Kit 02 · Ensaio + fotos digitais + canudo", ant: { valor: 369, parcelas: 9 }, pos: { valor: 0, parcelas: 0 } },
   {
     id: "k03",
@@ -23,12 +24,41 @@ export const MINIMO_FORMANDOS = 30;
 export const DIAS_UTEIS_ENTREGA = 120;
 export const DEVOLVE_DESISTENCIA = 70; // %
 
-// Tabela em uso: a de Ajustes (config/app.kitsFormatura) ou a padrão
-export function kitsDe(P) {
-  const k = P && Array.isArray(P.kitsFormatura) && P.kitsFormatura.length ? P.kitsFormatura : KITS_PADRAO;
-  return k.map(x => ({ ...x, ant: { ...(x.ant || {}) }, pos: { ...(x.pos || {}) } }));
+// Tabela em uso: a da turma (cada colégio pode ter valores e vezes próprios), senão a padrão de Kits e preços,
+// senão a do contrato. Kits que faltam numa tabela antiga entram com os valores do contrato.
+export function kitsPadrao(P) {
+  const salvos = P && Array.isArray(P.kitsFormatura) ? P.kitsFormatura : [];
+  return KITS_PADRAO.map(k => salvos.find(x => x.id === k.id) || k)
+    .concat(salvos.filter(x => !KITS_PADRAO.some(k => k.id === x.id)))
+    .map(x => ({ ...x, ant: { ...(x.ant || {}) }, pos: { ...(x.pos || {}) } }));
 }
-export const ehAdesao = kitId => kitId === "k01";
+export function kitsDe(P, inst) {
+  const base = kitsPadrao(P);
+  const daTurma = inst && Array.isArray(inst.kits) ? inst.kits : null;
+  if (!daTurma) return base;
+  return base.map(k => {
+    const t = daTurma.find(x => x.id === k.id);
+    return t ? { ...k, ant: { ...k.ant, ...(t.ant || {}) }, pos: { ...k.pos, ...(t.pos || {}) } } : k;
+  });
+}
+// O que a turma tem diferente da tabela padrão (para o aviso na turma)
+export function diferencasDaTurma(P, inst) {
+  const base = kitsPadrao(P),
+    t = kitsDe(P, inst),
+    out = [];
+  t.forEach(k => {
+    const b = base.find(x => x.id === k.id) || k;
+    ["ant", "pos"].forEach(q => {
+      if (centavos(k[q].valor) !== centavos(b[q].valor) || (Number(k[q].parcelas) || 0) !== (Number(b[q].parcelas) || 0))
+        out.push(k.id + "|" + q);
+    });
+  });
+  return out;
+}
+// Kit 01 (com ou sem canudo) é a adesão: todo formando entra pelo menos com ele
+export const ehAdesao = kitId => kitId === "k01" || kitId === "k01s";
+// Antecipado vale até o dia da formatura; depois dela, o preço é o de depois das fotos
+export const vendaSugerida = (inst, hoje) => (inst && inst.formatura && inst.formatura.data && hoje > inst.formatura.data ? "pos" : "ant");
 
 // Próximo dia 05 a partir de hoje (o de hoje vale se ainda não passou)
 export function proximoVenc(hoje, dia = DIA_VENC) {
@@ -85,4 +115,22 @@ export function devolucao(tipo, pagoReais, servicosReais) {
   if (tipo === "desistiu") return reais(Math.round((pago * DEVOLVE_DESISTENCIA) / 100));
   if (tipo === "reprovou") return reais(Math.max(0, pago - centavos(servicosReais)));
   return 0;
+}
+
+// Quem pode receber a oferta depois das fotos: alunos que têm só o Kit 01 (adesão) na turma,
+// sem outra compra ativa. Registros antigos "semkit" (ainda não comprou) também entram.
+export function candidatosPosFoto(listaDaTurma) {
+  const chave = f =>
+    String(f.nome || "")
+      .normalize("NFD")
+      .replace(/[̀-ͯ]/g, "")
+      .toLowerCase()
+      .trim();
+  const ativos = listaDaTurma.filter(f => !["desistiu", "reprovou"].includes(f.status));
+  const comKit = new Set(
+    ativos.filter(f => f.status !== "semkit" && !ehAdesao(f.kitId || (f.contrato === "colacao" ? "k01" : ""))).map(chave)
+  );
+  return ativos.filter(
+    f => (f.status === "semkit" || ehAdesao(f.kitId || (f.contrato === "colacao" ? "k01" : ""))) && !comKit.has(chave(f))
+  );
 }

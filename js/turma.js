@@ -18,19 +18,22 @@ import {
   somar,
   proxVenc,
   ehColacao,
-  somaDias as somaDiasRegra,
   ativo,
   SITUACOES,
   FORMAS
 } from "./regras.js";
 import {
   kitsDe,
+  kitsPadrao,
   plano,
   ehAdesao,
   previsaoEntrega,
   quitadoEm,
   devolucao,
   proximoVenc,
+  vendaSugerida,
+  diferencasDaTurma,
+  candidatosPosFoto,
   MINIMO_FORMANDOS,
   DEVOLVE_DESISTENCIA
 } from "./contrato.js";
@@ -102,20 +105,17 @@ export function cobrarWa(f) {
     : `Oi, ${nome}! Aqui é do ${ESTUDIO.nome} 📸 Só lembrando que a parcela ${prox}/${nParcelas(f)} ${item}, de ${valor}, vence ${venc ? "dia " + U.fmtDate(venc) : "em breve"}.${pagar}\nQualquer dúvida, estou por aqui 😊`;
   wa(f.tel, msg, U.toast);
 }
-// Mensagem para quem ainda não comprou: preços depois das fotos e o prazo
+// Mensagem para quem tem só o Kit 01: as fotos ficaram prontas, kits no preço depois das fotos (tabela da turma)
 export function oferecerKit(ctx, inst, f) {
   setCtx(ctx);
-  const ks = kitsDe(C.P).filter(k => k.pos && Number(k.pos.valor));
+  const ks = kitsDe(C.P, inst).filter(k => !ehAdesao(k.id) && k.pos && Number(k.pos.valor));
   if (!ks.length) return U.toast("Defina os preços depois das fotos em “📋 Kits e preços” (card Formaturas)");
-  const ct = inst.contratoTurma || {},
-    fotos = inst.diaFotos && inst.diaFotos.data,
-    ate = fotos ? somaDiasRegra(fotos > hoje() ? fotos : hoje(), Number(ct.posFotoDias) || 30) : "";
   const lin = ks.map(k => {
     const n = Math.max(1, Number(k.pos.parcelas) || 1);
     return `• ${k.nome}: ${n > 1 ? `${n}x de ${brl(dividir(k.pos.valor, n)[n - 1])} (${brl(k.pos.valor)})` : brl(k.pos.valor)}`;
   });
   const nome = U.first(title(f.nome));
-  const msg = `Oi, ${nome}! Aqui é do ${ESTUDIO.nome} 📸 As fotos da formatura do ${title(inst.nome)} ficaram lindas! Quer garantir as suas?\n\n${lin.join("\n")}\n\n${ate ? `Condição válida até ${U.fmtDate(ate)}. ` : ""}Posso te mandar uma prévia? 😊`;
+  const msg = `Oi, ${nome}! Aqui é do ${ESTUDIO.nome} 📸 As fotos da formatura do ${title(inst.nome)} ficaram prontas e estão lindas! Quer garantir as suas?\n\n${lin.join("\n")}\n\nPosso te mandar uma prévia? 😊`;
   wa(f.tel, msg, U.toast);
 }
 export function openTurma(ctx, inst, kits, aoFechar) {
@@ -138,7 +138,11 @@ export function openTurma(ctx, inst, kits, aoFechar) {
       const bar = el("div", "actions");
       bar.append(U.mkBtn("+ Formando", "btn-primary", () => form()));
       if (C.isAdmin) bar.append(U.mkBtn("Importar planilha", "", () => importar()));
-      if (C.isAdmin) bar.append(U.mkBtn("📅 Contrato da turma", "", () => contratoTurma()));
+      if (C.isAdmin)
+        bar.append(
+          U.mkBtn("📅 Contrato da turma", "", () => contratoTurma()),
+          U.mkBtn("📋 Kits desta turma", "", () => kitsTurma())
+        );
       p.append(bar);
       if (!C.isAdmin)
         p.append(el("p", "hint", "Você cadastra os formandos. Pagamentos e valores são lançados pelo Adriano ou pela Luciana."));
@@ -180,7 +184,7 @@ export function openTurma(ctx, inst, kits, aoFechar) {
 
       function desenhar() {
         const ativos = lista.filter(ativo),
-          semKit = lista.filter(f => f.status === "semkit"),
+          semKit = candidatosPosFoto(lista),
           sairam = lista.filter(f => f.status === "desistiu" || f.status === "reprovou"),
           atr = ativos.filter(atrasado);
         const nomesUnicos = new Set(lista.filter(f => !sairam.includes(f)).map(f => norm(f.nome))).size;
@@ -222,6 +226,29 @@ export function openTurma(ctx, inst, kits, aoFechar) {
             )
           );
         const ct = inst.contratoTurma || {};
+        // valores e vezes desta turma (aviso), marcando o que é diferente da tabela padrão
+        const dif = diferencasDaTurma(C.P, inst),
+          kt = kitsDe(C.P, inst).filter(k => Number(k.ant.valor));
+        const av = el("div", dif.length ? "wait" : "notes");
+        av.append(
+          el("b", null, dif.length ? "⚠️ Valores desta turma (diferentes da tabela padrão):" : "Valores desta turma (tabela padrão):")
+        );
+        kt.forEach(k => {
+          const n = Math.max(1, Number(k.ant.parcelas) || 1),
+            np = Math.max(1, Number(k.pos.parcelas) || 1);
+          const txt = `${k.nome.split(" · ")[0]}: ${n}x de ${brl(dividir(k.ant.valor, n)[n - 1])} (${brl(k.ant.valor)})${Number(k.pos.valor) ? ` · depois das fotos ${np}x de ${brl(dividir(k.pos.valor, np)[np - 1])}` : ""}`;
+          const mudou = dif.some(d => d.startsWith(k.id + "|"));
+          av.append(el("div", null, (mudou ? "✏️ " : "• ") + txt));
+        });
+        qtdBox.append(av);
+        if (ct.fotosProntasEm)
+          qtdBox.append(
+            el(
+              "p",
+              "hint",
+              `📸 Fotos prontas desde ${U.fmtDate(ct.fotosProntasEm)}: pode oferecer os kits para quem tem só o Kit 01 (${semKit.length}).`
+            )
+          );
         qtdBox.append(
           el(
             "p",
@@ -237,9 +264,9 @@ export function openTurma(ctx, inst, kits, aoFechar) {
           rec = somar(ativos.map(recebido));
         resumo.innerHTML = "";
         [
-          ["Compraram", `${ativos.length} de ${nomesUnicos}`],
+          ["Formandos", String(nomesUnicos)],
           ["Antecipado · depois das fotos", `${ant} · ${pos}`],
-          ["Ainda não compraram", String(semKit.length)],
+          ["Só Kit 01 (oferecer depois)", String(semKit.length)],
           ["Vendido", brl(vendido)],
           ["Recebido", brl(rec)],
           ["Em aberto", brl(somar(ativos.map(emAberto)))],
@@ -255,7 +282,7 @@ export function openTurma(ctx, inst, kits, aoFechar) {
           ["atrasados", "Atrasados", atr.length],
           ["aberto", "Em dia", ativos.filter(f => !quitado(f) && !atrasado(f)).length],
           ["quitados", "Quitados", ativos.filter(quitado).length],
-          ["semkit", "📸 Ainda não compraram", semKit.length],
+          ["semkit", "📸 Só Kit 01", semKit.length],
           ["adesao", "🎓 Adesão (Kit 01)", ativos.filter(ehColacao).length],
           ["kits", "📘 Kits 02 a 05", ativos.filter(f => !ehColacao(f)).length],
           ["sairam", "Desistiram / reprovaram", sairam.length]
@@ -276,7 +303,7 @@ export function openTurma(ctx, inst, kits, aoFechar) {
             atrasados: ativo(f) && atrasado(f),
             quitados: ativo(f) && quitado(f),
             aberto: ativo(f) && !quitado(f) && !atrasado(f),
-            semkit: f.status === "semkit",
+            semkit: semKit.includes(f),
             adesao: ativo(f) && ehColacao(f),
             kits: ativo(f) && !ehColacao(f),
             sairam: sairam.includes(f)
@@ -308,6 +335,8 @@ export function openTurma(ctx, inst, kits, aoFechar) {
         emPartes(lst, arr, card);
       }
       function card(f) {
+        const cand = candidatosPosFoto(lista).includes(f),
+          prontas = !!(inst.contratoTurma || {}).fotosProntasEm;
         const comprou = ativo(f),
           sem = f.status === "semkit",
           saiu = !comprou && !sem;
@@ -384,8 +413,10 @@ export function openTurma(ctx, inst, kits, aoFechar) {
                 .catch(er => C.handleErr(er))
             )
           );
-        if (sem && f.tel) act.append(U.mkBtn("💬 Oferecer kit", "btn-primary", () => oferecerKit(C, inst, f)));
-        if (sem) act.append(U.mkBtn("🛒 Comprou", "btn-ok", () => form(f, { venda: "pos" })));
+        // venda depois das fotos: quem tem só o Kit 01, quando as fotos ficaram prontas
+        if (cand && prontas && f.tel) act.append(U.mkBtn("💬 Oferecer kit", "btn-primary", () => oferecerKit(C, inst, f)));
+        if (cand && prontas)
+          act.append(U.mkBtn("🛒 Comprou kit", "btn-ok", () => (sem ? form(f, { venda: "pos" }) : form(null, { venda: "pos", base: f }))));
         act.append(U.mkBtn("Editar", "", () => form(f)));
         e.append(act);
         return e;
@@ -393,29 +424,30 @@ export function openTurma(ctx, inst, kits, aoFechar) {
 
       function form(f, preset) {
         const adm = C.isAdmin,
-          kits = kitsDe(C.P);
+          base = preset && preset.base,
+          kitsTodos = kitsDe(C.P, inst);
         preset = preset || {};
+        // na venda depois das fotos (compra a mais de quem já tem o Kit 01) só aparecem os kits 02 a 05
+        const kits = preset.venda ? kitsTodos.filter(k => !ehAdesao(k.id)) : kitsTodos;
         sheet(f ? (preset.venda ? "Venda depois das fotos" : "Editar formando") : "Novo formando", (fp, fechar) => {
-          const nome = inp(f ? title(f.nome) : "", "nome do formando");
+          const nome = inp(f ? title(f.nome) : base ? title(base.nome) : "", "nome do formando");
           nome.required = true;
           nome.disabled = !!f && !adm;
-          const tel = inp(f ? f.tel : "", "WhatsApp do responsável", 30);
+          const tel = inp(f ? f.tel : base ? base.tel : "", "WhatsApp do responsável", 30);
           tel.inputMode = "tel";
           const r1 = el("div", "row2");
           r1.append(field("Nome", nome), field("WhatsApp", tel));
           fp.append(r1);
-          // Kit do contrato (ou "ainda não comprou": fica na lista para vender depois das fotos)
-          const kitAtual = f ? f.kitId || (f.status === "semkit" ? "sem" : ehColacao(f) ? "k01" : f.kit ? "outro" : "sem") : "sem";
-          const kit = sel(
-            [["sem", "Ainda não comprou"], ...kits.map(k => [k.id, k.nome]), ["outro", "Outro kit (digitar)"]],
-            preset.kitId || kitAtual
-          );
+          // Kit do contrato: todo formando entra pelo menos com o Kit 01 (adesão)
+          const kitAtual =
+            f && f.status !== "semkit" ? f.kitId || (ehColacao(f) ? "k01" : f.kit ? "outro" : "k01") : preset.venda ? "k04" : "k01";
+          const kit = sel([...kits.map(k => [k.id, k.nome]), ["outro", "Outro kit (digitar)"]], preset.kitId || kitAtual);
           const venda = sel(
             [
               ["ant", "Antecipada (preço do contrato)"],
               ["pos", "Depois das fotos (preço maior)"]
             ],
-            preset.venda || (f && f.venda) || "ant"
+            preset.venda || (f && f.venda) || vendaSugerida(inst, hoje())
           );
           const r0 = el("div", "row2");
           r0.append(field("Kit", kit), field("Venda", venda));
@@ -423,7 +455,15 @@ export function openTurma(ctx, inst, kits, aoFechar) {
           const kitTxt = inp(f && kitAtual === "outro" ? f.kit : "", "nome do kit", 80);
           const fKitTxt = field("Qual kit", kitTxt);
           fp.append(fKitTxt);
-          const serie = sel(["Pré", "5º ano", "9º ano", "Ensino médio", "Outra"], f ? f.serie : "", "série");
+          const serie = sel(["Pré", "5º ano", "9º ano", "Ensino médio", "Outra"], f ? f.serie : base ? base.serie : "", "série");
+          // depois da formatura, o antecipado não vale mais
+          const avisoVenda = el("p", "wait");
+          fp.append(avisoVenda);
+          const confereVenda = () => {
+            const passou = vendaSugerida(inst, hoje()) === "pos";
+            avisoVenda.hidden = !(passou && venda.value === "ant");
+            avisoVenda.textContent = `A formatura foi em ${U.fmtDate(inst.formatura && inst.formatura.data)}: depois dela vale o preço depois das fotos (o antecipado era até o dia da formatura).`;
+          };
           fp.append(field("Série", serie));
           const valor = inpReais(f ? f.valor : "");
           const parc = inp(f ? f.parcelas || "" : "1", "1", 3);
@@ -475,8 +515,9 @@ export function openTurma(ctx, inst, kits, aoFechar) {
           };
           // Preenche valor, parcelas e 1º vencimento pela tabela do contrato (antecipado: termina junto com a turma)
           const aplicarPlano = () => {
-            const sem = kit.value === "sem",
+            const sem = false,
               outro = kit.value === "outro";
+            confereVenda();
             fKitTxt.hidden = !outro;
             [r3, r4].forEach(x => (x.hidden = sem));
             venda.disabled = sem || (!!f && !adm && !preset.venda);
@@ -507,7 +548,7 @@ export function openTurma(ctx, inst, kits, aoFechar) {
           if (!f || preset.venda) aplicarPlano();
           else {
             fKitTxt.hidden = kit.value !== "outro";
-            [r3, r4].forEach(x => (x.hidden = kit.value === "sem"));
+            confereVenda();
             atualizaInfo();
           }
           // Depois de cadastrado, só o admin muda dinheiro e contrato (na venda depois das fotos, a equipe escolhe o kit)
@@ -553,6 +594,15 @@ export function openTurma(ctx, inst, kits, aoFechar) {
           err.hidden = true;
           fp.append(err);
           const a = botoes(fechar, preset.venda ? "Registrar venda" : "Salvar");
+          if (preset.venda)
+            fp.insertBefore(
+              el(
+                "p",
+                "hint",
+                "Compra a mais, depois das fotos: o Kit 01 que o aluno já tem continua como está. O valor vem da tabela da turma e pode ser mudado se combinaram outro."
+              ),
+              fp.firstChild.nextSibling
+            );
           if (f && adm) {
             const del = el("button", "btn btn-danger", "Excluir");
             del.type = "button";
@@ -585,7 +635,7 @@ export function openTurma(ctx, inst, kits, aoFechar) {
                 U.toast("Salvo");
                 return;
               }
-              const sem = kit.value === "sem",
+              const sem = false,
                 k = kits.find(x => x.id === kit.value);
               const P = sem ? 1 : Math.max(1, n0(parc.value)),
                 v = sem ? 0 : lerReais(valor.value);
@@ -612,7 +662,7 @@ export function openTurma(ctx, inst, kits, aoFechar) {
                 parcelas: P,
                 primeiroVenc: sem ? "" : venc.value,
                 formaPag: sem ? "" : fpg.value,
-                status: sem && !saiu ? "semkit" : st.value,
+                status: st.value,
                 obs: obs.value.trim(),
                 atualizadoEm: agora
               };
@@ -625,7 +675,8 @@ export function openTurma(ctx, inst, kits, aoFechar) {
                   em: hoje()
                 };
               }
-              if (f && f.status === "semkit" && !sem) body.vendidoEm = hoje();
+              if (f && f.status === "semkit") body.vendidoEm = hoje();
+              if (base) body.compraDe = base.id; // compra a mais de quem já tinha o Kit 01
               if (f) {
                 // os pagamentos não mudam aqui; recalcula só o próximo vencimento
                 const pags = pagamentosDe(f);
@@ -679,20 +730,111 @@ export function openTurma(ctx, inst, kits, aoFechar) {
           const ini = el("input");
           ini.type = "date";
           ini.value = ct.inicio || proximoVenc(hoje());
-          const dias = inp(ct.posFotoDias || 30, "30", 3);
-          dias.inputMode = "numeric";
+          const prontas = el("input");
+          prontas.type = "date";
+          prontas.value = ct.fotosProntasEm || "";
           const r = el("div", "row2");
-          r.append(field("1º vencimento da turma", ini), field("Dias para comprar depois das fotos", dias));
-          fp.append(r);
+          r.append(field("1º vencimento da turma", ini), field("📸 Fotos prontas em (libera a oferta)", prontas));
+          const hoje0 = U.mkBtn("📸 As fotos ficaram prontas hoje", "btn-verde", () => {
+            prontas.value = hoje();
+          });
+          fp.append(r, hoje0);
+          fp.append(
+            el(
+              "p",
+              "hint",
+              "O antecipado vale até o dia da formatura. Quando as fotos ficarem prontas, o card Formaturas avisa para quem oferecer os kits."
+            )
+          );
           fp.append(botoes(fechar, "Salvar"));
           fp.addEventListener("submit", async ev => {
             ev.preventDefault();
-            const novo = { inicio: ini.value, posFotoDias: Math.max(1, n0(dias.value)) };
+            const novo = { inicio: ini.value, fotosProntasEm: prontas.value || "" };
             try {
               await FS.updateDoc(FS.doc(db, "instituicoes", inst.id), { contratoTurma: novo, atualizadoEm: new Date().toISOString() });
               inst.contratoTurma = novo;
               fechar();
               U.toast("Contrato da turma salvo");
+              desenhar();
+            } catch (e) {
+              C.handleErr(e);
+            }
+          });
+        });
+      }
+      // Tabela só desta turma (o Adriano ou a Luciana mudam valores e vezes); vazio = igual à tabela padrão
+      function kitsTurma() {
+        const padrao = kitsPadrao(C.P),
+          atual = kitsDe(C.P, inst);
+        sheet("Kits desta turma · " + title(inst.nome), (fp, fechar) => {
+          fp.append(el("p", "hint", "Valores e vezes só deste colégio. O que ficar igual à tabela padrão segue a tabela padrão."));
+          const linhas = atual.map(k => {
+            const b = padrao.find(x => x.id === k.id) || k;
+            const f0 = el("div", "field");
+            f0.append(el("label", null, k.nome));
+            const av = inpReais(k.ant.valor || ""),
+              an = inp(k.ant.parcelas || "", "1", 3),
+              pv = inpReais(k.pos.valor || ""),
+              pn = inp(k.pos.parcelas || "", "1", 3);
+            [an, pn].forEach(i => (i.inputMode = "numeric"));
+            av.setAttribute("aria-label", k.nome + " · valor antecipado (turma)");
+            an.setAttribute("aria-label", k.nome + " · parcelas antecipado (turma)");
+            pv.setAttribute("aria-label", k.nome + " · valor depois das fotos (turma)");
+            pn.setAttribute("aria-label", k.nome + " · parcelas depois das fotos (turma)");
+            const r = el("div", "row2"),
+              x1 = el("div", "field"),
+              x2 = el("div", "field");
+            x1.append(el("small", null, `Antecipado (padrão: ${b.ant.parcelas || 1}x · ${brl(b.ant.valor || 0)})`), av, an);
+            x2.append(
+              el(
+                "small",
+                null,
+                `Depois das fotos (padrão: ${Number(b.pos.valor) ? `${b.pos.parcelas || 1}x · ${brl(b.pos.valor)}` : "—"})`
+              ),
+              pv,
+              pn
+            );
+            r.append(x1, x2);
+            f0.append(r);
+            fp.append(f0);
+            return { k, b, av, an, pv, pn };
+          });
+          const a = botoes(fechar, "Salvar tabela da turma");
+          const volta = el("button", "btn", "Voltar à tabela padrão");
+          volta.type = "button";
+          volta.onclick = async () => {
+            try {
+              await FS.updateDoc(FS.doc(db, "instituicoes", inst.id), { kits: FS.deleteField(), atualizadoEm: new Date().toISOString() });
+              delete inst.kits;
+              fechar();
+              U.toast("Turma voltou para a tabela padrão");
+              desenhar();
+            } catch (e) {
+              C.handleErr(e);
+            }
+          };
+          a.prepend(volta);
+          fp.append(a);
+          fp.addEventListener("submit", async ev => {
+            ev.preventDefault();
+            const kits = linhas
+              .map(({ k, b, av, an, pv, pn }) => {
+                const ant = { valor: lerReais(av.value), parcelas: Math.max(1, parseInt(an.value, 10) || 1) },
+                  pos = { valor: lerReais(pv.value), parcelas: lerReais(pv.value) ? Math.max(1, parseInt(pn.value, 10) || 1) : 0 };
+                const igual = (x, y) =>
+                  Math.round((Number(x.valor) || 0) * 100) === Math.round((Number(y.valor) || 0) * 100) &&
+                  (Number(x.parcelas) || 0) === (Number(y.parcelas) || 0);
+                const o = { id: k.id };
+                if (!igual(ant, b.ant)) o.ant = ant;
+                if (!igual(pos, b.pos)) o.pos = pos;
+                return o;
+              })
+              .filter(o => o.ant || o.pos);
+            try {
+              await FS.updateDoc(FS.doc(db, "instituicoes", inst.id), { kits, atualizadoEm: new Date().toISOString() });
+              inst.kits = kits;
+              fechar();
+              U.toast(kits.length ? "Tabela da turma salva" : "Igual à tabela padrão");
               desenhar();
             } catch (e) {
               C.handleErr(e);
@@ -706,7 +848,7 @@ export function openTurma(ctx, inst, kits, aoFechar) {
             el(
               "p",
               "hint",
-              "Planilha do Excel com as colunas (os nomes podem variar): NOME, TELEFONE, SÉRIE, KIT (01 a 05), VALOR, PARCELAS, PAGAS, VENCIMENTO e PAGAMENTO. Só o nome é obrigatório; quem vier sem kit entra como “ainda não comprou” (venda depois das fotos)."
+              "Planilha do Excel com as colunas (os nomes podem variar): NOME, TELEFONE, SÉRIE, KIT (01 a 05), VALOR, PARCELAS, PAGAS, VENCIMENTO e PAGAMENTO. Só o nome é obrigatório; quem vier sem kit entra com o Kit 01 (adesão)."
             )
           );
           const file = el("input");
@@ -738,7 +880,7 @@ export function openTurma(ctx, inst, kits, aoFechar) {
                         .replace(/^(\d{2})\/(\d{2})\/(\d{4})$/, "$3-$2-$1")
                     : "";
               const ja = new Set(lista.map(f => norm(f.nome)));
-              const kits = kitsDe(C.P);
+              const kits = kitsDe(C.P, inst);
               linhas = rows
                 .map(r => {
                   // kit pelo número (01 a 05); sem kit = ainda não comprou (entra na venda depois das fotos)
@@ -748,18 +890,19 @@ export function openTurma(ctx, inst, kits, aoFechar) {
                     cola = /cola|adesao/.test(norm(pega(r, "contrato", "colacao", "tipo")));
                   const kk = k || (cola ? kits.find(x => x.id === "k01") : null);
                   const valor = lerReais(pega(r, "valor", "preco", "total")) || (kk ? Number(kk.ant.valor) || 0 : 0);
-                  const sem = !kk && !kTxt && !valor;
+                  const sem = false;
+                  const kk1 = kk || (!kTxt ? kits.find(x => x.id === "k01") : null);
                   return {
-                    contrato: sem ? "" : kk && kk.id === "k01" ? "colacao" : "album",
-                    kitId: sem ? "sem" : kk ? kk.id : "outro",
-                    kit: sem ? "" : kk ? kk.nome : kTxt,
+                    contrato: kk1 && ehAdesao(kk1.id) ? "colacao" : "album",
+                    kitId: kk1 ? kk1.id : "outro",
+                    kit: kk1 ? kk1.nome : kTxt,
                     venda: sem ? "" : "ant",
                     status: sem ? "semkit" : "ativo",
                     nome: String(pega(r, "nome", "formando", "aluno")).trim(),
                     tel: String(pega(r, "telefone", "celular", "whats", "tel")).trim(),
                     serie: String(pega(r, "serie", "turma", "ano")).trim(),
-                    valor,
-                    parcelas: sem ? 1 : Math.max(1, n0(pega(r, "parcela")) || (kk ? Number(kk.ant.parcelas) || 1 : 1)),
+                    valor: valor || (kk1 ? Number(kk1.ant.valor) || 0 : 0),
+                    parcelas: sem ? 1 : Math.max(1, n0(pega(r, "parcela")) || (kk1 ? Number(kk1.ant.parcelas) || 1 : 1)),
                     primeiroVenc: sem ? "" : isoDe(pega(r, "venc")) || (inst.contratoTurma || {}).inicio || proximoVenc(hoje()),
                     formaPag: sem ? "" : String(pega(r, "pagamento", "forma")).trim(),
                     pagasPlan: n0(pega(r, "paga"))

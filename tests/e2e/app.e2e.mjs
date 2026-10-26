@@ -319,9 +319,12 @@ console.log("Adriano (admin), com os dados já atualizados no servidor:");
   const ju = Object.values(s).find(x => x.nome === "Julia Costa");
   ok(ju && ju.valor === 400 && ju.respEmail === PEDRO && ju.proxVenc, "formando novo com responsável do colégio e próximo vencimento");
   // contrato: Kit 04 antecipado preenche valor e parcelas pela tabela
-  await pg.locator(".panel.wide").getByRole("button", { name: "+ Formando" }).click();
-  await pg.waitForTimeout(200);
-  let fk = pg.locator(".sheet").last();
+  const novoFormando = async () => {
+    await pg.locator(".panel.wide").getByRole("button", { name: "+ Formando" }).click();
+    await pg.waitForTimeout(200);
+    return pg.locator(".sheet").last();
+  };
+  let fk = await novoFormando();
   await fk.getByLabel("Nome").fill("Bia Antecipada");
   await fk.getByLabel("Kit", { exact: true }).selectOption("k04");
   await pg.waitForTimeout(150);
@@ -332,25 +335,53 @@ console.log("Adriano (admin), com os dados já atualizados no servidor:");
   );
   await fk.locator("button[type=submit]").click();
   await pg.waitForTimeout(300);
-  // quem ainda não comprou
-  await pg.locator(".panel.wide").getByRole("button", { name: "+ Formando" }).click();
-  await pg.waitForTimeout(200);
-  fk = pg.locator(".sheet").last();
-  await fk.getByLabel("Nome").fill("Caio Sem Kit");
+  // todo formando entra pelo menos com o Kit 01 (adesão)
+  fk = await novoFormando();
+  await fk.getByLabel("Nome").fill("Caio Kit Um");
   await fk.getByLabel("WhatsApp").fill("21966665555");
+  ok(
+    (await fk.getByLabel("Kit", { exact: true }).inputValue()) === "k01" && (await fk.getByLabel("Valor total").inputValue()) === "65,00",
+    "novo formando já vem com o Kit 01 (R$ 65,00)"
+  );
   await fk.locator("button[type=submit]").click();
   await pg.waitForTimeout(300);
   s = await store();
   const bia = Object.values(s).find(x => x.nome === "Bia Antecipada"),
-    caio = Object.values(s).find(x => x.nome === "Caio Sem Kit");
+    caio = Object.values(s).find(x => x.nome === "Caio Kit Um");
   ok(
     bia && bia.kitId === "k04" && bia.venda === "ant" && bia.valor === 850 && bia.contrato === "album",
     "venda antecipada gravada com o kit do contrato"
   );
-  ok(caio && caio.status === "semkit" && caio.valor === 0 && !caio.proxVenc, "quem ainda não comprou fica fora das cobranças");
+  ok(caio && caio.kitId === "k01" && caio.contrato === "colacao" && caio.valor === 65, "Kit 01 gravado como adesão");
+  // tabela só desta turma: Kit 04 por R$ 790,00 em 8x
+  await pg.locator(".panel.wide").getByRole("button", { name: "📋 Kits desta turma" }).click();
+  await pg.waitForTimeout(200);
+  fk = pg.locator(".sheet").last();
+  await fk.getByLabel(/Kit 04.* · valor antecipado \(turma\)$/).fill("790");
+  await fk.getByLabel(/Kit 04.* · parcelas antecipado \(turma\)$/).fill("8");
+  await fk.locator("button[type=submit]").click();
+  await pg.waitForTimeout(300);
+  ok(
+    /diferentes da tabela padrão/.test(await pg.textContent(".panel.wide")) && /✏️ Kit 04: 8x/.test(await pg.textContent(".panel.wide")),
+    "turma avisa os valores diferentes da tabela padrão"
+  );
+  fk = await novoFormando();
+  await fk.getByLabel("Nome").fill("Dani Turma");
+  await fk.getByLabel("Kit", { exact: true }).selectOption("k04");
+  await pg.waitForTimeout(150);
+  ok((await fk.getByLabel("Valor total").inputValue()) === "790,00", "formando novo usa a tabela da turma (R$ 790,00)");
+  await fk.getByRole("button", { name: "Cancelar" }).click();
+  await pg.waitForTimeout(200);
+  // fotos prontas libera a oferta
+  await pg.locator(".panel.wide").getByRole("button", { name: "📅 Contrato da turma" }).click();
+  await pg.waitForTimeout(200);
+  fk = pg.locator(".sheet").last();
+  await fk.getByRole("button", { name: "📸 As fotos ficaram prontas hoje" }).click();
+  await fk.locator("button[type=submit]").click();
+  await pg.waitForTimeout(300);
   await pg.locator(".panel.wide").getByRole("button", { name: "Fechar" }).click();
   await pg.waitForTimeout(300);
-  // tabela: preço depois das fotos do Kit 04
+  // tabela padrão: preço depois das fotos do Kit 04
   await pg.getByRole("button", { name: "📋 Kits e preços" }).click();
   await pg.waitForTimeout(200);
   fk = pg.locator(".sheet").last();
@@ -358,14 +389,20 @@ console.log("Adriano (admin), com os dados já atualizados no servidor:");
   await fk.getByLabel(/Kit 04.* · valor depois das fotos$/).fill("1.100,00");
   await fk.getByLabel(/Kit 04.* · parcelas depois das fotos$/).fill("6");
   await fk.locator("button[type=submit]").click();
-  await pg.waitForTimeout(300);
+  await pg.waitForTimeout(400);
   s = await store();
   const k4 = (s["config/app"].kitsFormatura || []).find(k => k.id === "k04");
   ok(k4 && k4.pos.valor === 1100 && k4.pos.parcelas === 6 && k4.ant.valor === 850, "tabela: Kit 04 depois das fotos R$ 1.100,00 em 6x");
-  // aba Depois das fotos → abrir turma → Comprou (preço depois das fotos)
+  ok(
+    /Pode oferecer os kits para 1 aluno do Colegio Alfa/i.test(await pg.textContent("#fmCorpo")),
+    "aviso: pode oferecer para 1 aluno do Colégio Alfa"
+  );
   await pg.locator("#fmChips").getByText("📸 Depois das fotos").click();
   await pg.waitForTimeout(400);
-  ok(/Caio Sem Kit/.test(await pg.textContent("#fmCorpo")), "Caio aparece em Depois das fotos");
+  ok(
+    /Caio Kit Um/.test(await pg.textContent("#fmCorpo")) && !/Bia Antecipada/.test(await pg.textContent("#fmCorpo")),
+    "só quem tem o Kit 01 aparece em Depois das fotos"
+  );
   await pg.locator("#fmCorpo .card").filter({ hasText: "Caio" }).getByText("💬 Oferecer kit").click();
   await pg.waitForTimeout(200);
   ok(
@@ -375,21 +412,24 @@ console.log("Adriano (admin), com os dados já atualizados no servidor:");
   await pg.locator("#fmCorpo .card").filter({ hasText: "Caio" }).getByText("Abrir turma").click();
   await pg.waitForTimeout(500);
   if (process.env.FOTOS) await pg.locator(".panel.wide").screenshot({ path: process.env.FOTOS + "/turma.png" });
-  await pg.locator(".panel.wide .card").filter({ hasText: "Caio" }).getByText("🛒 Comprou").click();
+  await pg.locator(".panel.wide .card").filter({ hasText: "Caio" }).getByText("🛒 Comprou kit").click();
   await pg.waitForTimeout(200);
   fk = pg.locator(".sheet").last();
-  await fk.getByLabel("Kit", { exact: true }).selectOption("k04");
-  await pg.waitForTimeout(150);
   ok(
     (await fk.getByLabel("Valor total").inputValue()) === "1.100,00" &&
       (await fk.getByLabel("Parcelas", { exact: true }).inputValue()) === "6",
-    "depois das fotos: R$ 1.100,00 em 6x"
+    "depois das fotos: Kit 04 R$ 1.100,00 em 6x"
   );
+  await fk.getByLabel("Valor total").fill("1.000,00"); // combinaram outro valor
   await fk.locator("button[type=submit]").click();
   await pg.waitForTimeout(300);
   s = await store();
-  const caio2 = s[Object.keys(s).find(k => s[k].nome === "Caio Sem Kit")];
-  ok(caio2.status === "ativo" && caio2.venda === "pos" && caio2.valor === 1100 && caio2.vendidoEm, "venda depois das fotos registrada");
+  const compras = Object.values(s).filter(x => x.nome === "Caio Kit Um");
+  const nova = compras.find(x => x.venda === "pos");
+  ok(
+    compras.length === 2 && nova && nova.kitId === "k04" && nova.valor === 1000 && nova.compraDe && compras.some(x => x.kitId === "k01"),
+    "compra a mais registrada (R$ 1.000,00 combinado) e o Kit 01 continua"
+  );
   await pg.locator(".panel.wide").getByRole("button", { name: "Fechar" }).click();
   await pg.waitForTimeout(200);
   // Dashboard

@@ -239,3 +239,10 @@ test("formatura: a equipe registra a venda depois das fotos de quem ainda não c
   await assertFails(updateDoc(doc(db, "formandos", "f1"), { entregueEm: "2026-10-26" }));
   await assertFails(updateDoc(doc(db, "formandos", "f1"), { devolucao: { valor: 10 } }));
 });
+test("valores da turma (kits e contrato) só o admin muda", async () => {
+  await assertFails(updateDoc(doc(como(PEDRO), "instituicoes", "i1"), { kits: [{ id: "k04", ant: { valor: 1, parcelas: 1 } }] }));
+  await assertFails(updateDoc(doc(como(PEDRO), "instituicoes", "i1"), { contratoTurma: { inicio: "2026-06-05" } }));
+  await assertSucceeds(
+    updateDoc(doc(como(ADRIANO), "instituicoes", "i1"), { kits: [], contratoTurma: { inicio: "2026-06-05", fotosProntasEm: "2026-12-01" } })
+  );
+});

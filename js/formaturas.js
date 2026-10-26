@@ -6,7 +6,7 @@
 //  - Turmas: colégios fechados, com acesso à lista de formandos
 // Quem não é administrador vê só as turmas dos colégios que fechou.
 import { setCtx, openTurma, cobrarWa, registrarPagamento, atrasado, oferecerKit } from "./turma.js";
-import { kitsDe } from "./contrato.js";
+import { kitsPadrao, candidatosPosFoto } from "./contrato.js";
 import {
   ativo,
   brl,
@@ -21,7 +21,6 @@ import {
   esperadas,
   ehColacao,
   fimDoMes,
-  somaDias,
   lerReais,
   dividir
 } from "./regras.js";
@@ -130,6 +129,8 @@ export function show() {
       C.carteira("instituicoes", FS.where("etapa", "==", "FECHADO"), FS.limit(500)),
       s => {
         insts = mapa(s).filter(i => i.etapa === "FECHADO");
+        // turma com fotos prontas: carrega os formandos para mostrar o aviso de quem pode receber a oferta
+        if (insts.some(i => (i.contratoTurma || {}).fotosProntasEm)) carregarTudo();
         render();
       },
       erro
@@ -224,6 +225,7 @@ function render() {
   else if (aba === "turmas") renderTurmas(corpo);
   else if (aba === "posfoto") renderPosFoto(corpo);
   else renderContrato(corpo, aba);
+  if (aba !== "posfoto") avisoOferta(corpo);
 }
 
 // Parcelas atrasadas e as que vencem até o fim do mês
@@ -398,24 +400,56 @@ function renderTurmas(corpo) {
 }
 
 // ---------- venda depois das fotos ----------
-// Quem ainda não comprou (situação "semkit"), das turmas que a pessoa vê
+// Quem tem só o Kit 01, nas turmas com as fotos prontas (o Adriano ou a Luciana marcam em "📅 Contrato da turma")
 function semKit() {
-  return forms.filter(f => f.status === "semkit" && (C.isAdmin || f.respEmail === C.email));
+  const out = [];
+  insts.forEach(i => {
+    if (!(i.contratoTurma || {}).fotosProntasEm) return;
+    const daTurma = forms.filter(f => f.instId === i.id && (C.isAdmin || f.respEmail === C.email));
+    candidatosPosFoto(daTurma).forEach(f => out.push(f));
+  });
+  return out;
+}
+// Aviso no topo: "Pode oferecer para N alunos do Colégio X"
+function avisoOferta(corpo) {
+  if (!tudoCarregado) return;
+  const porInst = {};
+  semKit().forEach(f => {
+    porInst[f.instId] = (porInst[f.instId] || 0) + 1;
+  });
+  Object.entries(porInst).forEach(([id, n]) => {
+    const i = insts.find(x => x.id === id) || {};
+    const b = el("div", "wait");
+    b.append(
+      document.createTextNode(`📸 Fotos prontas: pode oferecer os kits para ${n} aluno${n > 1 ? "s" : ""} do ${title(i.nome || "")}. `)
+    );
+    b.append(
+      U.mkBtn("Ver quem", "btn-sm", () => {
+        aba = "posfoto";
+        render();
+      })
+    );
+    corpo.prepend(b);
+  });
 }
 function renderPosFoto(corpo) {
   corpo.append(
     el(
       "p",
       "hint",
-      "Quem fotografou e ainda não comprou: mande a prévia e a condição com o preço depois das fotos. Quando comprar, toque em “Abrir turma” → 🛒 Comprou."
+      "Quem tem só o Kit 01, nas turmas com as fotos prontas: mande a prévia e os kits no preço depois das fotos. Quando comprar, toque em “Abrir turma” → 🛒 Comprou kit."
     )
   );
   const lst = semKit().sort((a, b) => (a.instNome || "").localeCompare(b.instNome || "") || (a.nome || "").localeCompare(b.nome || ""));
   if (!lst.length) {
     const e = el("div", "empty");
     e.append(
-      el("strong", null, "Ninguém esperando para comprar"),
-      el("span", null, "Na turma, cadastre quem fotografou e ainda não comprou como “Ainda não comprou”.")
+      el("strong", null, "Ninguém para oferecer agora"),
+      el(
+        "span",
+        null,
+        "Quando as fotos de uma turma ficarem prontas, marque em Turmas → Formandos → 📅 Contrato da turma → 📸 Fotos prontas."
+      )
     );
     corpo.append(e);
     return;
@@ -423,19 +457,13 @@ function renderPosFoto(corpo) {
   const g = el("div", "grid");
   lst.forEach(f => {
     const inst = insts.find(i => i.id === f.instId) || { id: f.instId, nome: f.instNome };
-    const ct = inst.contratoTurma || {},
-      fotos = inst.diaFotos && inst.diaFotos.data,
-      ate = fotos ? somaDias(fotos, Number(ct.posFotoDias) || 30) : "";
-    const venceu = ate && ate < U.todayStr();
-    const e = el("article", "card " + (venceu ? "late" : "today"));
+    const pr = (inst.contratoTurma || {}).fotosProntasEm;
+    const e = el("article", "card today");
     const top = el("div", "card-top");
-    top.append(
-      el("h3", "name", title(f.nome)),
-      el("span", "stage", ate ? (venceu ? "PRAZO PASSOU" : "ATÉ " + U.fmtDate(ate)) : "SEM DATA DE FOTOS")
-    );
+    top.append(el("h3", "name", title(f.nome)), el("span", "stage", pr ? "FOTOS PRONTAS " + U.fmtDate(pr) : "OFERECER"));
     e.append(top);
     const meta = el("div", "meta");
-    [title(f.instNome), f.serie, f.tel].filter(Boolean).forEach(t => meta.append(el("span", "tag", t)));
+    [title(f.instNome), f.kit || "Kit 01", f.serie, f.tel].filter(Boolean).forEach(t => meta.append(el("span", "tag", t)));
     e.append(meta);
     const act = el("div", "actions");
     if (f.tel) act.append(U.mkBtn("💬 Oferecer kit", "btn-primary", () => oferecerKit(C, inst, f)));
@@ -458,13 +486,13 @@ function renderPosFoto(corpo) {
 
 // ---------- tabela de kits (contrato) ----------
 function openKits() {
-  const kits = kitsDe(C.P);
-  sheet("Kits e preços", (p, close) => {
+  const kits = kitsPadrao(C.P);
+  sheet("Kits e preços (tabela padrão)", (p, close) => {
     p.append(
       el(
         "p",
         "hint",
-        "Antecipado = preço do contrato (parcelas todo dia 05). Depois das fotos = preço para quem quis ver o material antes; deixe em branco o kit que não é oferecido depois."
+        "Tabela padrão para todas as turmas (cada turma pode ter a sua em Formandos → 📋 Kits desta turma). Antecipado = preço do contrato, até o dia da formatura. Depois das fotos = valor a mais para quem tem só o Kit 01; deixe em branco o kit que não é oferecido depois."
       )
     );
     const linhas = kits.map(k => {

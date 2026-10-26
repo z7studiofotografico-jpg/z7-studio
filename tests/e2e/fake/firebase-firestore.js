@@ -34,6 +34,7 @@ export const query = (c, ...k) => ({ c, k });
 export const where = (f, op, v) => ({ w: 1, f, op, v }),
   orderBy = (f, d) => ({ o: 1, f, d }),
   limit = n => ({ l: n });
+export const deleteField = () => ({ __apagar: 1 });
 export const startAt = v => ({ sa: v }),
   endAt = v => ({ ea: v }),
   documentId = () => "__id__";
@@ -134,7 +135,8 @@ function aplica(o, p) {
         t = t[x];
       });
       t[ps[ps.length - 1]] = vv;
-    } else o[kk] = vv;
+    } else if (vv && vv.__apagar) delete o[kk];
+    else o[kk] = vv;
   }
   return o;
 }

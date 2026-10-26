@@ -5,6 +5,7 @@ import { initializeApp, cert } from "firebase-admin/app";
 import { getFirestore } from "firebase-admin/firestore";
 import { getMessaging } from "firebase-admin/messaging";
 import { somaDias } from "../js/regras.js";
+import { candidatosPosFoto } from "../js/contrato.js";
 import { DONOS, APROVADORES } from "./config.mjs";
 
 const OPEN = ["NOVO LEAD", "QUALIFICADO", "PROPOSTA ENVIADA", "FOLLOW-UP"];
@@ -71,6 +72,14 @@ const paraAvisar = {};
   .forEach(a => {
     paraAvisar[a.pedidoEmail] = (paraAvisar[a.pedidoEmail] || 0) + 1;
   });
+// Fotos prontas (últimos 60 dias): quem tem só o Kit 01 pode receber a oferta dos kits
+const ofertas = []; // { inst, n, respEmail }
+for (const d of (await db.collection("instituicoes").where("contratoTurma.fotosProntasEm", ">=", somaDias(hoje, -60)).get()).docs) {
+  const i = d.data();
+  const fs = (await db.collection("formandos").where("instId", "==", d.id).get()).docs.map(x => x.data());
+  const n = candidatosPosFoto(fs).length;
+  if (n) ofertas.push({ inst: i.nome || "", n, respEmail: String(i.respEmail || "").toLowerCase() });
+}
 const tokensSnap = await db.collection("tokens").get();
 console.log(`Hoje ${hoje}: ${vencidos.length} lead(s) com contato vencido, ${tokensSnap.size} aparelho(s).`);
 
@@ -103,8 +112,11 @@ for (const t of tokensSnap.docs) {
       parc = souAdmin ? parcAtrasadas : 0;
     const bec = souAdmin || (mods && mods.includes("becas")) ? becasAtr + becasRet : 0;
     const avisar = paraAvisar[String(t.get("email") || "").toLowerCase()] || 0;
-    if (!meus.length && !meusRep.length && !meusInst.length && !aprova && !lembrar && !ent && !aval && !parc && !bec && !avisar) continue;
-    const total = meus.length + meusRep.length + meusInst.length + aprova + lembrar + ent + aval + parc + bec + avisar;
+    const minhasOfertas = ofertas.filter(o => souAdmin || o.respEmail === String(t.get("email") || "").toLowerCase());
+    const ofe = minhasOfertas.reduce((a, o) => a + o.n, 0);
+    if (!meus.length && !meusRep.length && !meusInst.length && !aprova && !lembrar && !ent && !aval && !parc && !bec && !avisar && !ofe)
+      continue;
+    const total = meus.length + meusRep.length + meusInst.length + aprova + lembrar + ent + aval + parc + bec + avisar + ofe;
     const atrasados =
       meus.filter(l => l.followup < hoje).length +
       meusRep.filter(r => r.followup < hoje).length +
@@ -122,6 +134,13 @@ for (const t of tokensSnap.docs) {
     if (lembrar) partes.push(`Lembrar ${lembrar} cliente${lembrar > 1 ? "s" : ""} do ensaio de amanhã`);
     if (ent) partes.push(`⚠️ ${ent} entrega${ent > 1 ? "s" : ""} de fotos atrasada${ent > 1 ? "s" : ""}`);
     if (aval) partes.push(`Pedir ${aval} avaliação${aval > 1 ? "ões" : ""} no Google`);
+    if (ofe)
+      partes.push(
+        `📸 Pode oferecer os kits: ${minhasOfertas
+          .slice(0, 2)
+          .map(o => `${o.n} aluno${o.n > 1 ? "s" : ""} do ${o.inst}`)
+          .join(", ")}${minhasOfertas.length > 2 ? " e mais" : ""}`
+      );
     if (avisar) partes.push(`📲 Avisar ${avisar} colégio${avisar > 1 ? "s" : ""} da data aprovada`);
     if (bec && becasAtr) partes.push(`👘 ${becasAtr} devolução${becasAtr > 1 ? "ões" : ""} de becas atrasada${becasAtr > 1 ? "s" : ""}`);
     if (bec && becasRet) partes.push(`👘 ${becasRet} retirada${becasRet > 1 ? "s" : ""} de becas amanhã`);
