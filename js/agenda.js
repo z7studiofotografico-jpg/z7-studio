@@ -411,7 +411,7 @@ function linhaBeca(it) {
   if (C.pode("becas"))
     r.append(
       U.mkBtn("Abrir", "btn-sm", () => {
-        location.hash = "#becas";
+        C.ir("#becas");
       })
     );
   return r;

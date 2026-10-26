@@ -527,7 +527,8 @@ const ctx = {
     if (isAdmin) return FSv.query(c, ...filtros);
     return nomeCol === "formandos" ? FSv.query(c, where("respEmail", "==", ctx.email), FSv.limit(3000)) : FSv.query(c, where("respEmail", "in", ["", ctx.email]), FSv.limit(3000));
   },
-  goHome(){ location.hash = "#home"; }
+  goHome(){ ir("#home"); },
+  ir(h){ ir(h); }
 };
 Funil.init(ctx);
 let usersLoaded = false;
@@ -537,8 +538,8 @@ async function route(){
   let key = VIEWS[r] ? r : "home";
   const modDe = { vendas: "vendas", formaturas: "formaturas", becas: "becas", funil: "funil", pr: "pr", repasse: "pr", agenda: "agenda", colegios: "colegios", instituicoes: "colegios",
     "inst-particular": "colegios", "inst-publico": "colegios", "inst-profissionalizante": "colegios", "inst-faculdade": "colegios" };
-  if (modDe[key] && !pode(modDe[key])) { key = "home"; if (r) history.replaceState(null, "", "#home"); }
-  curView = key;
+  if (modDe[key] && !pode(modDe[key])) { key = "home"; if (r) history.replaceState(history.state, "", "#home"); }
+  curView = key; hashAtual = location.hash;
   new Set(Object.values(VIEWS)).forEach(id => { $(id).hidden = true; });
   $(VIEWS[key]).hidden = false;
   $("btnBack").hidden = key === "home";
@@ -580,8 +581,47 @@ async function route(){
   }
   window.scrollTo(0, 0);
 }
-addEventListener("hashchange", route);
-$("btnBack").onclick = () => { location.hash = INST_NOMES[curView] ? "#instituicoes" : "#home"; };
+// só troca de tela se o endereço mudou de verdade (o "voltar" restaura o endereço e não deve redesenhar)
+addEventListener("hashchange", () => { if (location.hash !== hashAtual) route(); });
+$("btnBack").onclick = () => ir(telaDeCima());
+
+// ---------- botão voltar do celular ----------
+// As telas trocam o endereço no lugar (sem empilhar histórico). O "voltar" do celular:
+// 1) fecha a janela aberta; 2) sobe uma tela (Instituições do tipo → Instituições → Início);
+// 3) no Início, pede um segundo toque para sair do app.
+let hashAtual = "";
+function telaDeCima(){ return INST_NOMES[curView] ? "#instituicoes" : "#home"; }
+function ir(h){
+  const alvo = "#" + String(h || "home").replace(/^#/, "");
+  if (location.hash !== alvo) history.replaceState(history.state, "", alvo);
+  route();
+}
+// links internos (cards da tela inicial etc.) também trocam no lugar
+document.addEventListener("click", e => {
+  const a = e.target.closest && e.target.closest('a[href^="#"]');
+  if (!a || e.defaultPrevented || e.button || e.metaKey || e.ctrlKey || e.shiftKey) return;
+  e.preventDefault(); ir(a.getAttribute("href"));
+});
+function janelaAberta(){ return [...document.querySelectorAll(".sheet")].filter(x => !x.hidden && getComputedStyle(x).display !== "none").pop(); }
+function fecharJanela(j){
+  if (j.id === "sheet") Funil.fecharForm();
+  else if (j.id) j.hidden = true;                                 // janelas fixas (Ajustes, Equipe)
+  else { j.dispatchEvent(new MouseEvent("click", { bubbles: true })); if (j.isConnected) j.remove(); }   // janelas que o app cria
+}
+const guarda = () => history.pushState({ z7: 1 }, "", location.hash || "#home");
+let tocouSair = 0;
+addEventListener("popstate", e => {
+  // trocar o endereço também dispara este evento, sem marca: aí é navegação normal (o hashchange cuida)
+  if (!e.state || !(e.state.z7 || e.state.z7base)) return;
+  history.replaceState(e.state, "", hashAtual || "#home");        // o navegador trocou o endereço; volta para o da tela atual
+  const j = janelaAberta();
+  if (j) { fecharJanela(j); guarda(); return; }
+  if (curView !== "home") { ir(telaDeCima()); guarda(); return; }
+  if (Date.now() - tocouSair < 2500) { history.back(); return; }   // segundo toque: sai
+  tocouSair = Date.now(); toast("Toque em voltar de novo para sair do app"); guarda();
+});
+// entrada de baixo marcada (é nela que o "voltar" cai) + uma entrada de guarda por cima
+if (!history.state || !history.state.z7) { history.replaceState({ z7base: 1 }, "", location.href); guarda(); }
 
 let repCount = { at: 0, n: null };
 function renderHome(){

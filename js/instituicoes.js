@@ -477,7 +477,7 @@ function card(it) {
         `⚠️ Pendência: marcar o dia de medir beca e fazer o ensaio de estúdio no ${title(it.nome)} (em Formaturas → Turmas)`
       ),
       U.mkBtn("🎓 Abrir Formaturas", "btn-primary", () => {
-        location.hash = "formaturas";
+        C.ir("#formaturas");
       })
     );
     e.append(pd);

@@ -444,6 +444,25 @@ console.log("Adriano (admin), com os dados já atualizados no servidor:");
   ok(erros.length === 0, "sem erros no console" + (erros.length ? ": " + erros.slice(0, 3).join(" | ") : ""));
 }
 
+console.log("Botão voltar do celular:");
+{
+  const { pg, erros } = await abrir(ADRIANO, migrar(base));
+  const voltar = async () => { await pg.evaluate(() => history.back()); await pg.waitForTimeout(500); };
+  await pg.locator('.tile[data-mod="colegios"]').click(); await pg.waitForTimeout(500);
+  await pg.locator("#viewInst .card, #viewInst a, #viewInst button").filter({ hasText: /Colégio particular/i }).first().click(); await pg.waitForTimeout(600);
+  await pg.getByRole("button", { name: "+ Nova instituição" }).click(); await pg.waitForTimeout(300);
+  ok((await pg.locator(".sheet:visible").count()) === 1, "abriu a janela de nova instituição");
+  await voltar();
+  ok((await pg.locator(".sheet:visible").count()) === 0 && /inst-particular/.test(pg.url()), "voltar fecha a janela e fica na mesma tela");
+  await voltar();
+  ok(/#instituicoes$/.test(pg.url()) && !(await pg.locator("#viewInst").isHidden()), "voltar sobe para Instituições: " + pg.url());
+  await voltar();
+  ok(/#home$/.test(pg.url()) && (await pg.locator("#viewHome").isVisible()), "voltar sobe para o Início");
+  await voltar();
+  ok((await pg.locator("#viewHome").isVisible()) && /voltar de novo para sair/.test(await pg.textContent("#toast")), "no Início, pede um segundo toque para sair (não fecha o app)");
+  ok(erros.length === 0, "sem erros no console" + (erros.length ? ": " + erros.slice(0, 3).join(" | ") : ""));
+}
+
 console.log("Pedro (vendedor: Linha de Frente, Agendamento, Instituições):");
 {
   const migrado = Object.assign(migrar(base), {
