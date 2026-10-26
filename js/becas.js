@@ -1,6 +1,6 @@
 // Card Aluguel de becas: para os nossos eventos e para outros eventos.
 // Coleção "becas": { cliente, tel, tipoEvento ("nosso" | "outro"), evento, dataEvento, retirada, retiradaHora, devolucao,
-//   qtd (total de becas), becasQtd: { pelerineAzul, infAzul, infPreta, tradPreta, americana }, faixasQtd: { azul, branca, ... }, capelosQtd: { capelo }, tamanhosQtd: { PPP, PP, P, M, G, GG, XG, XXG, EXG }, tamanhos (texto, ex.: "3 P, 5 M"; o jabor já vai com a beca), valor, caucao, pago, formaPag, status, obs }
+//   qtd (total de becas), becasQtd: { pelerineAzul, infAzul, infPreta, tradPreta, americana }, faixasQtd: { azul, branca, ... }, capelosQtd: { capelo }, tamanhosQtd: { tradPreta: { M: 7, G: 5 }, ... } (por tipo de beca), tamanhos (texto, ex.: "Beca tradicional preta: 7 M, 5 G"; o jabor já vai com a beca), valor, caucao, pago, formaPag, status, obs }
 // Status: reservado → retirado → devolvido (ou cancelado). Retirada e devolução aparecem no Agendamento.
 import { el, title, field, inp, inpReais, sheet, botoes, wa as abrirWa, avisoErro } from "./ui.js";
 import { ENDERECO, ESTUDIO } from "./mensagens.js";
@@ -10,6 +10,9 @@ const $ = (id) => document.getElementById(id);
 const n0 = v => Number(v) || 0;
 const ITENS = [["capelo", "Capelo"], ["jabor", "Jabor"]]; // só para aluguéis antigos
 export const CAPELOS = [["capelo", "Capelo"]];
+// Tamanhos por tipo de beca: { tipo: { tamanho: n } } (ignora o formato antigo, que não separava o tipo)
+const porTipo = o => Object.fromEntries(Object.entries(o || {}).filter(([, v]) => v && typeof v === "object"));
+const textoTam = t => BECAS.filter(([k]) => somaObj(t[k] || {})).map(([k, nm]) => `${nm}: ${TAMANHOS.filter(([z]) => n0(t[k][z])).map(([z]) => `${t[k][z]} ${z}`).join(", ")}`).join("; ");
 // Tamanhos de beca que o estúdio tem
 export const TAMANHOS = ["PPP", "PP", "P", "M", "G", "GG", "XG", "XXG", "EXG"].map(t => [t, t]);
 // Tipos de beca e cores de faixa: cada um tem o seu estoque (definido no botão "📦 Estoque")
@@ -49,7 +52,7 @@ function emUso(de, ate, ignora){
     Object.entries(x.becasQtd || {}).forEach(([k, v]) => { out.becas[k] = (out.becas[k] || 0) + n0(v); });
     Object.entries(x.faixasQtd || {}).forEach(([k, v]) => { out.faixas[k] = (out.faixas[k] || 0) + n0(v); });
     Object.entries(x.capelosQtd || {}).forEach(([k, v]) => { out.capelos[k] = (out.capelos[k] || 0) + n0(v); });
-    Object.entries(x.tamanhosQtd || {}).forEach(([k, v]) => { out.tamanhos[k] = (out.tamanhos[k] || 0) + n0(v); });
+    Object.entries(porTipo(x.tamanhosQtd)).forEach(([tp, zs]) => { const o = out.tamanhos[tp] = out.tamanhos[tp] || {}; Object.entries(zs).forEach(([z, v]) => { o[z] = (o[z] || 0) + n0(v); }); });
   });
   return out;
 }
@@ -140,13 +143,25 @@ function openEstoque(){
       f.append(box); p.append(f); return ins;
     };
     const iB = tab("Becas (o jabor vai junto)", BECAS, E.becas, u.becas), iF = tab("Faixas", FAIXAS, E.faixas, u.faixas), iC = tab("Capelos", CAPELOS, E.capelos, u.capelos);
-    const iT = tab("Tamanhos das becas (somando todos os tipos)", TAMANHOS, E.tamanhos, u.tamanhos);
-    p.append(el("p", "hint", "Beca americana: deixe 0 até chegar. O app avisa se alguém tentar alugar. Tamanhos: quantas becas de cada tamanho vocês têm no total; deixe tudo 0 se não quiser conferir tamanho."));
+    // Tamanhos de cada tipo de beca
+    const ET = porTipo(E.tamanhos), UT = u.tamanhos;
+    { const f = el("div", "field"); f.append(el("label", null, "Tamanhos de cada beca (PPP a EXG)")); p.append(f); }
+    const iT = BECAS.map(([tp, nm]) => {
+      const d = el("details", "tamtipo"), sm = el("summary"); d.append(sm);
+      const box = el("div", "estgrid"); d.append(box);
+      const ins = TAMANHOS.map(([z]) => { const r = el("div", "prow"); const q = inp((ET[tp] || {})[z] || "", "0", 4); q.inputMode = "numeric"; q.className = "preco"; q.disabled = !C.isAdmin; q.setAttribute("aria-label", `Estoque ${nm} ${z}`);
+        const fora = n0((UT[tp] || {})[z]); r.append(el("span", null, z + (fora ? ` · ${fora} fora` : "")), q); box.append(r); return [z, q]; });
+      const total = iB.find(([k]) => k === tp)[1];
+      const resumo = () => { const t = ins.reduce((a, [, q]) => a + n0(q.value), 0), b = n0(total.value); sm.textContent = `${nm}: ${t ? `${t} de ${b} com tamanho${t === b ? " ✅" : t > b ? " ⚠️ passou do total" : ""}` : "sem tamanhos"}`; };
+      [...ins.map(([, q]) => q), total].forEach(q => q.addEventListener("input", resumo)); resumo();
+      p.append(d); return [tp, ins];
+    });
+    p.append(el("p", "hint", "Beca americana: deixe 0 até chegar. O app avisa se alguém tentar alugar. Tamanhos: abra cada beca e coloque quantas tem de cada tamanho; beca sem tamanhos preenchidos não é conferida por tamanho."));
     p.append(botoes(close, "Salvar estoque"));
     if (!C.isAdmin) p.querySelector("button[type=submit]").hidden = true;
     p.addEventListener("submit", async ev => {
       ev.preventDefault(); if (!C.isAdmin) return;
-      const novo = { becas: Object.fromEntries(iB.map(([k, q]) => [k, n0(q.value)])), faixas: Object.fromEntries(iF.map(([k, q]) => [k, n0(q.value)])), capelos: Object.fromEntries(iC.map(([k, q]) => [k, n0(q.value)])), tamanhos: Object.fromEntries(iT.map(([k, q]) => [k, n0(q.value)])) };
+      const novo = { becas: Object.fromEntries(iB.map(([k, q]) => [k, n0(q.value)])), faixas: Object.fromEntries(iF.map(([k, q]) => [k, n0(q.value)])), capelos: Object.fromEntries(iC.map(([k, q]) => [k, n0(q.value)])), tamanhos: Object.fromEntries(iT.map(([tp, ins]) => [tp, Object.fromEntries(ins.map(([z, q]) => [z, n0(q.value)]).filter(([, v]) => v))]).filter(([, o]) => Object.keys(o).length)) };
       try { await FS.setDoc(FS.doc(db, "config", "app"), { estoque: novo }, { merge: true }); C.P.estoque = novo; close(); C.toast("Estoque salvo"); render(); }
       catch (e) { C.handleErr(e); }
     });
@@ -181,12 +196,19 @@ export function form(x, pre){
     const qC = grade("Capelos", CAPELOS, x ? x.capelosQtd || (x.itens && x.itens.capelo ? { capelo: totBecas(x) } : {}) : pre.capelosQtd, " (quantidade)");
     p.append(el("p", "hint", "O jabor já vai com a beca. Capelo tem estoque próprio e pode ser alugado sozinho."));
     const valObj = ins => Object.fromEntries(ins.map(([k, q]) => [k, n0(q.value)]).filter(([, v]) => v));
-    // Tamanhos: quantas becas de cada tamanho (a soma tem que bater com o total de becas)
-    const qT = grade("Tamanhos das becas", TAMANHOS, x ? x.tamanhosQtd : pre.tamanhosQtd, " (tamanho)");
-    const somaTam = el("p", "hint"); p.append(somaTam);
-    if (x && x.tamanhos && !x.tamanhosQtd) p.append(el("p", "hint", "Anotado antes: " + x.tamanhos));
-    const contaTam = () => { const t = somaObj(valObj(qT)), b = somaObj(valObj(qB)); somaTam.textContent = b ? `${t} de ${b} beca${b > 1 ? "s" : ""} com tamanho${t === b ? " ✅" : ""}` : ""; };
-    [...qB, ...qT].forEach(([, q]) => q.addEventListener("input", contaTam)); contaTam();
+    // Tamanhos: para cada tipo de beca escolhido, quantas de cada tamanho
+    const atualT = porTipo(x ? x.tamanhosQtd : pre.tamanhosQtd);
+    const blocoT = el("div"); p.append(blocoT);
+    const qT = BECAS.map(([tp, nm]) => {
+      const f = el("div", "field"); const lb = el("label"); f.append(lb); const box = el("div", "estgrid"); f.append(box);
+      const ins = TAMANHOS.map(([z]) => { const r = el("div", "prow"); const q = inp((atualT[tp] || {})[z] || "", "0", 4); q.inputMode = "numeric"; q.className = "preco"; q.setAttribute("aria-label", `${z} (${nm.toLowerCase()})`);
+        r.append(el("span", null, z), q); box.append(r); q.addEventListener("change", checa); return [z, q]; });
+      const total = qB.find(([k]) => k === tp)[1];
+      const atualiza = () => { const b = n0(total.value), t = ins.reduce((a, [, q]) => a + n0(q.value), 0); f.hidden = !b && !t; lb.textContent = `Tamanhos · ${nm}: ${t} de ${b}${t === b && b ? " ✅" : t > b ? " ⚠️ passou" : ""}`; };
+      [...ins.map(([, q]) => q), total].forEach(q => q.addEventListener("input", atualiza)); atualiza();
+      blocoT.append(f); return [tp, nm, ins];
+    });
+    if (x && x.tamanhos && !Object.keys(atualT).length) p.append(el("p", "hint", "Anotado antes: " + x.tamanhos));
     const val = inpReais(x ? x.valor : ""), pago = inpReais(x ? x.pago : ""), cau = inpReais(x ? x.caucao : "");
     const r6 = el("div", "row3"); r6.append(field("Valor total", val), field("Já pago", pago), field("Caução", cau)); p.append(r6);
     const fp = el("select"); [["", "forma de pagamento"], ...FORMAS.map(f => [f, f])].forEach(([v, t]) => { const o = el("option", null, t); o.value = v; fp.append(o); }); fp.value = x ? x.formaPag || "" : "";
@@ -202,8 +224,9 @@ export function form(x, pre){
       qF.forEach(([k, q]) => { const pede = n0(q.value); if (!pede) return; const tem = n0((E.faixas || {})[k]), livre = tem - n0(u.faixas[k]); if (pede > livre) out.push(`Faixa ${FAIXAS.find(b => b[0] === k)[1].toLowerCase()}: pediu ${pede}, livres ${Math.max(0, livre)}${tem ? "" : " (sem estoque cadastrado)"}`); });
       qC.forEach(([k, q]) => { const pede = n0(q.value); if (!pede) return; const tem = n0((E.capelos || {})[k]), livre = tem - n0(u.capelos[k]); if (pede > livre) out.push(`Capelo: pediu ${pede}, livres ${Math.max(0, livre)}${tem ? "" : " (sem estoque cadastrado)"}`); });
       // tamanho só é conferido se o estoque de tamanhos foi preenchido
-      const temTam = Object.values(E.tamanhos || {}).some(v => n0(v));
-      if (temTam) qT.forEach(([k, q]) => { const pede = n0(q.value); if (!pede) return; const livre = n0(E.tamanhos[k]) - n0(u.tamanhos[k]); if (pede > livre) out.push(`Tamanho ${k}: pediu ${pede}, livres ${Math.max(0, livre)}`); });
+      const ET = porTipo(E.tamanhos);
+      qT.forEach(([tp, nm, ins]) => { if (!somaObj(ET[tp] || {})) return; ins.forEach(([z, q]) => { const pede = n0(q.value); if (!pede) return;
+        const livre = n0(ET[tp][z]) - n0((u.tamanhos[tp] || {})[z]); if (pede > livre) out.push(`${nm} ${z}: pediu ${pede}, livres ${Math.max(0, livre)}`); }); });
       return out;
     }
     function checa(){
@@ -223,12 +246,14 @@ export function form(x, pre){
       if (dev.value < ret.value) { err.textContent = "A devolução precisa ser depois da retirada."; err.hidden = false; return; }
       const becasQtd = valObj(qB), faixasQtd = valObj(qF), capelosQtd = valObj(qC), q = somaObj(becasQtd);
       if (!q && !somaObj(faixasQtd) && !somaObj(capelosQtd)) { err.textContent = "Coloque a quantidade de becas, faixas ou capelos."; err.hidden = false; return; }
-      const tamanhosQtd = valObj(qT), nt = somaObj(tamanhosQtd);
-      if (nt > q) { err.textContent = `Os tamanhos somam ${nt}, mas são ${q} beca${q !== 1 ? "s" : ""}.`; err.hidden = false; return; }
+      const tamanhosQtd = Object.fromEntries(qT.map(([tp, , ins]) => [tp, valObj(ins)]).filter(([, o]) => Object.keys(o).length));
+      const passou = qT.find(([tp]) => somaObj(tamanhosQtd[tp] || {}) > n0(becasQtd[tp]));
+      if (passou) { err.textContent = `${passou[1]}: os tamanhos somam ${somaObj(tamanhosQtd[passou[0]])}, mas são ${n0(becasQtd[passou[0]])}.`; err.hidden = false; return; }
+      const nt = Object.keys(tamanhosQtd).length;
       const f = faltas();
       if (f.length && !p._ok) { p._ok = true; a.ok.textContent = "Registrar mesmo assim"; err.textContent = "Não tem o suficiente no estoque: " + f.join("; ") + ". Toque de novo para registrar mesmo assim."; err.hidden = false; return; }
       const body = { cliente: cli.value.trim(), tel: tel.value.trim(), tipoEvento: tipo.value, evento: ev.value.trim(), dataEvento: dEv.value, retirada: ret.value, retiradaHora: retH.value, devolucao: dev.value,
-        qtd: q, becasQtd, faixasQtd, capelosQtd, tamanhosQtd, tamanhos: nt ? TAMANHOS.filter(([k]) => tamanhosQtd[k]).map(([k]) => `${tamanhosQtd[k]} ${k}`).join(", ") : (x && x.tamanhos) || "", valor: lerReais(val.value), pago: lerReais(pago.value), caucao: lerReais(cau.value), formaPag: fp.value, obs: obs.value.trim(), atualizadoEm: new Date().toISOString() };
+        qtd: q, becasQtd, faixasQtd, capelosQtd, tamanhosQtd, tamanhos: nt ? textoTam(tamanhosQtd) : (x && x.tamanhos) || "", valor: lerReais(val.value), pago: lerReais(pago.value), caucao: lerReais(cau.value), formaPag: fp.value, obs: obs.value.trim(), atualizadoEm: new Date().toISOString() };
       try {
         if (x) await FS.updateDoc(FS.doc(db, "becas", x.id), body);
         else await FS.addDoc(col, Object.assign(body, { status: "reservado", criadoEm: new Date().toISOString(), por: C.me || "", porEmail: C.email || "" }));
