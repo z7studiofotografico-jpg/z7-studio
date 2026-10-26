@@ -2,6 +2,21 @@
 // O estado fica em window.__store (Map "colecao/id" -> objeto). Não aplica as regras de segurança
 // (essas são testadas no emulador, em tests/firebase).
 const store = (window.__store = window.__store || new Map());
+// Contador de operações em andamento: o teste espera chegar a zero antes de conferir os dados (sem espera fixa)
+window.__ops = 0;
+window.__ultimo = Date.now();
+const conta =
+  fn =>
+  async (...a) => {
+    window.__ops++;
+    window.__ultimo = Date.now();
+    try {
+      return await fn(...a);
+    } finally {
+      window.__ops--;
+      window.__ultimo = Date.now();
+    }
+  };
 const listeners = [];
 let seq = 0;
 const clone = v => (v === undefined ? undefined : JSON.parse(JSON.stringify(v)));
@@ -123,23 +138,23 @@ function aplica(o, p) {
   }
   return o;
 }
-export async function setDoc(r, d, opt) {
+async function setDoc_(r, d, opt) {
   const k = r.n + "/" + r.id;
   store.set(k, opt && opt.merge ? aplica(clone(store.get(k)) || {}, d) : clone(d));
   fire();
 }
-export async function updateDoc(r, p) {
+async function updateDoc_(r, p) {
   const k = r.n + "/" + r.id;
   if (!store.has(k)) throw Object.assign(new Error("not-found"), { code: "not-found" });
   store.set(k, aplica(clone(store.get(k)), p));
   fire();
 }
-export async function addDoc(c, d) {
+async function addDoc_(c, d) {
   const r = doc(c);
   await setDoc(r, d);
   return r;
 }
-export async function deleteDoc(r) {
+async function deleteDoc_(r) {
   store.delete(r.n + "/" + r.id);
   fire();
 }
@@ -149,12 +164,12 @@ export function writeBatch() {
     set: (r, d, o) => ops.push(() => setDoc(r, d, o)),
     update: (r, p) => ops.push(() => updateDoc(r, p)),
     delete: r => ops.push(() => deleteDoc(r)),
-    commit: async () => {
+    commit: conta(async () => {
       for (const f of ops) await f();
-    }
+    })
   };
 }
-export async function runTransaction(_db, fn) {
+async function runTransaction_(_db, fn) {
   const ops = [];
   const tx = {
     get: r => getDoc(r),
@@ -175,3 +190,9 @@ export async function runTransaction(_db, fn) {
   for (const f of ops) await f();
   return res;
 }
+
+export const setDoc = conta(setDoc_);
+export const updateDoc = conta(updateDoc_);
+export const addDoc = conta(addDoc_);
+export const deleteDoc = conta(deleteDoc_);
+export const runTransaction = conta(runTransaction_);

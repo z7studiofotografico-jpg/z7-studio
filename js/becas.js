@@ -2,7 +2,7 @@
 // Coleção "becas": { cliente, tel, tipoEvento ("nosso" | "outro"), evento, dataEvento, retirada, retiradaHora, devolucao,
 //   qtd (total de becas), becasQtd: { pelerineAzul, infAzul, infPreta, tradPreta, americana }, faixasQtd: { azul, branca, ... }, capelosQtd: { capelo }, tamanhosQtd: { tradPreta: { M: 7, G: 5 }, ... } (por tipo de beca), tamanhos (texto, ex.: "Beca tradicional preta: 7 M, 5 G"; o jabor já vai com a beca), valor, caucao, pago, formaPag, status, obs }
 // Status: reservado → retirado → devolvido (ou cancelado). Retirada e devolução aparecem no Agendamento.
-import { el, title, field, inp, inpReais, sheet, botoes, wa as abrirWa, avisoErro } from "./ui.js";
+import { el, title, field, inp, inpReais, sheet, botoes, wa as abrirWa, avisoErro, gradeQtd } from "./ui.js";
 import { ENDERECO, ESTUDIO } from "./mensagens.js";
 import { lerReais, centavos, reais, brl } from "./regras.js";
 import * as U from "./util.js";
@@ -389,22 +389,15 @@ function openEstoque() {
     const tab = (titulo, tipos, atual, fora) => {
       const f = el("div", "field");
       f.append(el("label", null, titulo));
-      const box = el("div", "estgrid");
-      const ins = tipos.map(([k, t]) => {
-        const r = el("div", "prow");
-        const q = inp((atual || {})[k] || "", "0", 5);
-        q.inputMode = "numeric";
-        q.className = "preco";
-        q.disabled = !C.isAdmin;
-        q.setAttribute("aria-label", "Estoque " + t);
-        const out = n0(fora[k]);
-        r.append(el("span", null, t + (out ? ` · ${out} fora hoje` : "")), q);
-        box.append(r);
-        return [k, q];
+      const g = gradeQtd(tipos, atual, {
+        max: 5,
+        disabled: !C.isAdmin,
+        rotulo: (k, t) => "Estoque " + t,
+        texto: (k, t) => t + (n0(fora[k]) ? ` · ${n0(fora[k])} fora hoje` : "")
       });
-      f.append(box);
+      f.append(g.box);
       p.append(f);
-      return ins;
+      return g.ins;
     };
     const iB = tab("Becas (o jabor vai junto)", BECAS, E.becas, u.becas),
       iF = tab("Faixas", FAIXAS, E.faixas, u.faixas),
@@ -421,20 +414,13 @@ function openEstoque() {
       const d = el("details", "tamtipo"),
         sm = el("summary");
       d.append(sm);
-      const box = el("div", "estgrid");
-      d.append(box);
-      const ins = TAMANHOS.map(([z]) => {
-        const r = el("div", "prow");
-        const q = inp((ET[tp] || {})[z] || "", "0", 4);
-        q.inputMode = "numeric";
-        q.className = "preco";
-        q.disabled = !C.isAdmin;
-        q.setAttribute("aria-label", `Estoque ${nm} ${z}`);
-        const fora = n0((UT[tp] || {})[z]);
-        r.append(el("span", null, z + (fora ? ` · ${fora} fora` : "")), q);
-        box.append(r);
-        return [z, q];
+      const g = gradeQtd(TAMANHOS, ET[tp], {
+        disabled: !C.isAdmin,
+        rotulo: z => `Estoque ${nm} ${z}`,
+        texto: z => z + (n0((UT[tp] || {})[z]) ? ` · ${n0(UT[tp][z])} fora` : "")
       });
+      d.append(g.box);
+      const ins = g.ins;
       const total = iB.find(([k]) => k === tp)[1];
       const resumo = () => {
         const t = ins.reduce((a, [, q]) => a + n0(q.value), 0),
@@ -557,21 +543,10 @@ export function form(x, pre) {
     const grade = (titulo, tipos, atual, sufixo) => {
       const f = el("div", "field");
       f.append(el("label", null, titulo));
-      const box = el("div", "estgrid");
-      f.append(box);
-      const ins = tipos.map(([k, t]) => {
-        const r = el("div", "prow");
-        const q = inp((atual || {})[k] || "", "0", 4);
-        q.inputMode = "numeric";
-        q.className = "preco";
-        q.setAttribute("aria-label", t + sufixo);
-        r.append(el("span", null, t), q);
-        box.append(r);
-        q.addEventListener("change", checa);
-        return [k, q];
-      });
+      const g = gradeQtd(tipos, atual, { rotulo: (k, t) => t + sufixo, aoMudar: () => checa() });
+      f.append(g.box);
       p.append(f);
-      return ins;
+      return g.ins;
     };
     const qB = grade("Becas", BECAS, x ? x.becasQtd || (x.qtd ? { tradPreta: x.qtd } : {}) : pre.becasQtd, "");
     const qF = grade("Faixas", FAIXAS, x ? x.faixasQtd : pre.faixasQtd, " (faixa)");
@@ -591,19 +566,9 @@ export function form(x, pre) {
       const f = el("div", "field");
       const lb = el("label");
       f.append(lb);
-      const box = el("div", "estgrid");
-      f.append(box);
-      const ins = TAMANHOS.map(([z]) => {
-        const r = el("div", "prow");
-        const q = inp((atualT[tp] || {})[z] || "", "0", 4);
-        q.inputMode = "numeric";
-        q.className = "preco";
-        q.setAttribute("aria-label", `${z} (${nm.toLowerCase()})`);
-        r.append(el("span", null, z), q);
-        box.append(r);
-        q.addEventListener("change", checa);
-        return [z, q];
-      });
+      const g = gradeQtd(TAMANHOS, atualT[tp], { rotulo: z => `${z} (${nm.toLowerCase()})`, aoMudar: () => checa() });
+      f.append(g.box);
+      const ins = g.ins;
       const total = qB.find(([k]) => k === tp)[1];
       const atualiza = () => {
         const b = n0(total.value),

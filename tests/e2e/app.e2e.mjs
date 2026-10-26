@@ -207,7 +207,14 @@ async function abrir(email, dados) {
     throw e;
   }
   await pg.waitForTimeout(600);
-  return { pg, erros, ctx, store: () => pg.evaluate(() => Object.fromEntries(window.__store)) };
+  // store(): espera o app terminar de gravar (nenhuma operação em andamento há 150 ms) e devolve os dados
+  const store = async () => {
+    await pg
+      .waitForFunction(() => window.__ops === 0 && Date.now() - window.__ultimo > 150, null, { timeout: 4000, polling: 50 })
+      .catch(() => {});
+    return pg.evaluate(() => Object.fromEntries(window.__store));
+  };
+  return { pg, erros, ctx, store };
 }
 const ir = async (pg, h) => {
   await pg.evaluate(h => {

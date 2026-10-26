@@ -25,12 +25,25 @@ test("todo arquivo js do app está na lista do service worker (para abrir sem in
     .forEach(f => assert.ok(sw.includes(`./js/${f}`), `faltou ./js/${f} no sw.js`));
 });
 test("os módulos do app não usam innerHTML com dados (só textos fixos)", () => {
+  // lê o arquivo inteiro: o texto atribuído pode ocupar várias linhas
   fs.readdirSync(new URL("../js/", import.meta.url))
     .filter(f => f.endsWith(".js"))
     .forEach(f => {
-      const linhas = ler("js/" + f)
-        .split("\n")
-        .filter(l => /innerHTML\s*=\s*[^"'`\s]/.test(l) || /innerHTML\s*=\s*`[^`]*\$\{/.test(l));
-      assert.deepEqual(linhas, [], "innerHTML com valor dinâmico em " + f);
+      const src = ler("js/" + f),
+        ruins = [];
+      const re = /innerHTML\s*[:=]\s*/g;
+      let m;
+      while ((m = re.exec(src))) {
+        const resto = src.slice(m.index + m[0].length),
+          q = resto[0];
+        if (q === '"' || q === "'") continue; // texto fixo entre aspas
+        if (q === "`") {
+          const fim = resto.indexOf("`", 1);
+          if (resto.slice(1, fim).includes("${")) ruins.push(src.slice(0, m.index).split("\n").length);
+          continue;
+        }
+        ruins.push(src.slice(0, m.index).split("\n").length); // variável ou expressão
+      }
+      assert.deepEqual(ruins, [], "innerHTML com valor dinâmico em " + f + " (linhas " + ruins.join(", ") + ")");
     });
 });

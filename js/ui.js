@@ -207,3 +207,22 @@ export function parseTel(v) {
     .replace(/^55(?=\d{10,11}$)/, "");
   return d.length >= 10 && d.length <= 11 ? d : "";
 }
+
+// Grade de quantidades (uma caixinha por item): usada no estoque e no aluguel de becas.
+// tipos = [[chave, nome]]; atual = { chave: n }. Devolve { box, ins: [[chave, input]] }.
+export function gradeQtd(tipos, atual, opts = {}) {
+  const box = el("div", "estgrid");
+  const ins = tipos.map(([k, t]) => {
+    const r = el("div", "prow");
+    const q = inp((atual || {})[k] || "", "0", opts.max || 4);
+    q.inputMode = "numeric";
+    q.className = "preco";
+    q.disabled = !!opts.disabled;
+    q.setAttribute("aria-label", opts.rotulo ? opts.rotulo(k, t) : t);
+    r.append(el("span", null, opts.texto ? opts.texto(k, t) : t), q);
+    if (opts.aoMudar) q.addEventListener("change", opts.aoMudar);
+    box.append(r);
+    return [k, q];
+  });
+  return { box, ins };
+}
