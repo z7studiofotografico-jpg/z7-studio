@@ -78,3 +78,6 @@ export function ligarCamposReais(){
   new MutationObserver(ms => ms.forEach(m => m.addedNodes.forEach(n => { if (n.nodeType === 1) { if (ehDinheiro(n)) n.value = campoReais(n.value); else formatarCampos(n); } })))
     .observe(document.body, { childList: true, subtree: true });
 }
+
+// Telefone brasileiro só com dígitos (DDD + número), ou "" se não for válido
+export function parseTel(v){ const d = String(v || "").replace(/\D/g, "").replace(/^55(?=\d{10,11}$)/, ""); return d.length >= 10 && d.length <= 11 ? d : ""; }

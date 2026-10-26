@@ -6,18 +6,21 @@
 import { setCtx, openTurma, cobrarWa, registrarPagamento, atrasado } from "./turma.js";
 import { brl, somar, recebido as recebidoDe, emAberto, pagasDe, nParcelas, quitado, vencDa, valorParcela, esperadas, ehColacao, fimDoMes } from "./regras.js";
 import { el, title, avisoErro } from "./ui.js";
+import * as Ev from "./eventos.js";
 // Leitura sob demanda: ao abrir, só as parcelas que vencem até o fim do mês (campo proxVenc);
 // a lista completa de formandos só é lida quando alguém abre as abas Colação, Álbum ou Turmas.
-let C, FS, db, unsubs = [], forms = [], cobr = [], insts = [], aba = "cobrancas", tudoCarregado = false, erroFn = () => {};
+let C, FS, db, unsubs = [], forms = [], cobr = [], insts = [], aba = "cobrancas", tudoCarregado = false, carregando = false, erroFn = () => {};
 const $ = (id) => document.getElementById(id);
 const moeda = brl;
 
-export function init(ctx){ C = ctx; FS = ctx.FS; db = ctx.db; setCtx(ctx); }
+export function init(ctx){ C = ctx; FS = ctx.FS; db = ctx.db; setCtx(ctx); Ev.init(ctx); }
 export function hide(){ unsubs.forEach(u => u()); unsubs = []; }
 
 export function show(){
   const v = $("viewFormaturas"); v.innerHTML = "";
-  const head = el("div", "vhead"); head.append(el("h2", null, "Formaturas")); v.append(head);
+  const head = el("div", "vhead"); head.append(el("h2", null, "Formaturas"));
+  // preços mínimos dos kits e da formatura (antes ficavam em Instituições)
+  const hb = el("div", "agact"); hb.append(C.mkBtn("💲 Preços mínimos", "btn-sm", () => Ev.openPrecos())); head.append(hb); v.append(head);
   v.append(el("p", "hint", "Colação de grau e álbum de formatura dos colégios fechados. O PR fica no card próprio."));
   const k = el("div", "kpis"); k.id = "fmKpis"; v.append(k);
   const chips = el("div", "chips"); chips.id = "fmChips"; v.append(chips);
@@ -30,12 +33,16 @@ export function show(){
   unsubs.push(FS.onSnapshot(C.carteira("instituicoes", FS.where("etapa", "==", "FECHADO"), FS.limit(500)), s => { insts = mapa(s).filter(i => i.etapa === "FECHADO"); render(); }, erro));
   erroFn = erro;
 }
-// Abas que precisam de todos os formandos: carrega uma vez, na hora
-function carregarTudo(){
-  if (tudoCarregado || !C.isAdmin) return;
-  tudoCarregado = true;
-  unsubs.push(FS.onSnapshot(FS.query(FS.collection(db, "formandos"), FS.limit(5000)), s => { forms = s.docs.map(d => Object.assign({ id: d.id }, d.data())); render(); }, erroFn));
+// Abas que precisam de todos os formandos: lê uma vez (sem ficar escutando a coleção inteira)
+// e lê de novo quando alguém fecha uma turma, que é onde os formandos mudam.
+async function carregarTudo(forcar){
+  if (!C.isAdmin || carregando || (tudoCarregado && !forcar)) return;
+  carregando = true;
+  try { const s = await FS.getDocs(FS.query(FS.collection(db, "formandos"), FS.limit(5000))); forms = s.docs.map(d => Object.assign({ id: d.id }, d.data())); tudoCarregado = true; render(); }
+  catch (e) { erroFn(e); } finally { carregando = false; }
 }
+// Abre a turma com os kits do tipo de colégio e, ao fechar, atualiza os números
+const abrirTurma = i => openTurma(C, i, Ev.produtos(i.tipo).filter(x => !x.formatura), () => carregarTudo(true));
 
 // Só as turmas que a pessoa pode ver
 function minhasInsts(){ return C.isAdmin ? insts : insts.filter(i => C.ehMeu(i)); }
@@ -82,7 +89,7 @@ function renderCobrancas(corpo, cob){
     const act = el("div", "actions");
     if (C.isAdmin) act.append(C.mkBtn("✅ Parcela paga", "btn-ok", () => registrarPagamento(f).catch(er => C.handleErr(er))));
     if (f.tel) act.append(C.mkBtn("💬 Cobrar", at ? "btn-primary" : "", () => cobrarWa(f)));
-    const inst = insts.find(i => i.id === f.instId); if (inst) act.append(C.mkBtn("Ver turma", "", () => openTurma(C, inst, [])));
+    const inst = insts.find(i => i.id === f.instId); if (inst) act.append(C.mkBtn("Ver turma", "", () => abrirTurma(inst)));
     e.append(act); g.append(e);
   });
   corpo.append(g);
@@ -108,7 +115,7 @@ function renderContrato(corpo, tipo){
     if (!colacao) { const kits = {}; lst.forEach(f => { const kk = (f.kit || "Outro").split(" · ")[0]; kits[kk] = (kits[kk] || 0) + 1; }); Object.entries(kits).forEach(([kk, n]) => meta.append(el("span", "tag", `${kk}: ${n}`))); }
     e.append(meta);
     e.append(el("div", "fu" + (r.atr ? " late" : ""), `Vendido ${moeda(r.vend)} · recebido ${moeda(r.rec)} · em aberto ${moeda(r.aberto)}${r.atr ? ` · ${r.atr} atrasado${r.atr > 1 ? "s" : ""}` : ""}`));
-    const act = el("div", "actions"); act.append(C.mkBtn("Abrir turma", "btn-primary", () => openTurma(C, i, []))); e.append(act);
+    const act = el("div", "actions"); act.append(C.mkBtn("Abrir turma", "btn-primary", () => abrirTurma(i))); e.append(act);
     g.append(e);
   });
   if (!algum) { const e = el("div", "empty"); e.append(el("strong", null, colacao ? "Nenhuma colação de grau ainda" : "Nenhum álbum vendido ainda"), el("span", null, "Abra a turma do colégio fechado (aba Turmas) e inclua os formandos.")); corpo.append(e); return; }
@@ -126,7 +133,10 @@ function renderTurmas(corpo){
     [`🎓 ${fs.filter(ehColacao).length} colação`, `📘 ${fs.filter(f => !ehColacao(f)).length} álbum`, C.nomeDe(i) ? "👤 " + C.first(C.nomeDe(i)) : "", i.fechadoEm ? "Fechado em " + C.fmtDate(i.fechadoEm) : ""].filter(Boolean).forEach(t => meta.append(el("span", "tag", t)));
     e.append(meta);
     e.append(el("div", "fu" + (r.atr ? " late" : ""), `Vendido ${moeda(r.vend)} · recebido ${moeda(r.rec)} · em aberto ${moeda(r.aberto)}`));
-    const act = el("div", "actions"); act.append(C.mkBtn("👥 Formandos e parcelas", "btn-primary", () => openTurma(C, i, []))); e.append(act);
+    // datas da formatura e do dia de fotos (antes ficavam no cartão da instituição)
+    ["fotos", "formatura"].forEach(kk => { const l = Ev.linhaEvento(i, kk); if (l) e.append(l); });
+    const act = el("div", "actions"); act.append(C.mkBtn("👥 Formandos e parcelas", "btn-primary", () => abrirTurma(i)),
+      C.mkBtn("🎓 Formatura", "", () => Ev.openEvento(i, "formatura")), C.mkBtn("📸 Dia de fotos", "", () => Ev.openEvento(i, "fotos"))); e.append(act);
     g.append(e);
   });
   corpo.append(g);

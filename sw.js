@@ -9,7 +9,7 @@ const SHELL = ["./", "./index.html", "./config.js", "./manifest.webmanifest",
   "./js/ui.js", "./js/regras.js", "./js/calc.js", "./js/feriados.js",
   "./js/repasse.js", "./js/mockup.js", "./js/instituicoes.js", "./js/agenda.js", "./js/vendas.js",
   "./js/turma.js", "./js/formaturas.js", "./js/becas.js", "./js/funil.js",
-  "./js/equipe.js", "./js/mensagens.js", "./css/app.css"];
+  "./js/equipe.js", "./js/mensagens.js", "./js/eventos.js", "./css/app.css"];
 
 importScripts("./config.js");
 importScripts(

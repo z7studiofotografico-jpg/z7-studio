@@ -62,7 +62,7 @@ export function cobrarWa(f){
 // Vencimento padrão do contrato: dia 5 (deste mês se ainda não passou, senão do próximo)
 function dia5(){ const t = new Date(); const d = new Date(t.getFullYear(), t.getMonth() + (t.getDate() > 5 ? 1 : 0), 5); return `${d.getFullYear()}-${C.pad(d.getMonth() + 1)}-05`; }
 
-export function openTurma(ctx, inst, kits){
+export function openTurma(ctx, inst, kits, aoFechar){
   setCtx(ctx);
   const col = FS.collection(db, "formandos");
   let lista = [], filtro = "todos", busca = "";
@@ -276,7 +276,7 @@ export function openTurma(ctx, inst, kits){
         });
       });
     }
-  }, { div: true, wide: true, onClose: () => { if (unsub) { unsub(); unsub = null; } } });
+  }, { div: true, wide: true, onClose: () => { if (unsub) { unsub(); unsub = null; } if (aoFechar) aoFechar(); } });
   return close;
 }
 function loadXLSX(){ return carregarLib("xlsx"); }

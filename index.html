@@ -380,6 +380,8 @@ function pode(m){
   const p = USERS[(user && user.email || "").toLowerCase()];
   if (!p || p.ativo === false || !Array.isArray(p.modulos)) return false;
   if (m === "pr") return p.modulos.includes("lf") || p.modulos.includes("rep");
+  // quem vende para colégios cuida das turmas e das datas deles no card Formaturas
+  if (m === "formaturas") return p.modulos.includes("formaturas") || p.modulos.includes("colegios");
   return p.modulos.includes(m);
 }
 function applyProfile(){
