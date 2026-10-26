@@ -52,15 +52,17 @@ test("vendedor não mexe em pagamento, valor nem responsável do formando", asyn
 });
 test("carteira: vendedor vê os colégios livres e os seus, e só os próprios formandos", async () => {
   const db = como(PEDRO);
-  await assertSucceeds(getDoc(doc(db, "instituicoes", "i1")));
-  await assertSucceeds(getDoc(doc(db, "instituicoes", "i2")));
-  await assertFails(getDoc(doc(db, "instituicoes", "i3")));
-  await assertSucceeds(getDocs(query(collection(db, "instituicoes"), where("respEmail", "in", ["", PEDRO]))));
-  await assertFails(getDocs(query(collection(db, "instituicoes"))));
-  await assertSucceeds(getDocs(query(collection(db, "formandos"), where("respEmail", "==", PEDRO))));
+  const nega = async (nome, p) => { try { await assertFails(p); } catch (e) { throw new Error("deveria negar: " + nome); } };
+  const deixa = async (nome, p) => { try { await assertSucceeds(p); } catch (e) { throw new Error("deveria deixar: " + nome + " (" + e.message + ")"); } };
+  await deixa("ler colégio próprio", getDoc(doc(db, "instituicoes", "i1")));
+  await deixa("ler colégio livre", getDoc(doc(db, "instituicoes", "i2")));
+  await nega("ler colégio da Ana", getDoc(doc(db, "instituicoes", "i3")));
+  await deixa("listar a carteira", getDocs(query(collection(db, "instituicoes"), where("respEmail", "in", ["", PEDRO]))));
+  await nega("listar todos os colégios", getDocs(query(collection(db, "instituicoes"))));
+  await deixa("listar os próprios formandos", getDocs(query(collection(db, "formandos"), where("respEmail", "==", PEDRO))));
   await semRegra(d => setDoc(doc(d, "formandos", "f9"), { instId: "i3", nome: "Z", respEmail: ANA }));
-  await assertFails(getDoc(doc(db, "formandos", "f9")));
-  await assertFails(setDoc(doc(db, "formandos", "f8"), { instId: "i1", nome: "W", pagas: 0, pagamentos: [], respEmail: ANA }));
+  await nega("ler formando da Ana", getDoc(doc(db, "formandos", "f9")));
+  await nega("cadastrar formando na carteira da Ana", setDoc(doc(db, "formandos", "f8"), { instId: "i1", nome: "W", pagas: 0, pagamentos: [], respEmail: ANA }));
 });
 test("PR: venda do vendedor fica a conferir; só o admin confere", async () => {
   await assertSucceeds(updateDoc(doc(como(PEDRO), "repasse", "r2"), { etapa: "PAGO", valor: 350, formaPag: "Pix", conferido: false, respEmail: PEDRO, resp: "Pedro" }));
