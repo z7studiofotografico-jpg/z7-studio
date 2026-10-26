@@ -27,6 +27,8 @@ const cols = Object.fromEntries(await Promise.all(nomes.map(async n => [n, await
 const { ops, conta } = planejar(cols, nome => porNome[nome] || "");
 
 console.log(SIMULAR ? "SIMULAÇÃO (nada gravado):" : "Atualizando:", JSON.stringify(conta), "·", ops.length, "gravações");
+// aparece como aviso no resumo da execução no GitHub
+console.log(`::notice title=Atualizar dados::${SIMULAR ? "Simulação" : "Gravado"}: ${JSON.stringify(conta)} · ${ops.length} gravações`);
 if (!SIMULAR) {
   for (let i = 0; i < ops.length; i += 400) {
     const b = db.batch();
