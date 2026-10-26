@@ -20,8 +20,10 @@ service cloud.firestore {
     function pode(m) { return dono() || podeP(m); }
     function podeP(m) { let p = perfil(); return p.ativo == true && (p.papel == 'admin' || ('modulos' in p && m in p.modulos)); }
     // Carteira: quem não é admin vê os colégios sem responsável e os seus; formandos, só os seus
-    function minhaOuLivre() { return resource.data.get('respEmail', '') in ['', email()]; }
-    function minha() { return resource.data.get('respEmail', '') == email(); }
+    // (o campo é lido direto: com .get() e valor padrão o Firebase deixava listar a coleção inteira;
+    //  a atualização de dados v4 do app grava "respEmail" em todos os documentos antigos)
+    function minhaOuLivre() { return resource.data.respEmail in ['', email()]; }
+    function minha() { return resource.data.respEmail == email(); }
     // Campos que mudaram nesta gravação
     function mudou(campos) { return request.resource.data.diff(resource.data).affectedKeys().hasAny(campos); }
     // Responsável: quem não é admin só pode assumir algo sem dono (para si) ou manter como está
