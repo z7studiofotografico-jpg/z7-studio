@@ -119,10 +119,14 @@ console.log("Adriano (admin), com dados antigos:");
   ok(comp && comp[1].titulo === "" && s["privado/" + comp[0].split("/")[1]] && s["privado/" + comp[0].split("/")[1]].titulo === "Exame de sangue", "compromisso particular: assunto guardado só em 'privado'");
   // Becas
   await ir(pg, "#becas"); await pg.waitForTimeout(300);
+  await pg.getByRole("button", { name: "📦 Estoque" }).click(); await pg.waitForTimeout(200);
+  await pg.locator(".sheet").last().getByLabel("Estoque M", { exact: true }).fill("5"); await pg.locator(".sheet").last().locator("button[type=submit]").click(); await pg.waitForTimeout(300);
+  s = await store(); ok(s["config/app"].estoque && s["config/app"].estoque.tamanhos.M === 5, "estoque por tamanho gravado (M = 5)");
   await pg.getByRole("button", { name: "+ Aluguel" }).click(); await pg.waitForTimeout(200);
   sh = pg.locator(".sheet").last();
   await sh.getByLabel("Cliente").fill("Igreja Central"); await sh.getByLabel("Data do evento").fill(dia(10)); await sh.getByLabel("Data do evento").dispatchEvent("change");
   await sh.getByLabel("Beca tradicional preta", { exact: true }).fill("12"); await sh.getByLabel("M (tamanho)", { exact: true }).fill("7"); await sh.getByLabel("G (tamanho)", { exact: true }).fill("5"); await sh.getByLabel("Valor total").fill("1.200,00"); await sh.getByLabel("Já pago").fill("300");
+  ok(/Tamanho M: pediu 7, livres 5/.test(await sh.locator(".notes").last().textContent()), "avisa que faltam becas tamanho M");
   await sh.locator("button[type=submit]").click(); await pg.waitForTimeout(200);
   if (await pg.locator(".sheet").count()) { await pg.locator(".sheet").last().locator("button[type=submit]").click(); await pg.waitForTimeout(300); }
   s = await store(); const bc = Object.values(s).find(x => x.cliente === "Igreja Central");

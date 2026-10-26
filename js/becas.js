@@ -44,11 +44,12 @@ export function show(){
 
 // Quantas becas estão comprometidas entre duas datas (para conferir o estoque)
 function emUso(de, ate, ignora){
-  const out = { becas: {}, faixas: {}, capelos: {} };
+  const out = { becas: {}, faixas: {}, capelos: {}, tamanhos: {} };
   lista.filter(x => x.id !== ignora && ativo(x) && x.retirada && x.devolucao && x.retirada <= ate && x.devolucao >= de).forEach(x => {
     Object.entries(x.becasQtd || {}).forEach(([k, v]) => { out.becas[k] = (out.becas[k] || 0) + n0(v); });
     Object.entries(x.faixasQtd || {}).forEach(([k, v]) => { out.faixas[k] = (out.faixas[k] || 0) + n0(v); });
     Object.entries(x.capelosQtd || {}).forEach(([k, v]) => { out.capelos[k] = (out.capelos[k] || 0) + n0(v); });
+    Object.entries(x.tamanhosQtd || {}).forEach(([k, v]) => { out.tamanhos[k] = (out.tamanhos[k] || 0) + n0(v); });
   });
   return out;
 }
@@ -129,7 +130,7 @@ function devolver(x){
 
 // Estoque por tipo de beca e cor de faixa (salvo em Ajustes / config). Mostra o que está fora agora.
 function openEstoque(){
-  sheet("📦 Estoque de becas, faixas e capelos", (p, close) => {
+  sheet("📦 Estoque de becas, faixas, capelos e tamanhos", (p, close) => {
     const E = estoque(), hoje = C.todayStr(), u = emUso(hoje, hoje);
     p.append(el("p", "hint", C.isAdmin ? "Quantas peças vocês têm de cada tipo. O app usa isso para avisar quando faltar num período." : "Só administradores mudam o estoque."));
     const tab = (titulo, tipos, atual, fora) => {
@@ -139,12 +140,13 @@ function openEstoque(){
       f.append(box); p.append(f); return ins;
     };
     const iB = tab("Becas (o jabor vai junto)", BECAS, E.becas, u.becas), iF = tab("Faixas", FAIXAS, E.faixas, u.faixas), iC = tab("Capelos", CAPELOS, E.capelos, u.capelos);
-    p.append(el("p", "hint", "Beca americana: deixe 0 até chegar. O app avisa se alguém tentar alugar."));
+    const iT = tab("Tamanhos das becas (somando todos os tipos)", TAMANHOS, E.tamanhos, u.tamanhos);
+    p.append(el("p", "hint", "Beca americana: deixe 0 até chegar. O app avisa se alguém tentar alugar. Tamanhos: quantas becas de cada tamanho vocês têm no total; deixe tudo 0 se não quiser conferir tamanho."));
     p.append(botoes(close, "Salvar estoque"));
     if (!C.isAdmin) p.querySelector("button[type=submit]").hidden = true;
     p.addEventListener("submit", async ev => {
       ev.preventDefault(); if (!C.isAdmin) return;
-      const novo = { becas: Object.fromEntries(iB.map(([k, q]) => [k, n0(q.value)])), faixas: Object.fromEntries(iF.map(([k, q]) => [k, n0(q.value)])), capelos: Object.fromEntries(iC.map(([k, q]) => [k, n0(q.value)])) };
+      const novo = { becas: Object.fromEntries(iB.map(([k, q]) => [k, n0(q.value)])), faixas: Object.fromEntries(iF.map(([k, q]) => [k, n0(q.value)])), capelos: Object.fromEntries(iC.map(([k, q]) => [k, n0(q.value)])), tamanhos: Object.fromEntries(iT.map(([k, q]) => [k, n0(q.value)])) };
       try { await FS.setDoc(FS.doc(db, "config", "app"), { estoque: novo }, { merge: true }); C.P.estoque = novo; close(); C.toast("Estoque salvo"); render(); }
       catch (e) { C.handleErr(e); }
     });
@@ -199,6 +201,9 @@ export function form(x, pre){
       qB.forEach(([k, q]) => { const pede = n0(q.value); if (!pede) return; const tem = n0((E.becas || {})[k]), livre = tem - n0(u.becas[k]); if (pede > livre) out.push(`${BECAS.find(b => b[0] === k)[1]}: pediu ${pede}, livres ${Math.max(0, livre)}${tem ? "" : " (sem estoque cadastrado)"}`); });
       qF.forEach(([k, q]) => { const pede = n0(q.value); if (!pede) return; const tem = n0((E.faixas || {})[k]), livre = tem - n0(u.faixas[k]); if (pede > livre) out.push(`Faixa ${FAIXAS.find(b => b[0] === k)[1].toLowerCase()}: pediu ${pede}, livres ${Math.max(0, livre)}${tem ? "" : " (sem estoque cadastrado)"}`); });
       qC.forEach(([k, q]) => { const pede = n0(q.value); if (!pede) return; const tem = n0((E.capelos || {})[k]), livre = tem - n0(u.capelos[k]); if (pede > livre) out.push(`Capelo: pediu ${pede}, livres ${Math.max(0, livre)}${tem ? "" : " (sem estoque cadastrado)"}`); });
+      // tamanho só é conferido se o estoque de tamanhos foi preenchido
+      const temTam = Object.values(E.tamanhos || {}).some(v => n0(v));
+      if (temTam) qT.forEach(([k, q]) => { const pede = n0(q.value); if (!pede) return; const livre = n0(E.tamanhos[k]) - n0(u.tamanhos[k]); if (pede > livre) out.push(`Tamanho ${k}: pediu ${pede}, livres ${Math.max(0, livre)}`); });
       return out;
     }
     function checa(){
