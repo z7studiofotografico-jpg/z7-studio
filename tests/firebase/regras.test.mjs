@@ -290,6 +290,16 @@ test("PR: quem é da Linha de Frente confere se o aluno já existe antes de incl
   await assertFails(getDoc(doc(como(PEDRO), "repasse", "antigo")));
 });
 
+test("erros do app: cada um grava o seu (curto); só o admin lê", async () => {
+  const e = { onde: "viewAgenda", msg: "x is undefined", pilha: "", email: PEDRO, tela: "#agenda", app: "teste", em: "2026-10-27" };
+  await assertSucceeds(setDoc(doc(como(PEDRO), "erros", "e1"), e));
+  await assertFails(setDoc(doc(como(PEDRO), "erros", "e2"), { ...e, email: ANA }));
+  await assertFails(setDoc(doc(como(PEDRO), "erros", "e3"), { ...e, msg: "x".repeat(301) }));
+  await assertFails(setDoc(doc(como(PEDRO), "erros", "e4"), { ...e, extra: "dado pessoal" }));
+  await assertFails(getDoc(doc(como(PEDRO), "erros", "e1")));
+  await assertSucceeds(getDoc(doc(como(ADRIANO), "erros", "e1")));
+});
+
 test("pedido de aluno repetido: a equipe pede e vê só o seu; só o admin decide", async () => {
   const meu = "pr_r2_pedro-vendas-com",
     ped = { tipo: "pr-repetido", alvoId: "r2", aluno: "Bruno", porEmail: PEDRO, status: "pendente" };

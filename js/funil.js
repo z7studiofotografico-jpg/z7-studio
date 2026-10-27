@@ -1,7 +1,7 @@
 // Funil de vendas: leads do WhatsApp, mensagens prontas, follow-ups e venda.
 // Antes ficava dentro do index.html; agora é um módulo como os outros.
 import { avisoErro, emPartes, norm } from "./ui.js";
-import { campoReais } from "./regras.js";
+import { campoReais, centavos, reais } from "./regras.js";
 import { ESTUDIO } from "./mensagens.js";
 import * as U from "./util.js";
 let C,
@@ -222,9 +222,11 @@ function renderStats() {
   $("sToday").textContent = today;
   $("sOpen").textContent = leads.filter(l => OPEN.includes(l.etapa)).length;
   const ym = todayStr().slice(0, 7);
-  $("sWon").textContent = money(
-    leads.filter(l => l.etapa === "FECHADO" && (l.fechadoEm || "").slice(0, 7) === ym).reduce((a, l) => a + (Number(l.valor) || 0), 0)
-  );
+  // igual ao Dashboard: em centavos e sem as vendas da equipe que ainda estão "a conferir"
+  const doMes = leads.filter(l => l.etapa === "FECHADO" && (l.fechadoEm || "").slice(0, 7) === ym),
+    aConferir = doMes.filter(l => l.conferido === false).length;
+  $("sWon").textContent = money(reais(doMes.filter(l => l.conferido !== false).reduce((a, l) => a + centavos(l.valor), 0)));
+  $("sWon").title = aConferir ? `Mais ${aConferir} venda${aConferir > 1 ? "s" : ""} a conferir` : "";
   try {
     if ("setAppBadge" in navigator) {
       late + today ? navigator.setAppBadge(late + today) : navigator.clearAppBadge();

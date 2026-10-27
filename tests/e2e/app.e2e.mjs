@@ -1222,6 +1222,29 @@ await cenario("Pedro (vendedor: Linha de Frente, Agendamento, Instituições)", 
   ok(erros.length === 0, "sem erros no console" + (erros.length ? ": " + erros.slice(0, 3).join(" | ") : ""));
 });
 
+await cenario("Erro no app (não é falta de internet)", async () => {
+  const { pg, ctx, store } = await abrir(ADRIANO, migrar(base));
+  // simula um defeito na tela de Becas
+  await ctx.route(/\/js\/becas\.js/, rt =>
+    rt.fulfill({
+      contentType: "text/javascript",
+      body: "export function init() {} export function hide() {} export function show() { throw new Error('defeito de teste'); }"
+    })
+  );
+  await ir(pg, "#becas");
+  const t = await pg.textContent("#viewBecas");
+  ok(
+    /Erro no app/.test(t) && /defeito de teste/.test(t) && !/Verifique a internet/.test(t),
+    "defeito aparece como erro no app, não como internet"
+  );
+  const s = await store();
+  const reg = Object.entries(s).find(([k]) => k.startsWith("erros/"));
+  ok(reg && reg[1].msg === "defeito de teste" && reg[1].email === ADRIANO, "o erro fica registrado para o admin");
+  await pg.click("#btnPrices");
+  await pg.waitForTimeout(400);
+  ok(/Erros do app \(1\)/.test(await pg.textContent("#pErros")), "Ajustes mostra os erros registrados");
+});
+
 await cenario("Cadastro sem módulos", async () => {
   const { pg } = await abrir(NOVO, Object.assign({}, base, { "config/app": { versaoDados: 4 } }));
   ok((await visiveis(pg)).length === 0, "não vê nenhum card");

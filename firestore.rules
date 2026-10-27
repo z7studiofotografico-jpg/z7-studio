@@ -119,6 +119,13 @@ service cloud.firestore {
       allow create: if aprovador() || admin();
       allow read: if aprovador() || admin();
     }
+    // Erros do app (defeitos, não falta de internet): cada um grava o seu; só o admin lê e apaga
+    match /erros/{id} {
+      allow create: if membro() && request.resource.data.email == email()
+        && request.resource.data.keys().hasOnly(['onde', 'msg', 'pilha', 'email', 'tela', 'app', 'em'])
+        && request.resource.data.msg.size() <= 300 && request.resource.data.pilha.size() <= 800;
+      allow read, delete: if admin();
+    }
     // Aluno repetido no PR: quem é da equipe pede; só o admin decide (passa para a pessoa ou mantém onde está).
     // Cada um vê só os próprios pedidos e avisos (o identificador termina com o e-mail da pessoa), marca que viu
     // a resposta e pode pedir de novo um pedido já decidido.
