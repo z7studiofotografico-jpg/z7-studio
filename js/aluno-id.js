@@ -1,8 +1,8 @@
-// ID do aluno (usado pelo estúdio para separar as fotos e identificar o aluno no ano): "SIGLA - NN".
+// ID do aluno (usado pelo estúdio para separar as fotos e identificar o aluno): "26CEPNCP-01" = ano + sigla + número.
 // SIGLA = iniciais do nome do colégio (COLEGIO ESTADUAL PROFESSOR NEY CIDADE PALMEIRO → CEPNCP);
 // CIEP usa o número (CIEP 225 → CIEP225); se outro colégio já usa as mesmas iniciais,
 // fica com as iniciais e o último nome inteiro (CEPNC + PALMEIRO → CEPNCPALMEIRO).
-// NN = número do aluno no colégio, em sequência.
+// A sigla é a mesma todo ano; o ano na frente separa os alunos de cada ano. Número em sequência no colégio e no ano.
 // Também avalia telefones: não dá para saber se o número existe sem mandar mensagem,
 // mas dá para pegar os que com certeza estão errados (DDD que não existe, celular sem o 9, número repetido).
 // Sem tela: testado em tests/aluno-id.test.mjs.
@@ -35,26 +35,41 @@ export function siglaDe(nome, ocupadas) {
   );
 }
 
-// "CEPNCP - 01", "cepncp-1", "CIEP225 - 3" → { sigla, n }; outro formato → null
+const aa = ano => String(ano || "").slice(-2);
+const p2 = n => String(n).padStart(2, "0");
+// "26CEPNCP-01" → { aa: 26, sigla, n }; formato antigo da planilha ("CEPNCP - 01") → aa: null; outro → null
 export function lerCodigo(c) {
-  const m = chave(c).match(/^([A-Z0-9]+(?: [A-Z0-9]+)*?)\s*-\s*(\d{1,4})$/);
+  const m = chave(c)
+    .replace(/\s+/g, "")
+    .match(/^(\d{2})?([A-Z][A-Z0-9]*)-(\d{1,4})$/);
   if (!m) return null;
-  return { sigla: m[1].replace(/\s+/g, ""), n: Number(m[2]) };
+  return { aa: m[1] ? Number(m[1]) : null, sigla: m[2], n: Number(m[3]) };
 }
-export const fmtCodigo = (sigla, n) => `${sigla} - ${String(n).padStart(2, "0")}`;
-// Forma única para buscar (sem espaço e com o número em 2 dígitos): "CEPNCP01"
+// ID com o ano na frente: cada aluno fica único (25CEPNCP-01 e 26CEPNCP-01 são alunos diferentes)
+export const fmtCodigo = (ano, sigla, n) => `${ano ? aa(ano) : ""}${sigla}-${p2(n)}`;
+// ID no formato atual: o antigo (sem ano) ganha o ano do aluno; o que não dá para ler fica como está
+export function comAno(c, ano) {
+  const x = lerCodigo(c);
+  if (!x) return String(c || "").trim();
+  return x.aa != null ? fmtCodigo(2000 + x.aa, x.sigla, x.n) : fmtCodigo(ano, x.sigla, x.n);
+}
+// Forma única para buscar: "26CEPNCP01" (sem ano no formato antigo: "CEPNCP01")
 export function codigoBusca(c) {
   const x = lerCodigo(c);
-  if (x) return x.sigla + String(x.n).padStart(2, "0");
+  if (x) return (x.aa != null ? p2(x.aa) : "") + x.sigla + p2(x.n);
   return chave(c).replace(/[^A-Z0-9]/g, "");
 }
-// O texto digitado na busca parece um ID? ("CEPNCP 05", "cepncp-5", "CIEP225 - 03")
+// O texto digitado na busca parece um ID? ("26CEPNCP-05", "26cepncp 5", "cepncp 5", "CIEP225-03")
 export function pareceCodigo(t) {
-  return /^[A-Za-z][A-Za-z0-9]{1,15}\s*[-\s]\s*\d{1,4}$/.test(String(t || "").trim());
+  return /^(\d{2})?[A-Za-z][A-Za-z0-9]{1,15}\s*[-\s]\s*\d{1,4}$/.test(String(t || "").trim());
 }
-export function codigoDaBusca(t) {
-  const m = chave(t).match(/^([A-Z][A-Z0-9]{1,15})\s*[-\s]\s*(\d{1,4})$/);
-  return m ? m[1] + m[2].padStart(2, "0") : "";
+// Formas de busca do que foi digitado; sem o ano, procura nos anos informados (e no formato antigo)
+export function codigosDaBusca(t, anos) {
+  const m = chave(t).match(/^(\d{2})?([A-Z][A-Z0-9]{1,15})\s*[-\s]\s*(\d{1,4})$/);
+  if (!m) return [];
+  const resto = m[2] + p2(m[3]);
+  if (m[1]) return [m[1] + resto];
+  return [...(anos || []).map(a => aa(a) + resto), resto];
 }
 
 // Sigla que um colégio já usa (a mais comum entre os IDs dos alunos dele), ou "" se ninguém tem ID
@@ -67,21 +82,41 @@ export function siglaUsada(codigos) {
   const top = Object.entries(n).sort((a, b) => b[1] - a[1])[0];
   return top ? top[0] : "";
 }
-// Próximo ID do colégio: depois do maior número já usado com essa sigla
-export function proximoCodigo(sigla, codigos) {
-  if (!sigla) return "";
+// Maior número já usado com essa sigla naquele ano (os IDs antigos, sem ano, contam como do ano do aluno)
+export function maiorNumero(ano, sigla, codigos) {
   let max = 0;
   (codigos || []).forEach(c => {
     const x = lerCodigo(c);
-    if (x && x.sigla === sigla && x.n > max) max = x.n;
+    if (x && x.sigla === sigla && (x.aa == null || x.aa === Number(aa(ano))) && x.n > max) max = x.n;
   });
-  return fmtCodigo(sigla, max + 1);
+  return max;
 }
-// Ordem da lista por ID (sigla, número); quem não tem ID vai para o fim, por nome
+export const proximoCodigo = (ano, sigla, codigos) => (sigla ? fmtCodigo(ano, sigla, maiorNumero(ano, sigla, codigos) + 1) : "");
+// Reserva o próximo número no banco (ids/26CEPNCP = { ultimo }), numa transação: duas pessoas
+// incluindo aluno do mesmo colégio ao mesmo tempo nunca recebem o mesmo ID.
+// Se o banco recusar (regras antigas), cai no cálculo pela lista.
+export async function reservarCodigo(FS, db, ano, sigla, codigos) {
+  if (!sigla) return "";
+  const max = maiorNumero(ano, sigla, codigos);
+  try {
+    const ref = FS.doc(db, "ids", aa(ano) + sigla);
+    const n = await FS.runTransaction(db, async tx => {
+      const s = await tx.get(ref);
+      const n = Math.max(s.exists() ? Number(s.data().ultimo) || 0 : 0, max) + 1;
+      tx.set(ref, { ultimo: n });
+      return n;
+    });
+    return fmtCodigo(ano, sigla, n);
+  } catch (e) {
+    console.warn("[Z7] reservar ID", e);
+    return fmtCodigo(ano, sigla, max + 1);
+  }
+}
+// Ordem da lista por ID (ano, sigla, número); quem não tem ID vai para o fim, por nome
 export function ordemCodigo(a, b) {
   const x = lerCodigo(a.codigo),
     y = lerCodigo(b.codigo);
-  if (x && y) return x.sigla.localeCompare(y.sigla) || x.n - y.n;
+  if (x && y) return (x.aa || 0) - (y.aa || 0) || x.sigla.localeCompare(y.sigla) || x.n - y.n;
   if (x || y) return x ? -1 : 1;
   return String(a.nome || "").localeCompare(String(b.nome || ""), "pt-BR");
 }
@@ -120,3 +155,5 @@ export function telRelatorio(tel) {
   const a = avisoTel(d);
   return a ? `${f} ⚠️ ${a}` : f;
 }
+// Telefone e e-mail juntos, para os relatórios
+export const contatoRel = (tel, email) => [telRelatorio(tel), String(email || "").trim()].filter(Boolean).join(" · ");

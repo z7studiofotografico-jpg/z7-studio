@@ -3,7 +3,7 @@
 import { pagamentosDe, proxVenc } from "./regras.js";
 import { norm } from "./ui.js";
 import { entradasFones } from "./pedidos.js";
-import { codigoBusca } from "./aluno-id.js";
+import { codigoBusca, comAno } from "./aluno-id.js";
 export const VERSAO_DADOS = 9;
 
 // cols = { instituicoes, formandos, repasse, agenda, ensaios, leads }: listas de { id, ...dados }
@@ -68,8 +68,16 @@ export function planejar(cols, emailDe) {
   for (const x of cols.repasse || []) {
     const patch = {};
     if (x.resp && !x.respEmail && emailDe(x.resp)) patch.respEmail = emailDe(x.resp);
-    // v9: ID do aluno (ex.: "CEPNCP - 01") no formato de busca, para achar o aluno digitando o ID
-    if (x.codigo && x.codigoBusca !== codigoBusca(x.codigo)) patch.codigoBusca = codigoBusca(x.codigo);
+    // v9: ID do aluno com o ano na frente ("CEPNCP - 01" do aluno de 2026 → "26CEPNCP-01"; o original fica em codigoOrig)
+    // e no formato de busca, para achar o aluno digitando o ID
+    if (x.codigo) {
+      const novo = x.ano ? comAno(x.codigo, x.ano) : x.codigo;
+      if (novo !== x.codigo) {
+        patch.codigo = novo;
+        if (x.codigoOrig == null) patch.codigoOrig = x.codigo;
+      }
+      if (x.codigoBusca !== codigoBusca(novo)) patch.codigoBusca = codigoBusca(novo);
+    }
     if (Object.keys(patch).length) muda("PR", "repasse", x.id, patch);
   }
   // v8: índice de telefones do PR (acha a mesma família em outro ano ou colégio, ex.: aluno transferido)

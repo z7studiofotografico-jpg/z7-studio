@@ -7,6 +7,7 @@ import { ENDERECO, ESTUDIO } from "./mensagens.js";
 import { lerReais, centavos, reais, brl } from "./regras.js";
 import * as U from "./util.js";
 import { botaoRelatorio } from "./relatorio.js";
+import { contatoRel } from "./aluno-id.js";
 let C,
   FS,
   db,
@@ -774,9 +775,10 @@ function relatorioBecas() {
     prox = lista.filter(x => x.status === "reservado");
   const est = somaObj(estoque().becas);
   const aRec = reais(lista.filter(ativo).reduce((s, x) => s + centavos(falta(x)), 0));
-  const cols = ["Cliente", "Evento", "Becas", "Retirada", "Devolução", "Falta receber"];
+  const cols = ["Cliente", "Telefone", "Evento", "Becas", "Retirada", "Devolução", "Falta receber"];
   const linha = x => [
     title(x.cliente),
+    contatoRel(x.tel, x.email),
     [x.evento, x.dataEvento && U.fmtDate(x.dataEvento)].filter(Boolean).join(" · "),
     totBecas(x),
     x.retirada ? U.fmtDate(x.retirada) + (x.retiradaHora ? " " + x.retiradaHora : "") : "",

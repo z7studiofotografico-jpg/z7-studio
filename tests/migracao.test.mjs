@@ -120,17 +120,21 @@ test("v8: índice de telefones do PR (e não regrava o que já está igual)", ()
   assert.equal(planejar({ repasse, fones }, () => "").ops.filter(o => o.col === "fones").length, 0);
 });
 
-test("v9: ID do aluno do PR ganha o formato de busca (só quando falta ou mudou)", async () => {
+test("v9: ID do aluno do PR ganha o ano na frente e o formato de busca (só quando falta ou mudou)", async () => {
   const { planejar } = await import("../js/migracao.js");
   const repasse = [
-    { id: "a", codigo: "CEPNCP - 1" },
-    { id: "b", codigo: "CEPNCP - 02", codigoBusca: "CEPNCP02" },
-    { id: "c", codigo: "" }
+    { id: "a", codigo: "CEPNCP - 1", ano: 2026 },
+    { id: "b", codigo: "26CEPNCP-02", codigoBusca: "26CEPNCP02", ano: 2026 },
+    { id: "c", codigo: "" },
+    { id: "d", codigo: "CEPNCP - 03", ano: 2025, codigoOrig: "CEPNCP - 03" }
   ];
   const { ops } = planejar({ repasse }, () => "");
   const pr = ops.filter(o => o.col === "repasse");
   assert.deepEqual(
     pr.map(o => [o.id, o.dados]),
-    [["a", { codigoBusca: "CEPNCP01" }]]
+    [
+      ["a", { codigo: "26CEPNCP-01", codigoOrig: "CEPNCP - 1", codigoBusca: "26CEPNCP01" }],
+      ["d", { codigo: "25CEPNCP-03", codigoBusca: "25CEPNCP03" }]
+    ]
   );
 });

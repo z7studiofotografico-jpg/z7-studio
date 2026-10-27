@@ -5,7 +5,7 @@ import { openEvento, reservarVarios, liberar, msgErroData, camposEvento, linhaEv
 import * as U from "./util.js";
 import { openImport } from "./instituicoes-import.js";
 import { botaoRelatorio, contar } from "./relatorio.js";
-import { siglaDe } from "./aluno-id.js";
+import { siglaDe, contatoRel } from "./aluno-id.js";
 // (o Agendamento importa estas daqui; continuam disponíveis)
 export { KINDS, nomeEvento, avisarColegioPorEmail, painelAvisar, msgWhatsColegio } from "./eventos.js";
 // Módulo Instituições: colégio particular, colégio público, colégio profissionalizante e faculdade.
@@ -604,15 +604,26 @@ function openForm(it) {
           )
         : null;
     if (tipoSel) p.append(field("É faculdade ou curso profissionalizante?", tipoSel));
-    // Sigla do ID dos alunos (CEPNCP - 01...): em branco, o app usa as iniciais do nome
+    // Sigla do ID dos alunos (26CEPNCP-01...): o app usa as iniciais do nome; escolhe na mão só quando repete com outro colégio
     const sigla = inp(it ? it.sigla || "" : "", "", 16);
     sigla.autocapitalize = "characters";
+    const avSigla = el("p", "hint");
     const sugere = () => {
-      sigla.placeholder = "automática: " + (siglaDe(nome.value) || "iniciais do nome");
+      const auto = siglaDe(nome.value);
+      const outro = items.find(x => (!it || x.id !== it.id) && (x.sigla || siglaDe(x.nome)) === auto);
+      sigla.placeholder = auto ? "automática: " + auto : "iniciais do nome";
+      avSigla.className = outro && !sigla.value.trim() ? "wait" : "hint";
+      avSigla.textContent =
+        outro && !sigla.value.trim()
+          ? `⚠️ A sigla ${auto} já é do ${title(outro.nome)}. Escolha outra aqui (ex.: ${siglaDe(nome.value, [auto])}).`
+          : "Só precisa preencher se a sigla repetir com outro colégio. O ID do aluno leva o ano na frente (ex.: 26" +
+            (auto || "CEPNCP") +
+            "-01).";
     };
     nome.addEventListener("input", sugere);
+    sigla.addEventListener("input", sugere);
     sugere();
-    p.append(field("Sigla do ID dos alunos", sigla));
+    p.append(field("Sigla do ID dos alunos", sigla), avSigla);
     const a = (it && it.endereco) || {};
     const rua = inp(title(a.rua)),
       num = inp(a.numero, "", 20),
@@ -1033,6 +1044,12 @@ function relatorioInst() {
   const alunos = i => i.alunosConfirmados || (i.mediaAlunos ? "~" + i.mediaAlunos : "");
   const lugar = i => [title(i.endereco?.bairro), title(i.endereco?.cidade)].filter(Boolean).join(" · ");
   const tipoTxt = i => (doisTipos ? [(TIPOS[i.tipo] || {}).nome || ""] : []);
+  // contatos do colégio: nome, cargo, telefone e e-mail
+  const contatos = i =>
+    (i.contatos || [])
+      .map(c => [c.nome && title(c.nome), c.cargo, contatoRel(c.tel, c.email)].filter(Boolean).join(" · "))
+      .concat(i.email ? [i.email] : [])
+      .join(" / ");
   const dataEv = (i, k) => (i[k] && i[k].data && i[k].status !== "recusado" ? U.fmtDate(i[k].data) : "");
   return {
     titulo: T.nome,
@@ -1056,7 +1073,17 @@ function relatorioInst() {
       {
         titulo: "Em andamento",
         tabela: {
-          cols: ["Instituição", ...(doisTipos ? ["Tipo"] : []), "Etapa", "Onde", "Responsável", "Próximo passo", "Retorno", "Alunos"],
+          cols: [
+            "Instituição",
+            ...(doisTipos ? ["Tipo"] : []),
+            "Etapa",
+            "Onde",
+            "Responsável",
+            "Próximo passo",
+            "Retorno",
+            "Alunos",
+            "Contatos"
+          ],
           linhas: abertas
             .slice()
             .sort(ordem)
@@ -1068,7 +1095,8 @@ function relatorioInst() {
               C.nomeDe(i) ? U.first(C.nomeDe(i)) : "Livre",
               i.proximoPasso || "",
               i.followup ? U.fmtDate(i.followup) + (status(i) === "late" ? " (atrasado)" : "") : "",
-              alunos(i)
+              alunos(i),
+              contatos(i)
             ])
         },
         vazio: "Nenhuma em andamento."
@@ -1076,7 +1104,16 @@ function relatorioInst() {
       {
         titulo: "Fechadas",
         tabela: {
-          cols: ["Instituição", ...(doisTipos ? ["Tipo"] : []), "Responsável", "Fechado em", "Dia de fotos", "Formatura", "Alunos"],
+          cols: [
+            "Instituição",
+            ...(doisTipos ? ["Tipo"] : []),
+            "Responsável",
+            "Fechado em",
+            "Dia de fotos",
+            "Formatura",
+            "Alunos",
+            "Contatos"
+          ],
           linhas: fechadas
             .slice()
             .sort((a, b) => (a.nome || "").localeCompare(b.nome || "", "pt-BR"))
@@ -1087,7 +1124,8 @@ function relatorioInst() {
               i.fechadoEm ? U.fmtDate(i.fechadoEm) + "/" + i.fechadoEm.slice(0, 4) : "",
               dataEv(i, "diaFotos"),
               dataEv(i, "formatura"),
-              alunos(i)
+              alunos(i),
+              contatos(i)
             ])
         },
         vazio: "Nenhuma fechada ainda."

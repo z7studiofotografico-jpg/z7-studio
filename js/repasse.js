@@ -14,10 +14,11 @@ import { botaoRelatorio, contar } from "./relatorio.js";
 import {
   siglaDe,
   siglaUsada,
-  proximoCodigo,
+  reservarCodigo,
   codigoBusca,
+  comAno,
   pareceCodigo,
-  codigoDaBusca,
+  codigosDaBusca,
   ordemCodigo,
   avisoTel,
   telRelatorio
@@ -455,7 +456,11 @@ async function gerarCodigo(d) {
     .filter(n => norm(n) !== norm(d.escola))
     .map(n => siglaDe(n));
   const sigla = siglaUsada(todos.map(x => x.codigo)) || siglaDe(d.escola, outras);
-  return proximoCodigo(
+  // número reservado no banco: dois cadastros ao mesmo tempo nunca pegam o mesmo ID
+  return reservarCodigo(
+    FS,
+    db,
+    d.ano || ANO(),
     sigla,
     todos.filter(x => !d.ano || x.ano === d.ano).map(x => x.codigo)
   );
@@ -478,13 +483,13 @@ async function buscar() {
       }
       const n = norm(txt),
         dg = txt.replace(/\D/g, ""),
-        cod = pareceCodigo(txt) ? codigoDaBusca(txt) : "";
+        cods = pareceCodigo(txt) ? codigosDaBusca(txt, [ANO()]) : [];
       items = cacheLF.docs
         .filter(
           it =>
             (!esc || it.escola === esc) &&
             (!txt ||
-              (cod && codigoBusca(it.codigo) === cod) ||
+              (cods.length && cods.includes(codigoBusca(it.codigo))) ||
               (dg.length >= 8 ? (it.telefones || []).some(t => t.includes(dg.slice(-8))) : (it.nomeBusca || "").includes(n)))
         )
         .slice(0, esc ? 1000 : 100)
@@ -499,7 +504,19 @@ async function buscar() {
   let q = null;
   const dg = txt.replace(/\D/g, "");
   if (dg.length >= 8) q = FS.query(col, FS.where("telefones", "array-contains", dg.replace(/^55(?=\d{10,11}$)/, "")), FS.limit(30));
-  else if (pareceCodigo(txt)) q = FS.query(col, FS.where("codigoBusca", "==", codigoDaBusca(txt)), FS.limit(30));
+  else if (pareceCodigo(txt))
+    q = FS.query(
+      col,
+      FS.where(
+        "codigoBusca",
+        "in",
+        codigosDaBusca(
+          txt,
+          Array.from({ length: 12 }, (_, i) => ANO() - i)
+        )
+      ),
+      FS.limit(30)
+    );
   else if (txt.length >= 2) {
     const n = norm(txt);
     q = FS.query(col, FS.orderBy("nomeBusca"), FS.startAt(n), FS.endAt(n + ""), FS.limit(30));
@@ -1094,7 +1111,7 @@ function openDados(it) {
     const r1 = el("div", "row2");
     r1.append(field("Colégio", escola), field("Ano", ano));
     // ID do aluno (separação das fotos): o app dá o próximo número do colégio; dá para trocar
-    const codigo = mk(it.codigo || "", novo ? "automático (ex.: CEPNCP - 07)" : "ex.: CEPNCP - 07");
+    const codigo = mk(it.codigo || "", novo ? "automático (ex.: 26CEPNCP-07)" : "ex.: 26CEPNCP-07");
     codigo.maxLength = 30;
     codigo.autocapitalize = "characters";
     p.append(field("Nome do aluno", nome), r1, field("ID do aluno", codigo));
@@ -1266,7 +1283,8 @@ function openDados(it) {
         contatos: cs,
         telefones: cs.map(c => c.tel)
       };
-      const cod = codigo.value.trim().toUpperCase();
+      // ID digitado sem o ano ganha o ano do aluno (CEPNCP-7 → 26CEPNCP-07)
+      const cod = codigo.value.trim() ? comAno(codigo.value.trim().toUpperCase(), Number(ano.value) || ANO()) : "";
       if (novo || cod !== (it.codigo || "")) Object.assign(patch, { codigo: cod, codigoBusca: cod ? codigoBusca(cod) : "" });
       const falta = faltando(patch);
       if (novo) {
@@ -1528,10 +1546,7 @@ function relatorioPR() {
     .slice()
     .sort(tab === "buscar" && esc ? ordemBusca(true) : (a, b) => String(a.followup || "9").localeCompare(String(b.followup || "9")));
   const tels = x =>
-    (x.contatos || [])
-      .slice(0, 2)
-      .map(c => (c.tipo ? c.tipo + ": " : "") + telRelatorio(c.tel))
-      .join(" / ");
+    [...(x.contatos || []).map(c => (c.tipo ? c.tipo + ": " : "") + telRelatorio(c.tel)), x.email || ""].filter(Boolean).join(" / ");
   return {
     titulo: "PR · " + segNome(seg),
     subtitulo:
@@ -1556,7 +1571,7 @@ function relatorioPR() {
       {
         titulo: "Contatos (" + lista.length + ")",
         tabela: {
-          cols: ["ID", "Aluno", "Colégio", "Ano", "Etapa", "Responsável", "Próximo contato", "Telefones"],
+          cols: ["ID", "Aluno", "Colégio", "Ano", "Etapa", "Responsável", "Próximo contato", "Telefones e e-mail"],
           linhas: lista.map(x => [
             x.codigo || "",
             title(x.nome),

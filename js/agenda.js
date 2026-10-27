@@ -14,6 +14,7 @@ import { feriado, feriadosEntre } from "./feriados.js";
 import { el, title, field, sheet, botoes, wa, avisoErro } from "./ui.js";
 import * as U from "./util.js";
 import { botaoRelatorio } from "./relatorio.js";
+import { contatoRel } from "./aluno-id.js";
 import { initForm, openEnsaio, openComp } from "./agenda-form.js";
 import { TIPOS_ENSAIO, diaTxt, fimDe, resumoDiaEm } from "./agenda-tempo.js";
 export { openEnsaio, TIPOS_ENSAIO };
@@ -988,6 +989,15 @@ export async function contarPendentes(ctx) {
 
 // Relatório para reunião: tudo do mês que está no calendário, com o filtro escolhido
 const NOME_FILTRO = { tudo: "Tudo", colegio: "Colégios", ensaio: "Ensaios", comp: "Compromissos", visita: "Visitas", beca: "Becas" };
+// Contato de cada compromisso para o relatório (nome, telefone e e-mail quando tem)
+function contatoRelatorio(it) {
+  const x = it.x;
+  const c = it.t === "c" ? x.contato || {} : it.t === "v" ? (x.contatos || [])[0] || {} : null;
+  if (c) return [c.nome && title(c.nome), contatoRel(c.tel, c.email)].filter(Boolean).join(" · ");
+  if (it.t === "e") return marco() ? contatoRel(x.tel, x.email) : "";
+  if (it.t === "b") return contatoRel(x.tel, x.email);
+  return "";
+}
 function linhaRelatorio(it) {
   const x = it.x;
   if (it.t === "c")
@@ -1036,14 +1046,15 @@ function relatorioAgenda() {
         titulo: "Dia a dia",
         nota: mes === U.todayStr().slice(0, 7) ? "Deste mês, de hoje em diante." : "",
         tabela: {
-          cols: ["Dia", "Tipo", "O quê", "Detalhes"],
+          cols: ["Dia", "Tipo", "O quê", "Detalhes", "Contato"],
           linhas: doMes.map(it => {
             const [oque, det] = linhaRelatorio(it);
             return [
               `${U.fmtDate(it.data)} (${SEMANA[new Date(it.data + "T12:00").getDay()]})`,
               TIPO[it.t] || "",
               oque,
-              det.filter(Boolean).join(" · ")
+              det.filter(Boolean).join(" · "),
+              contatoRelatorio(it)
             ];
           })
         },

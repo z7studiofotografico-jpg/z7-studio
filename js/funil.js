@@ -5,6 +5,7 @@ import { campoReais, centavos, reais } from "./regras.js";
 import { ESTUDIO } from "./mensagens.js";
 import * as U from "./util.js";
 import { botaoRelatorio, contar } from "./relatorio.js";
+import { contatoRel } from "./aluno-id.js";
 let C,
   leads = [],
   filter = "ABERTOS",
@@ -723,9 +724,10 @@ function relatorioFunil() {
       {
         titulo: "Leads em aberto",
         tabela: {
-          cols: ["Nome", "Etapa", "Próximo contato", "Responsável", "Serviço", "Origem", "Valor"],
+          cols: ["Nome", "Telefone", "Etapa", "Próximo contato", "Responsável", "Serviço", "Origem", "Valor"],
           linhas: abertos.map(l => [
             l.nome,
+            contatoRel(l.telefone, l.email),
             l.etapa,
             l.followup ? dataBR(l.followup) + (status(l) === "late" ? " (atrasado)" : "") : "sem data",
             C.nomeDe(l) || "—",
@@ -739,9 +741,10 @@ function relatorioFunil() {
       {
         titulo: "Vendas fechadas no mês",
         tabela: {
-          cols: ["Cliente", "Data", "Valor", "Responsável", "Situação"],
+          cols: ["Cliente", "Telefone", "Data", "Valor", "Responsável", "Situação"],
           linhas: fechados.map(l => [
             l.nome,
+            contatoRel(l.telefone, l.email),
             dataBR(l.fechadoEm),
             money(l.valor || 0),
             C.nomeDe(l) || "—",

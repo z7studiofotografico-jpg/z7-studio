@@ -27,7 +27,7 @@ import { editorPrecos } from "./precos.js";
 import * as Ev from "./eventos.js";
 import * as U from "./util.js";
 import { botaoRelatorio } from "./relatorio.js";
-import { siglaDe, telRelatorio } from "./aluno-id.js";
+import { siglaDe, contatoRel } from "./aluno-id.js";
 // Leitura sob demanda: ao abrir, só as parcelas que vencem até o fim do mês (campo proxVenc);
 // a lista completa de formandos só é lida quando alguém abre as abas Adesão, Kits ou Turmas.
 let C,
@@ -664,7 +664,7 @@ async function relatorioFormaturas() {
             f.codigo || "",
             title(f.nome),
             title(f.instNome),
-            telRelatorio(f.tel),
+            contatoRel(f.tel, f.email),
             f.kit || (ehKit01(f) ? "Kit 01" : "Kit"),
             `${pagasDe(f) + 1}/${nParcelas(f)}`,
             moeda(valorParcela(f, pagasDe(f) + 1)),

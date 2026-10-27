@@ -766,7 +766,7 @@ await cenario("Adriano (admin), com os dados já atualizados no servidor", async
     s = await store();
     const eva = Object.values(s).find(x => x.nome === "Eva Direto");
     // ID do aluno: COLEGIO ALFA e COLEGIO ANTIGO têm as mesmas iniciais (CA): fica com o último nome inteiro
-    ok(eva && /^CALFA - \d\d$/.test(eva.codigo || ""), "formando novo ganha o ID da turma: " + (eva && eva.codigo));
+    ok(eva && /^\d\dCALFA-\d\d$/.test(eva.codigo || ""), "formando novo ganha o ID da turma: " + (eva && eva.codigo));
     ok(eva && eva.instId === "i1" && eva.kitId === "k01", "+ Formando no card Formaturas: incluído na turma com o Kit 01");
     await pg.locator(".panel.wide").getByRole("button", { name: "Fechar" }).click();
     await calmo(pg);
@@ -1347,7 +1347,10 @@ await cenario("Pedro (vendedor: Linha de Frente, Agendamento, Instituições)", 
       "+ Aluno no PR: incluído e já separado para o vendedor"
     );
     ok(
-      paulo && paulo.codigo === "CA - 31" && paulo.codigoBusca === "CA31" && paulo.escola === "COLEGIO ALFA",
+      paulo &&
+        paulo.codigo === String(hoje.getFullYear()).slice(2) + "CA-31" &&
+        paulo.codigoBusca === String(hoje.getFullYear()).slice(2) + "CA31" &&
+        paulo.escola === "COLEGIO ALFA",
       "+ Aluno: ganha o próximo ID do colégio e o nome do colégio como já está no PR (" +
         (paulo && paulo.codigo + " · " + paulo.escola) +
         ")"
@@ -1578,6 +1581,19 @@ await cenario("Relatórios para imprimir (um por card)", async () => {
     const { pg, erros, store } = await abrir(ADRIANO, migrar(base));
     await calmo(pg);
     for (const [h, t] of telas) await etapa(pg, "relatório " + h, () => confere(pg, h, t, "admin"));
+    // relatórios com o telefone das pessoas
+    await etapa(pg, "telefones nos relatórios", async () => {
+      for (const [h, re] of [
+        ["#funil", /\(\d\d\) \d{4,5}-\d{4}/],
+        ["#formaturas", /\(21\) 97777-6666/]
+      ]) {
+        await ir(pg, h);
+        await pg.getByRole("button", { name: "🖨️ Relatório" }).first().click();
+        await pg.waitForSelector("#relatorio", { timeout: 5000 });
+        ok(re.test(await pg.textContent("#relatorio")), "relatório de " + h + " traz o telefone");
+        await pg.locator("#relatorio").getByRole("button", { name: "Fechar" }).click();
+      }
+    });
     // ID do aluno e telefone errado no PR
     await etapa(pg, "ID do aluno e telefone no PR", async () => {
       await ir(pg, "#pr");
@@ -1588,7 +1604,7 @@ await cenario("Relatórios para imprimir (um por card)", async () => {
         .waitForFunction(() => /ALUNO 4|Aluno 4/.test(document.getElementById("rList").textContent), null, { timeout: 4000 })
         .catch(() => {});
       ok(
-        /Aluno 4/i.test(await pg.textContent("#rList")) && /CA - 05/.test(await pg.textContent("#rList")),
+        /Aluno 4/i.test(await pg.textContent("#rList")) && /\d\dCA-05/.test(await pg.textContent("#rList")),
         "busca pelo ID (“ca 05”) acha o aluno"
       );
       await pg.getByRole("button", { name: "+ Aluno" }).click();
@@ -1598,7 +1614,12 @@ await cenario("Relatórios para imprimir (um por card)", async () => {
       await pg.evaluate(() => document.querySelectorAll(".sheet").forEach(x => (x.id ? (x.hidden = true) : x.remove())));
       await incluirAluno(pg, { nome: "Zuleica Nova", colegio: "Colegio Alfa", tel: "20988887777", contato: "Rita" });
       const z = Object.values(await store()).find(x => x.nome === "Zuleica Nova");
-      ok(z && /^CA - 3\d$/.test(z.codigo || ""), "admin: aluno novo também ganha ID (" + (z && z.codigo) + ")");
+      ok(z && /^\d\dCA-3\d$/.test(z.codigo || ""), "admin: aluno novo também ganha ID (" + (z && z.codigo) + ")");
+      const cont = (await store())["ids/" + String(hoje.getFullYear()).slice(2) + "CA"];
+      ok(
+        cont && cont.ultimo === Number(z.codigo.slice(-2)),
+        "número reservado no contador do colégio no ano (" + JSON.stringify(cont) + ")"
+      );
       await pg.fill("#rQ", "Zuleica");
       await pg
         .waitForFunction(() => /Zuleica/i.test(document.getElementById("rList").textContent), null, { timeout: 4000 })
@@ -1607,7 +1628,7 @@ await cenario("Relatórios para imprimir (um por card)", async () => {
       await pg.getByRole("button", { name: "🖨️ Relatório" }).first().click();
       await pg.waitForSelector("#relatorio .rel-tab", { timeout: 5000 });
       const t = await pg.textContent("#relatorio");
-      ok(/CA - 3\d/.test(t) && /⚠️ DDD 20 não existe/.test(t), "relatório do PR traz o ID e o aviso do telefone");
+      ok(/\d\dCA-3\d/.test(t) && /⚠️ DDD 20 não existe/.test(t), "relatório do PR traz o ID e o aviso do telefone");
       await pg.locator("#relatorio").getByRole("button", { name: "Fechar" }).click();
     });
     // lista da turma para imprimir

@@ -2,7 +2,7 @@
 // e o que falta para um aluno entrar na fila. Testado em tests/repasse-dados.test.mjs.
 import * as U from "./util.js";
 import { title } from "./ui.js";
-import { codigoBusca } from "./aluno-id.js";
+import { codigoBusca, comAno } from "./aluno-id.js";
 
 export const norm = U.chave,
   slug = U.slug;
@@ -95,8 +95,10 @@ export function linhaParaDoc(r, X) {
     turma: s(r.turma),
     statusOrig: s(r.status),
     vendedor: s(r.vendedor),
-    codigo: s(r.codigo),
-    codigoBusca: s(r.codigo) ? codigoBusca(r.codigo) : "",
+    // ID da planilha: guarda como veio (identifica a linha ao importar de novo) e no formato com o ano (26CEPNCP-01)
+    codigoOrig: s(r.codigo),
+    codigo: s(r.codigo) ? comAno(r.codigo, ano) : "",
+    codigoBusca: s(r.codigo) ? codigoBusca(comAno(r.codigo, ano)) : "",
     dataEnsaio,
     ano,
     contatos: cs,
@@ -112,7 +114,7 @@ export function docId(d, i) {
   return [
     String(9999 - (d.ano || 0)).padStart(4, "0"),
     slug(d.escola).slice(0, 24) || "sem-escola",
-    slug(d.codigo).slice(0, 24) || "x",
+    slug(d.codigoOrig != null ? d.codigoOrig : d.codigo).slice(0, 24) || "x",
     slug(d.nome).slice(0, 32) || "r" + i
   ].join("_");
 }

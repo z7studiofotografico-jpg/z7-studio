@@ -367,3 +367,14 @@ test("Dashboard: a equipe lê só o próprio desempenho", async () => {
   await assertFails(getDoc(doc(como(PEDRO), "resumos", "dashboard")));
   await assertFails(setDoc(doc(como(PEDRO), "resumos", "pessoa_pedro-vendas-com"), { email: PEDRO, meses: {} }));
 });
+test("ID do aluno: quem cadastra aluno reserva o próximo número; o contador só sobe", async () => {
+  await semRegra(d => setDoc(doc(d, "ids", "26ALFA"), { ultimo: 5 }));
+  const db = como(PEDRO);
+  await assertSucceeds(getDoc(doc(db, "ids", "26ALFA")));
+  await assertSucceeds(setDoc(doc(db, "ids", "26ALFA"), { ultimo: 6 }));
+  await assertFails(setDoc(doc(db, "ids", "26ALFA"), { ultimo: 3 }));
+  await assertFails(setDoc(doc(db, "ids", "26ALFA"), { ultimo: 7, outro: 1 }));
+  await assertSucceeds(setDoc(doc(db, "ids", "26BETA"), { ultimo: 1 }));
+  await assertFails(deleteDoc(doc(db, "ids", "26ALFA")));
+  await assertFails(getDoc(doc(como(NOVO), "ids", "26ALFA")));
+});

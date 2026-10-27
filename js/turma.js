@@ -42,7 +42,7 @@ import { msgCobranca, msgOfertaKit } from "./mensagens.js";
 import { contratoTurma, kitsTurma, importarFormandos } from "./turma-ajustes.js";
 import { el, title, norm, field, inp, inpReais, sel, sheet, botoes, wa, avisoErro, emPartes } from "./ui.js";
 import * as U from "./util.js";
-import { siglaDe, siglaUsada, proximoCodigo, ordemCodigo, avisoTel, telRelatorio } from "./aluno-id.js";
+import { siglaDe, siglaUsada, reservarCodigo, comAno, ordemCodigo, avisoTel, telRelatorio, contatoRel } from "./aluno-id.js";
 import { abrirRelatorio } from "./relatorio.js";
 let C,
   FS,
@@ -486,11 +486,17 @@ export function openTurma(ctx, inst, kits, aoFechar, opcoes) {
         return inst.sigla || siglaUsada(lista.map(x => x.codigo)) || (opcoes && opcoes.sigla) || siglaDe(inst.nome);
       }
       // ID de quem entra: o mesmo do aluno se ele já está na turma (outro kit), senão o próximo número
-      function codigoNovo(nm, base) {
+      // ano da turma (o da formatura): vai na frente do ID
+      const anoTurma = () => anoDaTurma(inst) || Number(hoje().slice(0, 4));
+      // número reservado no banco: dois cadastros ao mesmo tempo nunca pegam o mesmo ID
+      async function codigoNovo(nm, base) {
         if (base && base.codigo) return base.codigo;
         const mesmo = lista.find(x => x.codigo && U.chave(x.nome) === U.chave(nm));
         if (mesmo) return mesmo.codigo;
-        return proximoCodigo(
+        return reservarCodigo(
+          FS,
+          db,
+          anoTurma(),
           siglaTurma(),
           lista.map(x => x.codigo)
         );
@@ -502,7 +508,17 @@ export function openTurma(ctx, inst, kits, aoFechar, opcoes) {
           .filter(f => f.status !== "desistiu" && f.status !== "reprovou")
           .forEach(f => {
             const k = U.chave(f.nome);
-            const a = (alunos[k] = alunos[k] || { nome: f.nome, codigo: "", tel: "", serie: "", kits: [], aberto: 0, atr: false });
+            const a = (alunos[k] = alunos[k] || {
+              nome: f.nome,
+              codigo: "",
+              tel: "",
+              email: "",
+              serie: "",
+              kits: [],
+              aberto: 0,
+              atr: false
+            });
+            a.email = a.email || f.email || "";
             a.codigo = a.codigo || f.codigo || "";
             a.tel = a.tel || f.tel || "";
             a.serie = a.serie || f.serie || "";
@@ -529,12 +545,12 @@ export function openTurma(ctx, inst, kits, aoFechar, opcoes) {
             {
               titulo: "Alunos",
               tabela: {
-                cols: ["ID", "Formando", "Série", "WhatsApp", "Kits", "Em aberto"],
+                cols: ["ID", "Formando", "Série", "Telefone / e-mail", "Kits", "Em aberto"],
                 linhas: arr.map(a => [
                   a.codigo,
                   title(a.nome),
                   a.serie,
-                  telRelatorio(a.tel),
+                  contatoRel(a.tel, a.email),
                   a.kits.join(", "),
                   a.aberto ? brl(a.aberto) + (a.atr ? " (atrasado)" : "") : "—"
                 ])
@@ -585,7 +601,7 @@ export function openTurma(ctx, inst, kits, aoFechar, opcoes) {
           // ID do aluno (separação das fotos): o app dá o próximo número da turma; o admin pode trocar
           const codigoIn = inp(
             f ? f.codigo || "" : base ? base.codigo || "" : "",
-            f ? "ex.: CEPNCP - 07" : "automático (ex.: CEPNCP - 07)",
+            f ? "ex.: 26CEPNCP-07" : "automático (ex.: 26CEPNCP-07)",
             30
           );
           codigoIn.disabled = (!!f || !!base) && !adm;
@@ -813,7 +829,12 @@ export function openTurma(ctx, inst, kits, aoFechar, opcoes) {
                 return;
               }
               const saiu = st.value === "desistiu" || st.value === "reprovou";
-              const codigo = codigoIn.value.trim().toUpperCase() || (f ? f.codigo || "" : codigoNovo(nome.value, base));
+              // ID digitado sem o ano ganha o ano da turma (CEPNCP-7 → 26CEPNCP-07)
+              const codigo = codigoIn.value.trim()
+                ? comAno(codigoIn.value.trim().toUpperCase(), anoTurma())
+                : f
+                  ? f.codigo || ""
+                  : await codigoNovo(nome.value, base);
               const body = {
                 codigo,
                 contrato: k && ehAdesao(k.id) ? "adesao" : "album",

@@ -157,6 +157,17 @@ service cloud.firestore {
         && request.resource.data.alunos.diff(resource.data.alunos).changedKeys().size() == 0);
       allow delete: if admin();
     }
+    // ID do aluno (26CEPNCP-01): último número usado de cada colégio em cada ano. Quem cadastra aluno reserva
+    // o próximo número (o contador só sobe), assim dois cadastros ao mesmo tempo nunca pegam o mesmo ID.
+    match /ids/{prefixo} {
+      function cadastraAluno() { return pode('rep') || pode('lf') || pode('colegios') || pode('formaturas'); }
+      allow read: if admin() || cadastraAluno();
+      allow create: if admin() || (cadastraAluno() && request.resource.data.keys().hasOnly(['ultimo'])
+        && request.resource.data.ultimo is int && request.resource.data.ultimo > 0);
+      allow update: if admin() || (cadastraAluno() && request.resource.data.keys().hasOnly(['ultimo'])
+        && request.resource.data.ultimo is int && request.resource.data.ultimo > resource.data.ultimo);
+      allow delete: if admin();
+    }
     // PR: depois de pago, valor, forma de pagamento e responsável só o admin muda
     match /repasse/{id} {
       // (resource == null: aluno que ainda não existe; o "+ Aluno" confere antes de criar)
