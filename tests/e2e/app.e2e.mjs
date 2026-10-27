@@ -393,6 +393,22 @@ const calmo = pg =>
     .waitForFunction(() => window.__ops === 0 && Date.now() - window.__ultimo > 100, null, { timeout: 5000, polling: 25 })
     .then(() => pg.evaluate(() => new Promise(r => requestAnimationFrame(() => r()))))
     .catch(() => {});
+// Espera um documento com esse nome aparecer no banco (gravação lenta no CI não vira falha falsa)
+const esperaNome = (pg, nome) =>
+  pg
+    .waitForFunction(n => [...window.__store.values()].some(x => x && x.nome === n), nome, { timeout: 8000, polling: 50 })
+    .then(() => calmo(pg))
+    .catch(() => {});
+// Mensagem de erro visível nas janelas abertas (para entender uma falha no CI)
+const erroVisivel = pg =>
+  pg
+    .evaluate(() =>
+      [...document.querySelectorAll(".sheet .err, .sheet .wait, #toast")]
+        .filter(x => !x.hidden && x.textContent.trim())
+        .map(x => x.textContent.trim().slice(0, 160))
+        .join(" | ")
+    )
+    .catch(() => "");
 const ir = async (pg, h) => {
   await pg.evaluate(h => {
     document.body.dataset.tela = "";
@@ -558,10 +574,13 @@ await cenario("Adriano (admin), com os dados já atualizados no servidor", async
       "divide 400 em 3x sem perder centavo"
     );
     await f.locator("button[type=submit]").click();
-    await calmo(pg);
+    await esperaNome(pg, "Julia Costa");
     s = await store();
     const ju = Object.values(s).find(x => x.nome === "Julia Costa");
-    ok(ju && ju.valor === 400 && ju.respEmail === PEDRO && ju.proxVenc, "formando novo com responsável do colégio e próximo vencimento");
+    ok(
+      ju && ju.valor === 400 && ju.respEmail === PEDRO && ju.proxVenc,
+      "formando novo com responsável do colégio e próximo vencimento" + (ju ? "" : " — na tela: " + (await erroVisivel(pg)))
+    );
     // contrato: Kit 04 antecipado preenche valor e parcelas pela tabela
     const novoFormando = async () => {
       await pg.locator(".panel.wide").getByRole("button", { name: "+ Formando" }).click();
@@ -588,7 +607,7 @@ await cenario("Adriano (admin), com os dados já atualizados no servidor", async
       "novo formando já vem com o Kit 01 (R$ 65,00)"
     );
     await fk.locator("button[type=submit]").click();
-    await calmo(pg);
+    await esperaNome(pg, "Caio Kit Um");
     s = await store();
     const bia = Object.values(s).find(x => x.nome === "Bia Antecipada"),
       caio = Object.values(s).find(x => x.nome === "Caio Kit Um");
@@ -596,7 +615,10 @@ await cenario("Adriano (admin), com os dados já atualizados no servidor", async
       bia && bia.kitId === "k04" && bia.venda === "ant" && bia.valor === 850 && bia.contrato === "album",
       "venda antecipada gravada com o kit do contrato"
     );
-    ok(caio && caio.kitId === "k01" && caio.contrato === "adesao" && caio.valor === 65, "Kit 01 gravado como adesão");
+    ok(
+      caio && caio.kitId === "k01" && caio.contrato === "adesao" && caio.valor === 65,
+      "Kit 01 gravado como adesão" + (caio ? "" : " — na tela: " + (await erroVisivel(pg)))
+    );
     // tabela só desta turma: Kit 04 por R$ 790,00 em 8x
     await pg.locator(".panel.wide").getByRole("button", { name: "📋 Kits desta turma" }).click();
     await calmo(pg);
@@ -740,7 +762,7 @@ await cenario("Adriano (admin), com os dados já atualizados no servidor", async
     fk = pg.locator(".sheet").last();
     await fk.getByLabel("Nome").fill("Eva Direto");
     await fk.locator("button[type=submit]").click();
-    await calmo(pg);
+    await esperaNome(pg, "Eva Direto");
     s = await store();
     const eva = Object.values(s).find(x => x.nome === "Eva Direto");
     // ID do aluno: COLEGIO ALFA e COLEGIO ANTIGO têm as mesmas iniciais (CA): fica com o último nome inteiro
