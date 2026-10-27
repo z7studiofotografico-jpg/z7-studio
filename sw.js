@@ -1,6 +1,7 @@
 // Service worker do Z7 Studio: deixa o app abrir rápido (e sem internet) e recebe as notificações.
 // Os arquivos do app são sempre buscados de novo na internet (sem cache do navegador), então
-// uma atualização publicada aparece na próxima abertura, sem precisar trocar versão aqui.
+// uma atualização publicada aparece na próxima abertura, sem precisar trocar versão aqui
+// (com sinal fraco, em até 2,5 s usa a cópia guardada e atualiza para a próxima vez).
 // A lista abaixo só garante que o app abra sem internet; um teste confere que nenhum arquivo ficou de fora.
 const CACHE = "z7-app";
 const CDN = "z7-cdn-v1";
@@ -69,7 +70,11 @@ self.addEventListener("activate", e => {
 
 // Bibliotecas de fora (Firebase, gráficos, planilha): têm a versão no endereço, então podem ficar guardadas.
 const ehCDN = u => /^(www\.gstatic\.com|cdn\.jsdelivr\.net|unpkg\.com)$/.test(u.hostname);
-// Arquivos do próprio app: busca na internet primeiro (sem cache do navegador) e usa a cópia guardada se estiver sem sinal.
+// Arquivos do próprio app: busca na internet primeiro (sem cache do navegador).
+// Sinal fraco: se a internet não responder em 2,5 s, usa a cópia guardada (a resposta da internet, quando
+// chegar, atualiza a cópia para a próxima vez). Só guarda resposta boa: um erro do servidor não apaga a cópia.
+// Arquivo que não existe nem na cópia: página → abre o app (index.html); código → erro de rede (nunca HTML no lugar de JS).
+const ESPERA_MS = 2500;
 self.addEventListener("fetch", e => {
   const url = new URL(e.request.url);
   if (e.request.method !== "GET") return;
@@ -89,14 +94,29 @@ self.addEventListener("fetch", e => {
     return;
   }
   if (url.origin !== self.location.origin) return;
+  const pagina = e.request.mode === "navigate";
   e.respondWith(
-    fetch(e.request, { cache: "no-cache" })
-      .then(res => {
-        const copy = res.clone();
-        caches.open(CACHE).then(c => c.put(e.request, copy));
+    (async () => {
+      const guardado = await caches.match(e.request, { ignoreSearch: pagina });
+      const daRede = fetch(e.request, { cache: "no-cache" }).then(res => {
+        if (res.ok) {
+          const copia = res.clone();
+          e.waitUntil(caches.open(CACHE).then(c => c.put(e.request, copia)));
+        }
         return res;
-      })
-      .catch(() => caches.match(e.request).then(r => r || caches.match("./index.html")))
+      });
+      const semNada = () => (pagina ? caches.match("./index.html") : Response.error());
+      if (!guardado) return daRede.catch(semNada);
+      let espera;
+      const tempo = new Promise(r => (espera = setTimeout(() => r(guardado), ESPERA_MS)));
+      const rede = daRede.then(
+        res => (res.ok ? res : guardado), // erro do servidor: fica com a cópia boa
+        () => guardado
+      );
+      const res = await Promise.race([rede, tempo]);
+      clearTimeout(espera);
+      return res;
+    })()
   );
 });
 

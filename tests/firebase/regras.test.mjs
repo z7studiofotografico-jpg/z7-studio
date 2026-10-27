@@ -291,14 +291,25 @@ test("PR: quem é da Linha de Frente confere se o aluno já existe antes de incl
 });
 
 test("pedido de aluno repetido: a equipe pede e vê só o seu; só o admin decide", async () => {
-  const ped = { tipo: "pr-repetido", alvoId: "r2", aluno: "Bruno", porEmail: PEDRO, status: "pendente" };
-  await assertSucceeds(getDoc(doc(como(PEDRO), "pedidos", "p1"))); // ainda não existe: pode conferir
-  await assertSucceeds(setDoc(doc(como(PEDRO), "pedidos", "p1"), ped));
-  await assertFails(setDoc(doc(como(PEDRO), "pedidos", "p2"), { ...ped, porEmail: ANA }));
-  await assertFails(setDoc(doc(como(PEDRO), "pedidos", "p3"), { ...ped, status: "aprovado" }));
-  await assertFails(updateDoc(doc(como(PEDRO), "pedidos", "p1"), { status: "aprovado" }));
-  await assertFails(getDoc(doc(como(ANA), "pedidos", "p1")));
-  await assertSucceeds(updateDoc(doc(como(ADRIANO), "pedidos", "p1"), { status: "aprovado" }));
-  await assertSucceeds(updateDoc(doc(como(PEDRO), "pedidos", "p1"), { visto: true }));
-  await assertFails(deleteDoc(doc(como(PEDRO), "pedidos", "p1")));
+  const meu = "pr_r2_pedro-vendas-com",
+    ped = { tipo: "pr-repetido", alvoId: "r2", aluno: "Bruno", porEmail: PEDRO, status: "pendente" };
+  await assertSucceeds(getDoc(doc(como(PEDRO), "pedidos", meu))); // ainda não existe: pode conferir o seu
+  await assertFails(getDoc(doc(como(PEDRO), "pedidos", "pr_r2_ana-equipe-com"))); // o de outra pessoa, não
+  await assertSucceeds(setDoc(doc(como(PEDRO), "pedidos", meu), ped));
+  await assertFails(setDoc(doc(como(PEDRO), "pedidos", "pr_r9_pedro-vendas-com"), { ...ped, porEmail: ANA }));
+  await assertFails(setDoc(doc(como(PEDRO), "pedidos", "pr_r9_ana-equipe-com"), ped));
+  await assertFails(setDoc(doc(como(PEDRO), "pedidos", "pr_r8_pedro-vendas-com"), { ...ped, status: "aprovado" }));
+  await assertFails(updateDoc(doc(como(PEDRO), "pedidos", meu), { status: "aprovado" }));
+  await assertFails(getDoc(doc(como(ANA), "pedidos", meu)));
+  // pendente não se "repede"; decidido, sim
+  await assertFails(setDoc(doc(como(PEDRO), "pedidos", meu), { ...ped, aluno: "Outro" }));
+  await assertSucceeds(updateDoc(doc(como(ADRIANO), "pedidos", meu), { status: "negado" }));
+  await assertSucceeds(updateDoc(doc(como(PEDRO), "pedidos", meu), { visto: true }));
+  await assertSucceeds(setDoc(doc(como(PEDRO), "pedidos", meu), ped));
+  await assertFails(deleteDoc(doc(como(PEDRO), "pedidos", meu)));
+  // aviso de aluno que passou para outra pessoa: só o admin cria; o dono do aviso só marca que viu
+  const aviso = "aviso_r2_pedro-vendas-com";
+  await assertSucceeds(setDoc(doc(como(ADRIANO), "pedidos", aviso), { tipo: "pr-transferido", porEmail: PEDRO, status: "aviso" }));
+  await assertFails(updateDoc(doc(como(PEDRO), "pedidos", aviso), { status: "pendente" }));
+  await assertSucceeds(updateDoc(doc(como(PEDRO), "pedidos", aviso), { visto: true }));
 });

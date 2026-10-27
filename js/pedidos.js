@@ -13,7 +13,8 @@ const VENDIDO = ["PAGO", "ENTREGUE"];
 
 // ---------- regras puras (testadas em tests/pedidos.test.mjs) ----------
 const tels = d => new Set([...(d.telefones || []), ...(d.contatos || []).map(c => c.tel)].filter(Boolean));
-// Mesmo aluno: mesmo nome e mesmo colégio (ou um telefone em comum); ou mesmo primeiro nome com telefone e colégio iguais
+// Mesmo aluno: mesmo ano e mesmo nome no mesmo colégio (ou com um telefone em comum);
+// ou mesmo primeiro nome com telefone e colégio iguais
 export function mesmoAluno(a, d) {
   const na = U.chave(a.nome),
     nd = U.chave(d.nome);
@@ -23,6 +24,8 @@ export function mesmoAluno(a, d) {
     escola = !ea || !ed || ea === ed;
   const ta = tels(a),
     tel = [...tels(d)].some(t => ta.has(t));
+  // cada ano é um ensaio (e uma venda) diferente: o mesmo nome em outro ano não é repetido
+  if (a.ano && d.ano && Number(a.ano) !== Number(d.ano)) return false;
   if (na === nd) return escola || tel;
   return na.split(" ")[0] === nd.split(" ")[0] && tel && escola;
 }
@@ -66,7 +69,8 @@ const ondeEsta = r =>
         : "está na fila do repasse";
 
 // ---------- procurar e pedir ----------
-// Procura o aluno no PR (pelo nome; quem tem o Repasse procura também pelo telefone)
+// Procura o aluno no PR, no mesmo ano (pelo nome; quem tem o Repasse procura também pelo telefone).
+// Quem só tem a Linha de Frente procura no ano atual, que é o único em que ela pode incluir.
 export async function procurarRepetido(C, d) {
   const { FS, db } = C,
     col = FS.collection(db, "repasse");
@@ -83,12 +87,16 @@ export async function procurarRepetido(C, d) {
   }
   return null;
 }
-// Manda o pedido (um por aluno e por pessoa) e devolve o texto do aviso para quem tentou incluir
+// Identificador do pedido: um por aluno e por pessoa (as regras conferem que termina com o e-mail de quem pede)
+export const idPedido = (tipo, alvoId, email) => `${tipo}_${String(alvoId).slice(0, 200)}_${U.slug(email)}`;
+// Manda o pedido e devolve o texto do aviso para quem tentou incluir.
+// Já decidido antes (aprovado ou negado)? Pode pedir de novo: a situação pode ter mudado.
 export async function pedirAluno(C, r, d) {
   const { FS, db } = C,
-    ref = FS.doc(db, "pedidos", `pr_${r.id}_${U.slug(C.email)}`.slice(0, 300));
+    ref = FS.doc(db, "pedidos", idPedido("pr", r.id, C.email));
   const novo = await FS.runTransaction(db, async tx => {
-    if ((await tx.get(ref)).exists()) return false;
+    const atual = await tx.get(ref);
+    if (atual.exists() && atual.data().status === "pendente") return false;
     tx.set(ref, {
       tipo: "pr-repetido",
       alvoId: r.id,
@@ -137,6 +145,22 @@ export async function decidir(C, p, aprovar) {
     }
     tx.update(rRef, patch);
     tx.update(pRef, Object.assign({ status: "aprovado" }, decisao));
+    // quem estava com o aluno fica sabendo (para não mandarem mensagem os dois para a mesma família)
+    const antes = rs.data();
+    if (antes.respEmail && antes.respEmail !== ps.data().porEmail)
+      tx.set(FS.doc(db, "pedidos", idPedido("aviso", p.alvoId, antes.respEmail)), {
+        tipo: "pr-transferido",
+        alvoId: p.alvoId,
+        aluno: antes.nome || p.aluno,
+        escola: antes.escola || "",
+        porEmail: antes.respEmail,
+        porNome: antes.resp || "",
+        para: ps.data().porNome || ps.data().porEmail,
+        status: "aviso",
+        visto: false,
+        criadoEm: agora,
+        decididoPor: decisao.decididoPor
+      });
     return "aprovado";
   });
   const nome = title(p.porNome || p.porEmail);
@@ -213,9 +237,11 @@ function cartaoEquipe(C, p) {
       p.status === "pendente" ? "wait" : null,
       p.status === "pendente"
         ? `⏳ ${aluno} já estava cadastrado. Aguardando o Adriano ou a Luciana decidirem.`
-        : p.status === "aprovado"
-          ? `✅ ${aluno} passou para você: já está na sua lista.`
-          : `${aluno} ficou onde estava${p.motivo ? " (" + p.motivo + ")" : ""}. Não precisa trabalhar esse contato.`
+        : p.status === "aviso"
+          ? `↪️ ${aluno} passou para ${title(p.para)} (decisão ${p.decididoPor ? "de " + title(p.decididoPor) : "do admin"}). Não mande mais mensagem para essa família.`
+          : p.status === "aprovado"
+            ? `✅ ${aluno} passou para você: já está na sua lista.`
+            : `${aluno} ficou onde estava${p.motivo ? " (" + p.motivo + ")" : ""}. Não precisa trabalhar esse contato.`
     )
   );
   if (p.status !== "pendente")

@@ -169,6 +169,41 @@ const base = {
     visto: false,
     criadoEm: "2026-01-01T10:00:00Z"
   },
+  "repasse/r6": {
+    nome: "DUDA TROCADA",
+    nomeBusca: "DUDA TROCADA",
+    escola: "COLEGIO ALFA",
+    ano: hoje.getFullYear(),
+    etapa: "CONTATADO",
+    resp: "Pedro Vendedor",
+    respEmail: "pedro@vendas.com",
+    contatos: [{ tipo: "Mãe", nome: "Lu", tel: "21944445555" }],
+    telefones: ["21944445555"]
+  },
+  "pedidos/p10": {
+    tipo: "pr-repetido",
+    alvoId: "r6",
+    aluno: "DUDA TROCADA",
+    escola: "COLEGIO ALFA",
+    etapaAtual: "CONTATADO",
+    respAtual: "Pedro Vendedor",
+    porEmail: "ana@equipe.com",
+    porNome: "Ana Vendedora",
+    dados: { contatos: [] },
+    status: "pendente",
+    criadoEm: "2026-01-03T10:00:00Z"
+  },
+  "pedidos/aviso_rz_pedro-vendas-com": {
+    tipo: "pr-transferido",
+    alvoId: "rz",
+    aluno: "ZECA PASSADO",
+    porEmail: "pedro@vendas.com",
+    para: "Ana Vendedora",
+    decididoPor: "Adriano",
+    status: "aviso",
+    visto: false,
+    criadoEm: "2026-01-04T10:00:00Z"
+  },
   "pedidos/p9": {
     tipo: "pr-repetido",
     alvoId: "r5",
@@ -708,7 +743,7 @@ await cenario("Adriano (admin), com os dados já atualizados no servidor", async
     ok(s["repasse/r2"].conferido === true && s["repasse/r2"].conferidoPor === ADRIANO, "admin conferiu a venda do PR");
     // pedido de aluno repetido: o admin decide
     ok(/Ana Vendedora tentou incluir Carla Fila/.test(await pg.textContent("#rPedidos")), "admin vê o pedido de aluno repetido");
-    await pg.locator("#rPedidos").getByRole("button", { name: "Passar para Ana" }).click();
+    await pg.locator("#rPedidos .notes").filter({ hasText: "Carla Fila" }).getByRole("button", { name: "Passar para Ana" }).click();
     await pg.waitForTimeout(500);
     s = await store();
     ok(
@@ -717,6 +752,19 @@ await cenario("Adriano (admin), com os dados já atualizados no servidor", async
         s["repasse/r5"].etapa === "SEPARADO" &&
         s["repasse/r5"].contatos.length === 2,
       "admin passa o aluno para quem pediu (separado, com os contatos novos)"
+    );
+    // aluno que estava com o Pedro: passa para a Ana e o Pedro recebe o aviso
+    await pg.locator("#rPedidos .notes").filter({ hasText: "Duda Trocada" }).getByRole("button", { name: "Passar para Ana" }).click();
+    await pg.waitForTimeout(500);
+    s = await store();
+    const avisoPedro = s["pedidos/aviso_r6_pedro-vendas-com"];
+    ok(
+      s["repasse/r6"].respEmail === "ana@equipe.com" &&
+        s["repasse/r6"].etapa === "CONTATADO" &&
+        avisoPedro &&
+        avisoPedro.status === "aviso" &&
+        avisoPedro.porEmail === PEDRO,
+      "aluno de outro vendedor: passa mantendo a etapa e quem perdeu recebe o aviso"
     );
     // PR: importar planilha (módulo repasse-import.js)
     await pg.getByRole("button", { name: "Importar planilha" }).click();
@@ -1101,7 +1149,11 @@ await cenario("Pedro (vendedor: Linha de Frente, Agendamento, Instituições)", 
     );
     ok(/Carla Fila.*Aguardando/i.test(await pg.textContent("#rPedidos")), "vendedor vê o pedido aguardando");
     ok(/Bia Aprovada passou para você/.test(await pg.textContent("#rPedidos")), "vendedor vê o pedido aprovado");
-    await pg.locator("#rPedidos").getByRole("button", { name: "Ok, entendi" }).click();
+    ok(
+      /Zeca Passado passou para Ana Vendedora.*Não mande mais mensagem/.test(await pg.textContent("#rPedidos")),
+      "vendedor é avisado do aluno que passou para outra pessoa"
+    );
+    await pg.locator("#rPedidos .notes").filter({ hasText: "Bia Aprovada" }).getByRole("button", { name: "Ok, entendi" }).click();
     await pg.waitForTimeout(300);
     ok((await store())["pedidos/p8"].visto === true, "vendedor marca que viu a resposta");
   });

@@ -26,3 +26,10 @@ test("passar para quem pediu: da fila vai separado para a pessoa, com os contato
   assert.equal(passarPara(Object.assign({}, r, { etapa: "PAGO" }), p, "2026-10-27"), null);
   assert.deepEqual(mesclarContatos([{ tel: "1" }], [{ tel: "1" }, { tel: "2" }]), [{ tel: "1" }, { tel: "2" }]);
 });
+
+test("outro ano não é repetido (cada ano é um ensaio); identificador do pedido termina com o e-mail", async () => {
+  const { idPedido } = await import("../js/pedidos.js");
+  assert.ok(!mesmoAluno({ nome: "Lia", escola: "Alfa", ano: 2024 }, { nome: "Lia", escola: "Alfa", ano: 2026 }));
+  assert.ok(mesmoAluno({ nome: "Lia", escola: "Alfa", ano: 2026 }, { nome: "Lia", escola: "Alfa", ano: 2026 }));
+  assert.equal(idPedido("pr", "r2", "Pedro.Silva@Vendas.com"), "pr_r2_pedro-silva-vendas-com");
+});

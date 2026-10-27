@@ -120,13 +120,17 @@ service cloud.firestore {
       allow read: if aprovador() || admin();
     }
     // Aluno repetido no PR: quem é da equipe pede; só o admin decide (passa para a pessoa ou mantém onde está).
-    // Cada um vê só os próprios pedidos e só marca que viu a resposta.
+    // Cada um vê só os próprios pedidos e avisos (o identificador termina com o e-mail da pessoa), marca que viu
+    // a resposta e pode pedir de novo um pedido já decidido.
     match /pedidos/{id} {
-      allow read: if admin() || (membro() && (resource == null || resource.data.porEmail == email()));
-      allow create: if admin() || ((pode('rep') || pode('lf')) && request.resource.data.porEmail == email()
+      function meuId() { return id.matches('(pr|aviso)_.*_' + email().replace('[^a-z0-9]+', '-')); }
+      allow read: if admin() || (membro() && ((resource == null && meuId()) || (resource != null && resource.data.porEmail == email())));
+      allow create: if admin() || ((pode('rep') || pode('lf')) && meuId() && request.resource.data.porEmail == email()
         && request.resource.data.status == 'pendente');
-      allow update: if admin() || (membro() && resource.data.porEmail == email()
-        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['visto']));
+      allow update: if admin() || (membro() && resource.data.porEmail == email() && (
+        request.resource.data.diff(resource.data).affectedKeys().hasOnly(['visto'])
+        || ((pode('rep') || pode('lf')) && resource.data.status in ['aprovado', 'negado']
+          && request.resource.data.status == 'pendente' && request.resource.data.porEmail == email())));
       allow delete: if admin();
     }
     // PR: depois de pago, valor, forma de pagamento e responsável só o admin muda
