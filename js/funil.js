@@ -4,6 +4,7 @@ import { avisoErro, emPartes, norm } from "./ui.js";
 import { campoReais, centavos, reais } from "./regras.js";
 import { ESTUDIO } from "./mensagens.js";
 import * as U from "./util.js";
+import { botaoRelatorio, contar } from "./relatorio.js";
 let C,
   leads = [],
   filter = "ABERTOS",
@@ -602,6 +603,12 @@ export function syncLeads() {
 
 function ligar() {
   $("btnNew").onclick = () => openForm(null);
+  // relatório para imprimir (os leads que esta pessoa vê)
+  if (!$("btnRelFunil")) {
+    const b = botaoRelatorio(relatorioFunil, () => C.me);
+    b.id = "btnRelFunil";
+    $("btnNew").before(b);
+  }
   $("btnCancel").onclick = closeForm;
   $("sheet").addEventListener("click", e => {
     if (e.target === $("sheet")) closeForm();
@@ -683,4 +690,66 @@ function ligar() {
       $("btnSave").disabled = false;
     }
   });
+}
+
+// ---------- relatório para imprimir ----------
+function relatorioFunil() {
+  const hoje = todayStr(),
+    ym = hoje.slice(0, 7);
+  const abertos = leads
+    .filter(l => OPEN.includes(l.etapa))
+    .sort((a, b) => String(a.followup || "9").localeCompare(String(b.followup || "9")));
+  const st = abertos.map(status);
+  const fechados = leads.filter(l => l.etapa === "FECHADO" && (l.fechadoEm || "").slice(0, 7) === ym);
+  const conferidos = fechados.filter(l => l.conferido !== false);
+  const soma = lst => money(reais(lst.reduce((a, l) => a + centavos(l.valor), 0)));
+  const dataBR = d => (d ? U.fmtDate(d) + "/" + d.slice(0, 4) : "");
+  return {
+    titulo: "Funil de vendas",
+    subtitulo: C.isAdmin ? "Todos os leads" : "Leads livres e os seus",
+    secoes: [
+      {
+        titulo: "Resumo",
+        kpis: [
+          ["Em aberto", abertos.length],
+          ["Atrasados", st.filter(x => x === "late").length],
+          ["Para hoje", st.filter(x => x === "today").length],
+          ["Fechado no mês (conferido)", soma(conferidos)],
+          ["Vendas no mês", fechados.length]
+        ]
+      },
+      { titulo: "Leads por etapa", tabela: { cols: ["Etapa", "Leads"], linhas: contar(leads, l => l.etapa) } },
+      { titulo: "Leads por origem", tabela: { cols: ["Origem", "Leads"], linhas: contar(leads, l => l.origem) } },
+      {
+        titulo: "Leads em aberto",
+        tabela: {
+          cols: ["Nome", "Etapa", "Próximo contato", "Responsável", "Serviço", "Origem", "Valor"],
+          linhas: abertos.map(l => [
+            l.nome,
+            l.etapa,
+            l.followup ? dataBR(l.followup) + (status(l) === "late" ? " (atrasado)" : "") : "sem data",
+            C.nomeDe(l) || "—",
+            l.servico || "",
+            l.origem || "",
+            l.valor ? money(l.valor) : ""
+          ])
+        },
+        vazio: "Nenhum lead em aberto."
+      },
+      {
+        titulo: "Vendas fechadas no mês",
+        tabela: {
+          cols: ["Cliente", "Data", "Valor", "Responsável", "Situação"],
+          linhas: fechados.map(l => [
+            l.nome,
+            dataBR(l.fechadoEm),
+            money(l.valor || 0),
+            C.nomeDe(l) || "—",
+            l.conferido === false ? "a conferir" : "conferida"
+          ])
+        },
+        vazio: "Nenhuma venda fechada neste mês."
+      }
+    ]
+  };
 }

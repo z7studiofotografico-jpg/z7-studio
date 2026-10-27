@@ -7,6 +7,7 @@ import { lerFontes } from "./fontes-resumo.js";
 import { brl, reais, taxa } from "./regras.js";
 import { el, title, carregarLib } from "./ui.js";
 import * as U from "./util.js";
+import { botaoRelatorio, copiaDaTela } from "./relatorio.js";
 let C,
   FS,
   db,
@@ -53,7 +54,12 @@ export async function show() {
   const head = el("div", "vhead");
   head.append(el("h2", null, "Dashboard"));
   const bt = U.mkBtn("↻ Atualizar agora", "btn-sm", () => atualizar(bt));
-  head.append(bt);
+  const hb = el("div", "agact");
+  hb.append(
+    bt,
+    botaoRelatorio(relatorioDash, () => C.me)
+  );
+  head.append(hb);
   v.append(head);
   // um card de cada vez: cada área tem os seus números, gráfico e equipe
   const abas = el("div", "segs vdareas");
@@ -671,6 +677,7 @@ function areaFunil(corpo, p, nomeP) {
 async function mostrarMeu(v) {
   const head = el("div", "vhead");
   head.append(el("h2", null, "Meu desempenho"));
+  head.append(botaoRelatorio(relatorioDash, () => C.me));
   v.append(head);
   const chips = el("div", "chips");
   v.append(chips);
@@ -765,4 +772,17 @@ async function mostrarMeu(v) {
     console.warn("[Z7] meu desempenho", e);
   }
   desenharMeu();
+}
+
+// Relatório para reunião: o que está na tela (área e período escolhidos), com os gráficos como imagem
+function relatorioDash() {
+  const corpo = $("vdCorpo");
+  if (!corpo) throw new Error("dashboard ainda não abriu");
+  const nomeP = (PERIODOS.find(p => p[0] === periodo) || [])[1] || "";
+  const nomeA = C.isAdmin ? (AREAS.find(a => a[0] === area) || [])[1] || "" : "";
+  return {
+    titulo: C.isAdmin ? "Dashboard" + (nomeA ? " · " + nomeA : "") : "Meu desempenho",
+    subtitulo: nomeP,
+    secoes: [{ no: copiaDaTela(corpo) }]
+  };
 }

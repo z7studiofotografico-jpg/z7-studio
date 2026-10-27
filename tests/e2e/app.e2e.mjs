@@ -1508,6 +1508,78 @@ await cenario("Ver o app como a equipe (admin, só visualização)", async () =>
   ok(erros.length === 0, "sem erros no console" + (erros.length ? ": " + erros.slice(0, 3).join(" | ") : ""));
 });
 
+await cenario("Relatórios para imprimir (um por card)", async () => {
+  const telas = [
+    ["#funil", /Funil/],
+    ["#pr", /PR|Linha de Frente|Repasse/],
+    ["#formaturas", /Formaturas/],
+    ["#agenda", /Agenda de/],
+    ["#becas", /Aluguel de becas/],
+    ["#inst-particular", /Colégio particular/],
+    ["#inst-superior", /Faculdade e curso profissionalizante/],
+    ["#vendas", /Dashboard/]
+  ];
+  const confere = async (pg, hash, tit, quem) => {
+    await ir(pg, hash);
+    await pg.getByRole("button", { name: "🖨️ Relatório" }).first().click();
+    await pg.waitForSelector("#relatorio .rel-folha h1", { timeout: 5000 });
+    const r = await pg.evaluate(() => ({
+      h1: document.querySelector("#relatorio h1").textContent,
+      sub: document.querySelector("#relatorio .rel-sub").textContent,
+      secoes: document.querySelectorAll("#relatorio .rel-secao").length,
+      imprimindo: document.body.classList.contains("imprimindo")
+    }));
+    ok(
+      tit.test(r.h1) && r.secoes > 0 && r.imprimindo && /Gerado em/.test(r.sub),
+      `${quem}: relatório de ${hash} abre (“${r.h1}”, ${r.secoes} seções)`
+    );
+    await pg.locator("#relatorio").getByRole("button", { name: "Fechar" }).click();
+    ok(
+      !(await pg.$("#relatorio")) && !(await pg.evaluate(() => document.body.classList.contains("imprimindo"))),
+      `${quem}: fechar volta para a tela`
+    );
+  };
+  {
+    const { pg, erros } = await abrir(ADRIANO, migrar(base));
+    await calmo(pg);
+    for (const [h, t] of telas) await etapa(pg, "relatório " + h, () => confere(pg, h, t, "admin"));
+    // o relatório do Dashboard leva os números da tela
+    await etapa(pg, "conteúdo do dashboard", async () => {
+      await ir(pg, "#vendas");
+      await pg.getByRole("button", { name: "🖨️ Relatório" }).first().click();
+      await pg.waitForSelector("#relatorio .rel-copia", { timeout: 5000 });
+      ok(/Total de vendas/.test(await pg.textContent("#relatorio")), "Dashboard: relatório traz os números da tela");
+      ok((await pg.$$("#relatorio button")).length === 2, "Dashboard: botões da tela não vão para o papel");
+      await pg.locator("#relatorio").getByRole("button", { name: "Fechar" }).click();
+    });
+    ok(erros.length === 0, "sem erros no console" + (erros.length ? ": " + erros.slice(0, 3).join(" | ") : ""));
+  }
+  {
+    // página nova, navegando pelo card da tela inicial como no celular (o app troca de tela sem criar entradas no histórico)
+    const { pg } = await abrir(ADRIANO, migrar(base));
+    await calmo(pg);
+    await pg.locator('.tile[data-mod="becas"]').click();
+    await calmo(pg);
+    await pg.getByRole("button", { name: "🖨️ Relatório" }).first().click();
+    await pg.waitForSelector("#relatorio", { timeout: 5000 });
+    await pg.evaluate(() => history.back());
+    await pg.waitForFunction(() => !document.getElementById("relatorio"), null, { timeout: 4000 }).catch(() => {});
+    await calmo(pg);
+    const h = await pg.evaluate(() => location.hash);
+    ok(!(await pg.$("#relatorio")) && h === "#becas", "voltar do celular fecha o relatório e fica na tela (" + h + ")");
+  }
+  {
+    const { pg, erros } = await abrir(PEDRO, migrar(base));
+    await calmo(pg);
+    await etapa(pg, "relatório do PR (equipe)", () => confere(pg, "#pr", /PR|Linha de Frente|Repasse/, "Pedro"));
+    await etapa(pg, "relatório das instituições (equipe)", async () => {
+      await confere(pg, "#inst-particular", /Colégio particular/, "Pedro");
+    });
+    await etapa(pg, "relatório da agenda (equipe)", () => confere(pg, "#agenda", /Agenda de/, "Pedro"));
+    ok(erros.length === 0, "sem erros no console" + (erros.length ? ": " + erros.slice(0, 3).join(" | ") : ""));
+  }
+});
+
 await cenario("Cadastro sem módulos", async () => {
   const { pg } = await abrir(NOVO, Object.assign({}, base, { "config/app": { versaoDados: 4 } }));
   ok((await visiveis(pg)).length === 0, "não vê nenhum card");

@@ -26,6 +26,7 @@ import { el, title, avisoErro, sheet, botoes } from "./ui.js";
 import { editorPrecos } from "./precos.js";
 import * as Ev from "./eventos.js";
 import * as U from "./util.js";
+import { botaoRelatorio } from "./relatorio.js";
 // Leitura sob demanda: ao abrir, só as parcelas que vencem até o fim do mês (campo proxVenc);
 // a lista completa de formandos só é lida quando alguém abre as abas Adesão, Kits ou Turmas.
 let C,
@@ -64,7 +65,8 @@ export function show() {
   hb.append(
     U.mkBtn("+ Formando", "btn-primary btn-sm", () => novoFormando()),
     U.mkBtn("📋 Kits e preços", "btn-sm", () => openKits()),
-    U.mkBtn("💲 Preços mínimos", "btn-sm", () => Ev.openPrecos())
+    U.mkBtn("💲 Preços mínimos", "btn-sm", () => Ev.openPrecos()),
+    botaoRelatorio(relatorioFormaturas, () => C.me)
   );
   head.append(hb);
   v.append(head);
@@ -606,4 +608,61 @@ function openKits() {
       }
     });
   });
+}
+
+// Relatório para reunião: números das turmas do bloco escolhido e as cobranças em atraso
+async function relatorioFormaturas() {
+  await carregarTudo();
+  const turmas = minhasInsts(),
+    fs = meusForms(),
+    cf = meusForms(cobr);
+  const tot = resumoInst(null, fs);
+  const linhas = turmas
+    .map(i => [
+      i,
+      resumoInst(
+        i,
+        fs.filter(f => f.instId === i.id)
+      )
+    ])
+    .sort((a, b) => b[1].vend - a[1].vend)
+    .map(([i, r]) => [title(i.nome), r.n, moeda(r.vend), moeda(r.rec), moeda(r.aberto), r.atr || ""]);
+  const atr = cobrancas(cf).filter(({ f }) => atrasado(f));
+  return {
+    titulo: "Formaturas",
+    subtitulo: seg === "rep" ? "Repasse (turmas de anos anteriores)" : "Linha de Frente (turmas deste ano)",
+    secoes: [
+      {
+        titulo: "Resumo",
+        kpis: [
+          ["Turmas", turmas.length],
+          ["Formandos com kit", tot.n],
+          ["Vendido", moeda(tot.vend)],
+          ["Recebido", moeda(tot.rec)],
+          ["A receber", moeda(tot.aberto)],
+          ["Parcelas atrasadas", atr.length]
+        ]
+      },
+      {
+        titulo: "Por turma",
+        tabela: { cols: ["Colégio", "Kits", "Vendido", "Recebido", "Em aberto", "Atrasados"], linhas },
+        vazio: "Nenhuma turma neste bloco."
+      },
+      {
+        titulo: "Cobranças em atraso",
+        tabela: {
+          cols: ["Formando", "Colégio", "Kit", "Parcela", "Valor", "Venceu"],
+          linhas: atr.map(({ f, venc }) => [
+            title(f.nome),
+            title(f.instNome),
+            f.kit || (ehKit01(f) ? "Kit 01" : "Kit"),
+            `${pagasDe(f) + 1}/${nParcelas(f)}`,
+            moeda(valorParcela(f, pagasDe(f) + 1)),
+            U.fmtDate(venc)
+          ])
+        },
+        vazio: "Nenhuma parcela atrasada. 🎉"
+      }
+    ]
+  };
 }

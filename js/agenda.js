@@ -13,6 +13,7 @@ import { ENDERECO, ESTUDIO } from "./mensagens.js";
 import { feriado, feriadosEntre } from "./feriados.js";
 import { el, title, field, sheet, botoes, wa, avisoErro } from "./ui.js";
 import * as U from "./util.js";
+import { botaoRelatorio } from "./relatorio.js";
 import { initForm, openEnsaio, openComp } from "./agenda-form.js";
 import { TIPOS_ENSAIO, diaTxt, fimDe, resumoDiaEm } from "./agenda-tempo.js";
 export { openEnsaio, TIPOS_ENSAIO };
@@ -67,7 +68,8 @@ export function show() {
       U.mkBtn("+ Compromisso", "btn-amarelo btn-sm", () => openComp()),
       U.mkBtn("+ Marcar ensaio", "btn-primary btn-sm", () => openEnsaio())
     );
-  if (hb.children.length) head.append(hb);
+  hb.append(botaoRelatorio(relatorioAgenda, () => C.me));
+  head.append(hb);
   v.append(head);
   v.append(
     el(
@@ -289,26 +291,8 @@ function render() {
   }
 
   // Próximos compromissos, dia a dia
-  const ent = [];
-  if (filtro === "tudo" || filtro === "colegio")
-    items.filter(x => !(C.aprovador && x.status === "pendente")).forEach(x => ent.push({ data: x.data, hora: "", t: "c", x }));
-  if (filtro === "tudo" || filtro === "ensaio")
-    ensaios
-      .filter(x => x.status !== "remarcar" && !(C.aprovador && x.status === "analisar"))
-      .forEach(x => ent.push({ data: x.data, hora: x.hora || "", t: "e", x }));
-  if (filtro === "tudo" || filtro === "comp")
-    comps.forEach(x => ent.push({ data: x.data, hora: x.diaInteiro ? "" : x.hora || "", t: "p", x }));
-  if (filtro === "tudo" || filtro === "visita")
-    visitas.forEach(x => ent.push({ data: x.followup, hora: x.followupHora || "99", t: "v", x }));
   const hoje = U.todayStr();
-  if (filtro === "tudo" || filtro === "beca")
-    becas.forEach(x => {
-      if (x.status === "reservado" && x.retirada && x.retirada >= hoje)
-        ent.push({ data: x.retirada, hora: x.retiradaHora || "", t: "b", x, ret: true });
-      if (x.devolucao) ent.push({ data: x.devolucao, hora: "98", t: "b", x, ret: false });
-    });
-  if (filtro === "tudo") feriadosEntre(hoje, U.addDays(400)).forEach(f => ent.push({ data: f.data, hora: "", t: "f", x: f }));
-  ent.sort((a, b) => a.data.localeCompare(b.data) || a.hora.localeCompare(b.hora));
+  const ent = entradas(hoje);
   // Calendário do mês sempre no topo; a lista vem depois (feriados só dos próximos 60 dias)
   const calBox = $("agCal");
   calBox.innerHTML = "";
@@ -383,6 +367,29 @@ function linhaBeca(it) {
       })
     );
   return r;
+}
+// Tudo o que aparece na lista e no calendário, conforme o filtro escolhido
+function entradas(hoje) {
+  const ent = [];
+  if (filtro === "tudo" || filtro === "colegio")
+    items.filter(x => !(C.aprovador && x.status === "pendente")).forEach(x => ent.push({ data: x.data, hora: "", t: "c", x }));
+  if (filtro === "tudo" || filtro === "ensaio")
+    ensaios
+      .filter(x => x.status !== "remarcar" && !(C.aprovador && x.status === "analisar"))
+      .forEach(x => ent.push({ data: x.data, hora: x.hora || "", t: "e", x }));
+  if (filtro === "tudo" || filtro === "comp")
+    comps.forEach(x => ent.push({ data: x.data, hora: x.diaInteiro ? "" : x.hora || "", t: "p", x }));
+  if (filtro === "tudo" || filtro === "visita")
+    visitas.forEach(x => ent.push({ data: x.followup, hora: x.followupHora || "99", t: "v", x }));
+  if (filtro === "tudo" || filtro === "beca")
+    becas.forEach(x => {
+      if (x.status === "reservado" && x.retirada && x.retirada >= hoje)
+        ent.push({ data: x.retirada, hora: x.retiradaHora || "", t: "b", x, ret: true });
+      if (x.devolucao) ent.push({ data: x.devolucao, hora: "98", t: "b", x, ret: false });
+    });
+  if (filtro === "tudo") feriadosEntre(hoje, U.addDays(400)).forEach(f => ent.push({ data: f.data, hora: "", t: "f", x: f }));
+  ent.sort((a, b) => a.data.localeCompare(b.data) || a.hora.localeCompare(b.hora));
+  return ent;
 }
 function linha(it) {
   return it.t === "b"
@@ -977,4 +984,71 @@ export async function contarPendentes(ctx) {
     ctx.FS.query(ctx.FS.collection(ctx.db, "agenda"), ctx.FS.where("status", "==", "pendente"), ctx.FS.limit(200))
   );
   return s.size;
+}
+
+// Relatório para reunião: tudo do mês que está no calendário, com o filtro escolhido
+const NOME_FILTRO = { tudo: "Tudo", colegio: "Colégios", ensaio: "Ensaios", comp: "Compromissos", visita: "Visitas", beca: "Becas" };
+function linhaRelatorio(it) {
+  const x = it.x;
+  if (it.t === "c")
+    return [nomeEvento(x.kind, x.instNome), [x.hora, x.onde, x.status === "confirmado" ? "Confirmado" : "Aguardando aprovação"]];
+  if (it.t === "e")
+    return [
+      `Ensaio: ${title(x.cliente)}`,
+      [x.hora && x.hora + "–" + fimDe(x), x.tipo, marco() ? (x.sinalPago ? "sinal pago" : "sem sinal") : ""]
+    ];
+  if (it.t === "p") {
+    const oculto = x.particular && !marco();
+    return [
+      oculto ? `${x.deQuem || "Compromisso"}: ocupado` : `${x.titulo || "Compromisso"}${x.deQuem ? " · " + x.deQuem : ""}`,
+      [x.diaInteiro ? "Dia inteiro" : x.hora && x.hora + "–" + fimDe(x), !oculto && x.obs]
+    ];
+  }
+  if (it.t === "b")
+    return [
+      `${it.ret ? "Retirada" : "Devolução"} de becas: ${title(x.cliente)}`,
+      [it.ret && x.retiradaHora, `${x.qtd || 1} beca(s)`, x.evento]
+    ];
+  if (it.t === "f") return [`Feriado: ${x.nome || ""}`, []];
+  return [`Visita: ${title(x.nome)}`, [x.followupHora, C.nomeDe(x) && U.first(C.nomeDe(x)), x.proximoPasso]];
+}
+function relatorioAgenda() {
+  const mes = mesVis || U.todayStr().slice(0, 7);
+  const [y, m] = mes.split("-").map(Number);
+  const doMes = entradas(U.todayStr()).filter(it => (it.data || "").startsWith(mes));
+  const TIPO = { c: "Colégio", e: "Ensaio", p: "Compromisso", b: "Becas", f: "Feriado", v: "Visita" };
+  const conta = t => doMes.filter(it => it.t === t).length;
+  return {
+    titulo: `Agenda de ${MESES[m - 1]} de ${y}`,
+    subtitulo: "Mostrando: " + (NOME_FILTRO[filtro] || filtro),
+    secoes: [
+      {
+        titulo: "Resumo do mês",
+        kpis: [
+          ["Colégios", conta("c")],
+          ["Ensaios", conta("e")],
+          ["Compromissos", conta("p")],
+          ["Visitas", conta("v")],
+          ["Becas", conta("b")]
+        ].filter(([, n]) => n)
+      },
+      {
+        titulo: "Dia a dia",
+        nota: mes === U.todayStr().slice(0, 7) ? "Deste mês, de hoje em diante." : "",
+        tabela: {
+          cols: ["Dia", "Tipo", "O quê", "Detalhes"],
+          linhas: doMes.map(it => {
+            const [oque, det] = linhaRelatorio(it);
+            return [
+              `${U.fmtDate(it.data)} (${SEMANA[new Date(it.data + "T12:00").getDay()]})`,
+              TIPO[it.t] || "",
+              oque,
+              det.filter(Boolean).join(" · ")
+            ];
+          })
+        },
+        vazio: "Nada marcado neste mês."
+      }
+    ]
+  };
 }

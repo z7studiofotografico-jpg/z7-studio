@@ -34,6 +34,7 @@ import { todayStr, addDays, num, first, toast, showNotice, mkBtn } from "./util.
 ligarCamposReais();
 import * as Funil from "./funil.js";
 import { ligarErros, telaFalhou } from "./erros.js";
+import { fecharRelatorio } from "./relatorio.js";
 import * as Equipe from "./equipe.js";
 import { definirExtras as feriadosExtras, feriadosEntre } from "./feriados.js";
 
@@ -621,6 +622,7 @@ Funil.init(ctx);
 let usersLoaded = false;
 async function route() {
   if (!user || !usersLoaded) return;
+  fecharRelatorio(); // trocou de tela: o relatório da tela anterior sai
   // endereços antigos: faculdade e profissionalizante agora são um cartão só
   if (/^#inst-(faculdade|profissionalizante)$/.test(location.hash)) history.replaceState(history.state, "", "#inst-superior");
   const r = (location.hash || "").slice(1);
@@ -774,6 +776,12 @@ addEventListener("popstate", e => {
   // trocar o endereço também dispara este evento, sem marca: aí é navegação normal (o hashchange cuida)
   if (!e.state || !(e.state.z7 || e.state.z7base)) return;
   history.replaceState(e.state, "", hashAtual || "#home"); // o navegador trocou o endereço; volta para o da tela atual
+  // relatório aberto: o voltar fecha o relatório e fica na mesma tela
+  if (document.getElementById("relatorio")) {
+    fecharRelatorio();
+    guarda();
+    return;
+  }
   const j = janelaAberta();
   if (j) {
     fecharJanela(j);

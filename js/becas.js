@@ -6,6 +6,7 @@ import { el, title, field, inp, inpReais, sheet, botoes, wa as abrirWa, avisoErr
 import { ENDERECO, ESTUDIO } from "./mensagens.js";
 import { lerReais, centavos, reais, brl } from "./regras.js";
 import * as U from "./util.js";
+import { botaoRelatorio } from "./relatorio.js";
 let C,
   FS,
   db,
@@ -77,7 +78,8 @@ export function show() {
   const hb = el("div", "agact");
   hb.append(
     U.mkBtn("📦 Estoque", "btn-sm", () => openEstoque()),
-    U.mkBtn("+ Aluguel", "btn-primary btn-sm", () => form())
+    U.mkBtn("+ Aluguel", "btn-primary btn-sm", () => form()),
+    botaoRelatorio(relatorioBecas, () => C.me)
   );
   head.append(hb);
   v.append(head);
@@ -762,4 +764,41 @@ export function form(x, pre) {
     });
     setTimeout(() => cli.focus(), 30);
   });
+}
+
+// Relatório para reunião: o que está fora, atrasado e reservado, com o que falta receber
+function relatorioBecas() {
+  const hoje = U.todayStr();
+  const fora = lista.filter(x => x.status === "retirado"),
+    atr = lista.filter(x => atrasada(x, hoje)),
+    prox = lista.filter(x => x.status === "reservado");
+  const est = somaObj(estoque().becas);
+  const aRec = reais(lista.filter(ativo).reduce((s, x) => s + centavos(falta(x)), 0));
+  const cols = ["Cliente", "Evento", "Becas", "Retirada", "Devolução", "Falta receber"];
+  const linha = x => [
+    title(x.cliente),
+    [x.evento, x.dataEvento && U.fmtDate(x.dataEvento)].filter(Boolean).join(" · "),
+    totBecas(x),
+    x.retirada ? U.fmtDate(x.retirada) + (x.retiradaHora ? " " + x.retiradaHora : "") : "",
+    x.devolucao ? U.fmtDate(x.devolucao) : "",
+    centavos(falta(x)) ? brl(falta(x)) : "—"
+  ];
+  const ord = (arr, k) => arr.slice().sort((a, b) => (a[k] || "").localeCompare(b[k] || ""));
+  return {
+    titulo: "Aluguel de becas",
+    secoes: [
+      {
+        titulo: "Resumo",
+        kpis: [
+          ["Becas fora agora", `${fora.reduce((s, x) => s + totBecas(x), 0)}${est ? " de " + est : ""}`],
+          ["Reservas", prox.length],
+          ["Devoluções atrasadas", atr.length],
+          ["A receber", brl(aRec)]
+        ]
+      },
+      { titulo: "Devoluções atrasadas", tabela: { cols, linhas: ord(atr, "devolucao").map(linha) }, vazio: "Nenhuma devolução atrasada." },
+      { titulo: "Fora do estúdio", tabela: { cols, linhas: ord(fora, "devolucao").map(linha) }, vazio: "Nenhuma beca fora agora." },
+      { titulo: "Reservados", tabela: { cols, linhas: ord(prox, "retirada").map(linha) }, vazio: "Nenhuma reserva." }
+    ]
+  };
 }

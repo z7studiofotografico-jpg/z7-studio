@@ -4,6 +4,7 @@ import * as Ev from "./eventos.js";
 import { openEvento, reservarVarios, liberar, msgErroData, camposEvento, linhaEvento, produtos, avisarColegioPorEmail } from "./eventos.js";
 import * as U from "./util.js";
 import { openImport } from "./instituicoes-import.js";
+import { botaoRelatorio, contar } from "./relatorio.js";
 // (o Agendamento importa estas daqui; continuam disponíveis)
 export { KINDS, nomeEvento, avisarColegioPorEmail, painelAvisar, msgWhatsColegio } from "./eventos.js";
 // Módulo Instituições: colégio particular, colégio público, colégio profissionalizante e faculdade.
@@ -301,6 +302,7 @@ export function show(t) {
   const hb = el("div", "quick");
   hb.append(U.mkBtn("+ Nova instituição", "btn-primary", () => openForm(null)));
   if (C.isAdmin) hb.append(U.mkBtn("Importar planilha", "", () => openImport(C, T.tipos, T.nome, items)));
+  hb.append(botaoRelatorio(relatorioInst, () => C.me));
   head.append(hb);
   v.append(head);
 
@@ -1003,4 +1005,82 @@ function openVisita(it) {
       }
     });
   });
+}
+
+// Relatório para reunião: situação das instituições deste cartão (a equipe vê só a carteira dela)
+function relatorioInst() {
+  const T = CARTOES[tipo] || CARTOES.particular;
+  const doisTipos = T.tipos.length > 1;
+  const st = items.map(status);
+  const abertas = items.filter(i => ABERTAS.includes(i.etapa)),
+    fechadas = items.filter(i => i.etapa === "FECHADO");
+  const rank = { late: 0, today: 1, later: 2, none: 3, won: 4 };
+  const ordem = (a, b) =>
+    rank[status(a)] - rank[status(b)] ||
+    (a.followup || "9").localeCompare(b.followup || "9") ||
+    (a.nome || "").localeCompare(b.nome || "", "pt-BR");
+  const alunos = i => i.alunosConfirmados || (i.mediaAlunos ? "~" + i.mediaAlunos : "");
+  const lugar = i => [title(i.endereco?.bairro), title(i.endereco?.cidade)].filter(Boolean).join(" · ");
+  const tipoTxt = i => (doisTipos ? [(TIPOS[i.tipo] || {}).nome || ""] : []);
+  const dataEv = (i, k) => (i[k] && i[k].data && i[k].status !== "recusado" ? U.fmtDate(i[k].data) : "");
+  return {
+    titulo: T.nome,
+    subtitulo: C.isAdmin ? "" : "Só a sua carteira e as livres",
+    secoes: [
+      {
+        titulo: "Resumo",
+        kpis: [
+          ["Retornos atrasados", st.filter(x => x === "late").length],
+          ["Retornos para hoje", st.filter(x => x === "today").length],
+          ["Em andamento", abertas.length],
+          ["Fechadas", fechadas.length],
+          ["Pendências de fotos", items.filter(pendFotos).length]
+        ]
+      },
+      {
+        titulo: "Por etapa",
+        tabela: { cols: ["Etapa", "Instituições"], linhas: contar(items, i => i.etapa) },
+        vazio: "Nenhuma instituição cadastrada."
+      },
+      {
+        titulo: "Em andamento",
+        tabela: {
+          cols: ["Instituição", ...(doisTipos ? ["Tipo"] : []), "Etapa", "Onde", "Responsável", "Próximo passo", "Retorno", "Alunos"],
+          linhas: abertas
+            .slice()
+            .sort(ordem)
+            .map(i => [
+              title(i.nome),
+              ...tipoTxt(i),
+              i.etapa,
+              lugar(i),
+              C.nomeDe(i) ? U.first(C.nomeDe(i)) : "Livre",
+              i.proximoPasso || "",
+              i.followup ? U.fmtDate(i.followup) + (status(i) === "late" ? " (atrasado)" : "") : "",
+              alunos(i)
+            ])
+        },
+        vazio: "Nenhuma em andamento."
+      },
+      {
+        titulo: "Fechadas",
+        tabela: {
+          cols: ["Instituição", ...(doisTipos ? ["Tipo"] : []), "Responsável", "Fechado em", "Dia de fotos", "Formatura", "Alunos"],
+          linhas: fechadas
+            .slice()
+            .sort((a, b) => (a.nome || "").localeCompare(b.nome || "", "pt-BR"))
+            .map(i => [
+              title(i.nome),
+              ...tipoTxt(i),
+              C.nomeDe(i) ? U.first(C.nomeDe(i)) : "",
+              i.fechadoEm ? U.fmtDate(i.fechadoEm) + "/" + i.fechadoEm.slice(0, 4) : "",
+              dataEv(i, "diaFotos"),
+              dataEv(i, "formatura"),
+              alunos(i)
+            ])
+        },
+        vazio: "Nenhuma fechada ainda."
+      }
+    ]
+  };
 }

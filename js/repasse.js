@@ -10,6 +10,7 @@ import { el, title, emPartes, avisoErro } from "./ui.js";
 import * as U from "./util.js";
 import { norm, faltando, docId, situacaoTxt, enderecoTxt } from "./repasse-dados.js";
 import { openImport } from "./repasse-import.js";
+import { botaoRelatorio, contar } from "./relatorio.js";
 import { procurarRepetido, pedirAluno, painelPedidos, indexarFones } from "./pedidos.js";
 // Assumir o contato: quem não é admin só assume o que está sem responsável (ou já é seu)
 const assumir = it => (!C.isAdmin && it.respEmail && it.respEmail !== C.email ? {} : { resp: C.me, respEmail: C.email || "" });
@@ -242,6 +243,7 @@ function mount() {
   const hb = el("div", "quick");
   hb.append(U.mkBtn("+ Aluno", "btn-primary", () => openDados(null)));
   hb.append(U.mkBtn("🖼️ Prévia e fotos", "", () => openMockup({ preco: precoTxt(), toast: U.toast })));
+  hb.append(botaoRelatorio(relatorioPR, () => C.me));
   const imp = U.mkBtn("Importar planilha", "", () => openImport(C, { sheet, field, actions, meta }, () => (loadMeta(), refreshStats())));
   imp.id = "rImport";
   imp.hidden = !C.isAdmin;
@@ -1437,4 +1439,54 @@ async function loadMeta() {
   } catch (e) {
     avisoErro(e, "carregar a lista de escolas", U.toast);
   }
+}
+
+// ---------- relatório para imprimir (a aba aberta, com os números do topo) ----------
+const NOMES_ABA = {
+  hoje: "Para hoje",
+  interessados: "Interessados",
+  entregas: "Entregas",
+  buscar: "Busca",
+  conferir: "A conferir",
+  incompletos: "Incompletos"
+};
+function relatorioPR() {
+  const txt = id => ($(id) ? $(id).textContent : "–");
+  const dataBR = d => (d ? U.fmtDate(d) + "/" + String(d).slice(0, 4) : "");
+  const lista = items.slice().sort((a, b) => String(a.followup || "9").localeCompare(String(b.followup || "9")));
+  return {
+    titulo: "PR · " + segNome(seg),
+    subtitulo: "Aba " + (NOMES_ABA[tab] || tab) + (C.isAdmin ? "" : " · os contatos que você vê"),
+    secoes: [
+      {
+        titulo: "Números",
+        kpis: [
+          ["Para hoje", txt("rsHoje")],
+          ["Na fila", txt("rsFila")],
+          ["Interessados", txt("rsInt")],
+          ["Vendido no mês", txt("rsMes")]
+        ]
+      },
+      {
+        titulo: "Por etapa (" + (NOMES_ABA[tab] || tab) + ")",
+        tabela: { cols: ["Etapa", "Contatos"], linhas: contar(lista, x => x.etapa) }
+      },
+      {
+        titulo: "Contatos (" + lista.length + ")",
+        tabela: {
+          cols: ["Aluno", "Colégio", "Ano", "Etapa", "Responsável", "Próximo contato", "Telefone"],
+          linhas: lista.map(x => [
+            title(x.nome),
+            title(x.escola),
+            x.ano || "",
+            x.etapa,
+            C.nomeDe(x) || "—",
+            dataBR(x.followup),
+            ((x.contatos || [])[0] || {}).tel || ""
+          ])
+        },
+        vazio: "Nenhum contato nesta aba."
+      }
+    ]
+  };
 }
