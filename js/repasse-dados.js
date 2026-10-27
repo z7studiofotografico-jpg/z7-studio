@@ -1,6 +1,7 @@
 // PR: dados puros (sem tela): normalização, identificador do documento, leitura das linhas da planilha
 // e o que falta para um aluno entrar na fila. Testado em tests/repasse-dados.test.mjs.
 import * as U from "./util.js";
+import { title } from "./ui.js";
 
 export const norm = U.chave,
   slug = U.slug;
@@ -112,4 +113,41 @@ export function docId(d, i) {
     slug(d.codigo).slice(0, 24) || "x",
     slug(d.nome).slice(0, 32) || "r" + i
   ].join("_");
+}
+
+// Texto da situação no cartão do PR (s = status do contato: "late", "today", "later" ou "none")
+export function situacaoTxt(it, s) {
+  const ABERTAS = ["SEPARADO", "CONTATADO", "INTERESSADO"];
+  const dia = d => (d ? d.slice(8, 10) + "/" + d.slice(5, 7) : "");
+  if (ABERTAS.includes(it.etapa))
+    return it.followup
+      ? s === "late"
+        ? "Atrasado desde " + dia(it.followup)
+        : s === "today"
+          ? "Contato para hoje"
+          : "Próximo contato: " + dia(it.followup)
+      : "Sem data de contato";
+  if (it.etapa === "PAGO") {
+    const ret = (it.entregaTipo || "").startsWith("Retirada"),
+      comb = !it.entregaTipo || it.entregaTipo.startsWith("A combinar"),
+      pago = "Pago" + (it.pagoEm ? " em " + dia(it.pagoEm) : "");
+    if (comb) return pago + " · ⚠️ falta combinar entrega ou retirada";
+    return (
+      pago +
+      (ret ? " · retirada no estúdio" : " · entrega em casa") +
+      (it.entregaData ? " em " + dia(it.entregaData) : " · data a combinar") +
+      (!ret && !it.enderecoConfirmado ? " · ⚠️ endereço não confirmado" : "")
+    );
+  }
+  if (it.etapa === "ENTREGUE") return "Entregue" + (it.entregueEm ? " em " + dia(it.entregueEm) : "");
+  return it.etapa === "NA FILA" ? "Ainda na fila" : it.etapa === "INCOMPLETO" ? "Fora da fila até completar" : "Encerrado";
+}
+// Endereço de entrega numa linha (só quando pagou e vai receber em casa)
+export function enderecoTxt(it) {
+  if (it.etapa !== "PAGO" || !(it.entregaTipo || "").startsWith("Entrega")) return "";
+  const a = it.endereco || {},
+    t = title;
+  return [a.rua && t(a.rua) + (a.numero ? ", " + a.numero : ""), a.complemento && t(a.complemento), t(a.bairro), t(a.cidade)]
+    .filter(Boolean)
+    .join(" · ");
 }

@@ -56,3 +56,15 @@ test("mensagens da formatura: cobrança, oferta e prévia", async () => {
   assert.match(o, /formatura de 2025 no Colegio Alfa.*• Kit 04/s);
   assert.match(msgPrevia("Caio Lima", 35, ""), /^Oi, Caio! Aqui estão as 35 fotos/);
 });
+
+test("nenhuma função exportada depende de um setCtx chamado antes", () => {
+  for (const f of fs.readdirSync(new URL("../js/", import.meta.url))) {
+    const s = fs.readFileSync(new URL("../js/" + f, import.meta.url), "utf8");
+    assert.ok(!/export function setCtx/.test(s), f + " ainda exporta setCtx");
+  }
+});
+test("index.html não tem código dentro da página (o código fica em js/app.js, com lint)", () => {
+  const html = fs.readFileSync(new URL("../index.html", import.meta.url), "utf8");
+  const inline = [...html.matchAll(/<script(?![^>]*\bsrc=)[^>]*>([\s\S]*?)<\/script>/g)].filter(m => m[1].trim());
+  assert.equal(inline.length, 0);
+});

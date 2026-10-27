@@ -21,3 +21,18 @@ test("identificador estável (reimportar não duplica) e o que falta para entrar
   assert.deepEqual(faltando({ escola: "X", ano: 2025, nome: "Lia", contatos: [] }), ["responsável", "telefone"]);
   assert.deepEqual(faltando({ escola: "X", ano: 2025, nome: "Lia", contatos: [{ tipo: "Mãe", nome: "Rosa", tel: "1" }] }), []);
 });
+
+test("situação e endereço do cartão do PR", async () => {
+  const { situacaoTxt, enderecoTxt } = await import("../js/repasse-dados.js");
+  assert.equal(situacaoTxt({ etapa: "CONTATADO", followup: "2026-10-20" }, "late"), "Atrasado desde 20/10");
+  assert.equal(situacaoTxt({ etapa: "SEPARADO" }, "none"), "Sem data de contato");
+  assert.equal(situacaoTxt({ etapa: "PAGO", pagoEm: "2026-10-01" }, "none"), "Pago em 01/10 · ⚠️ falta combinar entrega ou retirada");
+  assert.equal(
+    situacaoTxt({ etapa: "PAGO", pagoEm: "2026-10-01", entregaTipo: "Entrega em casa", entregaData: "2026-10-05" }, "none"),
+    "Pago em 01/10 · entrega em casa em 05/10 · ⚠️ endereço não confirmado"
+  );
+  assert.equal(situacaoTxt({ etapa: "NA FILA" }, "none"), "Ainda na fila");
+  const end = { rua: "RUA DA PAZ", numero: "10", bairro: "CENTRO", cidade: "NILÓPOLIS" };
+  assert.equal(enderecoTxt({ etapa: "PAGO", entregaTipo: "Entrega em casa", endereco: end }), "Rua da Paz, 10 · Centro · Nilópolis");
+  assert.equal(enderecoTxt({ etapa: "PAGO", entregaTipo: "Retirada no estúdio", endereco: end }), "");
+});

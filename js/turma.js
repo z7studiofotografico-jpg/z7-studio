@@ -51,14 +51,17 @@ const hoje = () => U.todayStr();
 export const atrasado = f => atrasadoEm(f, hoje());
 export { quitado, ehKit01, vencDa };
 
-export function setCtx(ctx) {
+// guarda o contexto para as funções internas desta tela; toda função exportada recebe o ctx e chama usar(ctx),
+// então nenhuma depende de outra ter sido chamada antes
+function usar(ctx) {
   C = ctx;
   FS = ctx.FS;
   db = ctx.db;
 }
 
 // Registra a próxima parcela paga numa transação (duas pessoas ao mesmo tempo não se atropelam)
-export async function registrarPagamento(f) {
+export async function registrarPagamento(ctx, f) {
+  usar(ctx);
   const ref = FS.doc(db, "formandos", f.id);
   const r = await FS.runTransaction(db, async tx => {
     const s = await tx.get(ref);
@@ -94,7 +97,8 @@ async function desfazerPagamento(f) {
 }
 
 // Mensagem de cobrança no WhatsApp (usada aqui e no card Formaturas)
-export function cobrarWa(f) {
+export function cobrarWa(ctx, f) {
+  usar(ctx);
   const prox = pagasDe(f) + 1,
     venc = vencDa(f, prox),
     col = ehKit01(f);
@@ -125,7 +129,7 @@ export function linhasKitsPos(P, inst) {
 }
 // Prévia da formatura (todas as fotos do kit e prévia do álbum), com os kits na mensagem
 export async function abrirPrevia(ctx, inst, f) {
-  setCtx(ctx);
+  usar(ctx);
   try {
     const { openPrevia } = await import("./previa.js");
     openPrevia({
@@ -139,7 +143,7 @@ export async function abrirPrevia(ctx, inst, f) {
   }
 }
 export function oferecerKit(ctx, inst, f) {
-  setCtx(ctx);
+  usar(ctx);
   const rep = ehRepasse(inst, hoje()),
     lin = linhasKitsPos(C.P, inst);
   if (!lin.length) return U.toast(`Defina os preços ${rep ? "de repasse" : "depois das fotos"} em “📋 Kits e preços” (card Formaturas)`);
@@ -148,7 +152,7 @@ export function oferecerKit(ctx, inst, f) {
 }
 // opcoes.novo = abre já com o formulário de formando novo (botão "+ Formando" do card Formaturas)
 export function openTurma(ctx, inst, kits, aoFechar, opcoes) {
-  setCtx(ctx);
+  usar(ctx);
   const col = FS.collection(db, "formandos");
   let lista = [],
     filtro = "todos",
@@ -448,8 +452,8 @@ export function openTurma(ctx, inst, kits, aoFechar, opcoes) {
         if (f.obs) e.append(el("p", "notes", f.obs));
         const act = el("div", "actions");
         if (C.isAdmin && comprou && !q0)
-          act.append(U.mkBtn("✅ Parcela paga", "btn-ok", () => registrarPagamento(f).catch(er => C.handleErr(er))));
-        if (comprou && !q0 && f.tel) act.append(U.mkBtn("💬 Cobrar", at ? "btn-primary" : "", () => cobrarWa(f)));
+          act.append(U.mkBtn("✅ Parcela paga", "btn-ok", () => registrarPagamento(C, f).catch(er => C.handleErr(er))));
+        if (comprou && !q0 && f.tel) act.append(U.mkBtn("💬 Cobrar", at ? "btn-primary" : "", () => cobrarWa(C, f)));
         if (C.isAdmin && q0 && !f.entregueEm)
           act.append(
             U.mkBtn("📦 Marcar entregue", "btn-verde", () =>
