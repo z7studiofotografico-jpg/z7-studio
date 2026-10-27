@@ -319,7 +319,7 @@ async function abrir(email, dados) {
     console.log("Não abriu a tela inicial. Erros:", erros.join("\n"));
     throw e;
   }
-  await pg.waitForTimeout(600);
+  await calmo(pg);
   // store(): espera o app terminar de gravar (nenhuma operação em andamento há 150 ms) e devolve os dados
   const store = async () => {
     await pg
@@ -329,11 +329,21 @@ async function abrir(email, dados) {
   };
   return { pg, erros, ctx, store };
 }
+// Espera a tela "acalmar" (nenhuma gravação em andamento e nada novo do banco há 100 ms, e um quadro desenhado),
+// no lugar de esperas fixas: mais rápido quando está tudo pronto e sem falhar quando a máquina está lenta.
+const calmo = pg =>
+  pg
+    .waitForFunction(() => window.__ops === 0 && Date.now() - window.__ultimo > 100, null, { timeout: 5000, polling: 25 })
+    .then(() => pg.evaluate(() => new Promise(r => requestAnimationFrame(() => r()))))
+    .catch(() => {});
 const ir = async (pg, h) => {
   await pg.evaluate(h => {
+    document.body.dataset.tela = "";
     location.hash = h;
   }, h);
-  await pg.waitForTimeout(500);
+  // espera a troca de tela terminar (o app marca body[data-tela] no fim) e o banco acalmar
+  await pg.waitForFunction(() => document.body.dataset.tela === location.hash, null, { timeout: 8000 }).catch(() => {});
+  await calmo(pg);
 };
 // Cada cenário roda numa aba nova; um erro (ex.: tempo esgotado) conta como falha e o resto continua.
 // SO=palavra roda só os cenários com essa palavra no nome (ex.: SO=pedro).
@@ -369,7 +379,7 @@ const visiveis = pg => pg.$$eval(".tile[data-mod]", ts => ts.filter(t => !t.hidd
 
 await cenario("Adriano (admin), com os dados já atualizados no servidor", async () => {
   const { pg, erros, store } = await abrir(ADRIANO, migrar(base));
-  await pg.waitForTimeout(800);
+  await calmo(pg);
   let s = await store();
   await etapa(pg, "Início e dados atualizados", async () => {
     ok(s["instituicoes/i1"].respEmail === PEDRO, "colégio ganhou o e-mail do responsável");
@@ -392,7 +402,7 @@ await cenario("Adriano (admin), com os dados já atualizados no servidor", async
     ok(/atrasad/.test(await pg.textContent("#tFormaturas")), "card Formaturas mostra parcela atrasada");
     // Ajustes: 9.5 não pode virar 95
     await pg.click("#btnPrices");
-    await pg.waitForTimeout(200);
+    await calmo(pg);
     ok((await pg.inputValue("#pInd")) === "450,00", "valor salvo aparece com centavos (450,00): " + (await pg.inputValue("#pInd")));
     await pg.fill("#pSinal", "120");
     await pg.locator("#pSinal").blur();
@@ -405,7 +415,7 @@ await cenario("Adriano (admin), com os dados já atualizados no servidor", async
     await pg.fill('#comTab input[data-l="pr"][data-f="Boleto"]', "9.5");
     await pg.fill("#pFeriados", "24/12 Recesso de Natal");
     await pg.click("#pSave");
-    await pg.waitForTimeout(300);
+    await calmo(pg);
     s = await store();
     ok(s["config/app"].comissao.pr.Boleto === 9.5, "comissão 9.5 grava 9,5% (antes virava 95%) → " + s["config/app"].comissao.pr.Boleto);
     ok(s["config/app"].feriadosExtras === "24/12 Recesso de Natal", "feriado extra da cidade gravado em Ajustes");
@@ -425,7 +435,7 @@ await cenario("Adriano (admin), com os dados já atualizados no servidor", async
     await pg.waitForFunction(() => (window.__store.get("leads/l1") || {}).valor === 1350.5, null, { timeout: 3000 }).catch(() => {});
     // venda fechada pela equipe: aparece "a conferir" e o admin confere
     await pg.fill("#q", "venda da equipe");
-    await pg.waitForTimeout(600);
+    await calmo(pg);
     const cv = pg.locator("#list .card").filter({ hasText: "Venda Da Equipe" });
     ok(/a conferir/.test((await cv.textContent().catch(() => "")) || ""), "venda da equipe mostra ⏳ a conferir");
     await cv.getByText("✔ Conferir venda").click();
@@ -436,7 +446,7 @@ await cenario("Adriano (admin), com os dados já atualizados no servidor", async
     await pg.waitForTimeout(1200);
     ok(/Rosana Antiga/.test(await pg.textContent("#list")), "busca acha lead antigo no servidor");
     await pg.fill("#q", "");
-    await pg.waitForTimeout(200);
+    await calmo(pg);
     s = await store();
     ok(s["leads/l1"].valor === 1350.5, "valor R$ 1.350,50 gravado como 1350.5 → " + JSON.stringify(s["leads/l1"].valor));
   });
@@ -445,7 +455,7 @@ await cenario("Adriano (admin), com os dados já atualizados no servidor", async
     await ir(pg, "#formaturas");
     ok(/Lucas Silva/.test(await pg.textContent("#fmCorpo")), "cobranças mostram o formando atrasado");
     await pg.locator("#fmCorpo .card").filter({ hasText: "Lucas" }).getByText("✅ Parcela paga").click();
-    await pg.waitForTimeout(400);
+    await calmo(pg);
     s = await store();
     ok(
       s["formandos/f1"].pagamentos.length === 2 && s["formandos/f1"].pagas === 2 && s["formandos/f1"].pagamentos[1].valor === 85,
@@ -453,11 +463,11 @@ await cenario("Adriano (admin), com os dados já atualizados no servidor", async
     );
     // Turma: novo formando com 400 em 3x
     await pg.locator("#fmChips").getByText("Turmas").click();
-    await pg.waitForTimeout(200);
+    await calmo(pg);
     await pg.getByText("👥 Formandos e parcelas").click();
-    await pg.waitForTimeout(400);
+    await calmo(pg);
     await pg.locator(".panel.wide").getByRole("button", { name: "+ Formando" }).click();
-    await pg.waitForTimeout(200);
+    await calmo(pg);
     const f = pg.locator(".sheet").last();
     await f.getByLabel("Nome").fill("Julia Costa");
     await f.getByLabel("Kit", { exact: true }).selectOption("outro");
@@ -470,27 +480,27 @@ await cenario("Adriano (admin), com os dados já atualizados no servidor", async
       "divide 400 em 3x sem perder centavo"
     );
     await f.locator("button[type=submit]").click();
-    await pg.waitForTimeout(300);
+    await calmo(pg);
     s = await store();
     const ju = Object.values(s).find(x => x.nome === "Julia Costa");
     ok(ju && ju.valor === 400 && ju.respEmail === PEDRO && ju.proxVenc, "formando novo com responsável do colégio e próximo vencimento");
     // contrato: Kit 04 antecipado preenche valor e parcelas pela tabela
     const novoFormando = async () => {
       await pg.locator(".panel.wide").getByRole("button", { name: "+ Formando" }).click();
-      await pg.waitForTimeout(200);
+      await calmo(pg);
       return pg.locator(".sheet").last();
     };
     let fk = await novoFormando();
     await fk.getByLabel("Nome").fill("Bia Antecipada");
     await fk.getByLabel("Kit", { exact: true }).selectOption("k04");
-    await pg.waitForTimeout(150);
+    await calmo(pg);
     ok(
       (await fk.getByLabel("Valor total").inputValue()) === "850,00" &&
         (await fk.getByLabel("Parcelas", { exact: true }).inputValue()) === "10",
       "Kit 04 antecipado: R$ 850,00 em 10x (tabela do contrato)"
     );
     await fk.locator("button[type=submit]").click();
-    await pg.waitForTimeout(300);
+    await calmo(pg);
     // todo formando entra pelo menos com o Kit 01 (adesão)
     fk = await novoFormando();
     await fk.getByLabel("Nome").fill("Caio Kit Um");
@@ -500,7 +510,7 @@ await cenario("Adriano (admin), com os dados já atualizados no servidor", async
       "novo formando já vem com o Kit 01 (R$ 65,00)"
     );
     await fk.locator("button[type=submit]").click();
-    await pg.waitForTimeout(300);
+    await calmo(pg);
     s = await store();
     const bia = Object.values(s).find(x => x.nome === "Bia Antecipada"),
       caio = Object.values(s).find(x => x.nome === "Caio Kit Um");
@@ -511,12 +521,12 @@ await cenario("Adriano (admin), com os dados já atualizados no servidor", async
     ok(caio && caio.kitId === "k01" && caio.contrato === "adesao" && caio.valor === 65, "Kit 01 gravado como adesão");
     // tabela só desta turma: Kit 04 por R$ 790,00 em 8x
     await pg.locator(".panel.wide").getByRole("button", { name: "📋 Kits desta turma" }).click();
-    await pg.waitForTimeout(200);
+    await calmo(pg);
     fk = pg.locator(".sheet").last();
     await fk.getByLabel(/Kit 04.* · valor antecipado \(turma\)$/).fill("790");
     await fk.getByLabel(/Kit 04.* · parcelas antecipado \(turma\)$/).fill("8");
     await fk.locator("button[type=submit]").click();
-    await pg.waitForTimeout(300);
+    await calmo(pg);
     ok(
       /diferentes da tabela padrão/.test(await pg.textContent(".panel.wide")) && /✏️ Kit 04: 8x/.test(await pg.textContent(".panel.wide")),
       "turma avisa os valores diferentes da tabela padrão"
@@ -524,22 +534,22 @@ await cenario("Adriano (admin), com os dados já atualizados no servidor", async
     fk = await novoFormando();
     await fk.getByLabel("Nome").fill("Dani Turma");
     await fk.getByLabel("Kit", { exact: true }).selectOption("k04");
-    await pg.waitForTimeout(150);
+    await calmo(pg);
     ok((await fk.getByLabel("Valor total").inputValue()) === "790,00", "formando novo usa a tabela da turma (R$ 790,00)");
     await fk.getByRole("button", { name: "Cancelar" }).click();
-    await pg.waitForTimeout(200);
+    await calmo(pg);
     // fotos prontas libera a oferta
     await pg.locator(".panel.wide").getByRole("button", { name: "📅 Contrato da turma" }).click();
-    await pg.waitForTimeout(200);
+    await calmo(pg);
     fk = pg.locator(".sheet").last();
     await fk.getByRole("button", { name: "📸 As fotos ficaram prontas hoje" }).click();
     await fk.locator("button[type=submit]").click();
-    await pg.waitForTimeout(300);
+    await calmo(pg);
     await pg.locator(".panel.wide").getByRole("button", { name: "Fechar" }).click();
-    await pg.waitForTimeout(300);
+    await calmo(pg);
     // tabela padrão: preço depois das fotos do Kit 04
     await pg.getByRole("button", { name: "📋 Kits e preços" }).click();
-    await pg.waitForTimeout(200);
+    await calmo(pg);
     fk = pg.locator(".sheet").last();
     if (process.env.FOTOS) await fk.screenshot({ path: process.env.FOTOS + "/kits.png" });
     await fk.getByLabel(/Kit 04.* · valor depois das fotos$/).fill("1.100,00");
@@ -547,7 +557,7 @@ await cenario("Adriano (admin), com os dados já atualizados no servidor", async
     await fk.getByLabel(/Kit 04.* · valor repasse$/).fill("700");
     await fk.getByLabel(/Kit 04.* · parcelas repasse$/).fill("5");
     await fk.locator("button[type=submit]").click();
-    await pg.waitForTimeout(400);
+    await calmo(pg);
     s = await store();
     const k4 = (s["config/app"].kitsFormatura || []).find(k => k.id === "k04");
     ok(
@@ -564,27 +574,27 @@ await cenario("Adriano (admin), com os dados já atualizados no servidor", async
       window.__leituras = [];
     });
     await ir(pg, "#formaturas");
-    await pg.waitForTimeout(800);
+    await calmo(pg);
     const leit = await pg.evaluate(() => window.__leituras.filter(l => l.col === "formandos"));
     ok(
       /Pode oferecer os kits para 1 aluno/i.test(await pg.textContent("#fmCorpo")) && !leit.some(l => l.filtros === 0),
       "aviso de oferta sem ler a coleção inteira de formandos: " + JSON.stringify(leit)
     );
     await pg.locator("#fmChips").getByText("📸 Depois das fotos").click();
-    await pg.waitForTimeout(400);
+    await calmo(pg);
     ok(
       /Caio Kit Um/.test(await pg.textContent("#fmCorpo")) && !/Bia Antecipada/.test(await pg.textContent("#fmCorpo")),
       "só quem tem o Kit 01 aparece em Depois das fotos"
     );
     await pg.locator("#fmCorpo .card").filter({ hasText: "Caio" }).getByText("💬 Oferecer kit").click();
-    await pg.waitForTimeout(200);
+    await calmo(pg);
     ok(
       /Kit 04.*6x de R\$ 183,33/.test(decodeURIComponent(await pg.evaluate(() => window.__aberto || ""))),
       "mensagem oferece o Kit 04 a 6x de R$ 183,33"
     );
     // prévia: todas as fotos do kit (35 fotos = 2 páginas) e prévia do álbum, montadas no aparelho
     await pg.locator("#fmCorpo .card").filter({ hasText: "Caio" }).getByText("🖼️ Prévia").click();
-    await pg.waitForTimeout(500);
+    await calmo(pg);
     const foto = fs.readFileSync(RAIZ + "icons/icon-512.png");
     await pg
       .locator(".panel.mock input[type=file]")
@@ -597,7 +607,7 @@ await cenario("Adriano (admin), com os dados já atualizados no servidor", async
     ok(/35 fotos em 2 páginas/.test(await pg.textContent(".panel.mock")), "prévia: 35 fotos do kit em 2 páginas");
     if (process.env.FOTOS) await pg.locator(".panel.mock canvas").screenshot({ path: process.env.FOTOS + "/folha.png" });
     await pg.locator(".panel.mock").getByRole("button", { name: "📘 Prévia do álbum" }).click();
-    await pg.waitForTimeout(600);
+    await calmo(pg);
     ok((await pg.evaluate(() => document.querySelector(".panel.mock canvas").width)) === 1600, "prévia do álbum desenhada");
     if (process.env.FOTOS) await pg.locator(".panel.mock canvas").screenshot({ path: process.env.FOTOS + "/album.png" });
     // limite de fotos: mais 70 (total 105) → fica em 90, com aviso
@@ -605,18 +615,21 @@ await cenario("Adriano (admin), com os dados já atualizados no servidor", async
       .locator(".panel.mock input[type=file]")
       .setInputFiles(Array.from({ length: 70 }, (_, i) => ({ name: `g${i}.png`, mimeType: "image/png", buffer: foto })));
     await pg.waitForFunction(() => /Ficaram as primeiras/.test(document.body.textContent), null, { timeout: 15000 }).catch(() => {});
-    await pg.waitForTimeout(500);
+    await calmo(pg);
     const avisoLimite = await pg.textContent("body");
     await pg.locator(".panel.mock").getByRole("button", { name: "📋 Todas as fotos" }).click();
-    await pg.waitForTimeout(300);
+    // as fotos são reduzidas uma a uma (não é o banco): espera a contagem final aparecer
+    await pg
+      .waitForFunction(() => /90 fotos/.test(document.querySelector(".panel.mock").textContent), null, { timeout: 15000 })
+      .catch(() => {});
     ok(/90 fotos/.test(await pg.textContent(".panel.mock")) && /até 90 fotos/.test(avisoLimite), "prévia: limite de 90 fotos com aviso");
     await pg.locator(".panel.mock").getByRole("button", { name: "Fechar" }).click();
-    await pg.waitForTimeout(200);
+    await calmo(pg);
     await pg.locator("#fmCorpo .card").filter({ hasText: "Caio" }).getByText("Abrir turma").click();
-    await pg.waitForTimeout(500);
+    await calmo(pg);
     if (process.env.FOTOS) await pg.locator(".panel.wide").screenshot({ path: process.env.FOTOS + "/turma.png" });
     await pg.locator(".panel.wide .card").filter({ hasText: "Caio" }).getByText("🛒 Comprou kit").click();
-    await pg.waitForTimeout(200);
+    await calmo(pg);
     fk = pg.locator(".sheet").last();
     ok(
       (await fk.getByLabel("Valor total").inputValue()) === "1.100,00" &&
@@ -625,7 +638,7 @@ await cenario("Adriano (admin), com os dados já atualizados no servidor", async
     );
     await fk.getByLabel("Valor total").fill("1.000,00"); // combinaram outro valor
     await fk.locator("button[type=submit]").click();
-    await pg.waitForTimeout(300);
+    await calmo(pg);
     s = await store();
     const compras = Object.values(s).filter(x => x.nome === "Caio Kit Um");
     const nova = compras.find(x => x.venda === "pos");
@@ -634,41 +647,41 @@ await cenario("Adriano (admin), com os dados já atualizados no servidor", async
       "compra a mais registrada (R$ 1.000,00 combinado) e o Kit 01 continua"
     );
     await pg.locator(".panel.wide").getByRole("button", { name: "Fechar" }).click();
-    await pg.waitForTimeout(200);
+    await calmo(pg);
     // "+ Formando" direto no card Formaturas (sem planilha): escolhe a turma e já abre o cadastro
     await pg.getByRole("button", { name: "+ Formando" }).first().click();
-    await pg.waitForTimeout(300);
+    await calmo(pg);
     fk = pg.locator(".sheet").last();
     await fk.getByLabel("Turma (colégio)").selectOption("i1");
     await fk.locator("button[type=submit]").click();
-    await pg.waitForTimeout(600);
+    await calmo(pg);
     fk = pg.locator(".sheet").last();
     await fk.getByLabel("Nome").fill("Eva Direto");
     await fk.locator("button[type=submit]").click();
-    await pg.waitForTimeout(400);
+    await calmo(pg);
     s = await store();
     const eva = Object.values(s).find(x => x.nome === "Eva Direto");
     ok(eva && eva.instId === "i1" && eva.kitId === "k01", "+ Formando no card Formaturas: incluído na turma com o Kit 01");
     await pg.locator(".panel.wide").getByRole("button", { name: "Fechar" }).click();
-    await pg.waitForTimeout(200);
+    await calmo(pg);
     // Repasse: turmas de anos anteriores, quem ficou só com o Kit 01, preço de repasse
     await pg.locator("#viewFormaturas .segs").getByText("Repasse", { exact: true }).click();
-    await pg.waitForTimeout(400);
+    await calmo(pg);
     await pg.locator("#fmChips").getByText("🔁 Oferecer no repasse").click();
-    await pg.waitForTimeout(400);
+    await calmo(pg);
     let rt = await pg.textContent("#fmCorpo");
     ok(/Lia Antiga/.test(rt) && !/Caio Kit Um/.test(rt), "Repasse mostra só quem ficou com o Kit 01 nas turmas de anos anteriores");
     await pg.locator("#fmCorpo .card").filter({ hasText: "Lia" }).getByText("💬 Oferecer kit").click();
-    await pg.waitForTimeout(200);
+    await calmo(pg);
     const msgRep = decodeURIComponent(await pg.evaluate(() => window.__aberto || ""));
     ok(
       new RegExp("formatura de " + (hoje.getFullYear() - 1)).test(msgRep) && /Kit 04.*5x de R\$ 140,00/.test(msgRep),
       "mensagem do repasse com o preço de repasse (5x de R$ 140,00)"
     );
     await pg.locator("#fmCorpo .card").filter({ hasText: "Lia" }).getByText("Abrir turma").click();
-    await pg.waitForTimeout(500);
+    await calmo(pg);
     await pg.locator(".panel.wide .card").filter({ hasText: "Lia" }).getByText("🛒 Comprou kit").click();
-    await pg.waitForTimeout(200);
+    await calmo(pg);
     fk = pg.locator(".sheet").last();
     ok(
       (await fk.getByLabel("Valor total").inputValue()) === "700,00" &&
@@ -676,7 +689,7 @@ await cenario("Adriano (admin), com os dados já atualizados no servidor", async
       "venda no repasse: Kit 04 R$ 700,00 em 5x"
     );
     await fk.locator("button[type=submit]").click();
-    await pg.waitForTimeout(300);
+    await calmo(pg);
     s = await store();
     const lia = Object.values(s).filter(x => x.nome === "Lia Antiga" || x.nome === "LIA ANTIGA");
     ok(
@@ -684,12 +697,12 @@ await cenario("Adriano (admin), com os dados já atualizados no servidor", async
       "venda do repasse registrada"
     );
     await pg.locator(".panel.wide").getByRole("button", { name: "Fechar" }).click();
-    await pg.waitForTimeout(200);
+    await calmo(pg);
     await pg
       .locator("#viewFormaturas .segs")
       .getByText(/Linha de Frente/)
       .click();
-    await pg.waitForTimeout(200);
+    await calmo(pg);
   });
   await etapa(pg, "Dashboard", async () => {
     // Dashboard
@@ -705,7 +718,7 @@ await cenario("Adriano (admin), com os dados já atualizados no servidor", async
     ok((await pg.locator("#viewVendas canvas").count()) === 2, "gráficos desenhados (Chart.js com conferência de integridade)");
     // um card de cada vez
     await pg.locator(".vdareas").getByText("🖼️ PR").click();
-    await pg.waitForTimeout(400);
+    await calmo(pg);
     let vt = await pg.textContent("#vdCorpo");
     if (process.env.FOTOS) await pg.screenshot({ path: process.env.FOTOS + "/dash-pr.png", fullPage: true });
     ok(
@@ -713,7 +726,7 @@ await cenario("Adriano (admin), com os dados já atualizados no servidor", async
       "Dashboard · PR separado (vendas, separados, conversão, equipe) e aviso de venda a conferir"
     );
     await pg.locator(".vdareas").getByText("🎓 Formaturas").click();
-    await pg.waitForTimeout(400);
+    await calmo(pg);
     vt = await pg.textContent("#vdCorpo");
     if (process.env.FOTOS) await pg.screenshot({ path: process.env.FOTOS + "/dash-form.png", fullPage: true });
     ok(
@@ -721,7 +734,7 @@ await cenario("Adriano (admin), com os dados já atualizados no servidor", async
       "Dashboard · Formaturas separado (vendido, recebido, a receber, atrasados)"
     );
     await pg.locator(".vdareas").getByText("💬 Funil").click();
-    await pg.waitForTimeout(400);
+    await calmo(pg);
     vt = await pg.textContent("#vdCorpo");
     if (process.env.FOTOS) await pg.screenshot({ path: process.env.FOTOS + "/dash-funil.png", fullPage: true });
     ok(
@@ -729,22 +742,22 @@ await cenario("Adriano (admin), com os dados já atualizados no servidor", async
       "Dashboard · Funil separado (leads, conversão, origem)"
     );
     await pg.locator(".vdareas").getByText("Geral").click();
-    await pg.waitForTimeout(300);
+    await calmo(pg);
   });
   await etapa(pg, "PR", async () => {
     // PR: admin confere a venda feita pelo vendedor
     await ir(pg, "#pr");
-    await pg.waitForTimeout(400);
+    await calmo(pg);
     await pg.locator("#rChips").getByText("A conferir").click();
-    await pg.waitForTimeout(400);
+    await calmo(pg);
     await pg.locator(".card").filter({ hasText: "Bruno" }).getByRole("button", { name: "✔ Conferir venda" }).click();
-    await pg.waitForTimeout(300);
+    await calmo(pg);
     s = await store();
     ok(s["repasse/r2"].conferido === true && s["repasse/r2"].conferidoPor === ADRIANO, "admin conferiu a venda do PR");
     // pedido de aluno repetido: o admin decide
     ok(/Ana Vendedora tentou incluir Carla Fila/.test(await pg.textContent("#rPedidos")), "admin vê o pedido de aluno repetido");
     await pg.locator("#rPedidos .notes").filter({ hasText: "Carla Fila" }).getByRole("button", { name: "Passar para Ana" }).click();
-    await pg.waitForTimeout(500);
+    await calmo(pg);
     s = await store();
     ok(
       s["pedidos/p9"].status === "aprovado" &&
@@ -755,7 +768,7 @@ await cenario("Adriano (admin), com os dados já atualizados no servidor", async
     );
     // aluno que estava com o Pedro: passa para a Ana e o Pedro recebe o aviso
     await pg.locator("#rPedidos .notes").filter({ hasText: "Duda Trocada" }).getByRole("button", { name: "Passar para Ana" }).click();
-    await pg.waitForTimeout(500);
+    await calmo(pg);
     s = await store();
     const avisoPedro = s["pedidos/aviso_r6_pedro-vendas-com"];
     ok(
@@ -768,7 +781,7 @@ await cenario("Adriano (admin), com os dados já atualizados no servidor", async
     );
     // PR: importar planilha (módulo repasse-import.js)
     await pg.getByRole("button", { name: "Importar planilha" }).click();
-    await pg.waitForTimeout(300);
+    await calmo(pg);
     const csv =
       "ESCOLA;FORMANDO;DATA;STATUS;CEL 2 (MÃE)\nColegio Beta;Joana Planilha;10/03/2025;CAIDO;21944443333 (Sonia)\nColegio Beta;Sem Telefone;10/03/2025;CAIDO;\n";
     await pg.locator(".sheet:visible input[type=file]").setInputFiles({ name: "pr.csv", mimeType: "text/csv", buffer: Buffer.from(csv) });
@@ -784,13 +797,13 @@ await cenario("Adriano (admin), com os dados já atualizados no servidor", async
       "importar PR: fila e incompletos gravados"
     );
     await pg.locator(".sheet:visible").getByRole("button", { name: "Fechar" }).click();
-    await pg.waitForTimeout(200);
+    await calmo(pg);
     // a mesma planilha de novo: atualiza (não duplica) e não lê o PR inteiro
     await pg.evaluate(() => {
       window.__leituras = [];
     });
     await pg.getByRole("button", { name: "Importar planilha" }).click();
-    await pg.waitForTimeout(300);
+    await calmo(pg);
     await pg.locator(".sheet:visible input[type=file]").setInputFiles({ name: "pr.csv", mimeType: "text/csv", buffer: Buffer.from(csv) });
     await pg.waitForFunction(() => /2 formandos encontrados/.test(document.body.textContent), null, { timeout: 8000 }).catch(() => {});
     await pg.locator(".sheet:visible button[type=submit]").click();
@@ -804,14 +817,14 @@ await cenario("Adriano (admin), com os dados já atualizados no servidor", async
       "importar de novo: atualiza sem duplicar e sem ler o PR inteiro"
     );
     await pg.locator(".sheet:visible").getByRole("button", { name: "Fechar" }).click();
-    await pg.waitForTimeout(200);
+    await calmo(pg);
   });
   await etapa(pg, "Importar instituições", async () => {
     // Instituições: importar planilha (módulo instituicoes-import.js)
     await ir(pg, "#inst-particular");
-    await pg.waitForTimeout(400);
+    await calmo(pg);
     await pg.getByRole("button", { name: "Importar planilha" }).click();
-    await pg.waitForTimeout(300);
+    await calmo(pg);
     await pg.locator(".sheet:visible input[type=file]").setInputFiles({
       name: "colegios.csv",
       mimeType: "text/csv",
@@ -819,7 +832,7 @@ await cenario("Adriano (admin), com os dados já atualizados no servidor", async
     });
     await pg.waitForFunction(() => /1 instituições encontradas/.test(document.body.textContent), null, { timeout: 8000 }).catch(() => {});
     await pg.locator(".sheet:visible button[type=submit]").click();
-    await pg.waitForTimeout(800);
+    await calmo(pg);
     s = await store();
     const cp = Object.values(s).find(x => x.nome === "Colegio Planilha" || x.nome === "COLEGIO PLANILHA");
     ok(cp && cp.tipo === "particular" && cp.contatos[0].nome === "Dona Rita", "importar instituições: colégio gravado com o contato");
@@ -829,16 +842,16 @@ await cenario("Adriano (admin), com os dados já atualizados no servidor", async
         .locator(".sheet:visible")
         .last()
         .click({ position: { x: 5, y: 5 } });
-    await pg.waitForTimeout(200);
+    await calmo(pg);
   });
   await etapa(pg, "Agenda", async () => {
     // Agenda: admin vê o assunto particular, marca ensaio e compromisso particular
     await ir(pg, "#agenda");
-    await pg.waitForTimeout(400);
+    await calmo(pg);
     ok(/Consulta médica/.test(await pg.textContent("#viewAgenda")), "admin vê o assunto do compromisso particular");
     ok((await pg.getByRole("button", { name: "+ Agendar colégio" }).count()) === 1, "admin também tem o botão Agendar colégio");
     await pg.getByRole("button", { name: "+ Marcar ensaio" }).click();
-    await pg.waitForTimeout(200);
+    await calmo(pg);
     let sh = pg.locator(".sheet").last();
     ok((await sh.getByLabel("Valor do sinal").inputValue()) === "", "sinal do ensaio começa vazio (sem preço fixo)");
     await sh.getByLabel("Cliente").fill("Rita Lima");
@@ -848,18 +861,18 @@ await cenario("Adriano (admin), com os dados já atualizados no servidor", async
     await sh.getByLabel("Horário").fill("10:00");
     await sh.getByLabel("Valor do ensaio").fill("280,50");
     await sh.locator("button[type=submit]").click();
-    await pg.waitForTimeout(300);
+    await calmo(pg);
     s = await store();
     const rita = Object.values(s).find(x => x.cliente === "Rita Lima");
     ok(rita && rita.valor === 280.5 && rita.marcadoEmail === ADRIANO, "ensaio marcado com valor 280,50 e e-mail de quem marcou");
     await pg.getByRole("button", { name: "+ Compromisso" }).click();
-    await pg.waitForTimeout(200);
+    await calmo(pg);
     sh = pg.locator(".sheet").last();
     await sh.getByLabel("O que é").fill("Exame de sangue");
     await sh.getByLabel("Dia", { exact: true }).fill(dia(6));
     await sh.getByText("Dia inteiro").click();
     await sh.locator("button[type=submit]").click();
-    await pg.waitForTimeout(300);
+    await calmo(pg);
     s = await store();
     const comp = Object.entries(s).find(([k, x]) => k.startsWith("ensaios/") && x.kind === "pessoal" && x.data === dia(6));
     ok(
@@ -873,20 +886,20 @@ await cenario("Adriano (admin), com os dados já atualizados no servidor", async
   await etapa(pg, "Becas", async () => {
     // Becas
     await ir(pg, "#becas");
-    await pg.waitForTimeout(300);
+    await calmo(pg);
     await pg.getByRole("button", { name: "📦 Estoque" }).click();
-    await pg.waitForTimeout(200);
+    await calmo(pg);
     await pg.locator(".sheet").last().locator("summary", { hasText: "Beca tradicional preta" }).click();
     await pg.locator(".sheet").last().getByLabel("Estoque Beca tradicional preta M", { exact: true }).fill("5");
     await pg.locator(".sheet").last().locator("button[type=submit]").click();
-    await pg.waitForTimeout(300);
+    await calmo(pg);
     s = await store();
     ok(
       s["config/app"].estoque && s["config/app"].estoque.tamanhos.tradPreta.M === 5,
       "estoque por tipo e tamanho gravado (tradicional preta M = 5)"
     );
     await pg.getByRole("button", { name: "+ Aluguel" }).click();
-    await pg.waitForTimeout(200);
+    await calmo(pg);
     let sh = pg.locator(".sheet").last();
     await sh.getByLabel("Cliente").fill("Igreja Central");
     await sh.getByLabel("Data do evento").fill(dia(10));
@@ -901,10 +914,10 @@ await cenario("Adriano (admin), com os dados já atualizados no servidor", async
       "avisa que faltam becas tamanho M"
     );
     await sh.locator("button[type=submit]").click();
-    await pg.waitForTimeout(200);
+    await calmo(pg);
     if (await pg.locator(".sheet").count()) {
       await pg.locator(".sheet").last().locator("button[type=submit]").click();
-      await pg.waitForTimeout(300);
+      await calmo(pg);
     }
     s = await store();
     const bc = Object.values(s).find(x => x.cliente === "Igreja Central");
@@ -929,18 +942,18 @@ await cenario("Botão voltar do celular", async () => {
   const { pg, erros } = await abrir(ADRIANO, migrar(base));
   const voltar = async () => {
     await pg.evaluate(() => history.back());
-    await pg.waitForTimeout(500);
+    await calmo(pg);
   };
   await pg.locator('.tile[data-mod="colegios"]').click();
-  await pg.waitForTimeout(500);
+  await calmo(pg);
   await pg
     .locator("#viewInst .card, #viewInst a, #viewInst button")
     .filter({ hasText: /Colégio particular/i })
     .first()
     .click();
-  await pg.waitForTimeout(600);
+  await calmo(pg);
   await pg.getByRole("button", { name: "+ Nova instituição" }).click();
-  await pg.waitForTimeout(300);
+  await calmo(pg);
   ok((await pg.locator(".sheet:visible").count()) === 1, "abriu a janela de nova instituição");
   await voltar();
   ok((await pg.locator(".sheet:visible").count()) === 0 && /inst-particular/.test(pg.url()), "voltar fecha a janela e fica na mesma tela");
@@ -995,7 +1008,7 @@ await cenario("Pedro (vendedor: Linha de Frente, Agendamento, Instituições)", 
   });
   await etapa(pg, "Agenda (pedido de data)", async () => {
     await ir(pg, "#agenda");
-    await pg.waitForTimeout(400);
+    await calmo(pg);
     const ag = await pg.textContent("#viewAgenda");
     ok(/ocupado/.test(ag) && !/Consulta/.test(ag), "compromisso particular aparece só como ocupado");
     ok(!(await pg.getByRole("button", { name: "+ Marcar ensaio" }).count()), "não marca ensaio");
@@ -1005,7 +1018,7 @@ await cenario("Pedro (vendedor: Linha de Frente, Agendamento, Instituições)", 
       "data aprovada aparece para quem agendou avisar o colégio"
     );
     await pg.locator("#agPend .card").filter({ hasText: "Alfa" }).getByRole("button", { name: "📲 Avisar colégio" }).click();
-    await pg.waitForTimeout(200);
+    await calmo(pg);
     const msgAv = await pg.locator(".sheet").last().locator(".notes").textContent();
     console.log("    mensagem:", JSON.stringify(msgAv));
     ok(/Está confirmado/.test(msgAv) && /90 alunos/.test(msgAv) && /Espaço Festa/.test(msgAv), "mensagem confirmada com local e alunos");
@@ -1014,29 +1027,29 @@ await cenario("Pedro (vendedor: Linha de Frente, Agendamento, Instituições)", 
       .last()
       .getByRole("button", { name: /Enviar no WhatsApp/ })
       .click();
-    await pg.waitForTimeout(400);
+    await calmo(pg);
     ok((await store())["agenda/" + dia(20)].avisadoWhats === true, "marcado como avisado depois de abrir o WhatsApp");
     // Agendar colégio direto pela agenda (dia de fotos do PR)
     await pg.getByRole("button", { name: "+ Agendar colégio" }).click();
-    await pg.waitForTimeout(400);
+    await calmo(pg);
     let sa = pg.locator(".sheet").last();
     await sa.getByLabel("Colégio").fill("Colegio Beta");
     await sa.locator("button[type=submit]").click();
-    await pg.waitForTimeout(300);
+    await calmo(pg);
     sa = pg.locator(".sheet").last();
     await sa.locator("input[type=date]").first().fill(dia(15));
     await sa.locator("button[type=submit]").click();
-    await pg.waitForTimeout(200);
+    await calmo(pg);
     ok(/média de alunos/i.test(await sa.locator(".err").last().textContent()), "sem a média de alunos não agenda");
     await sa.getByLabel("Média de alunos (obrigatório)").fill("120");
     await sa.locator("button[type=submit]").click();
-    await pg.waitForTimeout(200);
+    await calmo(pg);
     ok(/WhatsApp/.test(await sa.locator(".err").last().textContent()), "sem o WhatsApp do responsável não agenda");
     await sa.getByLabel("Nome", { exact: true }).fill("Marta Diretora");
     await sa.getByLabel("WhatsApp", { exact: true }).fill("21 98888-1111");
     await sa.getByLabel("E-mail", { exact: true }).fill("marta@beta.com");
     await sa.locator("button[type=submit]").click();
-    await pg.waitForTimeout(500);
+    await calmo(pg);
     const av = pg.locator(".sheet").last();
     ok(
       /Avisar o colégio/i.test(await av.locator("h2").textContent()) &&
@@ -1045,7 +1058,7 @@ await cenario("Pedro (vendedor: Linha de Frente, Agendamento, Instituições)", 
       "depois de agendar, oferece a mensagem pronta para o responsável"
     );
     await av.getByRole("button", { name: /Enviar no WhatsApp/ }).click();
-    await pg.waitForTimeout(200);
+    await calmo(pg);
     ok(/wa\.me\/5521988881111/.test(await pg.evaluate(() => window.__aberto)), "abre o WhatsApp da diretora com a mensagem");
     const sAg = await store();
     ok(
@@ -1064,7 +1077,7 @@ await cenario("Pedro (vendedor: Linha de Frente, Agendamento, Instituições)", 
     );
     // Colégio novo cadastrado pela própria agenda
     await pg.getByRole("button", { name: "+ Agendar colégio" }).click();
-    await pg.waitForTimeout(400);
+    await calmo(pg);
     sa = pg.locator(".sheet").last();
     await sa.getByLabel("O que vai marcar").selectOption("formatura");
     await sa.getByLabel("Colégio").fill("Colégio Delta Novo");
@@ -1075,7 +1088,7 @@ await cenario("Pedro (vendedor: Linha de Frente, Agendamento, Instituições)", 
     await sa.getByLabel("WhatsApp do responsável").fill("21 3333-4444");
     await sa.getByLabel("Responsável", { exact: true }).fill("João Diretor");
     await sa.locator("button[type=submit]").click();
-    await pg.waitForTimeout(500);
+    await calmo(pg);
     sa = pg.locator(".sheet").last();
     ok(
       /Formatura do Colégio Delta Novo/i.test(await sa.locator("h2").textContent()),
@@ -1096,12 +1109,12 @@ await cenario("Pedro (vendedor: Linha de Frente, Agendamento, Instituições)", 
   });
   await etapa(pg, "PR (Linha de Frente)", async () => {
     await ir(pg, "#pr");
-    await pg.waitForTimeout(600);
+    await calmo(pg);
     ok((await pg.textContent("#viewRepasse")).length > 50, "PR (Linha de Frente) abre");
     // lote do dia: não trava, avisa depois de 25
     for (let i = 0; i < 3; i++) {
       await pg.locator("#rLoteBtn").click();
-      await pg.waitForTimeout(700);
+      await calmo(pg);
     }
     const sepS = await store();
     const sep = Object.values(sepS).filter(x => x.separadoEm && x.respEmail === PEDRO).length;
@@ -1114,14 +1127,14 @@ await cenario("Pedro (vendedor: Linha de Frente, Agendamento, Instituições)", 
     ok(await pg.locator("#rLoteBtn").isEnabled(), "botão continua liberado");
     // "+ Aluno" no PR, sem planilha: entra separado para quem incluiu
     await pg.getByRole("button", { name: "+ Aluno" }).click();
-    await pg.waitForTimeout(300);
+    await calmo(pg);
     let fa = pg.locator(".sheet").last();
     await fa.getByLabel("Nome do aluno").fill("Paulo Manual");
     await fa.getByLabel("Colégio").fill("Colegio Alfa");
     await fa.getByLabel("WhatsApp").fill("21933332222");
     await fa.getByLabel("Nome", { exact: true }).fill("Marta");
     await fa.locator("button[type=submit]").click();
-    await pg.waitForTimeout(500);
+    await calmo(pg);
     const sp = await store();
     const paulo = Object.values(sp).find(x => x.nome === "Paulo Manual");
     ok(
@@ -1131,14 +1144,14 @@ await cenario("Pedro (vendedor: Linha de Frente, Agendamento, Instituições)", 
     // o mesmo aluno de novo: não sobrescreve quem já está no PR
     const nAntes = Object.values(sp).filter(x => x.nome === "Paulo Manual").length;
     await pg.getByRole("button", { name: "+ Aluno" }).click();
-    await pg.waitForTimeout(300);
+    await calmo(pg);
     fa = pg.locator(".sheet:visible").last();
     await fa.getByLabel("Nome do aluno").fill("Paulo Manual");
     await fa.getByLabel("Colégio").fill("Colegio Alfa");
     await fa.getByLabel("WhatsApp").fill("21900000000");
     await fa.getByLabel("Nome", { exact: true }).fill("Outra");
     await fa.locator("button[type=submit]").click();
-    await pg.waitForTimeout(500);
+    await calmo(pg);
     const sp2 = await store();
     const paulos = Object.values(sp2).filter(x => x.nome === "Paulo Manual");
     ok(
@@ -1146,17 +1159,17 @@ await cenario("Pedro (vendedor: Linha de Frente, Agendamento, Instituições)", 
       "+ Aluno repetido (dele mesmo): avisa e não sobrescreve"
     );
     await fa.click({ position: { x: 5, y: 5 } }); // toque fora do painel fecha
-    await pg.waitForTimeout(200);
+    await calmo(pg);
     // aluno que está na fila do repasse: não passa sozinho; vai um pedido para o admin decidir
     await pg.getByRole("button", { name: "+ Aluno" }).click();
-    await pg.waitForTimeout(300);
+    await calmo(pg);
     fa = pg.locator(".sheet:visible").last();
     await fa.getByLabel("Nome do aluno").fill("Carla Fila");
     await fa.getByLabel("Colégio").fill("Colegio Alfa");
     await fa.getByLabel("WhatsApp").fill("21922223333");
     await fa.getByLabel("Nome", { exact: true }).fill("Vera");
     await fa.locator("button[type=submit]").click();
-    await pg.waitForTimeout(600);
+    await calmo(pg);
     const sp3 = await store();
     const pedC = Object.entries(sp3).find(([k, v]) => k.startsWith("pedidos/") && v.alvoId === "r5" && v.porEmail === PEDRO);
     ok(
@@ -1174,21 +1187,21 @@ await cenario("Pedro (vendedor: Linha de Frente, Agendamento, Instituições)", 
       "vendedor é avisado do aluno que passou para outra pessoa"
     );
     await pg.locator("#rPedidos .notes").filter({ hasText: "Bia Aprovada" }).getByRole("button", { name: "Ok, entendi" }).click();
-    await pg.waitForTimeout(300);
+    await calmo(pg);
     ok((await store())["pedidos/p8"].visto === true, "vendedor marca que viu a resposta");
   });
   await etapa(pg, "Instituições", async () => {
     await ir(pg, "#inst-particular");
-    await pg.waitForTimeout(400);
+    await calmo(pg);
     await pg.locator("#iChips").getByText("Todas").click();
-    await pg.waitForTimeout(200);
+    await calmo(pg);
     // visita num colégio sem responsável: ele assume (por e-mail) e a visita guarda quem foi
     await pg.locator("#iList .card").filter({ hasText: "Beta" }).getByText("📝 Registrar visita / contato").click();
-    await pg.waitForTimeout(200);
+    await calmo(pg);
     let sh = pg.locator(".sheet").last();
     await sh.getByLabel("Resultado").selectOption("Vai decidir em reunião");
     await sh.locator("button[type=submit]").click();
-    await pg.waitForTimeout(400);
+    await calmo(pg);
     let s = await store();
     ok(
       s["instituicoes/i2"].respEmail === PEDRO &&
@@ -1204,18 +1217,18 @@ await cenario("Pedro (vendedor: Linha de Frente, Agendamento, Instituições)", 
   });
   await etapa(pg, "Formaturas", async () => {
     await ir(pg, "#formaturas");
-    await pg.waitForTimeout(500);
+    await calmo(pg);
     await pg.locator("#fmChips").getByText("Turmas").click();
-    await pg.waitForTimeout(400);
+    await calmo(pg);
     await pg.locator("#fmCorpo .card").filter({ hasText: "Alfa" }).getByRole("button", { name: "📸 Dia de fotos" }).click();
-    await pg.waitForTimeout(200);
+    await calmo(pg);
     let sh = pg.locator(".sheet").last();
     await sh.locator("input[type=date]").first().fill(dia(12));
     await sh.getByLabel("Nome", { exact: true }).fill("Marta");
     await sh.getByLabel("WhatsApp", { exact: true }).fill("21988880000");
     await sh.getByLabel("Média de alunos (obrigatório)").fill("60");
     await sh.locator("button[type=submit]").click();
-    await pg.waitForTimeout(400);
+    await calmo(pg);
     if (await pg.locator(".sheet").count())
       await pg
         .locator(".sheet")
@@ -1232,11 +1245,11 @@ await cenario("Pedro (vendedor: Linha de Frente, Agendamento, Instituições)", 
       "pedido de data pelo card Formaturas, com o e-mail de quem pediu"
     );
     await pg.locator("#fmCorpo .card").filter({ hasText: "Alfa" }).getByText("👥 Formandos e parcelas").click();
-    await pg.waitForTimeout(400);
+    await calmo(pg);
     const t = await pg.textContent(".panel.wide");
     ok(!/Parcela paga/.test(t) && /lançados pelo Adriano/.test(t), "na turma não registra pagamento");
     await pg.locator(".panel.wide").getByText("Editar").first().click();
-    await pg.waitForTimeout(200);
+    await calmo(pg);
     ok(await pg.locator(".sheet").last().getByLabel("Valor total").isDisabled(), "não edita valor do formando");
   });
   ok(erros.length === 0, "sem erros no console" + (erros.length ? ": " + erros.slice(0, 3).join(" | ") : ""));
@@ -1261,7 +1274,7 @@ await cenario("Erro no app (não é falta de internet)", async () => {
   const reg = Object.entries(s).find(([k]) => k.startsWith("erros/"));
   ok(reg && reg[1].msg === "defeito de teste" && reg[1].email === ADRIANO, "o erro fica registrado para o admin");
   await pg.click("#btnPrices");
-  await pg.waitForTimeout(400);
+  await calmo(pg);
   ok(/Erros do app \(1\)/.test(await pg.textContent("#pErros")), "Ajustes mostra os erros registrados");
 });
 

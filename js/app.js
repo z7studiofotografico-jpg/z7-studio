@@ -606,6 +606,8 @@ async function route() {
     }
   }
   window.scrollTo(0, 0);
+  // tela aberta e desenhada (os testes esperam por isto em vez de um tempo fixo)
+  document.body.dataset.tela = location.hash;
 }
 // só troca de tela se o endereço mudou de verdade (o "voltar" restaura o endereço e não deve redesenhar)
 addEventListener("hashchange", () => {

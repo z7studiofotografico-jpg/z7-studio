@@ -90,6 +90,7 @@ function fire() {
   pend = true;
   setTimeout(() => {
     pend = false;
+    window.__ultimo = Date.now(); // a tela vai redesenhar: o teste espera ela "acalmar"
     listeners.slice().forEach(([q, cb]) => {
       try {
         cb(run(q));
@@ -115,7 +116,11 @@ export function onSnapshot(q, cb) {
   }
   const L = [q, cb];
   listeners.push(L);
-  setTimeout(() => cb(run(q)), 5);
+  window.__ultimo = Date.now();
+  setTimeout(() => {
+    window.__ultimo = Date.now();
+    cb(run(q));
+  }, 5);
   return () => {
     const i = listeners.indexOf(L);
     if (i >= 0) listeners.splice(i, 1);
