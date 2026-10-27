@@ -126,7 +126,20 @@ for (const t of tokensSnap.docs) {
     const avisar = paraAvisar[String(t.get("email") || "").toLowerCase()] || 0;
     const minhasOfertas = ofertas.filter(o => souAdmin || o.respEmail === String(t.get("email") || "").toLowerCase());
     const ofe = minhasOfertas.reduce((a, o) => a + o.n, 0);
-    if (!meus.length && !meusRep.length && !meusInst.length && !aprova && !lembrar && !ent && !aval && !parc && !bec && !avisar && !ofe && !ped)
+    if (
+      !meus.length &&
+      !meusRep.length &&
+      !meusInst.length &&
+      !aprova &&
+      !lembrar &&
+      !ent &&
+      !aval &&
+      !parc &&
+      !bec &&
+      !avisar &&
+      !ofe &&
+      !ped
+    )
       continue;
     const total = meus.length + meusRep.length + meusInst.length + aprova + lembrar + ent + aval + parc + bec + avisar + ofe + ped;
     const atrasados =
