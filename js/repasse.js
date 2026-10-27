@@ -6,8 +6,10 @@
 // cada aba busca só o que precisa (hoje, interessados, pagos, busca).
 import { openMockup, textoEscolha } from "./mockup.js";
 import { ESTUDIO } from "./mensagens.js";
-import { el, title, carregarLib, emPartes, avisoErro } from "./ui.js";
+import { el, title, emPartes, avisoErro } from "./ui.js";
 import * as U from "./util.js";
+import { norm, faltando, docId } from "./repasse-dados.js";
+import { openImport } from "./repasse-import.js";
 // Assumir o contato: quem não é admin só assume o que está sem responsável (ou já é seu)
 const assumir = it => (!C.isAdmin && it.respEmail && it.respEmail !== C.email ? {} : { resp: C.me, respEmail: C.email || "" });
 
@@ -39,20 +41,6 @@ export const ETAPAS = ["INCOMPLETO", "NA FILA", "SEPARADO", "CONTATADO", "INTERE
 const ABERTAS = ["SEPARADO", "CONTATADO", "INTERESSADO"];
 
 // ---------- utilidades ----------
-function norm(s) {
-  return String(s || "")
-    .normalize("NFD")
-    .replace(/[̀-ͯ]/g, "")
-    .toUpperCase()
-    .replace(/\s+/g, " ")
-    .trim();
-}
-function slug(s) {
-  return norm(s)
-    .replace(/[^A-Z0-9]+/g, "-")
-    .replace(/^-|-$/g, "")
-    .toLowerCase();
-}
 function eu() {
   const f = U.first(C.me);
   return f ? (/a$/i.test(f) ? "a " : "o ") + f : "a equipe";
@@ -113,18 +101,6 @@ function lockInfo(it) {
 function contatoPadrao(it) {
   const cs = it.contatos || [];
   return cs.find(c => c.tipo === "Mãe") || cs.find(c => c.tipo === "Pai") || cs.find(c => c.tipo === "Formando") || cs[0] || null;
-}
-
-// O que não pode faltar para entrar na fila: colégio, ano, aluno, nome de um responsável e 1 telefone.
-function faltando(d) {
-  const f = [];
-  if (!String(d.escola || "").trim()) f.push("colégio");
-  if (!d.ano) f.push("ano");
-  if (!String(d.nome || "").trim()) f.push("nome do aluno");
-  const cs = d.contatos || [];
-  if (!cs.some(c => c.tipo !== "Formando" && String(c.nome || "").trim()) && !String(d.responsavel || "").trim()) f.push("responsável");
-  if (!cs.length) f.push("telefone");
-  return f;
 }
 
 // ---------- mensagens prontas ----------
@@ -265,7 +241,7 @@ function mount() {
   const hb = el("div", "quick");
   hb.append(U.mkBtn("+ Aluno", "btn-primary", () => openDados(null)));
   hb.append(U.mkBtn("🖼️ Prévia e fotos", "", () => openMockup({ preco: precoTxt(), toast: U.toast })));
-  const imp = U.mkBtn("Importar planilha", "", () => openImport());
+  const imp = U.mkBtn("Importar planilha", "", () => openImport(C, { sheet, field, actions, meta }, () => (loadMeta(), refreshStats())));
   imp.id = "rImport";
   imp.hidden = !C.isAdmin;
   hb.append(imp);
@@ -1432,308 +1408,4 @@ async function loadMeta() {
   } catch (e) {
     avisoErro(e, "carregar a lista de escolas", U.toast);
   }
-}
-
-// ---------- importar planilha ----------
-const MAPA = {
-  ESCOLAFAC: "escola",
-  ESCOLA: "escola",
-  CURSO: "curso",
-  TURMA: "turma",
-  STATUS: "status",
-  VENDEDOR: "vendedor",
-  ID: "codigo",
-  FORMANDO: "nome",
-  DATA: "data",
-  CELULAR1: "c1",
-  CEL1: "c1",
-  CEL2MAE: "c2",
-  CELULAR2MAE: "c2",
-  CEL3PAI: "c3",
-  CELULAR3PAI: "c3",
-  TELEFONE4: "c4",
-  TEL4: "c4",
-  EMAIL: "email",
-  PAGAMENTO: "pagamento",
-  FOTOS: "fotos",
-  RUA: "rua",
-  N: "numero",
-  NO: "numero",
-  NUMERO: "numero",
-  COMPLEMENTO: "complemento",
-  BAIRRO: "bairro",
-  CIDADE: "cidade",
-  OBS: "obs",
-  OBSERVACAO: "obs",
-  OBSERVACOES: "obs"
-};
-const hkey = h =>
-  String(h || "")
-    .normalize("NFKD")
-    .replace(/[̀-ͯ]/g, "")
-    .toUpperCase()
-    .replace(/[^A-Z0-9]/g, "");
-
-function loadXLSX() {
-  return carregarLib("xlsx");
-}
-function parseTel(v, tipo) {
-  if (v == null || v === "") return null;
-  const raw = String(v);
-  let d = raw.replace(/\D/g, "").replace(/^55(?=\d{10,11}$)/, "");
-  if (d.length < 10 || d.length > 11) return null;
-  const nm = (raw.match(/\(([^)]+)\)/) || [])[1] || raw.replace(/[\d()+\-./]/g, "").trim();
-  return { tipo, nome: nm && /\p{L}/u.test(nm) ? nm.trim() : "", tel: d };
-}
-function parseData(v, X) {
-  if (!v) return "";
-  if (v instanceof Date && !isNaN(v)) return U.ds(v);
-  if (typeof v === "number") {
-    const p = X.SSF.parse_date_code(v);
-    return p ? `${p.y}-${U.pad(p.m)}-${U.pad(p.d)}` : "";
-  }
-  const m = String(v).match(/(\d{1,2})\/(\d{1,2})\/(\d{2,4})/);
-  if (m) {
-    const y = m[3].length === 2 ? "20" + m[3] : m[3];
-    return `${y}-${U.pad(m[2])}-${U.pad(m[1])}`;
-  }
-  return "";
-}
-function linhaParaDoc(r, X) {
-  const dataEnsaio = parseData(r.data, X);
-  const ano = dataEnsaio ? Number(dataEnsaio.slice(0, 4)) : null;
-  const contatos = [parseTel(r.c2, "Mãe"), parseTel(r.c3, "Pai"), parseTel(r.c1, "Formando"), parseTel(r.c4, "Telefone")].filter(Boolean);
-  const vistos = new Set();
-  const cs = contatos.filter(c => !vistos.has(c.tel) && vistos.add(c.tel));
-  const s = v => (v == null ? "" : String(v).trim());
-  return {
-    nome: s(r.nome),
-    nomeBusca: norm(r.nome),
-    escola: s(r.escola),
-    curso: s(r.curso),
-    turma: s(r.turma),
-    statusOrig: s(r.status),
-    vendedor: s(r.vendedor),
-    codigo: s(r.codigo),
-    dataEnsaio,
-    ano,
-    contatos: cs,
-    telefones: cs.map(c => c.tel),
-    email: s(r.email).toLowerCase(),
-    pagamentoOrig: s(r.pagamento),
-    fotosOrig: s(r.fotos),
-    endereco: { rua: s(r.rua), numero: s(r.numero), complemento: s(r.complemento), bairro: s(r.bairro), cidade: s(r.cidade) },
-    obs: s(r.obs)
-  };
-}
-function docId(d, i) {
-  return [
-    String(9999 - (d.ano || 0)).padStart(4, "0"),
-    slug(d.escola).slice(0, 24) || "sem-escola",
-    slug(d.codigo).slice(0, 24) || "x",
-    slug(d.nome).slice(0, 32) || "r" + i
-  ].join("_");
-}
-
-function openImport() {
-  if (!C.isAdmin) return;
-  sheet("Importar planilha", (p, close) => {
-    p.append(
-      el(
-        "p",
-        "hint",
-        "Escolha o arquivo Excel (.xlsx) ou CSV com as colunas da planilha de formandos. Os dados vão direto do seu aparelho para o banco do app."
-      )
-    );
-    const inp = el("input");
-    inp.type = "file";
-    inp.accept = ".xlsx,.xls,.csv";
-    p.append(field("Arquivo", inp));
-    const out = el("div", "imp");
-    p.append(out);
-    const acts = actions(close, "Importar");
-    const ok = acts.querySelector("button[type=submit]");
-    ok.disabled = true;
-    p.append(acts);
-    let rows = [];
-    inp.onchange = async () => {
-      out.innerHTML = "";
-      ok.disabled = true;
-      rows = [];
-      const f = inp.files[0];
-      if (!f) return;
-      out.append(el("p", "hint", "Lendo a planilha…"));
-      try {
-        const X = await loadXLSX();
-        const wb = X.read(await f.arrayBuffer(), { type: "array", cellDates: true });
-        const sh = wb.Sheets[wb.SheetNames[0]];
-        const m = X.utils.sheet_to_json(sh, { header: 1, defval: "", raw: true });
-        const hi = m.findIndex(r => r.some(c => hkey(c) === "FORMANDO"));
-        if (hi < 0) throw new Error("Não achei a coluna FORMANDO na primeira aba.");
-        const cols = m[hi].map(h => MAPA[hkey(h)] || null);
-        for (const r of m.slice(hi + 1)) {
-          const o = {};
-          cols.forEach((k, i) => {
-            if (k && o[k] == null) o[k] = r[i];
-          });
-          if (!String(o.nome || "").trim()) continue;
-          rows.push(linhaParaDoc(o, X));
-        }
-        out.innerHTML = "";
-        const incompletos = rows.filter(r => faltando(r).length);
-        out.append(
-          el(
-            "p",
-            null,
-            `${rows.length} formandos encontrados: ${rows.length - incompletos.length} completos e ${incompletos.length} incompletos.`
-          )
-        );
-        if (incompletos.length) {
-          const cont = {};
-          incompletos.forEach(r =>
-            faltando(r).forEach(f => {
-              cont[f] = (cont[f] || 0) + 1;
-            })
-          );
-          out.append(
-            el(
-              "p",
-              "hint",
-              "Os incompletos não entram na fila: ficam na aba Incompletos para vocês completarem. Falta " +
-                Object.entries(cont)
-                  .map(([f, n]) => `${f} em ${n}`)
-                  .join(", ") +
-                "."
-            )
-          );
-        }
-        const porStatus = {};
-        rows.forEach(r => {
-          const k = r.statusOrig || "(vazio)";
-          porStatus[k] = (porStatus[k] || 0) + 1;
-        });
-        out.append(
-          el("p", "hint", "Quais STATUS entram no Repasse? Deixe marcado só quem NÃO comprou (CAÍDO). Quem está como VENDIDO já tem o kit.")
-        );
-        const box = el("div", "quick");
-        const temCaido = Object.keys(porStatus).some(k => /CA[IÍ]D/i.test(norm(k)));
-        Object.entries(porStatus)
-          .sort((a, b) => b[1] - a[1])
-          .forEach(([k, n]) => {
-            const l = el("label", "chk");
-            const c = el("input");
-            c.type = "checkbox";
-            c.checked = temCaido ? /CAID/.test(norm(k)) : true;
-            c.value = k;
-            l.append(c, document.createTextNode(` ${k} (${n})`));
-            box.append(l);
-          });
-        out.append(box);
-        const porAno = {};
-        rows.forEach(r => {
-          const k = r.ano || "sem data";
-          porAno[k] = (porAno[k] || 0) + 1;
-        });
-        out.append(
-          el(
-            "p",
-            "hint",
-            "Por ano: " +
-              Object.entries(porAno)
-                .sort()
-                .reverse()
-                .map(([a, n]) => `${a}: ${n}`)
-                .join(" · ")
-          )
-        );
-        ok.disabled = false;
-      } catch (e) {
-        out.innerHTML = "";
-        out.append(el("p", "err", "Não consegui ler o arquivo: " + (e.message || e)));
-      }
-    };
-    p.addEventListener("submit", async ev => {
-      ev.preventDefault();
-      if (!rows.length) return;
-      const okStatus = new Set([...out.querySelectorAll("input[type=checkbox]")].filter(c => c.checked).map(c => c.value));
-      const sel = rows.filter(r => okStatus.has(r.statusOrig || "(vazio)"));
-      ok.disabled = true;
-      inp.disabled = true;
-      const prog = el("p", "hint", "Preparando…");
-      out.append(prog);
-      try {
-        // Quem já existe mantém a etapa e o histórico; só os dados da planilha são atualizados.
-        const exist = new Set();
-        const cnt = await FS.getCountFromServer(col);
-        if (cnt.data().count) {
-          prog.textContent = "Conferindo quem já está no app…";
-          (await FS.getDocs(col)).docs.forEach(d => exist.add(d.id));
-        }
-        const ids = new Set();
-        const agora = new Date().toISOString();
-        let novos = 0,
-          atual = 0;
-        const escolas = Object.assign({}, meta.escolas || {}),
-          anos = Object.assign({}, meta.anos || {});
-        const ops = sel.map((d, i) => {
-          let id = docId(d, i);
-          while (ids.has(id)) id += "-" + i;
-          ids.add(id);
-          if (exist.has(id)) {
-            atual++;
-            return [id, Object.assign({}, d, { atualizadoEm: agora }), true];
-          }
-          novos++;
-          if (d.escola) escolas[d.escola] = (escolas[d.escola] || 0) + 1;
-          if (d.ano) anos[d.ano] = (anos[d.ano] || 0) + 1;
-          return [
-            id,
-            Object.assign({}, d, {
-              etapa: faltando(d).length ? "INCOMPLETO" : "NA FILA",
-              followup: null,
-              tentativas: 0,
-              tentInteresse: 0,
-              resp: "",
-              respEmail: "",
-              importadoEm: agora,
-              atualizadoEm: agora
-            }),
-            false
-          ];
-        });
-        for (let i = 0; i < ops.length; i += 400) {
-          const b = FS.writeBatch(db);
-          ops
-            .slice(i, i + 400)
-            .forEach(([id, data, merge]) =>
-              merge ? b.set(FS.doc(db, "repasse", id), data, { merge: true }) : b.set(FS.doc(db, "repasse", id), data)
-            );
-          await b.commit();
-          prog.textContent = `Importando… ${Math.min(i + 400, ops.length)} de ${ops.length}`;
-        }
-        await FS.setDoc(FS.doc(db, "config", "repasse_meta"), { escolas, anos, importadoEm: agora }, { merge: true });
-        const nInc = ops.filter(([, d, m]) => !m && d.etapa === "INCOMPLETO").length;
-        prog.textContent = `Pronto! ${novos - nInc} novos na fila${nInc ? `, ${nInc} na aba Incompletos` : ""}${atual ? ` e ${atual} atualizados` : ""}.`;
-        U.toast("Planilha importada ✅");
-        loadMeta();
-        refreshStats();
-        const fechar = U.mkBtn("Fechar", "btn-primary", close);
-        out.append(fechar);
-      } catch (e) {
-        console.warn(e);
-        prog.textContent = "";
-        out.append(
-          el(
-            "p",
-            "err",
-            e.code === "permission-denied"
-              ? "Só administradores podem importar."
-              : "A importação parou no meio. Pode importar o mesmo arquivo de novo: quem já entrou não é duplicado."
-          )
-        );
-        ok.disabled = false;
-        inp.disabled = false;
-      }
-    });
-  });
 }

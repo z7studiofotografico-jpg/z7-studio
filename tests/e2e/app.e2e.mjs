@@ -628,6 +628,25 @@ console.log("Adriano (admin), com os dados já atualizados no servidor:");
   await pg.waitForTimeout(300);
   s = await store();
   ok(s["repasse/r2"].conferido === true && s["repasse/r2"].conferidoPor === ADRIANO, "admin conferiu a venda do PR");
+  // PR: importar planilha (módulo repasse-import.js)
+  await pg.getByRole("button", { name: "Importar planilha" }).click();
+  await pg.waitForTimeout(300);
+  const csv =
+    "ESCOLA;FORMANDO;DATA;STATUS;CEL 2 (MÃE)\nColegio Beta;Joana Planilha;10/03/2025;CAIDO;21944443333 (Sonia)\nColegio Beta;Sem Telefone;10/03/2025;CAIDO;\n";
+  await pg.locator(".sheet:visible input[type=file]").setInputFiles({ name: "pr.csv", mimeType: "text/csv", buffer: Buffer.from(csv) });
+  await pg.waitForFunction(() => /2 formandos encontrados/.test(document.body.textContent), null, { timeout: 8000 }).catch(() => {});
+  ok(/1 completos e 1 incompletos/.test(await pg.textContent("body")), "importar PR: lê a planilha e mostra incompletos");
+  await pg.locator(".sheet:visible button[type=submit]").click();
+  await pg.waitForFunction(() => /Pronto!/.test(document.body.textContent), null, { timeout: 8000 }).catch(() => {});
+  s = await store();
+  const joana = Object.values(s).find(x => x.nome === "Joana Planilha"),
+    semTel = Object.values(s).find(x => x.nome === "Sem Telefone");
+  ok(
+    joana && joana.etapa === "NA FILA" && joana.ano === 2025 && semTel && semTel.etapa === "INCOMPLETO",
+    "importar PR: fila e incompletos gravados"
+  );
+  await pg.locator(".sheet:visible").getByRole("button", { name: "Fechar" }).click();
+  await pg.waitForTimeout(200);
   // Agenda: admin vê o assunto particular, marca ensaio e compromisso particular
   await ir(pg, "#agenda");
   await pg.waitForTimeout(400);
