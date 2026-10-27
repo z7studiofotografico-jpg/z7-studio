@@ -95,7 +95,7 @@ function fire() {
       try {
         cb(run(q));
       } catch (e) {
-        console.error(e);
+        console.error(e && e.stack ? e.stack : e);
       }
     });
   }, 0);
@@ -128,16 +128,17 @@ export function onSnapshot(q, cb) {
 }
 // registra as leituras (o teste confere que telas não leem coleções inteiras sem precisar)
 window.__leituras = [];
-export const getDocs = async q => {
+// leituras também contam como "em andamento" (o teste espera o app terminar de ler antes de conferir)
+export const getDocs = conta(async q => {
   const qq = q.t === "col" ? { c: q, k: [] } : q;
   window.__leituras.push({ col: qq.c.n, filtros: qq.k.filter(x => x.w).length });
   return run(qq);
-};
-export const getDoc = async r => {
+});
+export const getDoc = conta(async r => {
   const v = store.get(r.n + "/" + r.id);
   return { exists: () => !!v, data: () => clone(v), id: r.id, ref: r };
-};
-export const getCountFromServer = async q => ({ data: () => ({ count: run(q).size }) });
+});
+export const getCountFromServer = conta(async q => ({ data: () => ({ count: run(q).size }) }));
 function aplica(o, p) {
   for (const [kk, vv] of Object.entries(clone(p))) {
     if (kk.includes(".")) {
