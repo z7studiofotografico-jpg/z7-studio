@@ -7,7 +7,8 @@ import { cover, marca, prep, logoAtual } from "./mockup.js";
 
 const POR_PAGINA = 30,
   COLS = 5,
-  LADO = 640; // fotos reduzidas para no máximo 640 px (pouca memória, mesmo com 70 fotos)
+  LADO = 640, // fotos reduzidas para no máximo 640 px (pouca memória, mesmo com 70 fotos)
+  MAX_FOTOS = 90; // acima disso o celular pode ficar sem memória
 const FUNDO = "#f3f0ec",
   TINTA = "#1c1b1d",
   CINZA = "#6b6670";
@@ -284,8 +285,13 @@ export function openPrevia({ nome = "", escola = "", kits = "", toast = null } =
     desenhar();
   };
   inp.onchange = async () => {
-    const files = [...inp.files].filter(f => f.type.startsWith("image/"));
+    let files = [...inp.files].filter(f => f.type.startsWith("image/"));
     inp.value = "";
+    const cabem = MAX_FOTOS - st.fotos.length;
+    if (files.length > cabem) {
+      toast(`A prévia aceita até ${MAX_FOTOS} fotos (mais que isso o celular pode travar). Ficaram as primeiras ${Math.max(0, cabem)}.`);
+      files = files.slice(0, Math.max(0, cabem));
+    }
     let falhou = 0;
     for (let i = 0; i < files.length; i++) {
       info.textContent = `Preparando as fotos… ${i + 1} de ${files.length}`;
@@ -299,6 +305,13 @@ export function openPrevia({ nome = "", escola = "", kits = "", toast = null } =
     st.pagina = 0;
     desenhar();
   };
+  // canvas → JPG; sem memória o navegador devolve null em vez de dar erro
+  const jpg = async (c, nome) => {
+    const b = await new Promise(r => c.toBlob(r, "image/jpeg", 0.82));
+    if (!b) throw new Error("sem memória");
+    return new File([b], nome, { type: "image/jpeg" });
+  };
+  const SEM_MEMORIA = "O celular ficou sem memória para gerar as imagens. Feche outros apps ou use menos fotos e tente de novo.";
   // gera as imagens para mandar: todas as páginas da folha, ou a imagem do álbum
   async function imagens() {
     await prep();
@@ -314,18 +327,27 @@ export function openPrevia({ nome = "", escola = "", kits = "", toast = null } =
     if (st.modo === "folha") {
       for (let i = 0; i < paginas(); i++) {
         desenharFolha(c, st, i);
-        out.push(
-          new File([await new Promise(r => c.toBlob(r, "image/jpeg", 0.82))], `${nome0}-fotos-${i + 1}.jpg`, { type: "image/jpeg" })
-        );
+        out.push(await jpg(c, `${nome0}-fotos-${i + 1}.jpg`));
       }
     } else {
       desenharAlbum(c, st, doAlbum());
-      out.push(new File([await new Promise(r => c.toBlob(r, "image/jpeg", 0.82))], `${nome0}-album.jpg`, { type: "image/jpeg" }));
+      out.push(await jpg(c, `${nome0}-album.jpg`));
     }
     return out;
   }
-  bDown.onclick = async () => {
-    for (const f of await imagens()) {
+  const gerar = async () => {
+    try {
+      return await imagens();
+    } catch (_) {
+      info.textContent = SEM_MEMORIA;
+      toast(SEM_MEMORIA);
+      return null;
+    }
+  };
+  bDown.onclick = async fs => {
+    const lista = Array.isArray(fs) ? fs : await gerar();
+    if (!lista) return false;
+    for (const f of lista) {
       const u = URL.createObjectURL(f),
         a = document.createElement("a");
       a.href = u;
@@ -335,21 +357,24 @@ export function openPrevia({ nome = "", escola = "", kits = "", toast = null } =
       a.remove();
       setTimeout(() => URL.revokeObjectURL(u), 4000);
     }
+    return true;
   };
   bShare.onclick = async () => {
     if (!st.fotos.length) return inp.click();
-    const files = await imagens(),
-      data = { files, text: textoPrevia(st.nome, st.fotos.length, kits) };
+    const files = await gerar();
+    if (!files) return;
+    const data = { files, text: textoPrevia(st.nome, st.fotos.length, kits) };
+    let motivo = "";
     if (navigator.canShare && navigator.canShare(data)) {
       try {
         await navigator.share(data);
         return;
       } catch (e) {
         if (e && e.name === "AbortError") return;
+        motivo = "Não deu para abrir o compartilhar do celular (imagens grandes demais ou muitas de uma vez). ";
       }
     }
-    await bDown.onclick();
-    info.textContent = "Imagens baixadas. No WhatsApp Web, clique no clipe 📎 e escolha as imagens.";
+    if (await bDown.onclick(files)) info.textContent = motivo + "Imagens baixadas. No WhatsApp, clique no clipe 📎 e escolha as imagens.";
   };
   if (!navigator.canShare) bShare.textContent = "Baixar para o WhatsApp";
   setModo("folha");

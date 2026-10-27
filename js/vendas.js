@@ -592,7 +592,9 @@ function areaForm(corpo, p, nomeP) {
   const b1 = caixa(corpo, "Recebido por contrato", nomeP);
   lista(b1, [
     ["🎓 Adesão · Kit 01 (parcelas pagas)", moeda(F.recCol || 0)],
-    ["📘 Kits 02 a 05 (parcelas pagas)", moeda(F.recAlb || 0)]
+    ["📘 Kits 02 a 05 (parcelas pagas)", moeda(F.recAlb || 0)],
+    [`↩️ Devolvido (desistência e reprovação) · ${F.devolvidoN || 0}`, "− " + moeda(F.devolvido || 0)],
+    ["= Ficou no caixa", moeda((F.recCol || 0) + (F.recAlb || 0) - (F.devolvido || 0))]
   ]);
   evolucao(
     corpo,

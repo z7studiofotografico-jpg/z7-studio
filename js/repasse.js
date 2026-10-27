@@ -1160,9 +1160,17 @@ function openDados(it) {
       });
       try {
         // mesmo colégio + mesmo nome já existe? não sobrescreve: cria outro registro
-        let id = docId(docNovo, Date.now());
-        if ((await FS.getDoc(FS.doc(db, "repasse", id)).catch(() => null))?.exists?.()) id += "-" + Date.now().toString(36);
-        await FS.setDoc(FS.doc(db, "repasse", id), docNovo);
+        // cria só se ainda não existe (transação): nunca sobrescreve um aluno que já está no PR
+        const ref = FS.doc(db, "repasse", docId(docNovo, Date.now()));
+        const criou = await FS.runTransaction(db, async tx => {
+          if ((await tx.get(ref)).exists()) return false;
+          tx.set(ref, docNovo);
+          return true;
+        });
+        if (!criou) {
+          U.toast("Esse aluno já está no PR (mesma escola, ano e nome). Procure pela busca.");
+          return;
+        }
         close();
         U.toast(
           falta.length

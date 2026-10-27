@@ -84,6 +84,11 @@ test("vendedor não mexe em pagamento, valor nem responsável do formando", asyn
   await assertFails(updateDoc(doc(db, "formandos", "f1"), { formaPag: "Pix" }));
   await assertFails(setDoc(doc(db, "formandos", "f2"), { instId: "i1", nome: "X", pagas: 2, pagamentos: [{ valor: 1 }] }));
   await assertSucceeds(setDoc(doc(db, "formandos", "f3"), { instId: "i1", nome: "Y", pagas: 0, pagamentos: [], respEmail: PEDRO }));
+  // só em turma da própria carteira (i3 é da Ana, i2 está sem responsável, "zz" não existe)
+  await assertFails(setDoc(doc(db, "formandos", "f3b"), { instId: "i3", nome: "Y", pagas: 0, pagamentos: [], respEmail: PEDRO }));
+  await assertFails(setDoc(doc(db, "formandos", "f3c"), { instId: "i2", nome: "Y", pagas: 0, pagamentos: [], respEmail: PEDRO }));
+  await assertFails(setDoc(doc(db, "formandos", "f3d"), { instId: "zz", nome: "Y", pagas: 0, pagamentos: [], respEmail: PEDRO }));
+  await assertFails(setDoc(doc(db, "formandos", "f3e"), { nome: "Y", pagas: 0, pagamentos: [], respEmail: PEDRO }));
   await assertFails(deleteDoc(doc(db, "formandos", "f1"))); // tem parcela paga
 });
 test("apagar: o vendedor só apaga o colégio da conta dele, e formando sem parcela paga", async () => {
@@ -275,4 +280,12 @@ test("funil: venda fechada pela equipe entra a conferir e só o admin confere", 
   await assertFails(updateDoc(doc(como(ANA), "leads", "c1"), { conferido: true }));
   await assertFails(updateDoc(doc(como(ANA), "leads", "c1"), { valor: 5000 }));
   await assertSucceeds(updateDoc(doc(como(ADRIANO), "leads", "c1"), { conferido: true }));
+});
+
+test("PR: quem é da Linha de Frente confere se o aluno já existe antes de incluir", async () => {
+  // aluno que não existe: pode conferir (para o "+ Aluno" não sobrescrever ninguém)
+  await assertSucceeds(getDoc(doc(como(PEDRO), "repasse", "nao-existe")));
+  // aluno de ano anterior continua fora do alcance da Linha de Frente
+  await semRegra(db => setDoc(doc(db, "repasse", "antigo"), { nome: "X", ano: 2000, etapa: "NA FILA", respEmail: "" }));
+  await assertFails(getDoc(doc(como(PEDRO), "repasse", "antigo")));
 });

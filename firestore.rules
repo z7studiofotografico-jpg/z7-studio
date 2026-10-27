@@ -34,6 +34,10 @@ service cloud.firestore {
     function anoAtual(d) { return d.ano >= request.time.year(); }   // Linha de Frente = ensaios do ano atual
     // Agenda: uma leitura do cadastro só (evita o limite de expressões das regras)
     function usaAgenda() { let p = perfil(); return p.ativo == true && (p.papel == 'admin' || ('modulos' in p && ('agenda' in p.modulos || 'colegios' in p.modulos))); }
+    // turma (colégio) da carteira de quem grava
+    function minhaTurma(instId) {
+      return instId != '' && get(/databases/$(database)/documents/instituicoes/$(instId)).data.get('respEmail', '') == email();
+    }
     function meuPedido() { return resource.data.get('pedidoEmail', email()) == email(); }
 
     match /usuarios/{em} { allow read: if membro(); allow write: if admin(); }
@@ -88,9 +92,10 @@ service cloud.firestore {
     // Formandos (álbum de formatura e colação de grau)
     match /formandos/{id} {
       allow read: if admin() || ((pode('colegios') || pode('formaturas')) && minha());
-      // a equipe cadastra o formando (na própria carteira), mas sem parcelas pagas
+      // a equipe cadastra o formando só em turma da própria carteira, e sem parcelas pagas
       allow create: if admin() || ((pode('colegios') || pode('formaturas')) && request.resource.data.get('pagamentos', []).size() == 0
-        && request.resource.data.get('pagas', 0) == 0 && request.resource.data.get('respEmail', '') == email());
+        && request.resource.data.get('pagas', 0) == 0 && request.resource.data.get('respEmail', '') == email()
+        && minhaTurma(request.resource.data.get('instId', '')));
       // depois de cadastrado, a equipe só corrige contato e observação;
       // quem ainda não comprou ("semkit"), a equipe pode registrar a venda depois das fotos (sem pagamento)
       allow update: if admin() || ((pode('colegios') || pode('formaturas')) && minha() && (
@@ -116,7 +121,8 @@ service cloud.firestore {
     }
     // PR: depois de pago, valor, forma de pagamento e responsável só o admin muda
     match /repasse/{id} {
-      allow read: if pode('rep') || (pode('lf') && anoAtual(resource.data));
+      // (resource == null: aluno que ainda não existe; o "+ Aluno" confere antes de criar)
+      allow read: if pode('rep') || (pode('lf') && (resource == null || anoAtual(resource.data)));
       allow update: if admin() || ((pode('rep') || (pode('lf') && anoAtual(resource.data) && anoAtual(request.resource.data)))
         && respOk()
         // a venda entra "a conferir": só o admin marca como conferida (a comissão só conta depois)

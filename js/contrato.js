@@ -85,11 +85,20 @@ export function plano(kit, venda, inicioTurma, hoje) {
   if (!t || !centavos(t.valor)) return null;
   const prox = proximoVenc(hoje);
   if (venda === "pos" || venda === "rep")
-    return { valor: reais(centavos(t.valor)), parcelas: Math.max(1, Number(t.parcelas) || 1), primeiroVenc: prox };
+    return { valor: reais(centavos(t.valor)), parcelas: Math.max(1, Number(t.parcelas) || 1), primeiroVenc: prox, aviso: "" };
   const inicio = inicioTurma && inicioTurma > prox ? inicioTurma : prox;
   const fim = somaMeses(inicioTurma || prox, Math.max(1, Number(t.parcelas) || 1) - 1);
-  const n = Math.max(1, Math.min(Number(t.parcelas) || 1, mesesEntre(inicio, fim) + 1));
-  return { valor: reais(centavos(t.valor)), parcelas: n, primeiroVenc: inicio };
+  const total = Math.max(1, Number(t.parcelas) || 1),
+    cabe = mesesEntre(inicio, fim) + 1,
+    n = Math.max(1, Math.min(total, cabe));
+  // quem entra depois do início paga em menos vezes (mesma data final); se o prazo já acabou, fica à vista
+  const aviso =
+    cabe < 1
+      ? `O prazo das parcelas do contrato já terminou (última em ${fim.split("-").reverse().join("/")}): ficou 1x à vista. Se combinar outra forma, mude as parcelas.`
+      : n < total
+        ? `Entrou depois do início da turma: ${n}x em vez de ${total}x, terminando junto com a turma.`
+        : "";
+  return { valor: reais(centavos(t.valor)), parcelas: n, primeiroVenc: inicio, aviso };
 }
 
 // Data da quitação = data do último pagamento (se quitado)

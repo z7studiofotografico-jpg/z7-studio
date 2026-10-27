@@ -547,6 +547,7 @@ export function openTurma(ctx, inst, kits, aoFechar, opcoes) {
           const fServ = field("Serviços já feitos (descontar)", serv);
           const devInfo = el("p", "wait");
           fp.append(fServ, devInfo);
+          let avisoPlano = "";
           const atualizaInfo = () => {
             const v = lerReais(valor.value),
               n = Math.max(1, n0(parc.value));
@@ -554,6 +555,7 @@ export function openTurma(ctx, inst, kits, aoFechar, opcoes) {
             parcInfo.textContent = v
               ? `${n}x de ${brl(ps[ps.length - 1])}${ps[0] !== ps[ps.length - 1] ? ` (a 1ª de ${brl(ps[0])})` : ""} · vencimento todo dia ${venc.value.slice(8) || "05"}`
               : "";
+            if (v && avisoPlano) parcInfo.textContent += " · ⚠️ " + avisoPlano;
             const sai = st.value === "desistiu" || st.value === "reprovou";
             fServ.hidden = st.value !== "reprovou";
             devInfo.hidden = !sai || !pago;
@@ -586,6 +588,8 @@ export function openTurma(ctx, inst, kits, aoFechar, opcoes) {
             valor.dispatchEvent(new Event("focusout", { bubbles: true }));
             parc.value = pl.parcelas;
             venc.value = pl.primeiroVenc;
+            avisoPlano = pl.aviso;
+            if (pl.aviso) U.toast(pl.aviso);
             if (ehAdesao(k.id)) fpg.value = fpg.value || "Pix";
             atualizaInfo();
           };

@@ -22,11 +22,15 @@ test("próximo vencimento é dia 05", () => {
   assert.equal(proximoVenc("2026-12-20"), "2027-01-05");
 });
 test("antecipado: quem entra no começo paga 10x; quem entra depois paga menos parcelas e termina junto", () => {
-  assert.deepEqual(plano(k04, "ant", "2026-06-05", "2026-05-20"), { valor: 850, parcelas: 10, primeiroVenc: "2026-06-05" });
+  assert.deepEqual(plano(k04, "ant", "2026-06-05", "2026-05-20"), { valor: 850, parcelas: 10, primeiroVenc: "2026-06-05", aviso: "" });
   // entrou em setembro: de 05/09 a 05/03/27 = 7 parcelas, mesmo total
-  assert.deepEqual(plano(k04, "ant", "2026-06-05", "2026-08-20"), { valor: 850, parcelas: 7, primeiroVenc: "2026-09-05" });
+  const tarde = plano(k04, "ant", "2026-06-05", "2026-08-20");
+  assert.deepEqual([tarde.valor, tarde.parcelas, tarde.primeiroVenc], [850, 7, "2026-09-05"]);
+  assert.match(tarde.aviso, /7x em vez de 10x/);
   // entrou depois do fim: 1 parcela
-  assert.equal(plano(k04, "ant", "2026-06-05", "2027-04-10").parcelas, 1);
+  const fora = plano(k04, "ant", "2026-06-05", "2027-04-10");
+  assert.equal(fora.parcelas, 1);
+  assert.match(fora.aviso, /já terminou .*05\/03\/2027.*1x à vista/);
   assert.equal(
     plano(
       KITS_PADRAO.find(k => k.id === "k03"),
@@ -40,7 +44,7 @@ test("antecipado: quem entra no começo paga 10x; quem entra depois paga menos p
 test("depois das fotos: usa o preço que o Adriano definiu; sem preço, não oferece", () => {
   assert.equal(plano(k04, "pos", "2026-06-05", "2026-10-26"), null);
   const ks = kitsDe({ kitsFormatura: [{ ...k04, pos: { valor: 1100, parcelas: 6 } }] }).filter(k => k.id === "k04");
-  assert.deepEqual(plano(ks[0], "pos", "2026-06-05", "2026-10-26"), { valor: 1100, parcelas: 6, primeiroVenc: "2026-11-05" });
+  assert.deepEqual(plano(ks[0], "pos", "2026-06-05", "2026-10-26"), { valor: 1100, parcelas: 6, primeiroVenc: "2026-11-05", aviso: "" });
 });
 test("entrega: 120 dias úteis depois da quitação, pulando fim de semana e feriado", () => {
   assert.equal(somaDiasUteis("2026-10-30", 1), "2026-11-03"); // sex → seg 02/11 é Finados → ter
@@ -95,7 +99,7 @@ test("repasse: turma de ano anterior vira repasse em 1º de janeiro, com tabela 
   assert.equal(ehRepasse(inst, "2027-01-01"), true);
   assert.equal(vendaSugerida(inst, "2027-01-02"), "rep");
   const k = kitsDe({ kitsFormatura: [{ id: "k04", rep: { valor: 690, parcelas: 5 } }] }).find(x => x.id === "k04");
-  assert.deepEqual(plano(k, "rep", "", "2027-01-10"), { valor: 690, parcelas: 5, primeiroVenc: "2027-02-05" });
+  assert.deepEqual(plano(k, "rep", "", "2027-01-10"), { valor: 690, parcelas: 5, primeiroVenc: "2027-02-05", aviso: "" });
   assert.equal(
     plano(
       KITS_PADRAO.find(x => x.id === "k04"),

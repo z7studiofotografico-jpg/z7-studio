@@ -22,6 +22,8 @@ const novoForm = () => ({
   vendRep: {},
   recCol: 0,
   recAlb: 0,
+  devolvido: 0,
+  devolvidoN: 0,
   colegios: 0,
   pessoas: {}
 });
@@ -181,6 +183,29 @@ export function resumir(fontes, hoje, emailPorNome) {
       }
     });
   });
+  // Desistência e reprovação: o dinheiro que entrou continua no "recebido" (entrou no caixa)
+  // e a devolução aparece como saída no mês em que foi registrada. Não entram em venda, a receber nem comissão.
+  forms
+    .filter(f => f.status === "desistiu" || f.status === "reprovou")
+    .forEach(f => {
+      const col = ehColacao(f),
+        inst = instPorId[f.instId] || {},
+        pessoa = quem(f.respEmail || inst.respEmail, f.resp || inst.resp);
+      pagamentosDe(f).forEach(p => {
+        const mpg = mes(p.data || f.vendidoEm);
+        if (!mpg) return;
+        const Fo = M(mpg).form,
+          c = centavos(p.valor);
+        Fo[col ? "recCol" : "recAlb"] += c;
+        if (pessoa) soma(Fo.pessoas, pessoa, "rec", c);
+      });
+      const dv = f.devolucao,
+        md = dv && mes(dv.em);
+      if (md && centavos(dv.valor)) {
+        M(md).form.devolvido += centavos(dv.valor);
+        M(md).form.devolvidoN++;
+      }
+    });
   ens
     .filter(e => e.kind !== "pessoal" && !e.leadId && centavos(e.valor) && e.status !== ENSAIO.FALTOU && e.data <= hoje)
     .forEach(e => venda(e.data, e.valor, e.tipo || "Ensaio", "Estúdio", quem(e.marcadoEmail, e.marcadoPor)));

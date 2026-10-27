@@ -132,3 +132,29 @@ test("venda do funil a conferir não entra nos números até o admin conferir", 
   assert.equal(r.meses["2026-10"].funil.fechados, 1);
   assert.equal(r.meses["2026-10"].funil.v, 45000);
 });
+
+test("desistência: o que foi pago continua recebido e a devolução entra como saída", () => {
+  const forms = [
+    {
+      instId: "i1",
+      contrato: "album",
+      valor: 1000,
+      parcelas: 10,
+      status: "desistiu",
+      vendidoEm: "2026-08-01",
+      pagamentos: [
+        { data: "2026-08-05", valor: 100 },
+        { data: "2026-09-05", valor: 100 }
+      ],
+      devolucao: { valor: 140, em: "2026-10-10", regra: "desistência" }
+    }
+  ];
+  const r = resumir({ forms }, "2026-10-20");
+  assert.equal(r.meses["2026-08"].form.recAlb, 10000);
+  assert.equal(r.meses["2026-09"].form.recAlb, 10000);
+  assert.equal(r.meses["2026-10"].form.devolvido, 14000);
+  assert.equal(r.aReceber, 0);
+  const p = periodo(r, ["2026-08", "2026-09", "2026-10"]);
+  assert.equal(p.form.devolvido, 14000);
+  assert.equal(Object.keys(r.meses["2026-08"].form.vendAlb).length, 0);
+});

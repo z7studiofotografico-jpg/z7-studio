@@ -490,6 +490,16 @@ console.log("Adriano (admin), com os dados já atualizados no servidor:");
   await pg.waitForTimeout(600);
   ok((await pg.evaluate(() => document.querySelector(".panel.mock canvas").width)) === 1600, "prévia do álbum desenhada");
   if (process.env.FOTOS) await pg.locator(".panel.mock canvas").screenshot({ path: process.env.FOTOS + "/album.png" });
+  // limite de fotos: mais 70 (total 105) → fica em 90, com aviso
+  await pg
+    .locator(".panel.mock input[type=file]")
+    .setInputFiles(Array.from({ length: 70 }, (_, i) => ({ name: `g${i}.png`, mimeType: "image/png", buffer: foto })));
+  await pg.waitForFunction(() => /Ficaram as primeiras/.test(document.body.textContent), null, { timeout: 15000 }).catch(() => {});
+  await pg.waitForTimeout(500);
+  const avisoLimite = await pg.textContent("body");
+  await pg.locator(".panel.mock").getByRole("button", { name: "📋 Todas as fotos" }).click();
+  await pg.waitForTimeout(300);
+  ok(/90 fotos/.test(await pg.textContent(".panel.mock")) && /até 90 fotos/.test(avisoLimite), "prévia: limite de 90 fotos com aviso");
   await pg.locator(".panel.mock").getByRole("button", { name: "Fechar" }).click();
   await pg.waitForTimeout(200);
   await pg.locator("#fmCorpo .card").filter({ hasText: "Caio" }).getByText("Abrir turma").click();
@@ -904,6 +914,25 @@ console.log("Pedro (vendedor: Linha de Frente, Agendamento, Instituições):");
     paulo && paulo.etapa === "SEPARADO" && paulo.respEmail === PEDRO && paulo.manual && paulo.contatos.length === 1,
     "+ Aluno no PR: incluído e já separado para o vendedor"
   );
+  // o mesmo aluno de novo: não sobrescreve quem já está no PR
+  const nAntes = Object.values(sp).filter(x => x.nome === "Paulo Manual").length;
+  await pg.getByRole("button", { name: "+ Aluno" }).click();
+  await pg.waitForTimeout(300);
+  fa = pg.locator(".sheet:visible").last();
+  await fa.getByLabel("Nome do aluno").fill("Paulo Manual");
+  await fa.getByLabel("Colégio").fill("Colegio Alfa");
+  await fa.getByLabel("WhatsApp").fill("21900000000");
+  await fa.getByLabel("Nome", { exact: true }).fill("Outra");
+  await fa.locator("button[type=submit]").click();
+  await pg.waitForTimeout(500);
+  const sp2 = await store();
+  const paulos = Object.values(sp2).filter(x => x.nome === "Paulo Manual");
+  ok(
+    paulos.length === nAntes && paulos[0].contatos[0].nome === "Marta" && /já está no PR/.test(await pg.textContent("body")),
+    "+ Aluno repetido: avisa e não sobrescreve"
+  );
+  await fa.click({ position: { x: 5, y: 5 } }); // toque fora do painel fecha
+  await pg.waitForTimeout(200);
   await ir(pg, "#inst-particular");
   await pg.waitForTimeout(400);
   await pg.locator("#iChips").getByText("Todas").click();
