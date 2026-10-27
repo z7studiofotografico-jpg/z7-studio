@@ -93,9 +93,10 @@ const MODULOS = [
 ];
 function pode(m) {
   if (isAdmin) return true;
-  if (m === "vendas") return false;
   const p = USERS[((user && user.email) || "").toLowerCase()];
   if (!p || p.ativo === false || !Array.isArray(p.modulos)) return false;
+  // Dashboard: quem é da equipe (com algum módulo) vê o próprio desempenho
+  if (m === "vendas") return p.modulos.length > 0;
   if (m === "pr") return p.modulos.includes("lf") || p.modulos.includes("rep");
   // quem vende para colégios cuida das turmas e das datas deles no card Formaturas
   if (m === "formaturas") return p.modulos.includes("formaturas") || p.modulos.includes("colegios");
@@ -683,6 +684,7 @@ function renderHome() {
   const h = new Date().getHours();
   $("hello").textContent = (h < 12 ? "Bom dia" : h < 18 ? "Boa tarde" : "Boa noite") + (me ? ", " + first(me) : "") + "!";
   const { late, today } = Funil.contagem();
+  $("tVendas").textContent = isAdmin ? "Abrir" : "Meu desempenho";
   document.querySelectorAll(".tile[data-mod]").forEach(t => {
     t.hidden = !pode(t.dataset.mod);
   });

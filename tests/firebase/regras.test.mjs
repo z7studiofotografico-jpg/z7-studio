@@ -343,3 +343,15 @@ test("índice de telefones 4: não troca nem apaga", async () => {
   await assertFails(setDoc(doc(como(PEDRO), "fones", "21911112222"), { alunos: {} }));
   await assertFails(deleteDoc(doc(como(PEDRO), "fones", "21911112222")));
 });
+
+test("Dashboard: a equipe lê só o próprio desempenho", async () => {
+  await semRegra(async d => {
+    await setDoc(doc(d, "resumos", "dashboard"), { total: 1 });
+    await setDoc(doc(d, "resumos", "pessoa_pedro-vendas-com"), { email: PEDRO });
+    await setDoc(doc(d, "resumos", "pessoa_ana-equipe-com"), { email: ANA });
+  });
+  await assertSucceeds(getDoc(doc(como(PEDRO), "resumos", "pessoa_pedro-vendas-com")));
+  await assertFails(getDoc(doc(como(PEDRO), "resumos", "pessoa_ana-equipe-com")));
+  await assertFails(getDoc(doc(como(PEDRO), "resumos", "dashboard")));
+  await assertFails(setDoc(doc(como(PEDRO), "resumos", "pessoa_pedro-vendas-com"), { email: PEDRO, meses: {} }));
+});

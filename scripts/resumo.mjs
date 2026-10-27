@@ -3,7 +3,7 @@
 // Assim o Dashboard abre lendo 1 documento.
 import { initializeApp, cert } from "firebase-admin/app";
 import { getFirestore } from "firebase-admin/firestore";
-import { resumir } from "../js/calc.js";
+import { resumir, pessoasDoResumo, fatiaDaPessoa, idResumoPessoa } from "../js/calc.js";
 import { lerFontes } from "../js/fontes-resumo.js";
 
 if (!process.env.FIREBASE_SERVICE_ACCOUNT) {
@@ -25,6 +25,10 @@ const versao = Number(((await db.collection("config").doc("app").get()).data() |
 const fontes = await lerFontes((c, filtros) => ler(filtros.reduce((q, [a, o, v]) => q.where(a, o, v), db.collection(c))), hoje, versao);
 const porNome = Object.fromEntries((await ler(db.collection("usuarios"))).filter(u => u.nome).map(u => [u.nome, u.id]));
 const r = resumir(fontes, hoje, porNome);
+// cada pessoa da equipe vê só os próprios números (resumos/pessoa_...)
+const lote = db.batch();
+pessoasDoResumo(r).forEach(e => lote.set(db.collection("resumos").doc(idResumoPessoa(e)), fatiaDaPessoa(r, e)));
+await lote.commit();
 // só grava se mudou alguma coisa (além do horário)
 const semHora = x => JSON.stringify(Object.assign({}, x, { geradoEm: null, hoje: null }));
 if (atual && semHora(atual) === semHora(r)) {

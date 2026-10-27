@@ -778,6 +778,11 @@ await cenario("Adriano (admin), com os dados já atualizados no servidor", async
     await pg.waitForTimeout(1500);
     s = await store();
     ok(!!s["resumos/dashboard"], "Dashboard gravou o resumo (abre lendo 1 documento)");
+    const pp = s["resumos/pessoa_pedro-vendas-com"];
+    ok(
+      pp && pp.email === PEDRO && !JSON.stringify(pp.meses).includes("ana@"),
+      "Dashboard grava o desempenho de cada pessoa separado (só os números dela)"
+    );
     const tab = await pg.textContent(".vdtab");
     ok(
       (tab.match(/Pedro/g) || []).length === 1 && /R\$ 82,75/.test(tab),
@@ -1063,7 +1068,16 @@ await cenario("Botão voltar do celular", async () => {
 });
 
 await cenario("Pedro (vendedor: Linha de Frente, Agendamento, Instituições)", async () => {
+  const mesAtual = hoje.getFullYear() + "-" + String(hoje.getMonth() + 1).padStart(2, "0");
   const migrado = Object.assign(migrar(base), {
+    "resumos/pessoa_pedro-vendas-com": {
+      email: PEDRO,
+      meses: {
+        [mesAtual]: { pessoa: { vend: 35000, visitas: 2, fechados: 1, com: { "pr|Pix": 35000 } }, pr: { v: 35000, n: 1, sep: 10 } }
+      },
+      marcadas: [],
+      geradoEm: new Date().toISOString()
+    },
     "instituicoes/i1": Object.assign({}, base["instituicoes/i1"], { respEmail: PEDRO }),
     "formandos/f1": Object.assign({}, base["formandos/f1"], {
       respEmail: PEDRO,
@@ -1093,10 +1107,22 @@ await cenario("Pedro (vendedor: Linha de Frente, Agendamento, Instituições)", 
       vs.includes("agenda") &&
         vs.includes("colegios") &&
         vs.includes("pr") &&
-        !vs.includes("vendas") &&
+        vs.includes("vendas") &&
         vs.includes("formaturas") &&
         !vs.includes("funil"),
       "vê só os módulos dele: " + vs.join(", ")
+    );
+  });
+  await etapa(pg, "Meu desempenho (Dashboard só dele)", async () => {
+    await ir(pg, "#vendas");
+    const t = await pg.textContent("#viewVendas");
+    ok(
+      /Meu desempenho/.test(t) &&
+        /Vendido por você\s*R\$\s*350,00/.test(t) &&
+        /Sua comissão \(estimada\)\s*R\$\s*70,00/.test(t) &&
+        !/Atualizar agora/.test(t) &&
+        !/Ana|Adriano/.test(t),
+      "Dashboard da equipe: só os números do vendedor, com a comissão"
     );
   });
   await etapa(pg, "Agenda (pedido de data)", async () => {

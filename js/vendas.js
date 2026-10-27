@@ -1,8 +1,8 @@
-// Dashboard de vendas (só administradores).
+// Dashboard de vendas. Administradores veem tudo; cada pessoa da equipe vê só o próprio desempenho ("Meu desempenho").
 // Abre lendo 1 documento (resumos/dashboard), gerado toda madrugada pelo GitHub e sempre que
 // alguém toca em "Atualizar agora". O cálculo fica em js/calc.js (o mesmo no app e no script).
 // Valores em centavos até a hora de mostrar. Gráficos com Chart.js, carregado só aqui.
-import { resumir, periodo as somaPeriodo, comissaoDe } from "./calc.js";
+import { resumir, periodo as somaPeriodo, comissaoDe, pessoasDoResumo, fatiaDaPessoa, idResumoPessoa, periodoDaPessoa } from "./calc.js";
 import { lerFontes } from "./fontes-resumo.js";
 import { brl, reais, taxa } from "./regras.js";
 import { el, title, carregarLib } from "./ui.js";
@@ -49,6 +49,7 @@ function carregarChart() {
 export async function show() {
   const v = $("viewVendas");
   v.innerHTML = "";
+  if (!C.isAdmin) return mostrarMeu(v);
   const head = el("div", "vhead");
   head.append(el("h2", null, "Dashboard"));
   const bt = U.mkBtn("↻ Atualizar agora", "btn-sm", () => atualizar(bt));
@@ -138,6 +139,10 @@ async function atualizar(bt) {
     );
     resumo = resumir(fontes, U.todayStr(), porNome);
     await FS.setDoc(FS.doc(db, "resumos", "dashboard"), resumo);
+    // cada pessoa da equipe vê só os próprios números (resumos/pessoa_...)
+    const b = FS.writeBatch(db);
+    pessoasDoResumo(resumo).forEach(e => b.set(FS.doc(db, "resumos", idResumoPessoa(e)), fatiaDaPessoa(resumo, e)));
+    await b.commit();
     await carregarChart().catch(() => {});
     desenhar();
   } catch (e) {
@@ -660,4 +665,104 @@ function areaFunil(corpo, p, nomeP) {
       .sort(ordemNome)
       .map(([k, x]) => [U.first(nomeDe(k)), x.fechados || 0, moeda(x.v || 0), x.fechados ? moeda(Math.round(x.v / x.fechados)) : "—"])
   );
+}
+
+// ---------- Meu desempenho (equipe): só os números da própria pessoa ----------
+async function mostrarMeu(v) {
+  const head = el("div", "vhead");
+  head.append(el("h2", null, "Meu desempenho"));
+  v.append(head);
+  const chips = el("div", "chips");
+  v.append(chips);
+  const corpo = el("div");
+  corpo.id = "vdCorpo";
+  corpo.append(el("div", "empty", "Carregando…"));
+  v.append(corpo);
+  let fatia = null;
+  const desenharMeu = () => {
+    corpo.innerHTML = "";
+    if (!fatia) {
+      corpo.append(
+        el(
+          "div",
+          "empty",
+          "Ainda não há números seus. Eles aparecem aqui no dia seguinte à sua primeira venda, visita ou contato separado (o resumo é feito toda madrugada)."
+        )
+      );
+      return;
+    }
+    const nomeP = PERIODOS.find(p => p[0] === periodo)[1];
+    const p = periodoDaPessoa(fatia, mesesDoPeriodo());
+    const ps = p.pessoa,
+      pr = p.pr,
+      fo = p.form,
+      fu = p.funil;
+    const com = comissaoDe(ps, (l, f) => taxa(C.P, l, f));
+    kpis(corpo, [
+      ["Vendido por você", moeda(ps.vend || 0)],
+      ["Sua comissão (estimada)", moeda(com.total)],
+      ["Visitas feitas", String(ps.visitas || 0)],
+      ["Colégios fechados", String(ps.fechados || 0)]
+    ]);
+    corpo.append(el("p", "hint", `${nomeP} · comissão do PR sobre a venda conferida; das formaturas, sobre as parcelas pagas.`));
+    const b1 = caixa(corpo, "🖼️ PR", nomeP);
+    lista(b1, [
+      ["Contatos separados", String(pr.sep || 0)],
+      [`Vendas · ${pr.n || 0}`, moeda(pr.v || 0)],
+      ["Conversão (vendas ÷ separados)", pr.sep ? Math.round(((pr.n || 0) * 100) / pr.sep) + "%" : "—"]
+    ]);
+    const b2 = caixa(corpo, "🎓 Formaturas", nomeP);
+    lista(b2, [
+      ["Kits vendidos", moeda(fo.vend || 0)],
+      ["Parcelas recebidas das suas turmas", moeda(fo.rec || 0)],
+      ["Colégios fechados", String(fo.colegios || 0)]
+    ]);
+    const b3 = caixa(corpo, "💬 Funil", nomeP);
+    lista(b3, [[`Vendas fechadas · ${fu.fechados || 0}`, moeda(fu.v || 0)]]);
+    // mês a mês (12 meses)
+    const s0 = periodo;
+    periodo = "12m";
+    const doze = mesesDoPeriodo();
+    periodo = s0;
+    const b4 = caixa(corpo, "Mês a mês", "Últimos 12 meses · vendido por você");
+    lista(
+      b4,
+      doze
+        .slice()
+        .reverse()
+        .map(m => {
+          const x = (fatia.meses[m] || {}).pessoa || {};
+          return [`${MESES_C[Number(m.slice(5, 7)) - 1]}/${m.slice(2, 4)}`, moeda(x.vend || 0)];
+        })
+    );
+    if ((fatia.marcadas || []).length) {
+      const b5 = caixa(corpo, "📅 Suas visitas marcadas", "");
+      lista(
+        b5,
+        fatia.marcadas.map(x => [`${U.fmtDate(x.data)}${x.hora ? " às " + x.hora : ""}`, title(x.inst)])
+      );
+    }
+    if (fatia.geradoEm)
+      corpo.append(
+        el("p", "hint", "Números atualizados em " + U.fmtDate(fatia.geradoEm.slice(0, 10)) + " às " + U.hhmm(fatia.geradoEm) + ".")
+      );
+  };
+  PERIODOS.forEach(([k, t]) => {
+    const b = el("button", "chip", t);
+    b.type = "button";
+    b.setAttribute("aria-pressed", String(periodo === k));
+    b.onclick = () => {
+      periodo = k;
+      chips.querySelectorAll("button").forEach(x => x.setAttribute("aria-pressed", String(x === b)));
+      desenharMeu();
+    };
+    chips.append(b);
+  });
+  try {
+    const s = await FS.getDoc(FS.doc(db, "resumos", idResumoPessoa(C.email)));
+    fatia = s.exists() ? s.data() : null;
+  } catch (e) {
+    console.warn("[Z7] meu desempenho", e);
+  }
+  desenharMeu();
 }

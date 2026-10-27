@@ -158,3 +158,23 @@ test("desistência: o que foi pago continua recebido e a devolução entra como 
   assert.equal(p.form.devolvido, 14000);
   assert.equal(Object.keys(r.meses["2026-08"].form.vendAlb).length, 0);
 });
+
+test("desempenho de cada pessoa: só os números dela", async () => {
+  const { pessoasDoResumo, fatiaDaPessoa, periodoDaPessoa, idResumoPessoa } = await import("../js/calc.js");
+  const r = resumir(
+    {
+      prs: [
+        { etapa: "PAGO", valor: 350, pagoEm: "2026-10-03", ano: 2026, formaPag: "Pix", respEmail: "pedro@x.com" },
+        { etapa: "PAGO", valor: 400, pagoEm: "2026-10-04", ano: 2026, formaPag: "Pix", respEmail: "ana@x.com" }
+      ]
+    },
+    "2026-10-20"
+  );
+  assert.deepEqual(pessoasDoResumo(r), ["ana@x.com", "pedro@x.com"]);
+  const f = fatiaDaPessoa(r, "pedro@x.com");
+  assert.ok(!JSON.stringify(f).includes("ana@"));
+  const p = periodoDaPessoa(f, ["2026-10"]);
+  assert.equal(p.pessoa.vend, 35000);
+  assert.equal(p.pr.n, 1);
+  assert.equal(idResumoPessoa("Pedro.Silva@x.com"), "pessoa_pedro-silva-x-com");
+});

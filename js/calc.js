@@ -311,3 +311,53 @@ export function comissaoDe(pessoa, taxaFn) {
   }
   return { total, semForma };
 }
+
+// ---------- Desempenho de cada pessoa (o que a equipe vê no Dashboard: só os próprios números) ----------
+// Pessoas com e-mail que aparecem no resumo (vendas, comissão, PR, formaturas, funil ou visitas)
+export function pessoasDoResumo(resumo) {
+  const s = new Set();
+  Object.values(resumo.meses || {}).forEach(b => {
+    [b.pessoas, (b.pr || {}).pessoas, (b.form || {}).pessoas, (b.funil || {}).pessoas].forEach(x =>
+      Object.keys(x || {}).forEach(k => k.includes("@") && s.add(k))
+    );
+  });
+  (resumo.marcadas || []).forEach(x => x.por && String(x.por).includes("@") && s.add(x.por));
+  return [...s].sort();
+}
+// Só os números dessa pessoa, mês a mês (centavos), e as visitas marcadas dela
+export function fatiaDaPessoa(resumo, chave) {
+  const meses = {};
+  Object.entries(resumo.meses || {}).forEach(([m, b]) => {
+    const x = {
+      pessoa: (b.pessoas || {})[chave] || null,
+      pr: ((b.pr || {}).pessoas || {})[chave] || null,
+      form: ((b.form || {}).pessoas || {})[chave] || null,
+      funil: ((b.funil || {}).pessoas || {})[chave] || null
+    };
+    if (x.pessoa || x.pr || x.form || x.funil) meses[m] = x;
+  });
+  return {
+    email: chave,
+    meses,
+    marcadas: (resumo.marcadas || []).filter(x => x.por === chave),
+    hoje: resumo.hoje || "",
+    geradoEm: resumo.geradoEm || ""
+  };
+}
+// Soma os meses do período da fatia de uma pessoa
+export function periodoDaPessoa(fatia, listaMeses) {
+  const ms = listaMeses.map(m => (fatia.meses || {})[m]).filter(Boolean);
+  return {
+    pessoa: juntar(ms.map(x => x.pessoa).filter(Boolean)),
+    pr: juntar(ms.map(x => x.pr).filter(Boolean)),
+    form: juntar(ms.map(x => x.form).filter(Boolean)),
+    funil: juntar(ms.map(x => x.funil).filter(Boolean))
+  };
+}
+// Identificador do documento da pessoa (resumos/pessoa_...): as regras conferem com o e-mail de quem lê
+export const idResumoPessoa = email =>
+  "pessoa_" +
+  String(email || "")
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-|-$/g, "");

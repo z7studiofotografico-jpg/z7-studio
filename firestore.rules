@@ -42,8 +42,12 @@ service cloud.firestore {
 
     match /usuarios/{em} { allow read: if membro(); allow write: if admin(); }
     match /config/{id} { allow read: if membro(); allow write: if admin(); }
-    // Resumo do Dashboard (gerado de madrugada pelo GitHub ou pelo admin)
-    match /resumos/{id} { allow read, write: if admin(); }
+    // Resumo do Dashboard (gerado de madrugada pelo GitHub ou pelo admin).
+    // Cada pessoa da equipe lê só o seu (resumos/pessoa_<e-mail>): o próprio desempenho, sem o dos outros.
+    match /resumos/{id} {
+      allow read: if admin() || (membro() && id == 'pessoa_' + email().replace('[^a-z0-9]+', '-'));
+      allow write: if admin();
+    }
     // Aparelhos que recebem notificação: cada um só grava o seu
     match /tokens/{token} {
       allow create, update: if membro() && request.resource.data.email == email();
