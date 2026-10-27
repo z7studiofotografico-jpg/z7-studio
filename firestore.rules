@@ -56,12 +56,13 @@ service cloud.firestore {
     }
     // Funil: a equipe cadastra e atende; valor e data de um lead fechado (entram no Dashboard) e apagar, só o admin
     match /leads/{id} {
-      allow read: if pode('funil');
+      // a equipe lê os leads livres (para assumir) e os seus; os dos outros, não
+      allow read: if admin() || (pode('funil') && minhaOuLivre());
       // lead novo da equipe não nasce como venda fechada (senão entraria direto no total do Dashboard)
       allow create: if admin() || (pode('funil') && request.resource.data.get('etapa', '') != 'FECHADO'
         && request.resource.data.get('respEmail', '') in ['', email()]);
       // venda fechada pela equipe entra "a conferir": só o admin marca como conferida
-      allow update: if admin() || (pode('funil') && respOk()
+      allow update: if admin() || (pode('funil') && minhaOuLivre() && respOk()
         && !(resource.data.get('etapa', '') == 'FECHADO' && mudou(['valor', 'fechadoEm', 'etapa']))
         && (!mudou(['conferido']) || request.resource.data.conferido == false)
         && (request.resource.data.get('etapa', '') != 'FECHADO' || resource.data.get('etapa', '') == 'FECHADO'

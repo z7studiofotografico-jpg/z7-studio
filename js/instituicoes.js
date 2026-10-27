@@ -19,9 +19,18 @@ const $ = id => document.getElementById(id);
 export const TIPOS = {
   particular: { nome: "Colégio particular", ico: "🏫" },
   publico: { nome: "Colégio público", ico: "🏛️" },
-  profissionalizante: { nome: "Colégio profissionalizante", ico: "🛠️" },
+  profissionalizante: { nome: "Curso profissionalizante", ico: "🛠️" },
   faculdade: { nome: "Faculdade", ico: "🎓" }
 };
+// Cartões da tela Instituições: faculdade e curso profissionalizante ficam no mesmo cartão
+// (as informações são as mesmas); no cadastro escolhe qual dos dois é.
+export const CARTOES = {
+  particular: { nome: "Colégio particular", ico: "🏫", tipos: ["particular"] },
+  publico: { nome: "Colégio público", ico: "🏛️", tipos: ["publico"] },
+  superior: { nome: "Faculdade e curso profissionalizante", ico: "🎓", tipos: ["faculdade", "profissionalizante"] }
+};
+export const cartaoDoTipo = t => (t === "faculdade" || t === "profissionalizante" ? "superior" : t);
+const semSeries = t => t === "faculdade" || t === "profissionalizante" || t === "superior";
 const ETAPAS = ["A VISITAR", "AGENDAR VISITA", "VISITADO", "PROPOSTA ENVIADA", "FECHADO", "NÃO FECHOU"];
 const ABERTAS = ["A VISITAR", "AGENDAR VISITA", "VISITADO", "PROPOSTA ENVIADA"];
 export const CARGOS = ["Direção", "Coordenação", "Secretaria", "Recepção", "Comissão de formatura", "Professor(a)", "Outro"];
@@ -282,15 +291,16 @@ export async function agendarColegio(ctx) {
 }
 
 export function show(t) {
+  t = cartaoDoTipo(t);
   tipo = t;
-  const T = TIPOS[t];
+  const T = CARTOES[t] || CARTOES.particular;
   const v = $("viewInstTipo");
   v.innerHTML = "";
   const head = el("div", "vhead");
   head.append(el("h2", null, T.ico + " " + T.nome));
   const hb = el("div", "quick");
   hb.append(U.mkBtn("+ Nova instituição", "btn-primary", () => openForm(null)));
-  if (C.isAdmin) hb.append(U.mkBtn("Importar planilha", "", () => openImport(C, tipo, TIPOS[tipo].nome, items)));
+  if (C.isAdmin) hb.append(U.mkBtn("Importar planilha", "", () => openImport(C, T.tipos, T.nome, items)));
   head.append(hb);
   v.append(head);
 
@@ -318,9 +328,9 @@ export function show(t) {
   if (unsub) unsub();
   // carteira: o vendedor recebe os colégios livres e os dele (o tipo é filtrado aqui)
   unsub = FS.onSnapshot(
-    C.carteira("instituicoes", FS.where("tipo", "==", t), FS.limit(1500)),
+    C.carteira("instituicoes", FS.where("tipo", "in", T.tipos), FS.limit(1500)),
     snap => {
-      items = snap.docs.map(d => Object.assign({ id: d.id }, d.data())).filter(x => x.tipo === t);
+      items = snap.docs.map(d => Object.assign({ id: d.id }, d.data())).filter(x => T.tipos.includes(x.tipo));
       renderChips();
       renderStats();
       renderList();
@@ -577,11 +587,20 @@ function quandoBtns(target) {
   return q;
 }
 function openForm(it) {
-  sheet(it ? "Editar instituição" : "Nova instituição · " + TIPOS[tipo].nome, (p, close) => {
+  const cartao = CARTOES[tipo] || CARTOES.particular;
+  sheet(it ? "Editar instituição" : "Nova instituição · " + cartao.nome, (p, close) => {
     const nome = inp(it ? title(it.nome) : "", "Nome da instituição");
     nome.required = true;
-    // O tipo vem do cartão que foi aberto: não precisa escolher.
     p.append(field("Nome", nome));
+    // O tipo vem do cartão que foi aberto; no cartão de faculdade e curso profissionalizante, escolhe qual dos dois
+    const tipoSel =
+      cartao.tipos.length > 1
+        ? sel(
+            cartao.tipos.map(k => [k, TIPOS[k].nome]),
+            it ? it.tipo : cartao.tipos[0]
+          )
+        : null;
+    if (tipoSel) p.append(field("É faculdade ou curso profissionalizante?", tipoSel));
     const a = (it && it.endereco) || {};
     const rua = inp(title(a.rua)),
       num = inp(a.numero, "", 20),
@@ -622,14 +641,7 @@ function openForm(it) {
     extraQ.inputMode = "numeric";
     extraQ.className = "preco";
     const rx = el("div", "prow");
-    rx.append(
-      el(
-        "span",
-        null,
-        tipo === "faculdade" || tipo === "profissionalizante" ? "Alunos formando (total)" : "Outras séries / total sem série"
-      ),
-      extraQ
-    );
+    rx.append(el("span", null, semSeries(tipo) ? "Alunos formando (total)" : "Outras séries / total sem série"), extraQ);
     segBox.append(rx);
     extraQ.addEventListener("input", somar);
     function somar() {
@@ -640,10 +652,10 @@ function openForm(it) {
     somar();
     {
       const f = el("div", "field");
-      f.append(el("label", null, tipo === "faculdade" || tipo === "profissionalizante" ? "Alunos" : "Séries e alunos"), segBox, totTxt);
+      f.append(el("label", null, semSeries(tipo) ? "Alunos" : "Séries e alunos"), segBox, totTxt);
       p.append(f);
     }
-    if (tipo === "faculdade" || tipo === "profissionalizante")
+    if (semSeries(tipo))
       segChk.forEach(([, , q]) => {
         q.closest(".prow").hidden = true;
       });
@@ -732,7 +744,7 @@ function openForm(it) {
     p.addEventListener("submit", async ev => {
       ev.preventDefault();
       if (!nome.value.trim()) return;
-      const tipoK = it ? it.tipo : tipo;
+      const tipoK = tipoSel ? tipoSel.value : it ? it.tipo : cartao.tipos[0];
       const contatos = linhas
         .map(({ nm, cg, tl, em }) => ({
           nome: nm.value.trim(),
@@ -812,7 +824,7 @@ function openVisita(it) {
     );
     const prodBox = el("div", "imp");
     const prods = [];
-    produtos(tipo).forEach(pr => {
+    produtos(it.tipo || CARTOES[tipo].tipos[0]).forEach(pr => {
       const r = el("div", "prow");
       const l = el("label", "chk");
       const c = el("input");

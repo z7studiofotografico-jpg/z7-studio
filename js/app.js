@@ -108,14 +108,14 @@ function entrarVerComo(pessoa) {
   } catch (_) {
     return toast("Este navegador não deixou guardar a visualização.");
   }
-  location.hash = "#home";
+  history.replaceState(null, "", "#home"); // sem criar entrada nova no histórico (o voltar continua certo)
   location.reload();
 }
 function sairVerComo() {
   try {
     sessionStorage.removeItem("z7verComo");
   } catch (_) {}
-  location.hash = "#home";
+  history.replaceState(null, "", "#home");
   location.reload();
 }
 function faixaVerComo() {
@@ -458,14 +458,17 @@ const VIEWS = {
   colegios: "viewInst",
   "inst-particular": "viewInstTipo",
   "inst-publico": "viewInstTipo",
+  "inst-superior": "viewInstTipo",
+  // endereços antigos (faculdade e profissionalizante viraram um cartão só)
   "inst-profissionalizante": "viewInstTipo",
   "inst-faculdade": "viewInstTipo"
 };
 const INST_NOMES = {
   "inst-particular": "Colégio particular",
   "inst-publico": "Colégio público",
-  "inst-profissionalizante": "Colégio profissionalizante",
-  "inst-faculdade": "Faculdade"
+  "inst-superior": "Faculdade e curso profissionalizante",
+  "inst-profissionalizante": "Faculdade e curso profissionalizante",
+  "inst-faculdade": "Faculdade e curso profissionalizante"
 };
 let repasseMod = null,
   instMod = null,
@@ -618,6 +621,8 @@ Funil.init(ctx);
 let usersLoaded = false;
 async function route() {
   if (!user || !usersLoaded) return;
+  // endereços antigos: faculdade e profissionalizante agora são um cartão só
+  if (/^#inst-(faculdade|profissionalizante)$/.test(location.hash)) history.replaceState(history.state, "", "#inst-superior");
   const r = (location.hash || "").slice(1);
   let key = VIEWS[r] ? r : "home";
   const modDe = {
@@ -632,6 +637,7 @@ async function route() {
     instituicoes: "colegios",
     "inst-particular": "colegios",
     "inst-publico": "colegios",
+    "inst-superior": "colegios",
     "inst-profissionalizante": "colegios",
     "inst-faculdade": "colegios"
   };
@@ -977,7 +983,7 @@ function contarInst(force) {
 function paintInst() {
   const por = instCount.por || {};
   document.querySelectorAll(".tile[data-inst]").forEach(t => {
-    const n = por[t.dataset.inst] || 0;
+    const n = t.dataset.inst === "superior" ? (por.faculdade || 0) + (por.profissionalizante || 0) : por[t.dataset.inst] || 0;
     t.querySelector(".tile-n").textContent = n ? `${n} para hoje` : "Nada pendente hoje ✓";
   });
   const tot = Object.values(por).reduce((a, b) => a + b, 0),

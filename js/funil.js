@@ -445,7 +445,8 @@ let ultimaBusca = "",
   timerBusca = null;
 function buscarNoServidor(q) {
   const nq = norm(q);
-  if (nq.length < 3 || nq === ultimaBusca) return;
+  // a equipe já tem todos os seus leads carregados: a busca no servidor (leads antigos de todos) é só do admin
+  if (!C.isAdmin || nq.length < 3 || nq === ultimaBusca) return;
   clearTimeout(timerBusca);
   timerBusca = setTimeout(async () => {
     ultimaBusca = nq;
@@ -579,12 +580,17 @@ export function syncLeads() {
         }
       );
     const desde = new Date(Date.now() - DIAS_HISTORICO * 864e5).toISOString();
-    const u1 = ouvir("abertos", query(c, where("etapa", "in", OPEN), limit(2000)));
-    const u2 = ouvir("recentes", query(c, where("atualizadoEm", ">=", desde), limit(2000)));
-    unsubLeads = () => {
-      u1();
-      u2();
-    };
+    // a equipe vê só os leads livres (para assumir) e os seus; os dos outros, não
+    const us = C.isAdmin
+      ? [
+          ouvir("abertos", query(c, where("etapa", "in", OPEN), limit(2000))),
+          ouvir("recentes", query(c, where("atualizadoEm", ">=", desde), limit(2000)))
+        ]
+      : [
+          ouvir("abertos", query(c, where("respEmail", "==", ""), where("etapa", "in", OPEN), limit(2000))),
+          ouvir("recentes", query(c, where("respEmail", "==", C.email), limit(2000)))
+        ];
+    unsubLeads = () => us.forEach(u => u());
   }
   if (!ok && unsubLeads) {
     unsubLeads();

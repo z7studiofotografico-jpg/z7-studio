@@ -60,6 +60,15 @@ const base = {
     servico: "Formatura individual (estúdio)",
     origem: "WhatsApp"
   },
+  "leads/l8": {
+    nome: "Perdido Do Adriano",
+    telefone: "21911110000",
+    etapa: "PERDIDO",
+    resp: "Adriano",
+    respEmail: ADRIANO,
+    atualizadoEm: new Date().toISOString(),
+    criadoEm: dia(-5)
+  },
   "leads/l3": {
     nome: "Venda Da Equipe",
     telefone: "21977776666",
@@ -934,6 +943,30 @@ await cenario("Adriano (admin), com os dados já atualizados no servidor", async
     s = await store();
     const cp = Object.values(s).find(x => x.nome === "Colegio Planilha" || x.nome === "COLEGIO PLANILHA");
     ok(cp && cp.tipo === "particular" && cp.contatos[0].nome === "Dona Rita", "importar instituições: colégio gravado com o contato");
+    // faculdade e curso profissionalizante: um cartão só; no cadastro escolhe qual dos dois
+    await pg.keyboard.press("Escape");
+    await pg.evaluate(() => document.querySelectorAll(".sheet").forEach(x => (x.id ? (x.hidden = true) : x.remove())));
+    await ir(pg, "#instituicoes");
+    const cartoesInst = await pg.$$eval("#viewInst .tile[data-inst]", ts => ts.map(t => t.dataset.inst));
+    ok(cartoesInst.join(",") === "particular,publico,superior", "Instituições: 3 cartões (" + cartoesInst.join(", ") + ")");
+    await ir(pg, "#inst-faculdade"); // endereço antigo leva ao cartão novo
+    ok(
+      pg.url().endsWith("#inst-superior") && /Faculdade e curso profissionalizante/.test(await pg.textContent("#viewInstTipo")),
+      "endereço antigo abre o cartão unificado"
+    );
+    await pg.getByRole("button", { name: "+ Nova instituição" }).click();
+    await calmo(pg);
+    const fi = pg.locator(".sheet:visible").last();
+    await fi.getByLabel("Nome", { exact: true }).first().fill("Curso Tecnico Teste");
+    await fi.getByLabel("É faculdade ou curso profissionalizante?").selectOption("profissionalizante");
+    await fi.locator("button[type=submit]").click();
+    await calmo(pg);
+    s = await store();
+    const ct = Object.values(s).find(x => x.nome === "Curso Tecnico Teste");
+    ok(
+      ct && ct.tipo === "profissionalizante" && /^\s*1\s*$/.test(await pg.textContent("#iAbertas")),
+      "cadastro no cartão unificado grava o tipo escolhido e aparece na lista"
+    );
     await pg.keyboard.press("Escape");
     if (await pg.locator(".sheet:visible").count())
       await pg
@@ -1036,36 +1069,68 @@ await cenario("Adriano (admin), com os dados já atualizados no servidor", async
   ok(erros.length === 0, "sem erros no console" + (erros.length ? ": " + erros.slice(0, 3).join(" | ") : ""));
 });
 
-await cenario("Botão voltar do celular", async () => {
-  const { pg, erros } = await abrir(ADRIANO, migrar(base));
-  const voltar = async () => {
-    await pg.evaluate(() => history.back());
+for (const [quem, email] of [
+  ["admin", ADRIANO],
+  ["equipe", PEDRO]
+])
+  await cenario("Botão voltar do celular (" + quem + ")", async () => {
+    const { pg, erros } = await abrir(email, migrar(base));
+    const voltar = async () => {
+      await pg.evaluate(() => history.back());
+      await calmo(pg);
+    };
+    await pg.locator('.tile[data-mod="colegios"]').click();
     await calmo(pg);
-  };
-  await pg.locator('.tile[data-mod="colegios"]').click();
-  await calmo(pg);
-  await pg
-    .locator("#viewInst .card, #viewInst a, #viewInst button")
-    .filter({ hasText: /Colégio particular/i })
-    .first()
-    .click();
-  await calmo(pg);
-  await pg.getByRole("button", { name: "+ Nova instituição" }).click();
-  await calmo(pg);
-  ok((await pg.locator(".sheet:visible").count()) === 1, "abriu a janela de nova instituição");
-  await voltar();
-  ok((await pg.locator(".sheet:visible").count()) === 0 && /inst-particular/.test(pg.url()), "voltar fecha a janela e fica na mesma tela");
-  await voltar();
-  ok(/#instituicoes$/.test(pg.url()) && !(await pg.locator("#viewInst").isHidden()), "voltar sobe para Instituições: " + pg.url());
-  await voltar();
-  ok(/#home$/.test(pg.url()) && (await pg.locator("#viewHome").isVisible()), "voltar sobe para o Início");
-  await voltar();
-  ok(
-    (await pg.locator("#viewHome").isVisible()) && /voltar de novo para sair/.test(await pg.textContent("#toast")),
-    "no Início, pede um segundo toque para sair (não fecha o app)"
-  );
-  ok(erros.length === 0, "sem erros no console" + (erros.length ? ": " + erros.slice(0, 3).join(" | ") : ""));
-});
+    await pg
+      .locator("#viewInst .card, #viewInst a, #viewInst button")
+      .filter({ hasText: /Colégio particular/i })
+      .first()
+      .click();
+    await calmo(pg);
+    await pg.getByRole("button", { name: "+ Nova instituição" }).click();
+    await calmo(pg);
+    ok((await pg.locator(".sheet:visible").count()) === 1, "abriu a janela de nova instituição");
+    await voltar();
+    ok(
+      (await pg.locator(".sheet:visible").count()) === 0 && /inst-particular/.test(pg.url()),
+      "voltar fecha a janela e fica na mesma tela"
+    );
+    await voltar();
+    ok(/#instituicoes$/.test(pg.url()) && !(await pg.locator("#viewInst").isHidden()), "voltar sobe para Instituições: " + pg.url());
+    await voltar();
+    ok(/#home$/.test(pg.url()) && (await pg.locator("#viewHome").isVisible()), "voltar sobe para o Início");
+    await voltar();
+    ok(
+      (await pg.locator("#viewHome").isVisible()) && /voltar de novo para sair/.test(await pg.textContent("#toast")),
+      "no Início, pede um segundo toque para sair (não fecha o app)"
+    );
+    // outras telas: abre e volta
+    for (const [tile, h] of [
+      ["pr", "#pr"],
+      ["agenda", "#agenda"],
+      ["formaturas", "#formaturas"]
+    ]) {
+      await pg.locator(`.tile[data-mod="${tile}"]`).click();
+      await calmo(pg);
+      ok(pg.url().endsWith(h), "abriu " + h);
+      await voltar();
+      ok(/#home$/.test(pg.url()) && (await pg.locator("#viewHome").isVisible()), "voltar de " + h + " vai para o Início: " + pg.url());
+    }
+    // janela aberta na Agenda: voltar fecha só a janela
+    await pg.locator('.tile[data-mod="agenda"]').click();
+    await calmo(pg);
+    await pg.getByRole("button", { name: "+ Agendar colégio" }).click();
+    await calmo(pg);
+    const abertas = await pg.locator(".sheet:visible").count();
+    await voltar();
+    ok(
+      abertas === 1 && (await pg.locator(".sheet:visible").count()) === 0 && pg.url().endsWith("#agenda"),
+      "Agenda: voltar fecha a janela e fica na Agenda"
+    );
+    await voltar();
+    ok(/#home$/.test(pg.url()), "e o próximo voltar vai para o Início");
+    ok(erros.length === 0, "sem erros no console" + (erros.length ? ": " + erros.slice(0, 3).join(" | ") : ""));
+  });
 
 await cenario("Pedro (vendedor: Linha de Frente, Agendamento, Instituições)", async () => {
   const mesAtual = hoje.getFullYear() + "-" + String(hoje.getMonth() + 1).padStart(2, "0");
@@ -1411,8 +1476,17 @@ await cenario("Ver o app como a equipe (admin, só visualização)", async () =>
   );
   await ir(pg, "#vendas");
   ok(/Meu desempenho/.test(await pg.textContent("#viewVendas")), "Dashboard aparece como Meu desempenho");
-  // tentar gravar: nada sai do app
+  // a equipe não vê os leads dos outros (só os livres e os seus)
   await ir(pg, "#funil");
+  await pg
+    .locator("#chips, .chips")
+    .getByText(/^Todos/)
+    .first()
+    .click();
+  await calmo(pg);
+  const tf = await pg.textContent("#list");
+  ok(/Erica/.test(tf) && !/Perdido Do Adriano/.test(tf), "Funil da equipe: leads livres sim, os do Adriano não");
+  // tentar gravar: nada sai do app
   const antes = await pg.evaluate(() => window.__store.size);
   await pg.getByRole("button", { name: "+ Novo lead" }).click();
   await pg.waitForFunction(() => document.activeElement && document.activeElement.id === "fNome", null, { timeout: 2000 }).catch(() => {});

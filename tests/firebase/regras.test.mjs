@@ -200,6 +200,18 @@ test("funil: equipe não apaga lead, não mexe em venda fechada e não toma lead
   await assertFails(updateDoc(doc(db, "leads", "l3"), { respEmail: ANA, resp: "Ana" }));
   await assertSucceeds(deleteDoc(doc(como(ADRIANO), "leads", "l2")));
 });
+test("funil: a equipe vê e mexe só nos leads livres e nos seus", async () => {
+  await semRegra(d => setDoc(doc(d, "leads", "l9"), { nome: "Do Pedro", etapa: "FOLLOW-UP", respEmail: PEDRO, resp: "Pedro" }));
+  const db = como(ANA);
+  await assertSucceeds(getDoc(doc(db, "leads", "l1"))); // livre
+  await assertFails(getDoc(doc(db, "leads", "l9"))); // de outra pessoa
+  await assertFails(updateDoc(doc(db, "leads", "l9"), { notas: "x" }));
+  await assertSucceeds(getDocs(query(collection(db, "leads"), where("respEmail", "==", ANA))));
+  await assertSucceeds(
+    getDocs(query(collection(db, "leads"), where("respEmail", "==", ""), where("etapa", "in", ["NOVO LEAD", "FOLLOW-UP"])))
+  );
+  await assertFails(getDocs(query(collection(db, "leads"), where("etapa", "in", ["NOVO LEAD", "FOLLOW-UP"]))));
+});
 test("becas: equipe não muda valor nem caução, e o já pago só aumenta", async () => {
   const db = como(ANA);
   await assertFails(updateDoc(doc(db, "becas", "b1"), { valor: 10 }));

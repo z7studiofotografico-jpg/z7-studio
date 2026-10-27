@@ -56,11 +56,31 @@ export function dataISO(v, X) {
   return "";
 }
 
-// tipo = "particular" | ..., nomeTipo = nome do tipo na tela, items = instituições já carregadas desse tipo
-export function openImport(ctx, tipo, nomeTipo, items) {
+// tipos = tipos do cartão (ex.: ["particular"] ou ["faculdade", "profissionalizante"]), nomeTipo = nome do cartão,
+// items = instituições já carregadas desse cartão
+const NOMES = {
+  particular: "Colégio particular",
+  publico: "Colégio público",
+  faculdade: "Faculdade",
+  profissionalizante: "Curso profissionalizante"
+};
+export function openImport(ctx, tipos, nomeTipo, items) {
   FS = ctx.FS;
   db = ctx.db;
+  tipos = [].concat(tipos);
+  let tipo = tipos[0];
   sheet("Importar planilha · " + nomeTipo, (p, close) => {
+    // cartão com dois tipos: escolhe qual é a planilha
+    if (tipos.length > 1) {
+      const s = el("select");
+      tipos.forEach(t => {
+        const o = el("option", null, NOMES[t] || t);
+        o.value = t;
+        s.append(o);
+      });
+      s.onchange = () => (tipo = s.value);
+      p.append(field("A planilha é de", s));
+    }
     p.append(
       el(
         "p",
