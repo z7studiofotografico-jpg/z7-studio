@@ -69,7 +69,7 @@ service cloud.firestore {
       allow read: if admin() || (pode('colegios') && minhaOuLivre());
       allow create: if admin() || (pode('colegios') && request.resource.data.get('respEmail', email()) == email());
       // valores da turma (kits, contrato) e responsável: só admin (o responsável recebe a comissão da turma)
-      allow update: if admin() || (pode('colegios') && minhaOuLivre() && respOk() && !mudou(['colacao', 'kits', 'contratoTurma'])
+      allow update: if admin() || (pode('colegios') && minhaOuLivre() && respOk() && !mudou(['kits', 'contratoTurma'])
         && (!mudou(['resp']) || resource.data.get('respEmail', '') == ''));
       // a equipe só apaga colégio que está na própria conta
       allow delete: if admin() || (pode('colegios') && minha());

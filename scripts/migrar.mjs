@@ -2,7 +2,7 @@
 // não no celular de ninguém. Pode rodar quantas vezes quiser: só mexe no que ainda está no formato antigo.
 // SIMULAR=true mostra quantos registros mudariam, sem gravar nada. O que muda está em js/migracao.js.
 import { initializeApp, cert } from "firebase-admin/app";
-import { getFirestore } from "firebase-admin/firestore";
+import { getFirestore, FieldValue } from "firebase-admin/firestore";
 import { planejar, VERSAO_DADOS } from "../js/migracao.js";
 import { CFG } from "./config.mjs";
 
@@ -34,8 +34,10 @@ if (!SIMULAR) {
     const b = db.batch();
     ops.slice(i, i + 400).forEach(o => {
       const r = db.collection(o.col).doc(o.id);
-      if (o.tipo === "s") b.set(r, o.dados);
-      else b.update(r, o.dados);
+      const dados = Object.assign({}, o.dados);
+      (o.apagar || []).forEach(c => (dados[c] = FieldValue.delete()));
+      if (o.tipo === "s") b.set(r, dados);
+      else b.update(r, dados);
     });
     await b.commit();
   }

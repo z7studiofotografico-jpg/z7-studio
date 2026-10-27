@@ -60,7 +60,7 @@ test("parcelas atrasadas e próximo vencimento", () => {
 test("comissão por linha e forma de pagamento", () => {
   assert.equal(R.taxa({}, "pr", "Pix"), 20);
   assert.equal(R.taxa({}, "form", "Boleto"), 9.5);
-  assert.equal(R.taxa({}, "colacao", "Boleto"), 20);
+  assert.equal(R.taxa({}, "adesao", "Boleto"), 20);
   assert.equal(R.taxa({ comissao: { pr: { Pix: 18 } } }, "pr", "Pix"), 18);
   assert.equal(R.formaDe("Cartão (link InfinityPay)"), "Link");
   assert.equal(R.formaDe("cartão"), "Cartão");
@@ -73,4 +73,11 @@ test("feriados", () => {
   assert.match(feriado("2026-02-18"), /Cinzas/);
   assert.match(feriado("2026-10-15"), /Professor/);
   assert.match(feriado("2026-12-31"), /Ano Novo/);
+});
+
+test("comissão da adesão lê a chave antiga 'colacao' até ser salva de novo", async () => {
+  const R = await import("../js/regras.js");
+  assert.equal(R.taxa({ comissao: { colacao: 18 } }, "adesao"), 18);
+  assert.equal(R.taxa({ comissao: { colacao: 18, adesao: 22 } }, "adesao"), 22);
+  assert.ok(R.ehKit01({ contrato: "colacao" }) && R.ehKit01({ contrato: "adesao" }) && !R.ehKit01({ contrato: "album" }));
 });

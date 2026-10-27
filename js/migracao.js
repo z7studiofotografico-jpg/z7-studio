@@ -2,16 +2,16 @@
 // Usado por scripts/migrar.mjs (no GitHub) e testado em tests/migracao.test.mjs.
 import { pagamentosDe, proxVenc } from "./regras.js";
 import { norm } from "./ui.js";
-export const VERSAO_DADOS = 5;
+export const VERSAO_DADOS = 6;
 
 // cols = { instituicoes, formandos, repasse, agenda, ensaios, leads }: listas de { id, ...dados }
 // emailDe(nome) → e-mail da pessoa com esse nome ("" se não achar)
-// devolve [{ col, id, tipo: "u" | "s", dados }] e a contagem por assunto
+// devolve [{ col, id, tipo: "u" | "s", dados, apagar?: [campos] }] e a contagem por assunto
 export function planejar(cols, emailDe) {
   const ops = [],
     conta = {};
-  const muda = (assunto, col, id, dados, tipo = "u") => {
-    ops.push({ col, id, tipo, dados });
+  const muda = (assunto, col, id, dados, tipo = "u", apagar) => {
+    ops.push(apagar ? { col, id, tipo, dados, apagar } : { col, id, tipo, dados });
     conta[assunto] = (conta[assunto] || 0) + 1;
   };
   const insts = {};
@@ -24,9 +24,26 @@ export function planejar(cols, emailDe) {
       muda("instituições", "instituicoes", x.id, { respEmail: re });
     }
   }
+  // v6: o preço antigo de "colação" da turma vira o preço do Kit 01 na tabela da turma
+  for (const x of cols.instituicoes || []) {
+    if (x.colacao == null) continue;
+    const kits = Array.isArray(x.kits) ? x.kits.slice() : [],
+      c = x.colacao || {},
+      dados = {};
+    if (Number(c.valor) && !kits.some(k => k.id === "k01")) {
+      kits.push({ id: "k01", ant: { valor: Number(c.valor), parcelas: Math.max(1, Number(c.parcelas) || 1) } });
+      dados.kits = kits;
+    }
+    muda("turmas (preço antigo da colação)", "instituicoes", x.id, dados, "u", ["colacao"]);
+  }
   for (const f of cols.formandos || []) {
     const pags = pagamentosDe(f),
       patch = {};
+    // v6: Kit 01 = "adesao" (antes "colacao")
+    if (f.contrato === "colacao") patch.contrato = "adesao";
+    // v6: só conta quantos ainda estão como "ainda não comprou" (formato antigo); não muda (seria inventar uma venda)
+    if (f.status === "semkit")
+      conta["formandos antigos sem kit (não mudados)"] = (conta["formandos antigos sem kit (não mudados)"] || 0) + 1;
     if (!Array.isArray(f.pagamentos)) {
       patch.pagamentos = pags;
       patch.pagas = pags.length;

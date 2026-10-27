@@ -176,7 +176,6 @@ export function desenharAlbum(cv, st, escolhidas) {
   ctx.fillText("Prévia com marca d'água · o álbum é entregue com todas as fotos, tratadas e sem marca", W / 2, cv.height - 30);
 }
 
-
 export function openPrevia({ nome = "", escola = "", kits = "", toast = null } = {}) {
   const st = { fotos: [], nome, escola, modo: "folha", pagina: 0, embaralho: 0 };
   const sh = el("div", "sheet"),

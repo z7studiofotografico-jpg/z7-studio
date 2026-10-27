@@ -74,7 +74,7 @@
         <a class="tile" href="#formaturas" data-mod="formaturas">
           <span class="tile-ico" aria-hidden="true">🎓</span>
           <b>Formaturas</b>
-          <small>Colação de grau e álbum de formatura dos colégios fechados: parcelas e cobranças</small>
+          <small>Adesão (Kit 01) e kits da formatura dos colégios fechados: parcelas e cobranças</small>
           <span class="tile-n" id="tFormaturas">Abrir</span>
         </a>
         <a class="tile" href="#pr" data-mod="pr">
@@ -227,7 +227,7 @@
       <details id="pFerLista"><summary>Ver todos os feriados (o app já bloqueia estes dias)</summary><div id="pFerDias" class="hint"></div></details>
       <p class="hint">Já estão inclusos os nacionais, o Carnaval, São Jorge (RJ), 21/08 (Aniversário de Nilópolis) e 08/12 (Imaculada Conceição).</p></div>
     <h3>Comissão do vendedor (%)</h3>
-    <p class="hint">PR: sobre a venda. Álbum de formatura (kits das turmas) e Colação de grau: sobre cada parcela paga. Só para a equipe de vendas.</p>
+    <p class="hint">PR: sobre a venda. Kits da formatura e adesão (Kit 01): sobre cada parcela paga. Só para a equipe de vendas.</p>
     <div class="comtab" id="comTab"></div>
     <h3>PR · Linha de Frente (ensaios deste ano)</h3>
     <div class="row2">
@@ -320,7 +320,7 @@ import { getAuth, initializeAuth, onAuthStateChanged, signInWithEmailAndPassword
 import { initializeFirestore, persistentLocalCache, persistentMultipleTabManager, collection, doc, onSnapshot, updateDoc, setDoc, query, where, getCountFromServer } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
 import * as FS from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
 import { getMessaging, getToken, onMessage, isSupported } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-messaging.js";
-import { COMISSAO_PADRAO, FORMAS } from "./js/regras.js";
+import { COMISSAO_PADRAO, FORMAS, taxa } from "./js/regras.js";
 import { avisoErro, ligarCamposReais, formatarCampos } from "./js/ui.js";
 import { todayStr, addDays, num, first, toast, showNotice, mkBtn } from "./js/util.js";
 ligarCamposReais();
@@ -438,11 +438,11 @@ function montarComissao(){
     ["pr", "form"].forEach(l => { const i = document.createElement("input"); i.inputMode = "decimal"; i.dataset.pct = "1"; i.dataset.l = l; i.dataset.f = f; i.setAttribute("aria-label", `Comissão ${l === "pr" ? "PR" : "Álbum de formatura"} no ${f}`);
       const v = cfg[l] && cfg[l][f]; i.value = String(v != null && v !== "" ? v : COM_PADRAO[l][f]).replace(".", ","); t.appendChild(i); });
   });
-  const s = document.createElement("span"); s.textContent = "🎓 Colação de grau (boleto, por parcela paga)"; s.style.gridColumn = "1 / 3"; t.appendChild(s);
-  const ic = document.createElement("input"); ic.inputMode = "decimal"; ic.dataset.pct = "1"; ic.id = "comColacao"; ic.setAttribute("aria-label", "Comissão da colação de grau");
-  ic.value = String(cfg.colacao != null && cfg.colacao !== "" ? cfg.colacao : COM_PADRAO.colacao).replace(".", ","); t.appendChild(ic);
+  const s = document.createElement("span"); s.textContent = "🎓 Adesão · Kit 01 (por parcela paga)"; s.style.gridColumn = "1 / 3"; t.appendChild(s);
+  const ic = document.createElement("input"); ic.inputMode = "decimal"; ic.dataset.pct = "1"; ic.id = "comAdesao"; ic.setAttribute("aria-label", "Comissão da adesão (Kit 01)");
+  ic.value = String(taxa({ comissao: cfg }, "adesao")).replace(".", ","); t.appendChild(ic);
 }
-function lerComissao(){ const o = { pr: {}, form: {} }; document.querySelectorAll("#comTab input[data-l]").forEach(i => { o[i.dataset.l][i.dataset.f] = num(i.value); }); o.colacao = num($("comColacao").value); return o; }
+function lerComissao(){ const o = { pr: {}, form: {} }; document.querySelectorAll("#comTab input[data-l]").forEach(i => { o[i.dataset.l][i.dataset.f] = num(i.value); }); o.adesao = num($("comAdesao").value); return o; }
 $("pCancel").onclick = () => { $("sheetPrices").hidden = true; };
 $("pSair").onclick = async () => { $("sheetPrices").hidden = true; await signOut(auth); };
 $("pPush").onclick = () => enablePush(true);

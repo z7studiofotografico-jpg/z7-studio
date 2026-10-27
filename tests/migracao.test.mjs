@@ -40,3 +40,29 @@ test("atualização dos dados antigos: responsável por e-mail, parcelas, privad
   );
   assert.equal(depois.ops.length, 0);
 });
+
+test("v6: Kit 01 vira 'adesao' e o preço antigo de colação da turma vira o Kit 01 da tabela da turma", () => {
+  const { ops, conta } = planejar(
+    {
+      instituicoes: [
+        { id: "i1", respEmail: "", colacao: { valor: 90, parcelas: 3 } },
+        { id: "i2", respEmail: "", colacao: { valor: 90 }, kits: [{ id: "k01", ant: { valor: 70, parcelas: 1 } }] },
+        { id: "i3", respEmail: "" }
+      ],
+      formandos: [
+        { id: "f1", contrato: "colacao", respEmail: "", pagamentos: [], proxVenc: "" },
+        { id: "f2", contrato: "album", status: "semkit", respEmail: "", pagamentos: [], proxVenc: "" }
+      ]
+    },
+    () => ""
+  );
+  const op = (col, id) => ops.find(o => o.col === col && o.id === id);
+  assert.deepEqual(op("instituicoes", "i1").dados.kits, [{ id: "k01", ant: { valor: 90, parcelas: 3 } }]);
+  assert.deepEqual(op("instituicoes", "i1").apagar, ["colacao"]);
+  assert.equal(op("instituicoes", "i2").dados.kits, undefined); // a tabela da turma já tinha o Kit 01
+  assert.deepEqual(op("instituicoes", "i2").apagar, ["colacao"]);
+  assert.equal(op("instituicoes", "i3"), undefined);
+  assert.equal(op("formandos", "f1").dados.contrato, "adesao");
+  assert.equal(op("formandos", "f2"), undefined);
+  assert.equal(conta["formandos antigos sem kit (não mudados)"], 1);
+});

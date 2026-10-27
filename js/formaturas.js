@@ -19,7 +19,7 @@ import {
   vencDa,
   valorParcela,
   esperadas,
-  ehColacao,
+  ehKit01,
   fimDoMes
 } from "./regras.js";
 import { el, title, avisoErro, sheet, botoes } from "./ui.js";
@@ -27,7 +27,7 @@ import { editorPrecos } from "./precos.js";
 import * as Ev from "./eventos.js";
 import * as U from "./util.js";
 // Leitura sob demanda: ao abrir, só as parcelas que vencem até o fim do mês (campo proxVenc);
-// a lista completa de formandos só é lida quando alguém abre as abas Colação, Álbum ou Turmas.
+// a lista completa de formandos só é lida quando alguém abre as abas Adesão, Kits ou Turmas.
 let C,
   FS,
   db,
@@ -268,8 +268,8 @@ function render() {
   if (!k) return;
   const fs = meusForms(),
     cf = meusForms(cobr);
-  const col = fs.filter(ehColacao),
-    alb = fs.filter(f => !ehColacao(f));
+  const col = fs.filter(ehKit01),
+    alb = fs.filter(f => !ehKit01(f));
   const atr = cf.filter(atrasado),
     aVencer = cf.filter(f => !atrasado(f));
   const doMes = somar(cf.map(f => valorParcela(f, pagasDe(f) + 1)));
@@ -290,7 +290,7 @@ function render() {
   chips.innerHTML = "";
   [
     ["cobrancas", "Cobranças", cob.length],
-    ["colacao", "🎓 Adesão (Kit 01)", tudoCarregado ? col.length : ""],
+    ["adesao", "🎓 Adesão (Kit 01)", tudoCarregado ? col.length : ""],
     ["album", "📘 Kits 02 a 05", tudoCarregado ? alb.length : ""],
     [
       "posfoto",
@@ -348,7 +348,7 @@ function renderCobrancas(corpo, cob) {
     top.append(el("h3", "name", title(f.nome)), el("span", "stage", at ? "ATRASADO" : "VENCE " + U.fmtDate(venc)));
     e.append(top);
     const meta = el("div", "meta");
-    [title(f.instNome), (ehColacao(f) ? "🎓 " : "📘 ") + (f.kit || (ehColacao(f) ? "Kit 01 · adesão" : "Kit")), f.serie]
+    [title(f.instNome), (ehKit01(f) ? "🎓 " : "📘 ") + (f.kit || (ehKit01(f) ? "Kit 01 · adesão" : "Kit")), f.serie]
       .filter(Boolean)
       .forEach((t, i) => meta.append(el("span", "tag" + (i === 1 ? " svc" : ""), t)));
     e.append(meta);
@@ -383,21 +383,21 @@ function resumoInst(i, lst) {
   };
 }
 function renderContrato(corpo, tipo) {
-  const colacao = tipo === "colacao";
+  const adesao = tipo === "adesao";
   corpo.append(
     el(
       "p",
       "hint",
-      colacao
-        ? "Kit 01 (beca + canudo) é a adesão da formatura. Comissão de 20% sobre cada parcela paga."
+      adesao
+        ? "Kit 01 (beca + canudo) é a adesão da formatura. A comissão é sobre cada parcela paga (taxa em Ajustes)."
         : "Kits 02 a 05 do contrato (e outros kits). Preços em “📋 Kits e preços”."
     )
   );
   const g = el("div", "grid");
   let algum = false;
   minhasInsts().forEach(i => {
-    const lst = meusForms().filter(f => f.instId === i.id && (colacao ? ehColacao(f) : !ehColacao(f)));
-    if (!lst.length && !(colacao && i.colacao && i.colacao.valor)) return;
+    const lst = meusForms().filter(f => f.instId === i.id && (adesao ? ehKit01(f) : !ehKit01(f)));
+    if (!lst.length) return;
     algum = true;
     const r = resumoInst(i, lst);
     const e = el("article", "card " + (r.atr ? "late" : ""));
@@ -405,11 +405,9 @@ function renderContrato(corpo, tipo) {
     top.append(el("h3", "name", title(i.nome)), el("span", "stage", `${r.n} aluno${r.n !== 1 ? "s" : ""}`));
     e.append(top);
     const meta = el("div", "meta");
-    if (colacao && i.colacao && i.colacao.valor)
-      meta.append(el("span", "tag svc", `${moeda(i.colacao.valor)} em ${i.colacao.parcelas || 1}x`));
     if (i.formatura && i.formatura.data && i.formatura.status !== "recusado")
       meta.append(el("span", "tag", `🎓 ${U.fmtDate(i.formatura.data)}/${i.formatura.data.slice(0, 4)}`));
-    if (!colacao) {
+    if (!adesao) {
       const kits = {};
       lst.forEach(f => {
         const kk = (f.kit || "Outro").split(" · ")[0];
@@ -433,7 +431,7 @@ function renderContrato(corpo, tipo) {
   if (!algum) {
     const e = el("div", "empty");
     e.append(
-      el("strong", null, colacao ? "Nenhuma adesão (Kit 01) ainda" : "Nenhum kit vendido ainda"),
+      el("strong", null, adesao ? "Nenhuma adesão (Kit 01) ainda" : "Nenhum kit vendido ainda"),
       el("span", null, "Abra a turma do colégio fechado (aba Turmas) e inclua os formandos.")
     );
     corpo.append(e);
@@ -465,8 +463,8 @@ function renderTurmas(corpo) {
       e.append(top);
       const meta = el("div", "meta");
       [
-        `🎓 ${fs.filter(ehColacao).length} adesão`,
-        `📘 ${fs.filter(f => !ehColacao(f)).length} kits`,
+        `🎓 ${fs.filter(ehKit01).length} adesão`,
+        `📘 ${fs.filter(f => !ehKit01(f)).length} kits`,
         C.nomeDe(i) ? "👤 " + U.first(C.nomeDe(i)) : "",
         i.fechadoEm ? "Fechado em " + U.fmtDate(i.fechadoEm) : ""
       ]

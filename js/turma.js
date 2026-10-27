@@ -1,4 +1,4 @@
-// Turma de um colégio FECHADO: formandos, contrato (álbum de formatura ou colação de grau), parcelas e cobrança.
+// Turma de um colégio FECHADO: formandos, kits (Kit 01 = adesão; Kits 02 a 05), parcelas e cobrança.
 // Coleção "formandos": { instId, instNome, nome, tel, serie, contrato, kit, valor, parcelas, primeiroVenc, formaPag,
 //   pagamentos: [{ data, valor, por }], pagas (= quantidade de pagamentos), proxVenc, status, resp, respEmail, vendidoEm }
 // Regras de parcela e dinheiro: js/regras.js. Só o administrador registra pagamento e muda valores.
@@ -17,7 +17,7 @@ import {
   emAberto,
   somar,
   proxVenc,
-  ehColacao,
+  ehKit01,
   ativo,
   SITUACOES,
   FORMAS
@@ -50,7 +50,7 @@ let C,
 const n0 = v => Number(v) || 0;
 const hoje = () => U.todayStr();
 export const atrasado = f => atrasadoEm(f, hoje());
-export { quitado, ehColacao, vencDa };
+export { quitado, ehKit01, vencDa };
 
 export function setCtx(ctx) {
   C = ctx;
@@ -98,7 +98,7 @@ async function desfazerPagamento(f) {
 export function cobrarWa(f) {
   const prox = pagasDe(f) + 1,
     venc = vencDa(f, prox),
-    col = ehColacao(f);
+    col = ehKit01(f);
   const item = col ? "da adesão da formatura (Kit 01)" : `do ${f.kit || "kit da formatura"}`;
   const pagar = f.formaPag === "Boleto" ? "\nO pagamento é pelo boleto." : C.P.pix ? `\nChave Pix: ${C.P.pix}` : "";
   const msg = msgCobranca({
@@ -329,8 +329,8 @@ export function openTurma(ctx, inst, kits, aoFechar, opcoes) {
           ["aberto", "Em dia", ativos.filter(f => !quitado(f) && !atrasado(f)).length],
           ["quitados", "Quitados", ativos.filter(quitado).length],
           ["semkit", "📸 Só Kit 01", semKit.length],
-          ["adesao", "🎓 Adesão (Kit 01)", ativos.filter(ehColacao).length],
-          ["kits", "📘 Kits 02 a 05", ativos.filter(f => !ehColacao(f)).length],
+          ["adesao", "🎓 Adesão (Kit 01)", ativos.filter(ehKit01).length],
+          ["kits", "📘 Kits 02 a 05", ativos.filter(f => !ehKit01(f)).length],
           ["sairam", "Desistiram / reprovaram", sairam.length]
         ].forEach(([k, t, n]) => {
           const b = el("button", "chip", t);
@@ -350,8 +350,8 @@ export function openTurma(ctx, inst, kits, aoFechar, opcoes) {
             quitados: ativo(f) && quitado(f),
             aberto: ativo(f) && !quitado(f) && !atrasado(f),
             semkit: candSet.has(f),
-            adesao: ativo(f) && ehColacao(f),
-            kits: ativo(f) && !ehColacao(f),
+            adesao: ativo(f) && ehKit01(f),
+            kits: ativo(f) && !ehKit01(f),
             sairam: sairam.includes(f)
           })[filtro];
         let arr = lista.filter(passa);
@@ -414,7 +414,7 @@ export function openTurma(ctx, inst, kits, aoFechar, opcoes) {
         const meta = el("div", "meta");
         [
           f.serie,
-          sem ? "" : f.kit || (ehColacao(f) ? "Kit 01 · Beca + canudo (adesão)" : "Kit"),
+          sem ? "" : f.kit || (ehKit01(f) ? "Kit 01 · Beca + canudo (adesão)" : "Kit"),
           comprou ? (f.venda === "pos" ? "Depois das fotos" : "Antecipado") : "",
           f.valor && !sem ? brl(f.valor) : "",
           comprou ? f.formaPag : "",
@@ -491,7 +491,7 @@ export function openTurma(ctx, inst, kits, aoFechar, opcoes) {
           fp.append(r1);
           // Kit do contrato: todo formando entra pelo menos com o Kit 01 (adesão)
           const kitAtual =
-            f && f.status !== "semkit" ? f.kitId || (ehColacao(f) ? "k01" : f.kit ? "outro" : "k01") : preset.venda ? "k04" : "k01";
+            f && f.status !== "semkit" ? f.kitId || (ehKit01(f) ? "k01" : f.kit ? "outro" : "k01") : preset.venda ? "k04" : "k01";
           const kit = sel([...kits.map(k => [k.id, k.nome]), ["outro", "Outro kit (digitar)"]], preset.kitId || kitAtual);
           const venda = sel(
             [
@@ -569,13 +569,11 @@ export function openTurma(ctx, inst, kits, aoFechar, opcoes) {
           };
           // Preenche valor, parcelas e 1º vencimento pela tabela do contrato (antecipado: termina junto com a turma)
           const aplicarPlano = () => {
-            const sem = false,
-              outro = kit.value === "outro";
+            const outro = kit.value === "outro";
             confereVenda();
             fKitTxt.hidden = !outro;
-            [r3, r4].forEach(x => (x.hidden = sem));
-            venda.disabled = sem || (!!f && !adm && !preset.venda);
-            if (sem || outro) return atualizaInfo();
+            venda.disabled = !!f && !adm && !preset.venda;
+            if (outro) return atualizaInfo();
             const k = kits.find(x => x.id === kit.value),
               pl = plano(k, venda.value, (inst.contratoTurma || {}).inicio, hoje());
             if (!pl) {
@@ -691,11 +689,10 @@ export function openTurma(ctx, inst, kits, aoFechar, opcoes) {
                 U.toast("Salvo");
                 return;
               }
-              const sem = false,
-                k = kits.find(x => x.id === kit.value);
-              const P = sem ? 1 : Math.max(1, n0(parc.value)),
-                v = sem ? 0 : lerReais(valor.value);
-              if (!sem && !v) {
+              const k = kits.find(x => x.id === kit.value);
+              const P = Math.max(1, n0(parc.value)),
+                v = lerReais(valor.value);
+              if (!v) {
                 err.textContent = "Coloque o valor do kit.";
                 err.hidden = false;
                 return;
@@ -707,17 +704,17 @@ export function openTurma(ctx, inst, kits, aoFechar, opcoes) {
               }
               const saiu = st.value === "desistiu" || st.value === "reprovou";
               const body = {
-                contrato: sem ? "" : k && ehAdesao(k.id) ? "colacao" : "album",
+                contrato: k && ehAdesao(k.id) ? "adesao" : "album",
                 kitId: kit.value,
-                kit: sem ? "" : k ? k.nome : kitTxt.value.trim(),
-                venda: sem ? "" : venda.value,
+                kit: k ? k.nome : kitTxt.value.trim(),
+                venda: venda.value,
                 nome: nome.value.trim(),
                 tel: tel.value.trim(),
                 serie: serie.value,
                 valor: v,
                 parcelas: P,
-                primeiroVenc: sem ? "" : venc.value,
-                formaPag: sem ? "" : fpg.value,
+                primeiroVenc: venc.value,
+                formaPag: fpg.value,
                 status: st.value,
                 obs: obs.value.trim(),
                 atualizadoEm: agora
@@ -745,7 +742,7 @@ export function openTurma(ctx, inst, kits, aoFechar, opcoes) {
                   })
                 );
               } else {
-                const n = adm && !sem ? Math.min(P, n0(jaPagas.value)) : 0,
+                const n = adm ? Math.min(P, n0(jaPagas.value)) : 0,
                   vals = dividir(v, P);
                 const pags = Array.from({ length: n }, (_, i) => ({ data: hoje(), valor: vals[i], por: C.email || "" }));
                 const novo = Object.assign(body, {
@@ -757,7 +754,7 @@ export function openTurma(ctx, inst, kits, aoFechar, opcoes) {
                   ano: Number(hoje().slice(0, 4)),
                   resp: inst.resp || C.me || "",
                   respEmail: inst.respEmail || (adm ? "" : C.email || ""),
-                  vendidoEm: sem ? "" : hoje(),
+                  vendidoEm: hoje(),
                   criadoEm: agora,
                   por: C.me || ""
                 });
@@ -897,28 +894,27 @@ export function openTurma(ctx, inst, kits, aoFechar, opcoes) {
               const kits = kitsDe(C.P, inst);
               linhas = rows
                 .map(r => {
-                  // kit pelo número (01 a 05); sem kit = ainda não comprou (entra na venda depois das fotos)
+                  // kit pelo número (01 a 05); sem kit = Kit 01 (adesão é obrigatória)
                   const kTxt = String(pega(r, "kit", "produto", "pacote")).trim(),
                     num = (kTxt.match(/0?([1-5])\b/) || [])[1],
                     k = num ? kits.find(x => x.id === "k0" + num) : null,
                     cola = /cola|adesao/.test(norm(pega(r, "contrato", "colacao", "tipo")));
                   const kk = k || (cola ? kits.find(x => x.id === "k01") : null);
                   const valor = lerReais(pega(r, "valor", "preco", "total")) || (kk ? Number(kk.ant.valor) || 0 : 0);
-                  const sem = false;
                   const kk1 = kk || (!kTxt ? kits.find(x => x.id === "k01") : null);
                   return {
-                    contrato: kk1 && ehAdesao(kk1.id) ? "colacao" : "album",
+                    contrato: kk1 && ehAdesao(kk1.id) ? "adesao" : "album",
                     kitId: kk1 ? kk1.id : "outro",
                     kit: kk1 ? kk1.nome : kTxt,
-                    venda: sem ? "" : "ant",
-                    status: sem ? "semkit" : "ativo",
+                    venda: "ant",
+                    status: "ativo",
                     nome: String(pega(r, "nome", "formando", "aluno")).trim(),
                     tel: String(pega(r, "telefone", "celular", "whats", "tel")).trim(),
                     serie: String(pega(r, "serie", "turma", "ano")).trim(),
                     valor: valor || (kk1 ? Number(kk1.ant.valor) || 0 : 0),
-                    parcelas: sem ? 1 : Math.max(1, n0(pega(r, "parcela")) || (kk1 ? Number(kk1.ant.parcelas) || 1 : 1)),
-                    primeiroVenc: sem ? "" : isoDe(pega(r, "venc")) || (inst.contratoTurma || {}).inicio || proximoVenc(hoje()),
-                    formaPag: sem ? "" : String(pega(r, "pagamento", "forma")).trim(),
+                    parcelas: Math.max(1, n0(pega(r, "parcela")) || (kk1 ? Number(kk1.ant.parcelas) || 1 : 1)),
+                    primeiroVenc: isoDe(pega(r, "venc")) || (inst.contratoTurma || {}).inicio || proximoVenc(hoje()),
+                    formaPag: String(pega(r, "pagamento", "forma")).trim(),
                     pagasPlan: n0(pega(r, "paga"))
                   };
                 })

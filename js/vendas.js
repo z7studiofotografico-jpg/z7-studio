@@ -615,7 +615,7 @@ function areaForm(corpo, p, nomeP) {
         x.colegios || 0,
         moeda(x.vend || 0),
         moeda(x.rec || 0),
-        vend.has(k) ? moeda(comissaoLinhas(p.pessoas[k] || {}, ["form", "colacao"])) : "—"
+        vend.has(k) ? moeda(comissaoLinhas(p.pessoas[k] || {}, ["form", "adesao"])) : "—"
       ])
   );
 }

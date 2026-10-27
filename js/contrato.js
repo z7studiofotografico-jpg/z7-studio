@@ -1,12 +1,12 @@
 // Regras do contrato de formatura (venda antecipada e venda depois das fotos), sem tela.
 // Contrato: kits opcionais com parcelas no dia 05; entrega só com o contrato quitado, em até 120 dias úteis;
 // desistência devolve 70% do valor pago; reprovação devolve o pago menos os serviços já feitos; mínimo de 30 formandos.
-import { centavos, reais, somaMeses, somaDias, pagamentosDe, quitado } from "./regras.js";
+import { centavos, reais, somaMeses, somaDias, pagamentosDe, quitado, ehKit01 } from "./regras.js";
 import { feriado } from "./feriados.js";
 
 // Tabela padrão (contrato de 27/04/2026). "pos" = preço para quem compra depois de ver as fotos; "rep" = preço do Repasse
 // (turmas de anos anteriores). O Adriano e a Luciana definem em Kits e preços.
-// O Kit 01 é a adesão (beca + canudo): entra na comissão da colação.
+// O Kit 01 é a adesão (beca + canudo): tem comissão própria (Ajustes → adesão).
 export const KITS_PADRAO = [
   { id: "k01", nome: "Kit 01 · Beca + canudo (adesão)", ant: { valor: 65, parcelas: 1 }, pos: { valor: 0, parcelas: 0 } },
   { id: "k01s", nome: "Kit 01 · Só beca, sem canudo (adesão)", ant: { valor: 0, parcelas: 1 }, pos: { valor: 0, parcelas: 0 } },
@@ -143,10 +143,6 @@ export function candidatosPosFoto(listaDaTurma) {
       .toLowerCase()
       .trim();
   const ativos = listaDaTurma.filter(f => !["desistiu", "reprovou"].includes(f.status));
-  const comKit = new Set(
-    ativos.filter(f => f.status !== "semkit" && !ehAdesao(f.kitId || (f.contrato === "colacao" ? "k01" : ""))).map(chave)
-  );
-  return ativos.filter(
-    f => (f.status === "semkit" || ehAdesao(f.kitId || (f.contrato === "colacao" ? "k01" : ""))) && !comKit.has(chave(f))
-  );
+  const comKit = new Set(ativos.filter(f => f.status !== "semkit" && !ehAdesao(f.kitId || (ehKit01(f) ? "k01" : ""))).map(chave));
+  return ativos.filter(f => (f.status === "semkit" || ehAdesao(f.kitId || (ehKit01(f) ? "k01" : ""))) && !comKit.has(chave(f)));
 }

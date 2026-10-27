@@ -71,7 +71,7 @@ export function somaMeses(dataIso, n) {
   return iso(alvo);
 }
 
-// ---------- Parcelas (formandos: álbum de formatura e colação de grau) ----------
+// ---------- Parcelas (formandos: kits da formatura e adesão Kit 01) ----------
 // Fonte única: a lista de pagamentos [{ data, valor, por }]. "pagas" é só a quantidade dessa lista.
 // Registros antigos sem a lista: cada parcela paga conta na data da venda.
 export function pagamentosDe(f) {
@@ -101,15 +101,16 @@ export const ativo = f => !["desistiu", "reprovou", "semkit"].includes(f.status)
 export const atrasado = (f, hoje) => ativo(f) && !quitado(f) && esperadas(f, hoje) > pagasDe(f);
 // Próximo vencimento em aberto ("" quando quitado ou desistiu): fica gravado para buscas rápidas
 export const proxVenc = f => (!ativo(f) || quitado(f) || !f.primeiroVenc ? "" : vencDa(f, pagasDe(f) + 1));
-export const ehColacao = f => f.contrato === "colacao";
+// Kit 01 (adesão: beca + canudo). "colacao" é o nome antigo, trocado pela atualização de dados v6
+export const ehKit01 = f => f.contrato === "adesao" || f.contrato === "colacao";
 
 // ---------- Comissão do vendedor ----------
-// PR: sobre a venda. Álbum de formatura e colação de grau: sobre cada parcela paga.
+// PR: sobre a venda. Kits da formatura e adesão (Kit 01): sobre cada parcela paga.
 export const FORMAS = ["Pix", "Cartão", "Link", "Recorrente", "Dinheiro", "Boleto"];
 export const COMISSAO_PADRAO = {
   pr: { Cartão: 20, Recorrente: 17, Link: 17, Dinheiro: 20, Pix: 20, Boleto: 9.5 },
   form: { Cartão: 15, Recorrente: 13, Link: 13, Dinheiro: 15, Pix: 15, Boleto: 9.5 },
-  colacao: 20
+  adesao: 20
 };
 export function formaDe(s) {
   const t = String(s || "").toLowerCase();
@@ -123,7 +124,10 @@ export function formaDe(s) {
 }
 export function taxa(P, linha, forma) {
   const cfg = (P && P.comissao) || {};
-  if (linha === "colacao") return cfg.colacao != null && cfg.colacao !== "" ? Number(cfg.colacao) : COMISSAO_PADRAO.colacao;
+  if (linha === "adesao") {
+    const v = cfg.adesao != null && cfg.adesao !== "" ? cfg.adesao : cfg.colacao; // "colacao" = nome antigo da chave
+    return v != null && v !== "" ? Number(v) : COMISSAO_PADRAO.adesao;
+  }
   const v = cfg[linha] && cfg[linha][forma];
   return v != null && v !== "" ? Number(v) : (COMISSAO_PADRAO[linha] || {})[forma] || 0;
 }

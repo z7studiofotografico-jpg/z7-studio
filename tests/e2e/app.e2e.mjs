@@ -202,6 +202,7 @@ function migrar(dados) {
   for (const o of planejar(cols, n => nomes[n] || "").ops) {
     const k = o.col + "/" + o.id;
     out[k] = o.tipo === "s" ? o.dados : Object.assign({}, out[k], o.dados);
+    (o.apagar || []).forEach(c => delete out[k][c]);
   }
   return out;
 }
@@ -398,7 +399,7 @@ console.log("Adriano (admin), com os dados já atualizados no servidor:");
     bia && bia.kitId === "k04" && bia.venda === "ant" && bia.valor === 850 && bia.contrato === "album",
     "venda antecipada gravada com o kit do contrato"
   );
-  ok(caio && caio.kitId === "k01" && caio.contrato === "colacao" && caio.valor === 65, "Kit 01 gravado como adesão");
+  ok(caio && caio.kitId === "k01" && caio.contrato === "adesao" && caio.valor === 65, "Kit 01 gravado como adesão");
   // tabela só desta turma: Kit 04 por R$ 790,00 em 8x
   await pg.locator(".panel.wide").getByRole("button", { name: "📋 Kits desta turma" }).click();
   await pg.waitForTimeout(200);

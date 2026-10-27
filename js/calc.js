@@ -1,7 +1,7 @@
 // Cálculo do Dashboard de vendas, sem tela: usado pelo app ("Atualizar agora") e pelo
 // script noturno do GitHub, que grava o resumo pronto em resumos/dashboard.
 // Assim o Dashboard abre lendo 1 documento em vez de milhares.
-import { centavos, reais, pagamentosDe, formaDe, ehColacao, emAberto, atrasado, ativo, LEAD, PR, INST, BECA, ENSAIO } from "./regras.js";
+import { centavos, reais, pagamentosDe, formaDe, ehKit01, emAberto, atrasado, ativo, LEAD, PR, INST, BECA, ENSAIO } from "./regras.js";
 
 const mes = d => {
   const m = String(d || "").slice(0, 7);
@@ -150,11 +150,11 @@ export function resumir(fontes, hoje, emailPorNome) {
   forms.filter(ativo).forEach(f => {
     const inst = instPorId[f.instId] || {},
       pessoa = quem(f.respEmail || inst.respEmail, f.resp || inst.resp),
-      col = ehColacao(f);
+      col = ehKit01(f);
     const dv = f.vendidoEm || String(f.criadoEm || "").slice(0, 10),
       cv = centavos(f.valor),
       ab = centavos(emAberto(f));
-    venda(dv, f.valor, col ? "Colação de grau" : f.kit || "Álbum de formatura", "Formaturas", pessoa);
+    venda(dv, f.valor, col ? "Kit 01 (adesão)" : f.kit || "Álbum de formatura", "Formaturas", pessoa);
     aReceber += ab;
     agoraForm[col ? "aReceberCol" : "aReceberAlb"] += ab;
     agoraForm.alunos++;
@@ -173,7 +173,7 @@ export function resumir(fontes, hoje, emailPorNome) {
       if (pessoa) soma(Fo.pessoas, pessoa, "vend", cv);
     }
     pagamentosDe(f).forEach(p => {
-      comissao(p.data || f.vendidoEm, p.valor, col ? "colacao" : "form", col ? "Boleto" : formaDe(f.formaPag), pessoa);
+      comissao(p.data || f.vendidoEm, p.valor, col ? "adesao" : "form", col ? "Boleto" : formaDe(f.formaPag), pessoa);
       const mpg = mes(p.data || f.vendidoEm);
       if (mpg) {
         const Fo = M(mpg).form,
@@ -188,7 +188,7 @@ export function resumir(fontes, hoje, emailPorNome) {
   forms
     .filter(f => f.status === "desistiu" || f.status === "reprovou")
     .forEach(f => {
-      const col = ehColacao(f),
+      const col = ehKit01(f),
         inst = instPorId[f.instId] || {},
         pessoa = quem(f.respEmail || inst.respEmail, f.resp || inst.resp);
       pagamentosDe(f).forEach(p => {
@@ -303,7 +303,7 @@ export function comissaoDe(pessoa, taxaFn) {
     semForma = 0;
   for (const [k, base] of Object.entries(pessoa.com || {})) {
     const [linha, forma] = k.split("|");
-    if (!forma && linha !== "colacao") {
+    if (!forma && linha !== "adesao") {
       semForma++;
       continue;
     }
