@@ -688,6 +688,15 @@ export function openTurma(ctx, inst, kits, aoFechar, opcoes) {
                 U.toast("Salvo");
                 return;
               }
+              // formando repetido na turma: não cadastra de novo (para outro kit, use "🛒 Comprou kit" no cartão dele)
+              if (!f && !preset.base) {
+                const igual = lista.find(x => ativo(x) && U.chave(x.nome) === U.chave(nome.value));
+                if (igual) {
+                  err.textContent = `${title(igual.nome)} já está cadastrado nesta turma. Para vender outro kit, use “🛒 Comprou kit” no cartão dele.`;
+                  err.hidden = false;
+                  return;
+                }
+              }
               const k = kits.find(x => x.id === kit.value);
               const P = Math.max(1, n0(parc.value)),
                 v = lerReais(valor.value);

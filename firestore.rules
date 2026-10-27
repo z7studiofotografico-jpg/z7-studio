@@ -119,6 +119,16 @@ service cloud.firestore {
       allow create: if aprovador() || admin();
       allow read: if aprovador() || admin();
     }
+    // Aluno repetido no PR: quem é da equipe pede; só o admin decide (passa para a pessoa ou mantém onde está).
+    // Cada um vê só os próprios pedidos e só marca que viu a resposta.
+    match /pedidos/{id} {
+      allow read: if admin() || (membro() && (resource == null || resource.data.porEmail == email()));
+      allow create: if admin() || ((pode('rep') || pode('lf')) && request.resource.data.porEmail == email()
+        && request.resource.data.status == 'pendente');
+      allow update: if admin() || (membro() && resource.data.porEmail == email()
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['visto']));
+      allow delete: if admin();
+    }
     // PR: depois de pago, valor, forma de pagamento e responsável só o admin muda
     match /repasse/{id} {
       // (resource == null: aluno que ainda não existe; o "+ Aluno" confere antes de criar)

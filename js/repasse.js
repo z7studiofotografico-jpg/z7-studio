@@ -10,6 +10,7 @@ import { el, title, emPartes, avisoErro } from "./ui.js";
 import * as U from "./util.js";
 import { norm, faltando, docId } from "./repasse-dados.js";
 import { openImport } from "./repasse-import.js";
+import { procurarRepetido, pedirAluno, painelPedidos } from "./pedidos.js";
 // Assumir o contato: quem não é admin só assume o que está sem responsável (ou já é seu)
 const assumir = it => (!C.isAdmin && it.respEmail && it.respEmail !== C.email ? {} : { resp: C.me, respEmail: C.email || "" });
 
@@ -277,6 +278,13 @@ function mount() {
     <button class="btn btn-primary btn-sm" id="rLoteBtn" type="button">Separar contatos</button></div>`;
   v.append(lote);
 
+  // pedidos de aluno repetido (admin decide; a equipe vê a resposta)
+  const ped = el("section", "pedidos");
+  ped.id = "rPedidos";
+  ped.hidden = true;
+  v.append(ped);
+  painelPedidos(C, ped);
+
   const chips = el("div", "chips");
   chips.id = "rChips";
   chips.setAttribute("role", "toolbar");
@@ -349,6 +357,7 @@ function renderChips() {
     ["buscar", "Buscar"]
   ];
   if (C.isAdmin) tabs.push(["conferir", "A conferir"], ["incompletos", "Incompletos"]);
+  else tabs.push(["incompletos", "Meus incompletos"]);
   tabs.forEach(([k, t]) => {
     const b = el("button", "chip", t);
     b.type = "button";
@@ -379,7 +388,16 @@ function openTab(k) {
     if (k === "interessados") q = FS.query(col, FS.where("etapa", "==", "INTERESSADO"), FS.limit(200));
     if (k === "entregas") q = FS.query(col, FS.where("etapa", "==", "PAGO"), FS.limit(300));
   }
-  if (k === "incompletos") q = FS.query(col, FS.where("etapa", "==", "INCOMPLETO"), FS.limit(200));
+  if (k === "incompletos")
+    q = C.isAdmin
+      ? FS.query(col, FS.where("etapa", "==", "INCOMPLETO"), FS.limit(200))
+      : FS.query(
+          col,
+          ...(seg === "lf" ? baseLF() : []),
+          FS.where("etapa", "==", "INCOMPLETO"),
+          FS.where("respEmail", "==", C.email || ""),
+          FS.limit(200)
+        );
   if (k === "conferir") q = FS.query(col, FS.where("conferido", "==", false), FS.limit(300));
   if (q)
     unsubList = FS.onSnapshot(
@@ -1061,8 +1079,7 @@ function openDados(it) {
     escola.setAttribute("list", dlE.id);
     p.append(dlE);
     let curso = null,
-      turma = null,
-      paraMim = null;
+      turma = null;
     if (novo) {
       nome.required = true;
       curso = mk("", "ex.: Ensino Médio");
@@ -1094,14 +1111,15 @@ function openDados(it) {
     (it.contatos && it.contatos.length ? it.contatos : [novo ? { tipo: "Mãe" } : {}]).forEach(addLinha);
     const add = U.mkBtn("+ Adicionar contato", "", () => addLinha());
     p.append(add);
-    if (novo && !C.isAdmin) {
-      const l = el("label", "chk");
-      paraMim = el("input");
-      paraMim.type = "checkbox";
-      paraMim.checked = true;
-      l.append(paraMim, document.createTextNode(" Já separar para mim (entra em Para hoje)"));
-      p.append(l);
-    }
+    // quem é da equipe trabalha o que cadastrou: o aluno entra direto na carteira de quem incluiu
+    if (novo && !C.isAdmin)
+      p.append(
+        el(
+          "p",
+          "hint",
+          "O aluno entra na sua lista (Para hoje). Se ele já estiver no PR, o Adriano ou a Luciana decidem se passa para você."
+        )
+      );
     const erro = el("p", "err");
     erro.hidden = true;
     p.append(erro);
@@ -1115,7 +1133,8 @@ function openDados(it) {
       }
       const agora = new Date().toISOString(),
         hoje = U.todayStr(),
-        meu = paraMim && paraMim.checked && !falta.length;
+        daEquipe = !C.isAdmin,
+        meu = daEquipe && !falta.length;
       const docNovo = Object.assign(d, {
         curso: curso ? curso.value.trim() : "",
         turma: turma ? turma.value.trim() : "",
@@ -1126,38 +1145,53 @@ function openDados(it) {
         followup: meu ? hoje : null,
         tentativas: 0,
         tentInteresse: 0,
-        resp: meu ? C.me || "" : "",
-        respEmail: meu ? C.email || "" : "",
+        resp: daEquipe ? C.me || "" : "",
+        respEmail: daEquipe ? C.email || "" : "",
         ...(meu ? { separadoEm: hoje, separadoSeg: d.ano >= ANO() ? "lf" : "rep" } : {}),
         manual: true,
         incluidoPor: C.email || "",
         importadoEm: agora,
         atualizadoEm: agora
       });
-      try {
-        // mesmo colégio + mesmo nome já existe? não sobrescreve: cria outro registro
-        // cria só se ainda não existe (transação): nunca sobrescreve um aluno que já está no PR
-        const ref = FS.doc(db, "repasse", docId(docNovo, Date.now()));
-        const criou = await FS.runTransaction(db, async tx => {
-          if ((await tx.get(ref)).exists()) return false;
-          tx.set(ref, docNovo);
-          return true;
-        });
-        if (!criou) {
-          U.toast("Esse aluno já está no PR (mesma escola, ano e nome). Procure pela busca.");
+      // aluno que já está no PR: não grava por cima. A equipe manda um pedido para o admin decidir.
+      const repetido = async r => {
+        if (C.isAdmin) {
+          erro.textContent = `${title(r.nome)} já está no PR (${title(r.escola)}${r.ano ? ", " + r.ano : ""}). Procure pela busca.`;
+          erro.hidden = false;
           return;
         }
+        if (r.respEmail && r.respEmail === C.email) {
+          erro.textContent = `${title(r.nome)} já está na sua lista. Procure pela busca.`;
+          erro.hidden = false;
+          return;
+        }
+        const aviso = await pedirAluno(C, r, docNovo);
+        close();
+        U.toast(aviso);
+      };
+      try {
+        const achado = await procurarRepetido(C, docNovo);
+        if (achado) return await repetido(achado);
+        // cria só se ainda não existe (transação): nunca sobrescreve um aluno que já está no PR
+        const ref = FS.doc(db, "repasse", docId(docNovo, Date.now()));
+        const existente = await FS.runTransaction(db, async tx => {
+          const s0 = await tx.get(ref);
+          if (s0.exists()) return Object.assign({ id: ref.id }, s0.data());
+          tx.set(ref, docNovo);
+          return null;
+        });
+        if (existente) return await repetido(existente);
         close();
         U.toast(
           falta.length
-            ? "Incluído. Ainda falta: " + falta.join(", ") + " (aba Incompletos)"
+            ? "Incluído. Ainda falta: " + falta.join(", ") + (C.isAdmin ? " (aba Incompletos)" : " (aba Meus incompletos)")
             : meu
               ? "Incluído e separado para você ✅"
               : "Incluído na fila ✅"
         );
         refreshStats();
         refreshLote();
-        openTab(meu ? "hoje" : falta.length && C.isAdmin ? "incompletos" : tab);
+        openTab(meu ? "hoje" : falta.length ? "incompletos" : tab);
       } catch (e) {
         C.handleErr(e);
       }
@@ -1192,7 +1226,13 @@ function openDados(it) {
         }
         return criar(patch, falta);
       }
-      if (it.etapa === "INCOMPLETO" || it.etapa === "NA FILA") patch.etapa = falta.length ? "INCOMPLETO" : "NA FILA";
+      if (it.etapa === "INCOMPLETO" || it.etapa === "NA FILA") {
+        // aluno de alguém da equipe: completo, volta para a lista dessa pessoa; sem dono, vai para a fila
+        const dono = it.etapa === "INCOMPLETO" && it.respEmail;
+        patch.etapa = falta.length ? "INCOMPLETO" : dono ? "SEPARADO" : "NA FILA";
+        if (!falta.length && dono)
+          Object.assign(patch, { followup: U.todayStr(), separadoEm: it.separadoEm || U.todayStr(), separadoSeg: segDe(it) });
+      }
       close();
       save(
         it,

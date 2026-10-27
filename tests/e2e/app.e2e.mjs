@@ -148,6 +148,40 @@ const base = {
     respEmail: PEDRO,
     conferido: false
   },
+  "repasse/r5": {
+    nome: "CARLA FILA",
+    nomeBusca: "CARLA FILA",
+    escola: "COLEGIO ALFA",
+    ano: hoje.getFullYear(),
+    etapa: "NA FILA",
+    resp: "",
+    respEmail: "",
+    contatos: [{ tipo: "Mãe", nome: "Sonia", tel: "21955556666" }],
+    telefones: ["21955556666"]
+  },
+  "pedidos/p8": {
+    tipo: "pr-repetido",
+    alvoId: "rx",
+    aluno: "BIA APROVADA",
+    porEmail: "pedro@vendas.com",
+    porNome: "Pedro Vendedor",
+    status: "aprovado",
+    visto: false,
+    criadoEm: "2026-01-01T10:00:00Z"
+  },
+  "pedidos/p9": {
+    tipo: "pr-repetido",
+    alvoId: "r5",
+    aluno: "CARLA FILA",
+    escola: "COLEGIO ALFA",
+    etapaAtual: "NA FILA",
+    respAtual: "",
+    porEmail: "ana@equipe.com",
+    porNome: "Ana Vendedora",
+    dados: { contatos: [{ tipo: "Pai", nome: "Jorge", tel: "21977778888" }] },
+    status: "pendente",
+    criadoEm: "2026-01-02T10:00:00Z"
+  },
   "repasse/r1": {
     nome: "ANA",
     ano: hoje.getFullYear(),
@@ -672,6 +706,18 @@ await cenario("Adriano (admin), com os dados já atualizados no servidor", async
     await pg.waitForTimeout(300);
     s = await store();
     ok(s["repasse/r2"].conferido === true && s["repasse/r2"].conferidoPor === ADRIANO, "admin conferiu a venda do PR");
+    // pedido de aluno repetido: o admin decide
+    ok(/Ana Vendedora tentou incluir Carla Fila/.test(await pg.textContent("#rPedidos")), "admin vê o pedido de aluno repetido");
+    await pg.locator("#rPedidos").getByRole("button", { name: "Passar para Ana" }).click();
+    await pg.waitForTimeout(500);
+    s = await store();
+    ok(
+      s["pedidos/p9"].status === "aprovado" &&
+        s["repasse/r5"].respEmail === "ana@equipe.com" &&
+        s["repasse/r5"].etapa === "SEPARADO" &&
+        s["repasse/r5"].contatos.length === 2,
+      "admin passa o aluno para quem pediu (separado, com os contatos novos)"
+    );
     // PR: importar planilha (módulo repasse-import.js)
     await pg.getByRole("button", { name: "Importar planilha" }).click();
     await pg.waitForTimeout(300);
@@ -1028,11 +1074,36 @@ await cenario("Pedro (vendedor: Linha de Frente, Agendamento, Instituições)", 
     const sp2 = await store();
     const paulos = Object.values(sp2).filter(x => x.nome === "Paulo Manual");
     ok(
-      paulos.length === nAntes && paulos[0].contatos[0].nome === "Marta" && /já está no PR/.test(await pg.textContent("body")),
-      "+ Aluno repetido: avisa e não sobrescreve"
+      paulos.length === nAntes && paulos[0].contatos[0].nome === "Marta" && /já está na sua lista/.test(await pg.textContent("body")),
+      "+ Aluno repetido (dele mesmo): avisa e não sobrescreve"
     );
     await fa.click({ position: { x: 5, y: 5 } }); // toque fora do painel fecha
     await pg.waitForTimeout(200);
+    // aluno que está na fila do repasse: não passa sozinho; vai um pedido para o admin decidir
+    await pg.getByRole("button", { name: "+ Aluno" }).click();
+    await pg.waitForTimeout(300);
+    fa = pg.locator(".sheet:visible").last();
+    await fa.getByLabel("Nome do aluno").fill("Carla Fila");
+    await fa.getByLabel("Colégio").fill("Colegio Alfa");
+    await fa.getByLabel("WhatsApp").fill("21922223333");
+    await fa.getByLabel("Nome", { exact: true }).fill("Vera");
+    await fa.locator("button[type=submit]").click();
+    await pg.waitForTimeout(600);
+    const sp3 = await store();
+    const pedC = Object.entries(sp3).find(([k, v]) => k.startsWith("pedidos/") && v.alvoId === "r5" && v.porEmail === PEDRO);
+    ok(
+      pedC &&
+        pedC[1].status === "pendente" &&
+        sp3["repasse/r5"].respEmail === "" &&
+        Object.values(sp3).filter(x => x.nome === "Carla Fila").length === 0 &&
+        /já está cadastrado no PR/.test(await pg.textContent("body")),
+      "+ Aluno de outra carteira: avisa o vendedor e manda o pedido (não grava por cima)"
+    );
+    ok(/Carla Fila.*Aguardando/i.test(await pg.textContent("#rPedidos")), "vendedor vê o pedido aguardando");
+    ok(/Bia Aprovada passou para você/.test(await pg.textContent("#rPedidos")), "vendedor vê o pedido aprovado");
+    await pg.locator("#rPedidos").getByRole("button", { name: "Ok, entendi" }).click();
+    await pg.waitForTimeout(300);
+    ok((await store())["pedidos/p8"].visto === true, "vendedor marca que viu a resposta");
   });
   await etapa(pg, "Instituições", async () => {
     await ir(pg, "#inst-particular");

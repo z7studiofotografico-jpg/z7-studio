@@ -41,6 +41,8 @@ comFormatura.docs
   .forEach(x => instVencidos.push(Object.assign({}, x, { followup: hoje })));
 // Agenda: datas esperando aprovação (só para quem aprova)
 const pendAgenda = (await db.collection("agenda").where("status", "==", "pendente").get()).size;
+// pedidos de aluno repetido no PR (a equipe tentou incluir quem já estava cadastrado): o admin decide
+const pedidosPR = (await db.collection("pedidos").where("status", "==", "pendente").get()).size;
 // Ensaios no estúdio: lembrar o cliente na véspera (donos) e os que a Luciana precisa analisar
 const amanha = new Intl.DateTimeFormat("en-CA", { timeZone: "America/Sao_Paulo" }).format(new Date(Date.now() + 864e5));
 const ensAmanha = (await db.collection("ensaios").where("data", "==", amanha).get()).docs
@@ -118,14 +120,15 @@ for (const t of tokensSnap.docs) {
     const lembrar = souAdmin ? ensAmanha.length : 0;
     const ent = souAdmin ? entAtrasadas : 0,
       aval = souAdmin ? avaliacoes : 0,
-      parc = souAdmin ? parcAtrasadas : 0;
+      parc = souAdmin ? parcAtrasadas : 0,
+      ped = souAdmin ? pedidosPR : 0;
     const bec = souAdmin || (mods && mods.includes("becas")) ? becasAtr + becasRet : 0;
     const avisar = paraAvisar[String(t.get("email") || "").toLowerCase()] || 0;
     const minhasOfertas = ofertas.filter(o => souAdmin || o.respEmail === String(t.get("email") || "").toLowerCase());
     const ofe = minhasOfertas.reduce((a, o) => a + o.n, 0);
-    if (!meus.length && !meusRep.length && !meusInst.length && !aprova && !lembrar && !ent && !aval && !parc && !bec && !avisar && !ofe)
+    if (!meus.length && !meusRep.length && !meusInst.length && !aprova && !lembrar && !ent && !aval && !parc && !bec && !avisar && !ofe && !ped)
       continue;
-    const total = meus.length + meusRep.length + meusInst.length + aprova + lembrar + ent + aval + parc + bec + avisar + ofe;
+    const total = meus.length + meusRep.length + meusInst.length + aprova + lembrar + ent + aval + parc + bec + avisar + ofe + ped;
     const atrasados =
       meus.filter(l => l.followup < hoje).length +
       meusRep.filter(r => r.followup < hoje).length +
@@ -140,6 +143,7 @@ for (const t of tokensSnap.docs) {
       );
     if (meusRep.length) partes.push(`PR: ${meusRep.length}`);
     if (aprova) partes.push(`Agenda: ${aprova} para analisar`);
+    if (ped) partes.push(`📩 ${ped} pedido${ped > 1 ? "s" : ""} de aluno repetido no PR`);
     if (lembrar) partes.push(`Lembrar ${lembrar} cliente${lembrar > 1 ? "s" : ""} do ensaio de amanhã`);
     if (ent) partes.push(`⚠️ ${ent} entrega${ent > 1 ? "s" : ""} de fotos atrasada${ent > 1 ? "s" : ""}`);
     if (aval) partes.push(`Pedir ${aval} avaliação${aval > 1 ? "ões" : ""} no Google`);

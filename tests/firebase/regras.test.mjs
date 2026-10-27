@@ -289,3 +289,16 @@ test("PR: quem é da Linha de Frente confere se o aluno já existe antes de incl
   await semRegra(db => setDoc(doc(db, "repasse", "antigo"), { nome: "X", ano: 2000, etapa: "NA FILA", respEmail: "" }));
   await assertFails(getDoc(doc(como(PEDRO), "repasse", "antigo")));
 });
+
+test("pedido de aluno repetido: a equipe pede e vê só o seu; só o admin decide", async () => {
+  const ped = { tipo: "pr-repetido", alvoId: "r2", aluno: "Bruno", porEmail: PEDRO, status: "pendente" };
+  await assertSucceeds(getDoc(doc(como(PEDRO), "pedidos", "p1"))); // ainda não existe: pode conferir
+  await assertSucceeds(setDoc(doc(como(PEDRO), "pedidos", "p1"), ped));
+  await assertFails(setDoc(doc(como(PEDRO), "pedidos", "p2"), { ...ped, porEmail: ANA }));
+  await assertFails(setDoc(doc(como(PEDRO), "pedidos", "p3"), { ...ped, status: "aprovado" }));
+  await assertFails(updateDoc(doc(como(PEDRO), "pedidos", "p1"), { status: "aprovado" }));
+  await assertFails(getDoc(doc(como(ANA), "pedidos", "p1")));
+  await assertSucceeds(updateDoc(doc(como(ADRIANO), "pedidos", "p1"), { status: "aprovado" }));
+  await assertSucceeds(updateDoc(doc(como(PEDRO), "pedidos", "p1"), { visto: true }));
+  await assertFails(deleteDoc(doc(como(PEDRO), "pedidos", "p1")));
+});

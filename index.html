@@ -637,6 +637,12 @@ function renderHome(){
     else if (pode("lf")) FS.getDocs(query(collection(db, "repasse"), where("ano", "==", new Date().getFullYear()), where("etapa", "in", ["SEPARADO", "CONTATADO", "INTERESSADO"]), FS.limit(300)))
       .then(s => { repCount.n = s.docs.filter(d => (d.data().followup || "9") <= todayStr() && (!d.data().respEmail || d.data().respEmail === ctx.email)).length; paintRep(); }).catch(e => avisoErro(e, "contar o PR"));
   }
+  // pedidos de aluno repetido no PR esperando a decisão do admin
+  if (isAdmin && Date.now() - (repCount.pedAt || 0) > 60000) {
+    repCount.pedAt = Date.now();
+    getCountFromServer(query(collection(db, "pedidos"), where("status", "==", "pendente")))
+      .then(c => { repCount.ped = c.data().count; paintRep(); }).catch(() => {});
+  }
   paintRep(); contarInst(); contarAgenda(); contarFormBecas();
 }
 // Cartões Formaturas e Becas: parcelas atrasadas e devoluções atrasadas
@@ -703,7 +709,10 @@ function paintInst(){
   const tot = Object.values(por).reduce((a, b) => a + b, 0), tile = document.querySelector('.tile[data-mod="colegios"] .tile-n');
   if (tile) tile.textContent = instCount.por ? (tot ? `${tot} para hoje` : "Nada pendente hoje ✓") : "Abrir";
 }
-function paintRep(){ $("tRepasse").textContent = repCount.n == null ? "" : repCount.n ? `${repCount.n} para hoje` : "Nada pendente hoje ✓"; }
+function paintRep(){
+  const base = repCount.n == null ? "" : repCount.n ? `${repCount.n} para hoje` : "Nada pendente hoje ✓";
+  $("tRepasse").textContent = base + (repCount.ped ? ` · 📩 ${repCount.ped} pedido${repCount.ped > 1 ? "s" : ""} de aluno repetido` : "");
+}
 
 // ---------- login ----------
 $("formLogin").addEventListener("submit", async e => {
