@@ -2,7 +2,8 @@
 // Usado por scripts/migrar.mjs (no GitHub) e testado em tests/migracao.test.mjs.
 import { pagamentosDe, proxVenc } from "./regras.js";
 import { norm } from "./ui.js";
-export const VERSAO_DADOS = 7;
+import { entradasFones } from "./pedidos.js";
+export const VERSAO_DADOS = 8;
 
 // cols = { instituicoes, formandos, repasse, agenda, ensaios, leads }: listas de { id, ...dados }
 // emailDe(nome) → e-mail da pessoa com esse nome ("" se não achar)
@@ -65,6 +66,18 @@ export function planejar(cols, emailDe) {
   }
   for (const x of cols.repasse || [])
     if (x.resp && !x.respEmail && emailDe(x.resp)) muda("PR", "repasse", x.id, { respEmail: emailDe(x.resp) });
+  // v8: índice de telefones do PR (acha a mesma família em outro ano ou colégio, ex.: aluno transferido)
+  const fones = {};
+  for (const x of cols.repasse || []) for (const [t, d] of entradasFones(x.id, x)) Object.assign((fones[t] = fones[t] || {}), d.alunos);
+  const atuaisF = Object.fromEntries((cols.fones || []).map(f => [f.id, f.alunos || {}]));
+  const ordenado = o =>
+    JSON.stringify(
+      Object.keys(o)
+        .sort()
+        .map(k => [k, (o[k] || {}).nome || "", (o[k] || {}).ano || null])
+    );
+  for (const [t, alunos] of Object.entries(fones))
+    if (ordenado(alunos) !== ordenado(atuaisF[t] || {})) muda("telefones do PR (índice)", "fones", t, { alunos }, "s");
   for (const x of cols.agenda || [])
     if (!x.pedidoEmail && emailDe(x.pedidoPor)) muda("agenda", "agenda", x.id, { pedidoEmail: emailDe(x.pedidoPor) });
   // compromisso particular: o assunto vai para "privado" (só admin lê)

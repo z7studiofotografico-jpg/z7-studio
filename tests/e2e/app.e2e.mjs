@@ -204,6 +204,50 @@ const base = {
     visto: false,
     criadoEm: "2026-01-04T10:00:00Z"
   },
+  "repasse/r7": {
+    nome: "MARIA TRANSFERIDA",
+    nomeBusca: "MARIA TRANSFERIDA",
+    escola: "COLEGIO VELHO",
+    ano: hoje.getFullYear() - 1,
+    etapa: "NA FILA",
+    resp: "",
+    respEmail: "",
+    contatos: [{ tipo: "Mãe", nome: "Clara", tel: "21966667777" }],
+    telefones: ["21966667777"]
+  },
+  "pedidos/pr_r7_pedro-vendas-com": {
+    tipo: "pr-repetido",
+    alvoId: "r7",
+    aluno: "MARIA TRANSFERIDA",
+    porEmail: "pedro@vendas.com",
+    porNome: "Pedro Vendedor",
+    dados: {
+      nome: "Maria Transferida",
+      escola: "Colegio Novo",
+      ano: hoje.getFullYear(),
+      contatos: [{ tipo: "Mãe", nome: "Clara", tel: "21966667777" }]
+    },
+    status: "negado",
+    decididoEm: "2026-02-10T10:00:00Z",
+    visto: true,
+    criadoEm: "2026-02-01T10:00:00Z"
+  },
+  "pedidos/p12": {
+    tipo: "pr-repetido",
+    alvoId: "r7",
+    aluno: "MARIA TRANSFERIDA",
+    porEmail: "pedro@vendas.com",
+    porNome: "Pedro Vendedor",
+    dados: {
+      nome: "Maria Transferida",
+      escola: "Colegio Novo",
+      ano: hoje.getFullYear(),
+      contatos: [{ tipo: "Mãe", nome: "Clara", tel: "21966667777" }]
+    },
+    anteriores: [{ status: "negado", decididoEm: "2026-02-10T10:00:00Z" }],
+    status: "pendente",
+    criadoEm: "2026-01-05T10:00:00Z"
+  },
   "pedidos/p9": {
     tipo: "pr-repetido",
     alvoId: "r5",
@@ -779,6 +823,29 @@ await cenario("Adriano (admin), com os dados já atualizados no servidor", async
         avisoPedro.porEmail === PEDRO,
       "aluno de outro vendedor: passa mantendo a etapa e quem perdeu recebe o aviso"
     );
+    // aluno do Repasse de outro ano pedido por quem só tem a Linha de Frente (transferido): cadastra como novo
+    const cartaoMaria = pg.locator("#rPedidos .notes").filter({ hasText: "Maria Transferida" });
+    await calmo(pg);
+    const txtMaria = await cartaoMaria.textContent();
+    ok(
+      /só tem a Linha de Frente/.test(txtMaria) &&
+        /já foi pedido antes/.test(txtMaria) &&
+        !(await cartaoMaria.getByRole("button", { name: "Passar para Pedro" }).isVisible()),
+      "pedido de aluno do Repasse por quem só tem a Linha de Frente: avisa que já foi pedido e não oferece passar"
+    );
+    await cartaoMaria.getByRole("button", { name: "Cadastrar como novo para Pedro" }).click();
+    await calmo(pg);
+    s = await store();
+    const mariaNova = Object.entries(s).find(([k, v]) => k.startsWith("repasse/") && k !== "repasse/r7" && v.nome === "Maria Transferida");
+    ok(
+      s["pedidos/p12"].status === "novo" &&
+        mariaNova &&
+        mariaNova[1].respEmail === PEDRO &&
+        mariaNova[1].escola === "Colegio Novo" &&
+        s["repasse/r7"].respEmail === "" &&
+        s["fones/21966667777"].alunos[mariaNova[0].slice(8)],
+      "cadastrado como novo para o vendedor (o antigo continua no Repasse) e telefone no índice"
+    );
     // PR: importar planilha (módulo repasse-import.js)
     await pg.getByRole("button", { name: "Importar planilha" }).click();
     await calmo(pg);
@@ -1181,6 +1248,40 @@ await cenario("Pedro (vendedor: Linha de Frente, Agendamento, Instituições)", 
       "+ Aluno de outra carteira: avisa o vendedor e manda o pedido (não grava por cima)"
     );
     ok(/Carla Fila.*Aguardando/i.test(await pg.textContent("#rPedidos")), "vendedor vê o pedido aguardando");
+    // de novo o mesmo aluno, ainda aguardando: avisa que já foi pedido
+    await pg.getByRole("button", { name: "+ Aluno" }).click();
+    await calmo(pg);
+    fa = pg.locator(".sheet:visible").last();
+    await fa.getByLabel("Nome do aluno").fill("Carla Fila");
+    await fa.getByLabel("Colégio").fill("Colegio Alfa");
+    await fa.getByLabel("WhatsApp").fill("21922223333");
+    await fa.getByLabel("Nome", { exact: true }).fill("Vera");
+    await fa.locator("button[type=submit]").click();
+    await calmo(pg);
+    ok(
+      /já foi pedido por você e está aguardando/.test(await pg.textContent("body")),
+      "pedido repetido: avisa que esse aluno já foi pedido"
+    );
+    // aluno transferido (outro colégio, Repasse do ano passado), achado pelo telefone da família; já tinha sido pedido e negado
+    await pg.getByRole("button", { name: "+ Aluno" }).click();
+    await calmo(pg);
+    fa = pg.locator(".sheet:visible").last();
+    await fa.getByLabel("Nome do aluno").fill("Maria Transferida");
+    await fa.getByLabel("Colégio").fill("Colegio Novo");
+    await fa.getByLabel("WhatsApp").fill("21966667777");
+    await fa.getByLabel("Nome", { exact: true }).fill("Clara");
+    await fa.locator("button[type=submit]").click();
+    await calmo(pg);
+    const sp4 = await store(),
+      corpo4 = await pg.textContent("body");
+    ok(
+      sp4["pedidos/pr_r7_pedro-vendas-com"].status === "pendente" &&
+        sp4["pedidos/pr_r7_pedro-vendas-com"].anteriores.length === 1 &&
+        /já foi pedido antes \(ficou onde estava/.test(corpo4) &&
+        new RegExp("Maria Transferida já está cadastrado no PR \\(.*" + (hoje.getFullYear() - 1)).test(corpo4) &&
+        !Object.values(sp4).some(x => x.nome === "Maria Transferida"),
+      "aluno transferido achado pela família (outro colégio e ano); pedido de novo com aviso"
+    );
     ok(/Bia Aprovada passou para você/.test(await pg.textContent("#rPedidos")), "vendedor vê o pedido aprovado");
     ok(
       /Zeca Passado passou para Ana Vendedora.*Não mande mais mensagem/.test(await pg.textContent("#rPedidos")),

@@ -104,3 +104,15 @@ test("v7: nome de busca no formato único (maiúsculas) em leads e instituiçõe
   assert.equal(de("instituicoes", "i1").nomeBusca, "COLEGIO ACAO");
   assert.equal(de("leads", "l1").nomeBusca, "ERICA SOUZA");
 });
+
+test("v8: índice de telefones do PR (e não regrava o que já está igual)", () => {
+  const repasse = [
+    { id: "r1", nome: "Lia", ano: 2025, contatos: [{ tel: "21911112222" }], respEmail: "" },
+    { id: "r2", nome: "Rui", ano: 2026, telefones: ["21911112222", "21933334444"], respEmail: "" }
+  ];
+  const { ops } = planejar({ repasse }, () => "");
+  const f = ops.filter(o => o.col === "fones");
+  assert.deepEqual(f.find(o => o.id === "21911112222").dados.alunos, { r1: { nome: "LIA", ano: 2025 }, r2: { nome: "RUI", ano: 2026 } });
+  const fones = f.map(o => ({ id: o.id, alunos: o.dados.alunos }));
+  assert.equal(planejar({ repasse, fones }, () => "").ops.filter(o => o.col === "fones").length, 0);
+});

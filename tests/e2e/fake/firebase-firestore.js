@@ -153,9 +153,19 @@ function aplica(o, p) {
   }
   return o;
 }
+// set com merge: junta mapas dentro de mapas (como o Firestore de verdade)
+function fundir(o, p) {
+  for (const [kk, vv] of Object.entries(clone(p))) {
+    if (vv && vv.__apagar) delete o[kk];
+    else if (vv && typeof vv === "object" && !Array.isArray(vv) && o[kk] && typeof o[kk] === "object" && !Array.isArray(o[kk]))
+      o[kk] = fundir(Object.assign({}, o[kk]), vv);
+    else o[kk] = vv;
+  }
+  return o;
+}
 async function setDoc_(r, d, opt) {
   const k = r.n + "/" + r.id;
-  store.set(k, opt && opt.merge ? aplica(clone(store.get(k)) || {}, d) : clone(d));
+  store.set(k, opt && opt.merge ? fundir(clone(store.get(k)) || {}, d) : clone(d));
   fire();
 }
 async function updateDoc_(r, p) {

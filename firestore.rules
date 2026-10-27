@@ -136,8 +136,19 @@ service cloud.firestore {
         && request.resource.data.status == 'pendente');
       allow update: if admin() || (membro() && resource.data.porEmail == email() && (
         request.resource.data.diff(resource.data).affectedKeys().hasOnly(['visto'])
-        || ((pode('rep') || pode('lf')) && resource.data.status in ['aprovado', 'negado']
+        || ((pode('rep') || pode('lf')) && resource.data.status in ['aprovado', 'negado', 'novo']
           && request.resource.data.status == 'pendente' && request.resource.data.porEmail == email())));
+      allow delete: if admin();
+    }
+    // Índice de telefones do PR (um documento por telefone, com o nome e o ano dos alunos daquela família):
+    // quem trabalha o PR consulta para achar o mesmo aluno em outro ano ou colégio; só acrescenta, nunca apaga nem troca.
+    match /fones/{tel} {
+      allow read: if pode('rep') || pode('lf');
+      allow create: if admin() || ((pode('rep') || pode('lf')) && request.resource.data.keys().hasOnly(['alunos']));
+      allow update: if admin() || ((pode('rep') || pode('lf'))
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['alunos'])
+        && resource.data.alunos.diff(request.resource.data.alunos).removedKeys().size() == 0
+        && resource.data.alunos.diff(request.resource.data.alunos).changedKeys().size() == 0);
       allow delete: if admin();
     }
     // PR: depois de pago, valor, forma de pagamento e responsável só o admin muda

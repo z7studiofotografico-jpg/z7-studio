@@ -22,7 +22,7 @@ const porNome = {};
 (CFG.donos || []).forEach(d => {
   if (d.nome && !porNome[d.nome]) porNome[d.nome] = d.email.toLowerCase();
 });
-const nomes = ["instituicoes", "formandos", "repasse", "agenda", "ensaios", "leads"];
+const nomes = ["instituicoes", "formandos", "repasse", "agenda", "ensaios", "leads", "fones"];
 const cols = Object.fromEntries(await Promise.all(nomes.map(async n => [n, await ler(n)])));
 const { ops, conta } = planejar(cols, nome => porNome[nome] || "");
 

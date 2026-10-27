@@ -2,6 +2,7 @@
 import { el, carregarLib } from "./ui.js";
 import { MAPA, hkey, linhaParaDoc, docId, faltando, norm } from "./repasse-dados.js";
 import * as U from "./util.js";
+import { indexarFones } from "./pedidos.js";
 let C, FS, db;
 const loadXLSX = () => carregarLib("xlsx");
 
@@ -192,15 +193,16 @@ export function openImport(ctx, ui, aoTerminar) {
             false
           ];
         });
-        for (let i = 0; i < ops.length; i += 400) {
+        // de 80 em 80 alunos: cada aluno grava 1 documento + até 4 telefones no índice (o lote do Firestore vai até 500)
+        for (let i = 0; i < ops.length; i += 80) {
           const b = FS.writeBatch(db);
-          ops
-            .slice(i, i + 400)
-            .forEach(([id, data, merge]) =>
-              merge ? b.set(FS.doc(db, "repasse", id), data, { merge: true }) : b.set(FS.doc(db, "repasse", id), data)
-            );
+          ops.slice(i, i + 80).forEach(([id, data, merge]) => {
+            if (merge) b.set(FS.doc(db, "repasse", id), data, { merge: true });
+            else b.set(FS.doc(db, "repasse", id), data);
+            indexarFones(FS, db, b, id, data);
+          });
           await b.commit();
-          prog.textContent = `Importando… ${Math.min(i + 400, ops.length)} de ${ops.length}`;
+          prog.textContent = `Importando… ${Math.min(i + 80, ops.length)} de ${ops.length}`;
         }
         await FS.setDoc(FS.doc(db, "config", "repasse_meta"), { escolas, anos, importadoEm: agora }, { merge: true });
         const nInc = ops.filter(([, d, m]) => !m && d.etapa === "INCOMPLETO").length;

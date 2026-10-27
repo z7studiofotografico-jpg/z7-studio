@@ -10,7 +10,7 @@ import { el, title, emPartes, avisoErro } from "./ui.js";
 import * as U from "./util.js";
 import { norm, faltando, docId, situacaoTxt, enderecoTxt } from "./repasse-dados.js";
 import { openImport } from "./repasse-import.js";
-import { procurarRepetido, pedirAluno, painelPedidos } from "./pedidos.js";
+import { procurarRepetido, pedirAluno, painelPedidos, indexarFones } from "./pedidos.js";
 // Assumir o contato: quem não é admin só assume o que está sem responsável (ou já é seu)
 const assumir = it => (!C.isAdmin && it.respEmail && it.respEmail !== C.email ? {} : { resp: C.me, respEmail: C.email || "" });
 
@@ -1156,6 +1156,7 @@ function openDados(it) {
           const s0 = await tx.get(ref);
           if (s0.exists()) return Object.assign({ id: ref.id }, s0.data());
           tx.set(ref, docNovo);
+          indexarFones(FS, db, tx, ref.id, docNovo); // telefones no índice: acha a família depois, em outro ano ou colégio
           return null;
         });
         if (existente) return await repetido(existente);
@@ -1212,6 +1213,13 @@ function openDados(it) {
           Object.assign(patch, { followup: U.todayStr(), separadoEm: it.separadoEm || U.todayStr(), separadoSeg: segDe(it) });
       }
       close();
+      // telefone novo entra no índice (para achar a família depois); se falhar, não atrapalha o salvar
+      const novosTels = patch.telefones.filter(t => !(it.telefones || []).includes(t));
+      if (novosTels.length) {
+        const b = FS.writeBatch(db);
+        indexarFones(FS, db, b, it.id, Object.assign({}, it, patch, { telefones: novosTels, contatos: [] }));
+        b.commit().catch(e => console.warn("[Z7] índice de telefones", e));
+      }
       save(
         it,
         patch,
