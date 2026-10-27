@@ -20,11 +20,10 @@ import {
   valorParcela,
   esperadas,
   ehColacao,
-  fimDoMes,
-  lerReais,
-  dividir
+  fimDoMes
 } from "./regras.js";
-import { el, title, avisoErro, sheet, botoes, inp, inpReais } from "./ui.js";
+import { el, title, avisoErro, sheet, botoes } from "./ui.js";
+import { editorPrecos } from "./precos.js";
 import * as Ev from "./eventos.js";
 import * as U from "./util.js";
 // Leitura sob demanda: ao abrir, só as parcelas que vencem até o fim do mês (campo proxVenc);
@@ -581,12 +580,7 @@ function renderPosFoto(corpo) {
 }
 
 // ---------- tabela de kits (contrato) ----------
-// Três preços por kit: antecipado (contrato), depois das fotos (Linha de Frente) e repasse (turmas de anos anteriores)
-export const COLUNAS_PRECO = [
-  ["ant", "Antecipado"],
-  ["pos", "Depois das fotos"],
-  ["rep", "Repasse"]
-];
+// Três preços por kit (editor em js/precos.js, o mesmo da tabela da turma)
 function openKits() {
   const kits = kitsPadrao(C.P);
   sheet("Kits e preços (tabela padrão)", (p, close) => {
@@ -597,55 +591,14 @@ function openKits() {
         "Tabela padrão para todas as turmas (cada turma pode ter a sua em Formandos → 📋 Kits desta turma). Antecipado = preço do contrato, até o dia da formatura. Depois das fotos = valor a mais para quem tem só o Kit 01. Repasse = preço para quem ficou só com o Kit 01 em turmas de anos anteriores. Deixe em branco o que não é oferecido."
       )
     );
-    const linhas = kits.map(k => {
-      const f = el("div", "field");
-      f.append(el("label", null, k.nome));
-      const r = el("div", "row3"),
-        ins = {};
-      COLUNAS_PRECO.forEach(([q, nomeQ]) => {
-        const v = inpReais((k[q] || {}).valor || ""),
-          n = inp((k[q] || {}).parcelas || "", "1", 3);
-        n.inputMode = "numeric";
-        v.setAttribute("aria-label", `${k.nome} · valor ${nomeQ.toLowerCase()}`);
-        n.setAttribute("aria-label", `${k.nome} · parcelas ${nomeQ.toLowerCase()}`);
-        [v, n].forEach(i => (i.disabled = !C.isAdmin));
-        const c = el("div", "field");
-        c.append(el("small", null, nomeQ + ": valor e parcelas"), v, n);
-        r.append(c);
-        ins[q] = { v, n };
-      });
-      const info = el("p", "hint");
-      const upd = () => {
-        const t = q => {
-          const val = lerReais(ins[q].v.value),
-            nn = Math.max(1, Number(ins[q].n.value) || 1);
-          return val ? `${nn}x de ${brl(dividir(val, nn).pop())}` : "—";
-        };
-        info.textContent = COLUNAS_PRECO.map(([q, nomeQ]) => `${nomeQ} ${t(q)}`).join(" · ");
-      };
-      Object.values(ins).forEach(({ v, n }) => [v, n].forEach(i => i.addEventListener("input", upd)));
-      upd();
-      f.append(r, info);
-      p.append(f);
-      return { k, ins };
-    });
+    const ed = editorPrecos(p, kits, { bloqueado: !C.isAdmin });
     const a = botoes(close, "Salvar tabela");
     if (!C.isAdmin) a.ok.hidden = true;
     p.append(a);
     p.addEventListener("submit", async ev => {
       ev.preventDefault();
       if (!C.isAdmin) return;
-      const preco = ({ v, n }, obrig) => {
-        const val = lerReais(v.value);
-        return { valor: val, parcelas: val || obrig ? Math.max(1, parseInt(n.value, 10) || 1) : 0 };
-      };
-      const nova = linhas.map(({ k, ins }) => ({
-        id: k.id,
-        nome: k.nome,
-        ant: preco(ins.ant, true),
-        pos: preco(ins.pos),
-        rep: preco(ins.rep)
-      }));
+      const nova = ed.ler();
       try {
         await FS.setDoc(FS.doc(db, "config", "app"), { kitsFormatura: nova }, { merge: true });
         C.P.kitsFormatura = nova;

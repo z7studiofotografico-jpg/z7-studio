@@ -4,6 +4,7 @@
 // Tudo sai com marca d'água repetida e as fotos reduzidas (um print não serve como foto final).
 import { el, avisoErro } from "./ui.js";
 import { cover, marca, prep, logoAtual } from "./mockup.js";
+import { msgPrevia } from "./mensagens.js";
 
 const POR_PAGINA = 30,
   COLS = 5,
@@ -175,10 +176,6 @@ export function desenharAlbum(cv, st, escolhidas) {
   ctx.fillText("Prévia com marca d'água · o álbum é entregue com todas as fotos, tratadas e sem marca", W / 2, cv.height - 30);
 }
 
-export function textoPrevia(nome, n, extra) {
-  const pn = (nome || "").trim().split(/\s+/)[0];
-  return `Oi${pn ? ", " + pn : ""}! Aqui estão as ${n} fotos da sua formatura 📸 O kit vem com todas elas, tratadas e sem a marca d'água.${extra ? "\n\n" + extra : ""}\n\nQuer garantir o seu? 😊`;
-}
 
 export function openPrevia({ nome = "", escola = "", kits = "", toast = null } = {}) {
   const st = { fotos: [], nome, escola, modo: "folha", pagina: 0, embaralho: 0 };
@@ -363,7 +360,7 @@ export function openPrevia({ nome = "", escola = "", kits = "", toast = null } =
     if (!st.fotos.length) return inp.click();
     const files = await gerar();
     if (!files) return;
-    const data = { files, text: textoPrevia(st.nome, st.fotos.length, kits) };
+    const data = { files, text: msgPrevia(st.nome, st.fotos.length, kits) };
     let motivo = "";
     if (navigator.canShare && navigator.canShare(data)) {
       try {

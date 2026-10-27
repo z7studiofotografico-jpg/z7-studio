@@ -39,7 +39,8 @@ import {
   MINIMO_FORMANDOS,
   DEVOLVE_DESISTENCIA
 } from "./contrato.js";
-import { ESTUDIO } from "./mensagens.js";
+import { msgCobranca, msgOfertaKit } from "./mensagens.js";
+import { editorPrecos, soDiferencas } from "./precos.js";
 import { el, title, norm, field, inp, inpReais, sel, sheet, botoes, wa, avisoErro, carregarLib, emPartes } from "./ui.js";
 import * as U from "./util.js";
 let C,
@@ -100,11 +101,15 @@ export function cobrarWa(f) {
     col = ehColacao(f);
   const item = col ? "da adesão da formatura (Kit 01)" : `do ${f.kit || "kit da formatura"}`;
   const pagar = f.formaPag === "Boleto" ? "\nO pagamento é pelo boleto." : C.P.pix ? `\nChave Pix: ${C.P.pix}` : "";
-  const valor = brl(valorParcela(f, prox)),
-    nome = U.first(title(f.nome));
-  const msg = atrasado(f)
-    ? `Oi, ${nome}! Aqui é do ${ESTUDIO.nome} 📸 Passando para lembrar da parcela ${prox}/${nParcelas(f)} ${item}, de ${valor}, que venceu ${venc ? "dia " + U.fmtDate(venc) : "este mês"}.${pagar}\nPode me mandar o comprovante por aqui? Se já pagou, é só desconsiderar 😊`
-    : `Oi, ${nome}! Aqui é do ${ESTUDIO.nome} 📸 Só lembrando que a parcela ${prox}/${nParcelas(f)} ${item}, de ${valor}, vence ${venc ? "dia " + U.fmtDate(venc) : "em breve"}.${pagar}\nQualquer dúvida, estou por aqui 😊`;
+  const msg = msgCobranca({
+    nome: title(f.nome),
+    parcela: `${prox}/${nParcelas(f)}`,
+    item,
+    valor: brl(valorParcela(f, prox)),
+    venc: venc ? U.fmtDate(venc) : "",
+    atrasada: atrasado(f),
+    pagar
+  });
   wa(f.tel, msg, U.toast);
 }
 // Mensagem para quem tem só o Kit 01: as fotos ficaram prontas, kits no preço depois das fotos (tabela da turma)
@@ -139,10 +144,7 @@ export function oferecerKit(ctx, inst, f) {
   const rep = ehRepasse(inst, hoje()),
     lin = linhasKitsPos(C.P, inst);
   if (!lin.length) return U.toast(`Defina os preços ${rep ? "de repasse" : "depois das fotos"} em “📋 Kits e preços” (card Formaturas)`);
-  const nome = U.first(title(f.nome));
-  const msg = rep
-    ? `Oi, ${nome}! Aqui é do ${ESTUDIO.nome} 📸 Ainda guardamos as fotos da sua formatura de ${anoDaTurma(inst)} no ${title(inst.nome)}. Que tal ter todas elas tratadas e impressas?\n\n${lin.join("\n")}\n\nPosso te mandar uma prévia? 😊`
-    : `Oi, ${nome}! Aqui é do ${ESTUDIO.nome} 📸 As fotos da formatura do ${title(inst.nome)} ficaram prontas e estão lindas! Quer garantir as suas?\n\n${lin.join("\n")}\n\nPosso te mandar uma prévia? 😊`;
+  const msg = msgOfertaKit({ nome: title(f.nome), escola: title(inst.nome), linhas: lin, repasse: rep, ano: anoDaTurma(inst) });
   wa(f.tel, msg, U.toast);
 }
 // opcoes.novo = abre já com o formulário de formando novo (botão "+ Formando" do card Formaturas)
@@ -822,33 +824,7 @@ export function openTurma(ctx, inst, kits, aoFechar, opcoes) {
           atual = kitsDe(C.P, inst);
         sheet("Kits desta turma · " + title(inst.nome), (fp, fechar) => {
           fp.append(el("p", "hint", "Valores e vezes só deste colégio. O que ficar igual à tabela padrão segue a tabela padrão."));
-          const COL = [
-            ["ant", "Antecipado"],
-            ["pos", "Depois das fotos"],
-            ["rep", "Repasse"]
-          ];
-          const linhas = atual.map(k => {
-            const b = padrao.find(x => x.id === k.id) || k;
-            const f0 = el("div", "field");
-            f0.append(el("label", null, k.nome));
-            const r = el("div", "row3"),
-              ins = {};
-            COL.forEach(([q, nomeQ]) => {
-              const v = inpReais((k[q] || {}).valor || ""),
-                n = inp((k[q] || {}).parcelas || "", "1", 3);
-              n.inputMode = "numeric";
-              v.setAttribute("aria-label", `${k.nome} · valor ${nomeQ.toLowerCase()} (turma)`);
-              n.setAttribute("aria-label", `${k.nome} · parcelas ${nomeQ.toLowerCase()} (turma)`);
-              const bq = b[q] || {},
-                c = el("div", "field");
-              c.append(el("small", null, `${nomeQ} (padrão: ${Number(bq.valor) ? `${bq.parcelas || 1}x · ${brl(bq.valor)}` : "—"})`), v, n);
-              r.append(c);
-              ins[q] = { v, n };
-            });
-            f0.append(r);
-            fp.append(f0);
-            return { k, b, ins };
-          });
+          const ed = editorPrecos(fp, atual, { padrao, sufixo: " (turma)", bloqueado: !C.isAdmin });
           const a = botoes(fechar, "Salvar tabela da turma");
           const volta = el("button", "btn", "Voltar à tabela padrão");
           volta.type = "button";
@@ -867,20 +843,7 @@ export function openTurma(ctx, inst, kits, aoFechar, opcoes) {
           fp.append(a);
           fp.addEventListener("submit", async ev => {
             ev.preventDefault();
-            const igual = (x, y) =>
-              Math.round((Number(x.valor) || 0) * 100) === Math.round((Number((y || {}).valor) || 0) * 100) &&
-              (Number(x.parcelas) || 0) === (Number((y || {}).parcelas) || 0);
-            const kits = linhas
-              .map(({ k, b, ins }) => {
-                const o = { id: k.id };
-                COL.forEach(([q]) => {
-                  const val = lerReais(ins[q].v.value),
-                    x = { valor: val, parcelas: val || q === "ant" ? Math.max(1, parseInt(ins[q].n.value, 10) || 1) : 0 };
-                  if (!igual(x, b[q])) o[q] = x;
-                });
-                return o;
-              })
-              .filter(o => o.ant || o.pos || o.rep);
+            const kits = soDiferencas(ed.ler(), padrao);
             try {
               await FS.updateDoc(FS.doc(db, "instituicoes", inst.id), { kits, atualizadoEm: new Date().toISOString() });
               inst.kits = kits;

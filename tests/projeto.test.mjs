@@ -47,3 +47,12 @@ test("os módulos do app não usam innerHTML com dados (só textos fixos)", () =
       assert.deepEqual(ruins, [], "innerHTML com valor dinâmico em " + f + " (linhas " + ruins.join(", ") + ")");
     });
 });
+
+test("mensagens da formatura: cobrança, oferta e prévia", async () => {
+  const { msgCobranca, msgOfertaKit, msgPrevia } = await import("../js/mensagens.js");
+  const c = msgCobranca({ nome: "Lucas Silva", parcela: "2/10", item: "do Kit 04", valor: "R$ 85,00", venc: "05/10/2026", atrasada: true });
+  assert.match(c, /^Oi, Lucas!.*parcela 2\/10 do Kit 04, de R\$ 85,00, que venceu dia 05\/10\/2026/s);
+  const o = msgOfertaKit({ nome: "Ana", escola: "Colegio Alfa", linhas: ["• Kit 04: R$ 1.100,00"], repasse: true, ano: 2025 });
+  assert.match(o, /formatura de 2025 no Colegio Alfa.*• Kit 04/s);
+  assert.match(msgPrevia("Caio Lima", 35, ""), /^Oi, Caio! Aqui estão as 35 fotos/);
+});
