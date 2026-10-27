@@ -1,14 +1,16 @@
 // WhatsApp de trabalho.
 // - Empresa (Adriano e Luciana): um número para cada frente, em Ajustes: Funil, PR Linha de Frente, PR Repasse e
 //   cobrança das formaturas. O app mostra em cada tela qual WhatsApp usar.
-// - Equipe: cada representante trabalha com os PRÓPRIOS números (até 4), cadastrados junto com a pessoa em Equipe.
+// - Equipe: cada representante trabalha com os PRÓPRIOS números (até 3), cadastrados junto com a pessoa em Equipe.
 //   Ninguém usa número da empresa nem o de outra pessoa: assim se sabe quem fez cada contato.
+// - Em cada tela há o seletor "📱 Use o WhatsApp ▾": vem no número pré-definido e dá para trocar por outro já liberado
+//   (ex.: o cliente bloqueou). A escolha fica guardada neste aparelho até trocar de novo.
 //   Trocar depois: a pessoa pede em Ajustes; o Adriano ou a Luciana autorizam; ela recebe o aviso no app.
 // Coleções: usuarios/{e-mail}.numeros = números liberados; numeros/{e-mail} = pedido de troca
 //   { numeros, status: "pendente" | "aprovado" | "recusado", pedidoEm, nome, decididoEm, decididoPor, visto }
 import { avisoTel } from "./aluno-id.js";
 
-export const MAX_NUMEROS = 4;
+export const MAX_NUMEROS = 3;
 // Números da empresa que já vêm preenchidos em Ajustes (o admin pode trocar)
 export const EMPRESA_PADRAO = { funilNumero: "21998817771", cobrancaNumero: "21997597605" };
 export const FRENTES = {
@@ -45,7 +47,8 @@ export const numerosDe = u => ((u && u.numeros) || []).map(normTel).filter(Boole
 // Confere a lista de números de uma pessoa: devolve { numeros (normalizados, sem repetir), erro }.
 // Bloqueia número da empresa e número que já é de outra pessoa (cada um com o seu).
 // outros = { "21999998888": "Ana Vendedora", ... } (os números das outras pessoas)
-export function conferirNumeros(lista, P, outros) {
+// admin = true: a pessoa é admin (pode usar os números da empresa)
+export function conferirNumeros(lista, P, outros, admin) {
   const vistos = new Set(),
     numeros = [];
   for (const t of lista || []) {
@@ -53,7 +56,7 @@ export function conferirNumeros(lista, P, outros) {
     const d = normTel(t);
     const a = avisoTel(d);
     if (a && !/fixo/.test(a)) return { numeros, erro: `${fmtTel(t)}: ${a}.` };
-    if (numerosEmpresa(P).includes(d))
+    if (!admin && numerosEmpresa(P).includes(d))
       return { numeros, erro: `${fmtTel(d)} é número da empresa (Adriano e Luciana). Use o seu número de trabalho.` };
     if ((outros || {})[d]) return { numeros, erro: `${fmtTel(d)} já é de ${outros[d]}. Cada pessoa trabalha com o próprio número.` };
     if (!vistos.has(d)) {
@@ -65,25 +68,21 @@ export function conferirNumeros(lista, P, outros) {
   return { numeros, erro: "" };
 }
 // Os números das outras pessoas (para não repetir), a partir dos cadastros
-export function numerosDosOutros(usuarios, email) {
+// (para quem é admin, os outros admins não contam: Adriano e Luciana podem ter os mesmos números da empresa)
+export function numerosDosOutros(usuarios, email, admin) {
   const o = {};
   Object.entries(usuarios || {}).forEach(([em, u]) => {
-    if (em === email || !u || u.ativo === false) return;
+    if (em === email || !u || u.ativo === false || (admin && u.papel === "admin")) return;
     numerosDe(u).forEach(n => (o[n] = u.nome || em));
   });
   return o;
 }
-// Qual WhatsApp usar nesta frente: admin = o da empresa; equipe = os próprios
-export function whatsDaVez(C, frente) {
-  if (C.isAdmin) {
-    const n = numeroEmpresa(C.P, frente);
-    return n ? [n] : [];
-  }
-  return numerosDe((C.usuarios || {})[C.email]);
+// Os WhatsApp que esta pessoa pode usar nesta frente, o pré-definido primeiro:
+// admin = o número da empresa daquela frente, os outros números da empresa e os próprios; equipe = os próprios (até 3)
+export function opcoesWhats(C, frente) {
+  const meus = numerosDe((C.usuarios || {})[C.email]);
+  const lista = C.isAdmin ? [numeroEmpresa(C.P, frente), ...numerosEmpresa(C.P), ...meus] : meus;
+  return [...new Set(lista.filter(Boolean))];
 }
-export function textoUse(C, frente) {
-  const ns = whatsDaVez(C, frente);
-  if (C.isAdmin) return ns.length ? `📱 Use o WhatsApp da empresa ${fmtTel(ns[0])}` : "";
-  if (!ns.length) return "⚠️ Você ainda não tem WhatsApp de trabalho liberado. Peça em ⚙️ Ajustes → Meus WhatsApp de trabalho.";
-  return `📱 Use o seu WhatsApp de trabalho: ${ns.map(fmtTel).join(" ou ")}`;
-}
+// O número em uso: o que a pessoa escolheu (se ainda é dela) ou o pré-definido
+export const escolhido = (opcoes, guardado) => (opcoes.includes(normTel(guardado)) ? normTel(guardado) : opcoes[0] || "");

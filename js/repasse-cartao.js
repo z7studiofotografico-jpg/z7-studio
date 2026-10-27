@@ -4,7 +4,8 @@ import { el, title } from "./ui.js";
 import * as U from "./util.js";
 import { faltando, situacaoTxt, enderecoTxt } from "./repasse-dados.js";
 import { avisoTel } from "./aluno-id.js";
-import { whatsDaVez, fmtTel } from "./numeros.js";
+import { fmtTel } from "./numeros.js";
+import { whatsAtivo } from "./numeros-tela.js";
 import {
   C,
   tab,
@@ -216,7 +217,7 @@ function desenharProximo(box, it, escolhido, blocked, li) {
           ultimo: {
             por: C.me || "—",
             porEmail: C.email || "",
-            whats: whatsDaVez(C, segDe(it) || seg).join(" / "),
+            whats: whatsAtivo(C, segDe(it) || seg),
             em: new Date().toISOString(),
             para: escolhido ? escolhido.tipo : ""
           }

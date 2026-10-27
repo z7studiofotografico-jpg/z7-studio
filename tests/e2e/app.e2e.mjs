@@ -1834,7 +1834,10 @@ await cenario("WhatsApp de trabalho (empresa x equipe, troca com autorização)"
     // admin: número da empresa no Funil; cadastra pessoa com o próprio número (o da empresa não pode)
     const { pg, erros, store } = await abrir(ADRIANO, migrar(base));
     await ir(pg, "#funil");
-    ok(/WhatsApp da empresa \(21\) 99881-7771/.test(await pg.textContent("#funilNum")), "admin: Funil mostra o WhatsApp da empresa");
+    ok(
+      /Use o WhatsApp/.test(await pg.textContent("#funilNum")) && (await pg.inputValue("#funilNum select")) === "21998817771",
+      "admin: Funil vem no WhatsApp da empresa do Funil (pré-definido)"
+    );
     await ir(pg, "#home");
     await pg.click("#btnTeam");
     await pg.fill("#uNome", "Rita Nova");
@@ -1855,10 +1858,7 @@ await cenario("WhatsApp de trabalho (empresa x equipe, troca com autorização)"
     // equipe: PR mostra o próprio número; pede troca em Ajustes
     const { pg, erros, store } = await abrir(PEDRO, comNumero());
     await ir(pg, "#pr");
-    ok(
-      /seu WhatsApp de trabalho: \(21\) 95555-0000/.test(await pg.textContent("#rLoteNum")),
-      "equipe: PR mostra o próprio WhatsApp de trabalho"
-    );
+    ok(/Use o WhatsApp \(21\) 95555-0000/.test(await pg.textContent("#rLoteNum")), "equipe: PR mostra o próprio WhatsApp de trabalho");
     await ir(pg, "#home");
     await pg.click("#btnPrices");
     await pg.getByRole("button", { name: "📱 Pedir troca de número" }).click();
@@ -1873,6 +1873,20 @@ await cenario("WhatsApp de trabalho (empresa x equipe, troca com autorização)"
     );
     ok(JSON.stringify((await store())["usuarios/" + PEDRO].numeros) === '["21955550000"]', "o número só muda depois de autorizado");
     ok(erros.length === 0, "sem erros no console" + (erros.length ? ": " + erros.slice(0, 3).join(" | ") : ""));
+  }
+  {
+    // com 2 números: vem no pré-definido; troca pelo outro (ex.: o cliente bloqueou) e a escolha fica
+    const d = comNumero();
+    d["usuarios/" + PEDRO].numeros = ["21955550000", "21966660000"];
+    const { pg } = await abrir(PEDRO, d);
+    await ir(pg, "#pr");
+    ok((await pg.inputValue("#rLoteNum select")) === "21955550000", "vem no WhatsApp pré-definido");
+    await pg.selectOption("#rLoteNum select", "21966660000");
+    await pg.reload();
+    await pg.waitForSelector("#viewApp:not([hidden])");
+    await ir(pg, "#pr");
+    await calmo(pg);
+    ok((await pg.inputValue("#rLoteNum select")) === "21966660000", "a troca de WhatsApp fica guardada até trocar de novo");
   }
   {
     // admin autoriza na tela inicial

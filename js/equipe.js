@@ -70,12 +70,15 @@ export function render() {
     head.append(info, pill);
     r.append(head);
     // WhatsApp de trabalho (equipe): cada pessoa com o próprio número
-    if (!D.isDono(em) && u.papel !== "admin" && u.ativo !== false) {
+    if (u.ativo !== false) {
       const ns = document.createElement("small");
-      ns.className = numerosDe(u).length ? "hint" : "wait";
+      const adm = u.papel === "admin" || D.isDono(em);
+      ns.className = numerosDe(u).length || adm ? "hint" : "wait";
       ns.textContent = numerosDe(u).length
         ? "📱 " + numerosDe(u).map(fmtTel).join(" · ")
-        : "⚠️ Sem WhatsApp de trabalho: toque em 📱 Números";
+        : adm
+          ? "📱 Usa os WhatsApp da empresa (pode cadastrar outros em 📱 Números)"
+          : "⚠️ Sem WhatsApp de trabalho: toque em 📱 Números";
       r.append(ns);
       acts.appendChild(D.mkBtn("📱 Números", "", () => editarNumeros(em, u)));
     }
@@ -129,7 +132,8 @@ function editarNumeros(em, u) {
   document.body.append(sh);
   p.addEventListener("submit", async e => {
     e.preventDefault();
-    const conf = conferirNumeros(cn.ler(), D.ctx.P, numerosDosOutros(D.usuarios(), em));
+    const adm = u.papel === "admin" || D.isDono(em);
+    const conf = conferirNumeros(cn.ler(), D.ctx.P, numerosDosOutros(D.usuarios(), em, adm), adm);
     if (conf.erro) {
       err.textContent = conf.erro;
       err.hidden = false;

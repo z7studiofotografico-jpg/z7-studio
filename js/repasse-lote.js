@@ -1,7 +1,7 @@
 // PR: números do topo, lote do dia (separar contatos da fila) e a lista de escolas
 import { el, title, avisoErro } from "./ui.js";
 import * as U from "./util.js";
-import { textoUse } from "./numeros.js";
+import { pintarSeletor } from "./numeros-tela.js";
 import { C, FS, db, col, tab, seg, meta, mudarMeta, ANO, ANO_MIN, ABERTAS, baseLF, soMinha, noSeg, $, tela } from "./repasse-estado.js";
 
 export async function refreshStats() {
@@ -94,9 +94,7 @@ export async function refreshLote() {
     $("rLoteBtn").textContent = n ? `Separar mais ${POR_VEZ}` : `Separar ${POR_VEZ} contatos`;
     $("rLoteBtn").dataset.n = n;
     // qual WhatsApp usar: o da empresa (admin) ou os da própria pessoa (equipe)
-    const n0 = textoUse(C, seg);
-    $("rLoteNum").textContent = n0;
-    $("rLoteNum").hidden = !n0;
+    pintarSeletor($("rLoteNum"), C, seg);
   } catch (e) {
     console.warn(e);
     $("rLoteTxt").textContent = " Não foi possível contar agora.";

@@ -175,7 +175,7 @@ service cloud.firestore {
       allow read: if admin() || (membro() && em == email());
       allow create, update: if admin() || (membro() && em == email() && (
         (request.resource.data.status == 'pendente' && request.resource.data.keys().hasOnly(['numeros', 'status', 'pedidoEm', 'nome'])
-          && request.resource.data.numeros is list && request.resource.data.numeros.size() <= 4)
+          && request.resource.data.numeros is list && request.resource.data.numeros.size() <= 3)
         || (resource != null && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['visto']))));
       allow delete: if admin();
     }

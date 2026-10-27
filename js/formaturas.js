@@ -28,7 +28,7 @@ import * as Ev from "./eventos.js";
 import * as U from "./util.js";
 import { botaoRelatorio } from "./relatorio.js";
 import { siglaDe, contatoRel } from "./aluno-id.js";
-import { textoUse } from "./numeros.js";
+import { pintarSeletor } from "./numeros-tela.js";
 // Leitura sob demanda: ao abrir, só as parcelas que vencem até o fim do mês (campo proxVenc);
 // a lista completa de formandos só é lida quando alguém abre as abas Adesão, Kits ou Turmas.
 let C,
@@ -76,8 +76,9 @@ export function show() {
     el("p", "hint", "Kits do contrato de formatura (venda antecipada e depois das fotos) dos colégios fechados. O PR fica no card próprio.")
   );
   // qual WhatsApp usar nas cobranças: o da empresa (admin) ou os da própria pessoa (equipe)
-  const nUse = textoUse(C, "cobranca");
-  if (nUse) v.append(el("p", "lnum", nUse.replace("Use o", "Cobranças: use o")));
+  const nUse = el("p", "lnum");
+  v.append(nUse);
+  pintarSeletor(nUse, C, "cobranca");
   // Como no PR: Linha de Frente = turmas deste ano; Repasse = turmas de anos anteriores (vira sozinho em 1º de janeiro)
   const segs = el("div", "segs");
   segs.setAttribute("role", "tablist");

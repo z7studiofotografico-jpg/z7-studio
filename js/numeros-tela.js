@@ -2,7 +2,7 @@
 // As regras dos números (empresa, cada um com o seu) ficam em numeros.js.
 import { el, field, sheet, botoes } from "./ui.js";
 import * as U from "./util.js";
-import { MAX_NUMEROS, fmtTel, normTel, numerosDe, conferirNumeros, numerosDosOutros } from "./numeros.js";
+import { MAX_NUMEROS, fmtTel, normTel, numerosDe, conferirNumeros, numerosDosOutros, opcoesWhats, escolhido } from "./numeros.js";
 import { avisoTel } from "./aluno-id.js";
 
 // Campos para digitar os números (começa com 2; "+ outro número" até o máximo). Devolve { box, ler() }.
@@ -153,7 +153,7 @@ export function secaoMeusNumeros(C, box) {
       atuais.length
         ? "Liberados: " +
             atuais.map(fmtTel).join(" · ") +
-            ". Trabalhe só com esses números (o número da empresa é do Adriano e da Luciana)."
+            ". O primeiro é o pré-definido; nas telas, o seletor 📱 troca pelo outro quando precisar (ex.: o cliente bloqueou). Até 3 números."
         : "Você ainda não tem número liberado. Peça abaixo: o Adriano ou a Luciana autorizam."
     )
   );
@@ -176,7 +176,7 @@ function pedirTroca(C, atuais) {
       el(
         "p",
         "hint",
-        "Coloque os números que você vai usar para trabalhar (pode ser mais de um). O Adriano ou a Luciana autorizam e você recebe o aviso aqui no app."
+        "Coloque os números que você vai usar para trabalhar (até 3; o primeiro é o pré-definido). O Adriano ou a Luciana autorizam e você recebe o aviso aqui no app."
       )
     );
     const cn = campoNumeros(atuais);
@@ -206,4 +206,59 @@ function pedirTroca(C, atuais) {
       }
     });
   });
+}
+
+// ---------- qual WhatsApp usar agora (seletor das telas) ----------
+const chaveEscolha = (C, frente) => `z7whats:${C.email}:${frente}`;
+function lerEscolha(C, frente) {
+  try {
+    return localStorage.getItem(chaveEscolha(C, frente)) || "";
+  } catch (_) {
+    return "";
+  }
+}
+// O número em uso nesta frente (o pré-definido, ou o que a pessoa escolheu no seletor)
+export const whatsAtivo = (C, frente) => escolhido(opcoesWhats(C, frente), lerEscolha(C, frente));
+// "📱 Use o WhatsApp [ (21) 99881-7771 ▾ ]": vem no pré-definido; a troca vale até trocar de novo (neste aparelho)
+export function seletorWhats(C, frente) {
+  const box = el("span", "whats");
+  const ops = opcoesWhats(C, frente);
+  if (!ops.length) {
+    box.className = "whats wait";
+    box.textContent = C.isAdmin
+      ? "⚠️ Sem WhatsApp da empresa para esta frente: coloque em ⚙️ Ajustes."
+      : "⚠️ Você ainda não tem WhatsApp de trabalho liberado. Peça em ⚙️ Ajustes → Meus WhatsApp de trabalho.";
+    return box;
+  }
+  box.append(el("span", null, "📱 Use o WhatsApp "));
+  if (ops.length === 1) {
+    box.append(el("b", null, fmtTel(ops[0])));
+    return box;
+  }
+  const s = el("select");
+  s.setAttribute("aria-label", "WhatsApp em uso");
+  ops.forEach((n, i) => {
+    const o = el("option", null, fmtTel(n) + (i === 0 ? " (pré-definido)" : ""));
+    o.value = n;
+    s.append(o);
+  });
+  s.value = whatsAtivo(C, frente);
+  s.onchange = () => {
+    try {
+      if (s.value === ops[0]) localStorage.removeItem(chaveEscolha(C, frente));
+      else localStorage.setItem(chaveEscolha(C, frente), s.value);
+    } catch (_) {}
+    U.toast("Agora use o WhatsApp " + fmtTel(s.value) + (s.value === ops[0] ? " (o pré-definido)" : ""));
+  };
+  box.append(s);
+  return box;
+}
+// Põe o seletor numa caixa da tela; só refaz quando as opções mudam (não fecha a lista no meio da escolha)
+export function pintarSeletor(box, C, frente) {
+  if (!box) return;
+  const chave = [C.email, C.isAdmin, frente, ...opcoesWhats(C, frente)].join("|");
+  if (box.dataset.chave === chave) return;
+  box.dataset.chave = chave;
+  box.replaceChildren(seletorWhats(C, frente));
+  box.hidden = false;
 }

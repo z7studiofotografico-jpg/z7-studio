@@ -6,7 +6,7 @@ import { ESTUDIO } from "./mensagens.js";
 import * as U from "./util.js";
 import { botaoRelatorio, contar } from "./relatorio.js";
 import { contatoRel } from "./aluno-id.js";
-import { textoUse } from "./numeros.js";
+import { pintarSeletor } from "./numeros-tela.js";
 let C,
   leads = [],
   filter = "ABERTOS",
@@ -476,9 +476,7 @@ function buscarNoServidor(q) {
 export function render() {
   if (!$("list")) return;
   // qual WhatsApp usar: o da empresa (admin) ou os da própria pessoa (equipe)
-  const nUse = C ? textoUse(C, "funil") : "";
-  $("funilNum").textContent = nUse;
-  $("funilNum").hidden = !nUse;
+  if (C) pintarSeletor($("funilNum"), C, "funil");
   renderChips();
   renderStats();
   const q = $("q").value.trim().toLowerCase();

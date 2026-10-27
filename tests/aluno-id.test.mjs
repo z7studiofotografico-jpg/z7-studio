@@ -101,7 +101,7 @@ test("telefone: pega só o que com certeza está errado", () => {
 });
 
 test("WhatsApp de trabalho: cada um com o seu, nunca o da empresa", async () => {
-  const { normTel, fmtTel, conferirNumeros, numeroEmpresa, textoUse, numerosDosOutros } = await import("../js/numeros.js");
+  const { normTel, fmtTel, conferirNumeros, numeroEmpresa, opcoesWhats, escolhido, numerosDosOutros } = await import("../js/numeros.js");
   assert.equal(normTel("998817771"), "21998817771");
   assert.equal(normTel("5521997597605"), "21997597605");
   assert.equal(fmtTel("37430000"), "(21) 3743-0000");
@@ -117,8 +117,27 @@ test("WhatsApp de trabalho: cada um com o seu, nunca o da empresa", async () => 
   assert.match(conferirNumeros(["3743-0000"], P, outros).erro, /número da empresa/);
   assert.match(conferirNumeros(["21911112222"], P, outros).erro, /já é de Ana/);
   assert.match(conferirNumeros(["20988887777"], P, outros).erro, /DDD 20/);
+  // o seletor: vem no pré-definido e troca por outro já liberado (ex.: o cliente bloqueou)
   const equipe = { isAdmin: false, email: "p@x", usuarios: { "p@x": { numeros: ["21933334444", "21955556666"] } }, P };
-  assert.equal(textoUse(equipe, "funil"), "📱 Use o seu WhatsApp de trabalho: (21) 93333-4444 ou (21) 95555-6666");
-  assert.match(textoUse({ isAdmin: true, P }, "funil"), /empresa \(21\) 99881-7771/);
-  assert.match(textoUse({ isAdmin: false, email: "z@x", usuarios: {}, P }, "rep"), /ainda não tem WhatsApp/);
+  assert.deepEqual(opcoesWhats(equipe, "funil"), ["21933334444", "21955556666"]);
+  assert.equal(escolhido(opcoesWhats(equipe, "funil"), ""), "21933334444");
+  assert.equal(escolhido(opcoesWhats(equipe, "funil"), "(21) 95555-6666"), "21955556666");
+  assert.equal(escolhido(opcoesWhats(equipe, "funil"), "21900000000"), "21933334444"); // número que não é mais dela: volta ao pré-definido
+  const adm = { isAdmin: true, email: "a@x", usuarios: {}, P };
+  assert.deepEqual(opcoesWhats(adm, "funil"), ["21998817771", "2137430000", "21997597605"]);
+  assert.equal(opcoesWhats(adm, "rep")[0], "2137430000");
+  assert.deepEqual(opcoesWhats({ isAdmin: false, email: "z@x", usuarios: {}, P }, "rep"), []);
+  // admin pode cadastrar número da empresa; repetir entre os admins também pode
+  assert.equal(
+    conferirNumeros(["998817771"], P, numerosDosOutros({ "l@x": { papel: "admin", numeros: ["21998817771"] } }, "a@x", true), true).erro,
+    ""
+  );
+  assert.match(
+    conferirNumeros(
+      ["1", "2", "3", "4"].map(n => "2199999000" + n),
+      P,
+      {}
+    ).erro,
+    /No máximo 3/
+  );
 });
