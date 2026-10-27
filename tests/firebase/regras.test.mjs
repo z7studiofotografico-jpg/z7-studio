@@ -451,3 +451,26 @@ test("consultas da equipe 4: Repasse (todos os anos) e ID do aluno", async () =>
   await assertSucceeds(setDoc(doc(db, "ids", "26ALFA"), { ultimo: 1 }));
   await assertSucceeds(setDoc(doc(como(FORM), "ids", "26BETA"), { ultimo: 1 }));
 });
+test("consultas da equipe 5: PR só com os contatos da pessoa (abas e números)", async () => {
+  await assertSucceeds(
+    getDocs(
+      query(
+        c(como(ANA), "repasse"),
+        where("respEmail", "==", ANA),
+        where("etapa", "in", ["SEPARADO", "CONTATADO", "INTERESSADO", "ENTREGUE"]),
+        limit(500)
+      )
+    )
+  );
+  await assertSucceeds(
+    getDocs(
+      query(
+        c(como(PEDRO), "repasse"),
+        where("ano", "==", ANO),
+        where("respEmail", "==", PEDRO),
+        where("etapa", "in", ["SEPARADO"]),
+        limit(300)
+      )
+    )
+  );
+});

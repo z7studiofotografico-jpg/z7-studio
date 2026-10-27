@@ -217,6 +217,19 @@ const base = {
     visto: false,
     criadoEm: "2026-01-04T10:00:00Z"
   },
+  // contato da Ana (outra pessoa da equipe): o Pedro não vê nas abas dele
+  "repasse/r8": {
+    nome: "OUTRA DA ANA",
+    nomeBusca: "OUTRA DA ANA",
+    escola: "COLEGIO ALFA",
+    ano: hoje.getFullYear(),
+    etapa: "SEPARADO",
+    followup: dia(0),
+    resp: "Ana Vendedora",
+    respEmail: "ana@equipe.com",
+    contatos: [{ tipo: "Mãe", nome: "Bia", tel: "21933334444" }],
+    telefones: ["21933334444"]
+  },
   "repasse/r7": {
     nome: "MARIA TRANSFERIDA",
     nomeBusca: "MARIA TRANSFERIDA",
@@ -1332,6 +1345,7 @@ await cenario("Pedro (vendedor: Linha de Frente, Agendamento, Instituições)", 
     await ir(pg, "#pr");
     await calmo(pg);
     ok((await pg.textContent("#viewRepasse")).length > 50, "PR (Linha de Frente) abre");
+    ok(!/Outra Da Ana/i.test(await pg.textContent("#rList")), "Para hoje da equipe: só os contatos dela (o da Ana não aparece)");
     // lote do dia: não trava, avisa depois de 25
     for (let i = 0; i < 3; i++) {
       await pg.locator("#rLoteBtn").click();

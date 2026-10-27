@@ -21,10 +21,25 @@ export function criarInicio(ctx, Funil) {
       late + today ? `${late + today} para hoje` + (late ? ` · ${late} atrasado${late > 1 ? "s" : ""}` : "") : "Nada pendente hoje ✓";
     if (Date.now() - repCount.at > 5 * 60000) {
       repCount.at = Date.now();
-      if (pode("rep"))
+      if (pode("rep") && ctx.isAdmin)
         getCountFromServer(query(collection(db, "repasse"), where("followup", "<=", todayStr())))
           .then(c => {
             repCount.n = c.data().count;
+            paintRep();
+          })
+          .catch(e => avisoErro(e, "contar o PR"));
+      // equipe do Repasse: só os contatos dela
+      else if (pode("rep"))
+        FS.getDocs(
+          query(
+            collection(db, "repasse"),
+            where("respEmail", "==", ctx.email),
+            where("etapa", "in", ["SEPARADO", "CONTATADO", "INTERESSADO"]),
+            FS.limit(500)
+          )
+        )
+          .then(s => {
+            repCount.n = s.docs.filter(d => (d.data().followup || "9") <= todayStr()).length;
             paintRep();
           })
           .catch(e => avisoErro(e, "contar o PR"));

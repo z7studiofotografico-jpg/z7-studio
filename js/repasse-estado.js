@@ -38,6 +38,8 @@ export const segNome = s0 => (s0 === "lf" ? "Linha de Frente " + ANO() : "Repass
 // então as buscas da Linha de Frente sempre filtram pelo ano.
 export const segsPermitidas = () => ["lf", "rep"].filter(k => C.pode(k));
 export const baseLF = () => [FS.where("ano", "==", ANO())];
+// A equipe trabalha só a própria carteira (o admin vê tudo): filtro das abas e dos números
+export const soMinha = () => (C.isAdmin ? [] : [FS.where("respEmail", "==", C.email || "")]);
 export const $ = id => document.getElementById(id);
 
 export const ETAPAS = ["INCOMPLETO", "NA FILA", "SEPARADO", "CONTATADO", "INTERESSADO", "PAGO", "ENTREGUE", "NÃO QUER", "SEM CONTATO"];

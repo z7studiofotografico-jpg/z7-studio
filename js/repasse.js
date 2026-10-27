@@ -32,6 +32,7 @@ import {
   segNome,
   segsPermitidas,
   baseLF,
+  soMinha,
   noSeg,
   status,
   precoTxt,
@@ -222,14 +223,18 @@ function openTab(k) {
   renderList(true);
   const today = U.todayStr();
   let q = null;
+  // a equipe vê só os contatos dela (soMinha); a busca continua mostrando todos, para achar o aluno
   if (seg === "lf") {
-    if (k === "hoje") q = FS.query(col, ...baseLF(), FS.where("etapa", "in", [...ABERTAS, "ENTREGUE"]), FS.limit(300));
-    if (k === "interessados") q = FS.query(col, ...baseLF(), FS.where("etapa", "==", "INTERESSADO"), FS.limit(200));
-    if (k === "entregas") q = FS.query(col, ...baseLF(), FS.where("etapa", "==", "PAGO"), FS.limit(300));
+    if (k === "hoje") q = FS.query(col, ...baseLF(), ...soMinha(), FS.where("etapa", "in", [...ABERTAS, "ENTREGUE"]), FS.limit(300));
+    if (k === "interessados") q = FS.query(col, ...baseLF(), ...soMinha(), FS.where("etapa", "==", "INTERESSADO"), FS.limit(200));
+    if (k === "entregas") q = FS.query(col, ...baseLF(), ...soMinha(), FS.where("etapa", "==", "PAGO"), FS.limit(300));
   } else {
-    if (k === "hoje") q = FS.query(col, FS.where("followup", "<=", today), FS.orderBy("followup"), FS.limit(150));
-    if (k === "interessados") q = FS.query(col, FS.where("etapa", "==", "INTERESSADO"), FS.limit(200));
-    if (k === "entregas") q = FS.query(col, FS.where("etapa", "==", "PAGO"), FS.limit(300));
+    if (k === "hoje")
+      q = C.isAdmin
+        ? FS.query(col, FS.where("followup", "<=", today), FS.orderBy("followup"), FS.limit(150))
+        : FS.query(col, ...soMinha(), FS.where("etapa", "in", [...ABERTAS, "ENTREGUE"]), FS.limit(500));
+    if (k === "interessados") q = FS.query(col, ...soMinha(), FS.where("etapa", "==", "INTERESSADO"), FS.limit(200));
+    if (k === "entregas") q = FS.query(col, ...soMinha(), FS.where("etapa", "==", "PAGO"), FS.limit(300));
   }
   if (k === "incompletos")
     q = C.isAdmin

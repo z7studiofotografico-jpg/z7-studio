@@ -1,7 +1,7 @@
 // PR: números do topo, lote do dia (separar contatos da fila) e a lista de escolas
 import { el, title, avisoErro } from "./ui.js";
 import * as U from "./util.js";
-import { C, FS, db, col, tab, seg, meta, mudarMeta, ANO, ANO_MIN, ABERTAS, baseLF, noSeg, $, tela } from "./repasse-estado.js";
+import { C, FS, db, col, tab, seg, meta, mudarMeta, ANO, ANO_MIN, ABERTAS, baseLF, soMinha, noSeg, $, tela } from "./repasse-estado.js";
 
 export async function refreshStats() {
   const today = U.todayStr(),
@@ -16,15 +16,21 @@ export async function refreshStats() {
     const [h, i, m] = await Promise.all(
       lf
         ? [
-            FS.getDocs(FS.query(col, ...baseLF(), FS.where("etapa", "in", ABERTAS), FS.limit(300))),
-            FS.getDocs(FS.query(col, ...baseLF(), FS.where("etapa", "==", "INTERESSADO"), FS.limit(300))),
-            FS.getDocs(FS.query(col, ...baseLF(), FS.where("etapa", "in", ["PAGO", "ENTREGUE"]), FS.limit(1000)))
+            FS.getDocs(FS.query(col, ...baseLF(), ...soMinha(), FS.where("etapa", "in", ABERTAS), FS.limit(300))),
+            FS.getDocs(FS.query(col, ...baseLF(), ...soMinha(), FS.where("etapa", "==", "INTERESSADO"), FS.limit(300))),
+            FS.getDocs(FS.query(col, ...baseLF(), ...soMinha(), FS.where("etapa", "in", ["PAGO", "ENTREGUE"]), FS.limit(1000)))
           ]
-        : [
-            FS.getDocs(FS.query(col, FS.where("followup", "<=", today), FS.limit(300))),
-            FS.getDocs(FS.query(col, FS.where("etapa", "==", "INTERESSADO"), FS.limit(300))),
-            FS.getDocs(FS.query(col, FS.where("pagoEm", ">=", mes), FS.limit(500)))
-          ]
+        : C.isAdmin
+          ? [
+              FS.getDocs(FS.query(col, FS.where("followup", "<=", today), FS.limit(300))),
+              FS.getDocs(FS.query(col, FS.where("etapa", "==", "INTERESSADO"), FS.limit(300))),
+              FS.getDocs(FS.query(col, FS.where("pagoEm", ">=", mes), FS.limit(500)))
+            ]
+          : [
+              FS.getDocs(FS.query(col, ...soMinha(), FS.where("etapa", "in", ABERTAS), FS.limit(500))),
+              FS.getDocs(FS.query(col, ...soMinha(), FS.where("etapa", "==", "INTERESSADO"), FS.limit(300))),
+              FS.getDocs(FS.query(col, ...soMinha(), FS.where("etapa", "in", ["PAGO", "ENTREGUE"]), FS.limit(1000)))
+            ]
     );
     const docs = s0 => s0.docs.map(d => d.data()).filter(noSeg);
     set("rsHoje", docs(h).filter(x => ABERTAS.includes(x.etapa) && x.followup && x.followup <= today).length);
