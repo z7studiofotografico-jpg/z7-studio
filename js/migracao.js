@@ -111,3 +111,53 @@ export function planejar(cols, emailDe) {
   return { ops, conta };
 }
 export { norm as normBusca };
+
+// ---------- responsável antigo (nome) → e-mail de quem está cadastrado ----------
+// usuarios: [{ id: e-mail, nome }]; donos: [{ email, nome }] (config.js).
+// Acha pelo nome completo (sem diferença de maiúsculas e acentos), pelo e-mail escrito no lugar do nome
+// ou, se só uma pessoa tem aquele primeiro nome, pelo primeiro nome ("Pedro" → Pedro Vendedor).
+// Devolve emailDe(nome) e comoAchou(nome) → "nome completo" | "e-mail" | "primeiro nome" | "".
+export function criarEmailDe(usuarios, donos) {
+  const pessoas = [
+    ...(usuarios || []).filter(u => u && u.nome && u.id).map(u => ({ email: String(u.id).toLowerCase(), nome: u.nome })),
+    ...(donos || []).filter(d => d && d.nome && d.email).map(d => ({ email: d.email.toLowerCase(), nome: d.nome }))
+  ];
+  const completo = {},
+    primeiro = {};
+  pessoas.forEach(p => {
+    const k = norm(p.nome);
+    if (!completo[k]) completo[k] = p.email;
+    const f = k.split(" ")[0];
+    (primeiro[f] = primeiro[f] || new Set()).add(p.email);
+  });
+  const emails = new Set(pessoas.map(p => p.email));
+  const achar = nome => {
+    const k = norm(nome);
+    if (!k) return ["", ""];
+    if (completo[k]) return [completo[k], "nome completo"];
+    const em = String(nome).trim().toLowerCase();
+    if (emails.has(em)) return [em, "e-mail"];
+    const f = primeiro[k.split(" ")[0]];
+    if (f && f.size === 1) return [[...f][0], "primeiro nome"];
+    return ["", ""];
+  };
+  return { emailDe: nome => achar(nome)[0], comoAchou: nome => achar(nome)[1] };
+}
+// Relatório para quem roda a atualização: cada nome de responsável antigo (registros ainda sem e-mail),
+// com quem foi ligado, como, e quantos registros. Os que não acharam ninguém ficam primeiro.
+export function relatorioResponsaveis(cols, emailDe, comoAchou) {
+  const m = {};
+  const anota = (nome, onde) => {
+    const k = norm(nome);
+    if (!k) return;
+    const r = (m[k] = m[k] || { nome: String(nome).trim(), email: emailDe(nome), como: comoAchou(nome), registros: 0, onde: {} });
+    r.registros++;
+    r.onde[onde] = (r.onde[onde] || 0) + 1;
+  };
+  (cols.repasse || []).forEach(x => x.resp && !x.respEmail && anota(x.resp, "PR"));
+  (cols.leads || []).forEach(x => x.resp && x.respEmail == null && anota(x.resp, "Funil"));
+  (cols.instituicoes || []).forEach(x => x.resp && x.respEmail == null && anota(x.resp, "Instituições"));
+  (cols.formandos || []).forEach(x => x.resp && x.respEmail == null && anota(x.resp, "Formandos"));
+  (cols.agenda || []).forEach(x => x.pedidoPor && !x.pedidoEmail && anota(x.pedidoPor, "Agenda"));
+  return Object.values(m).sort((a, b) => !!a.email - !!b.email || b.registros - a.registros);
+}

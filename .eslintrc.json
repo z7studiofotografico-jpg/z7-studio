@@ -1,2 +1,2 @@
 { "root": true, "env": { "browser": true, "es2022": true }, "parserOptions": { "ecmaVersion": 2022, "sourceType": "module" },
-  "rules": { "no-undef": "error", "no-unused-vars": ["warn", { "args": "none", "varsIgnorePattern": "^_" }], "no-dupe-keys": "error", "no-redeclare": "error" } }
+  "rules": { "no-undef": "error", "no-unused-vars": ["warn", { "args": "none", "varsIgnorePattern": "^_" }], "no-dupe-keys": "error", "no-redeclare": "error", "no-import-assign": "error" } }

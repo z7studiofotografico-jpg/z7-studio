@@ -47,7 +47,9 @@ export function card(it) {
     [[it.curso, it.turma].filter(Boolean).join(" · "), ""],
     [it.ano ? String(it.ano) : "", ""],
     [it.valor ? U.money(it.valor) : "", ""],
-    [telAvisos(it), "warn"]
+    [telAvisos(it), "warn"],
+    // admin: contato antigo cujo responsável não está ligado a ninguém da Equipe (a equipe não vê)
+    [C.isAdmin && it.resp && !it.respEmail ? `⚠️ “${title(it.resp)}” sem cadastro: ninguém da equipe vê` : "", "warn"]
   ].forEach(([v, c]) => {
     if (v) meta.append(el("span", "tag " + c, v));
   });

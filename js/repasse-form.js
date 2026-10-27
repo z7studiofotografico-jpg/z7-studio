@@ -87,6 +87,25 @@ export function openDados(it) {
     (it.contatos && it.contatos.length ? it.contatos : [novo ? { tipo: "Mãe" } : {}]).forEach(addLinha);
     const add = U.mkBtn("+ Adicionar contato", "", () => addLinha());
     p.append(add);
+    // admin: escolhe quem cuida do contato (inclusive os antigos cujo responsável não está ligado a ninguém da Equipe)
+    let respSel = null;
+    if (!novo && C.isAdmin) {
+      respSel = el("select");
+      const pessoas = Object.entries(C.usuarios || {})
+        .filter(([, u]) => u && u.nome && u.ativo !== false)
+        .sort((a, b) => a[1].nome.localeCompare(b[1].nome, "pt-BR"));
+      [["", "Ninguém (livre)"], ...pessoas.map(([em, u]) => [em, u.nome])].forEach(([v, t]) => {
+        const o = el("option", null, t);
+        o.value = v;
+        respSel.append(o);
+      });
+      respSel.value = it.respEmail || "";
+      p.append(field("Responsável", respSel));
+      if (it.resp && !it.respEmail)
+        p.append(
+          el("p", "wait", `⚠️ Responsável antigo: “${title(it.resp)}”, sem cadastro na Equipe. Escolha acima quem cuida deste contato.`)
+        );
+    }
     // quem é da equipe trabalha o que cadastrou: o aluno entra direto na carteira de quem incluiu
     if (novo && !C.isAdmin)
       p.append(
@@ -202,6 +221,10 @@ export function openDados(it) {
         telefones: cs.map(c => c.tel)
       };
       // ID digitado sem o ano ganha o ano do aluno (CEPNCP-7 → 26CEPNCP-07)
+      if (respSel && respSel.value !== (it.respEmail || "")) {
+        const u = (C.usuarios || {})[respSel.value];
+        Object.assign(patch, { respEmail: respSel.value, resp: u ? u.nome : "" });
+      }
       const cod = codigo.value.trim() ? comAno(codigo.value.trim().toUpperCase(), Number(ano.value) || ANO()) : "";
       if (novo || cod !== (it.codigo || "")) Object.assign(patch, { codigo: cod, codigoBusca: cod ? codigoBusca(cod) : "" });
       const falta = faltando(patch);

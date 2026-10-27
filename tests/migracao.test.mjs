@@ -138,3 +138,45 @@ test("v9: ID do aluno do PR ganha o ano na frente e o formato de busca (só quan
     ]
   );
 });
+
+test("responsável antigo: acha pelo nome completo, pelo e-mail ou pelo primeiro nome (se só um tem)", async () => {
+  const { criarEmailDe, relatorioResponsaveis, planejar } = await import("../js/migracao.js");
+  const usuarios = [
+    { id: "pedro@x.com", nome: "Pedro Vendedor" },
+    { id: "ana@x.com", nome: "Ana Souza" },
+    { id: "ana2@x.com", nome: "Ana Lima" }
+  ];
+  const { emailDe, comoAchou } = criarEmailDe(usuarios, [{ email: "Dono@x.com", nome: "Adriano" }]);
+  assert.equal(emailDe("PEDRO VENDEDOR"), "pedro@x.com");
+  assert.equal(comoAchou("pedro vendedor"), "nome completo");
+  assert.equal(emailDe("Pedro"), "pedro@x.com");
+  assert.equal(comoAchou("Pedro"), "primeiro nome");
+  assert.equal(emailDe("Ana"), ""); // duas Anas: não chuta
+  assert.equal(emailDe("ana@x.com"), "ana@x.com");
+  assert.equal(emailDe("Adriano"), "dono@x.com");
+  assert.equal(emailDe("Zé Antigo"), "");
+  const cols = {
+    repasse: [
+      { id: "r1", resp: "Pedro" },
+      { id: "r2", resp: "Zé Antigo" },
+      { id: "r3", resp: "Zé Antigo" },
+      { id: "r4", resp: "Pedro", respEmail: "pedro@x.com" }
+    ],
+    leads: [{ id: "l1", resp: "Ana" }]
+  };
+  const rel = relatorioResponsaveis(cols, emailDe, comoAchou);
+  assert.deepEqual(
+    rel.map(r => [r.nome, r.email, r.registros]),
+    [
+      ["Zé Antigo", "", 2],
+      ["Ana", "", 1],
+      ["Pedro", "pedro@x.com", 1]
+    ]
+  );
+  // o plano liga o PR pelo primeiro nome e deixa sem e-mail quem não achou
+  const ops = planejar(cols, emailDe).ops.filter(o => o.col === "repasse");
+  assert.deepEqual(
+    ops.map(o => [o.id, o.dados.respEmail]),
+    [["r1", "pedro@x.com"]]
+  );
+});

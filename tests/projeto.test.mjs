@@ -95,3 +95,26 @@ test("os arquivos do app não dependem um do outro em círculo", () => {
   };
   Object.keys(deps).forEach(f => visita(f, []));
 });
+// Estado compartilhado (PR, Agenda, Instituições): as outras partes só leem. Mudar o estado é só por quem é dono dele
+// (as funções "mudar..."), e a lista de donos está aqui: quem quiser mudar de outro lugar tem que passar por ela.
+// (Atribuir direto numa variável importada nem funciona: o lint barra com no-import-assign.)
+test("só o dono muda o estado compartilhado de cada tela", () => {
+  const DONOS = {
+    "repasse-estado.js": { "repasse.js": ["mudarTab", "mudarSeg", "mudarItems"], "repasse-lote.js": ["mudarMeta"] },
+    "agenda-estado.js": { "agenda.js": ["mudar"] },
+    "instituicoes-estado.js": { "instituicoes.js": ["mudarTipo", "mudarItems"] }
+  };
+  const dir = new URL("../js/", import.meta.url);
+  for (const f of fs.readdirSync(dir).filter(x => x.endsWith(".js"))) {
+    const s = fs.readFileSync(new URL(f, dir), "utf8");
+    for (const m of s.matchAll(/import\s*\{([^}]*)\}\s*from\s*"\.\/([\w-]+-estado\.js)"/g)) {
+      const nomes = m[1]
+        .split(",")
+        .map(x => x.trim().split(/\s+as\s+/)[0])
+        .filter(Boolean);
+      const muda = nomes.filter(n => /^mudar/.test(n));
+      const pode = ((DONOS[m[2]] || {})[f] || []).slice();
+      muda.forEach(n => assert.ok(pode.includes(n), `${f} importa ${n} de ${m[2]}: só o dono muda esse estado`));
+    }
+  }
+});

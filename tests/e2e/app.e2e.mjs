@@ -230,6 +230,18 @@ const base = {
     contatos: [{ tipo: "Mãe", nome: "Bia", tel: "21933334444" }],
     telefones: ["21933334444"]
   },
+  // contato antigo cujo responsável não está cadastrado na Equipe
+  "repasse/r9": {
+    nome: "ALUNO DO ZE",
+    nomeBusca: "ALUNO DO ZE",
+    escola: "COLEGIO ALFA",
+    ano: hoje.getFullYear(),
+    etapa: "SEPARADO",
+    followup: dia(0),
+    resp: "Zé Antigo",
+    contatos: [{ tipo: "Mãe", nome: "Rita", tel: "21922221111" }],
+    telefones: ["21922221111"]
+  },
   "repasse/r7": {
     nome: "MARIA TRANSFERIDA",
     nomeBusca: "MARIA TRANSFERIDA",
@@ -329,7 +341,7 @@ for (let i = 0; i < 30; i++)
     contatos: [{ tipo: "Mãe", tel: "2199999" + String(1000 + i) }]
   };
 // Os dados antigos são atualizados no servidor (scripts/migrar.mjs); aqui aplicamos o mesmo plano antes de abrir o app
-import { planejar } from "../../js/migracao.js";
+import { planejar, criarEmailDe } from "../../js/migracao.js";
 function migrar(dados) {
   const out = JSON.parse(JSON.stringify(dados)),
     cols = {};
@@ -337,12 +349,9 @@ function migrar(dados) {
     const [c, id] = k.split("/");
     (cols[c] = cols[c] || []).push({ id, ...v });
   }
-  const nomes = Object.fromEntries(
-    Object.entries(out)
-      .filter(([k, v]) => k.startsWith("usuarios/") && v.nome)
-      .map(([k, v]) => [v.nome, k.slice(9)])
-  );
-  for (const o of planejar(cols, n => nomes[n] || "").ops) {
+  // o mesmo jeito de achar o responsável que o scripts/migrar.mjs usa
+  const { emailDe } = criarEmailDe(cols.usuarios || [], []);
+  for (const o of planejar(cols, emailDe).ops) {
     const k = o.col + "/" + o.id;
     out[k] = o.tipo === "s" ? o.dados : Object.assign({}, out[k], o.dados);
     (o.apagar || []).forEach(c => delete out[k][c]);
@@ -1799,6 +1808,21 @@ for (const [quem, email] of [
     );
     ok(erros.length === 0, quem + ": sem erros no console" + (erros.length ? ": " + erros.slice(0, 4).join(" | ") : ""));
   });
+
+await cenario("Responsável antigo sem cadastro (admin liga a alguém da equipe)", async () => {
+  const { pg, erros, store } = await abrir(ADRIANO, migrar(base));
+  await ir(pg, "#pr");
+  const cartao = pg.locator("#rList .card").filter({ hasText: /Aluno Do Ze/i });
+  ok(/Zé Antigo.*sem cadastro/i.test(await cartao.textContent()), "admin vê o aviso no cartão do contato sem responsável ligado");
+  await cartao.getByRole("button", { name: "Editar dados" }).click();
+  const fa = pg.locator(".sheet:visible").last();
+  await fa.getByLabel("Responsável").selectOption(PEDRO);
+  await fa.locator("button[type=submit]").click();
+  await calmo(pg);
+  const r9 = (await store())["repasse/r9"];
+  ok(r9.respEmail === PEDRO && r9.resp === "Pedro Vendedor", "admin escolhe o responsável e o contato passa para a carteira dele");
+  ok(erros.length === 0, "sem erros no console" + (erros.length ? ": " + erros.slice(0, 3).join(" | ") : ""));
+});
 
 await cenario("Cadastro sem módulos", async () => {
   const { pg } = await abrir(NOVO, Object.assign({}, base, { "config/app": { versaoDados: 4 } }));
