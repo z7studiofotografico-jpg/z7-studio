@@ -26,6 +26,7 @@ const SHELL = [
   "./js/turma-ajustes.js",
   "./js/repasse-dados.js",
   "./js/repasse-import.js",
+  "./js/instituicoes-import.js",
   "./js/turma.js",
   "./js/formaturas.js",
   "./js/becas.js",

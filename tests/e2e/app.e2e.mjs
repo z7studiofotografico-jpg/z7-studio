@@ -647,6 +647,29 @@ console.log("Adriano (admin), com os dados já atualizados no servidor:");
   );
   await pg.locator(".sheet:visible").getByRole("button", { name: "Fechar" }).click();
   await pg.waitForTimeout(200);
+  // Instituições: importar planilha (módulo instituicoes-import.js)
+  await ir(pg, "#inst-particular");
+  await pg.waitForTimeout(400);
+  await pg.getByRole("button", { name: "Importar planilha" }).click();
+  await pg.waitForTimeout(300);
+  await pg.locator(".sheet:visible input[type=file]").setInputFiles({
+    name: "colegios.csv",
+    mimeType: "text/csv",
+    buffer: Buffer.from("ESCOLA;BAIRRO;TELEFONE 1;RESPONSAVEL\nColegio Planilha;Centro;21933334444;Dona Rita\n")
+  });
+  await pg.waitForFunction(() => /1 instituições encontradas/.test(document.body.textContent), null, { timeout: 8000 }).catch(() => {});
+  await pg.locator(".sheet:visible button[type=submit]").click();
+  await pg.waitForTimeout(800);
+  s = await store();
+  const cp = Object.values(s).find(x => x.nome === "Colegio Planilha" || x.nome === "COLEGIO PLANILHA");
+  ok(cp && cp.tipo === "particular" && cp.contatos[0].nome === "Dona Rita", "importar instituições: colégio gravado com o contato");
+  await pg.keyboard.press("Escape");
+  if (await pg.locator(".sheet:visible").count())
+    await pg
+      .locator(".sheet:visible")
+      .last()
+      .click({ position: { x: 5, y: 5 } });
+  await pg.waitForTimeout(200);
   // Agenda: admin vê o assunto particular, marca ensaio e compromisso particular
   await ir(pg, "#agenda");
   await pg.waitForTimeout(400);

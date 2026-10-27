@@ -2,20 +2,8 @@
 // e o que falta para um aluno entrar na fila. Testado em tests/repasse-dados.test.mjs.
 import * as U from "./util.js";
 
-export function norm(s) {
-  return String(s || "")
-    .normalize("NFD")
-    .replace(/[̀-ͯ]/g, "")
-    .toUpperCase()
-    .replace(/\s+/g, " ")
-    .trim();
-}
-export function slug(s) {
-  return norm(s)
-    .replace(/[^A-Z0-9]+/g, "-")
-    .replace(/^-|-$/g, "")
-    .toLowerCase();
-}
+export const norm = U.chave,
+  slug = U.slug;
 
 // O que não pode faltar para entrar na fila: colégio, ano, aluno, nome de um responsável e 1 telefone.
 export function faltando(d) {

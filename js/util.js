@@ -23,6 +23,21 @@ export function hhmm(iso) {
 export const money = brl;
 export const num = lerReais;
 // Telefone com 55 na frente, para o wa.me
+// Texto em maiúsculas, sem acento e sem espaço sobrando (para comparar nomes); slug = para identificadores
+export function chave(s) {
+  return String(s || "")
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toUpperCase()
+    .replace(/\s+/g, " ")
+    .trim();
+}
+export function slug(s) {
+  return chave(s)
+    .replace(/[^A-Z0-9]+/g, "-")
+    .replace(/^-|-$/g, "")
+    .toLowerCase();
+}
 export function digits(t) {
   let d = (t || "").replace(/\D/g, "");
   if (d.length === 10 || d.length === 11) d = "55" + d;
