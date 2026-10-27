@@ -474,3 +474,22 @@ test("consultas da equipe 5: PR só com os contatos da pessoa (abas e números)"
     )
   );
 });
+test("WhatsApp de trabalho: a pessoa pede a troca dos próprios números; só o admin autoriza", async () => {
+  const p = como(PEDRO);
+  await assertSucceeds(
+    setDoc(doc(p, "numeros", PEDRO), { numeros: ["21999998888"], status: "pendente", pedidoEm: "2026-10-27", nome: "Pedro" })
+  );
+  // não se autoriza sozinho, não pede por outra pessoa e não muda o próprio cadastro
+  await assertFails(setDoc(doc(p, "numeros", PEDRO), { numeros: ["21999998888"], status: "aprovado", pedidoEm: "x", nome: "Pedro" }));
+  await assertFails(setDoc(doc(p, "numeros", ANA), { numeros: ["21999998888"], status: "pendente", pedidoEm: "x", nome: "Pedro" }));
+  await assertFails(updateDoc(doc(p, "usuarios", PEDRO), { numeros: ["21999998888"] }));
+  await assertFails(getDoc(doc(p, "numeros", ANA)));
+  // o admin autoriza; a pessoa só marca que viu
+  await assertSucceeds(updateDoc(doc(como(ADRIANO), "usuarios", PEDRO), { numeros: ["21999998888"] }));
+  await assertSucceeds(
+    updateDoc(doc(como(ADRIANO), "numeros", PEDRO), { status: "aprovado", decididoEm: "x", decididoPor: "Adriano", visto: false })
+  );
+  await assertSucceeds(updateDoc(doc(p, "numeros", PEDRO), { visto: true }));
+  await assertFails(updateDoc(doc(p, "numeros", PEDRO), { status: "aprovado" }));
+  await assertSucceeds(getDocs(query(c(como(ADRIANO), "numeros"), where("status", "==", "pendente"), limit(50))));
+});

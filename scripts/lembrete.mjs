@@ -43,6 +43,8 @@ comFormatura.docs
 const pendAgenda = (await db.collection("agenda").where("status", "==", "pendente").get()).size;
 // pedidos de aluno repetido no PR (a equipe tentou incluir quem já estava cadastrado): o admin decide
 const pendPR = (await db.collection("pedidos").where("status", "==", "pendente").get()).docs;
+// pedidos de troca do WhatsApp de trabalho (a equipe pede; o admin autoriza no app)
+const pedNumeros = (await db.collection("numeros").where("status", "==", "pendente").get()).size;
 const pedidosPR = pendPR.length,
   trocaramColegio = pendPR.filter(d => d.get("trocouColegio")).length;
 // Ensaios no estúdio: lembrar o cliente na véspera (donos) e os que a Luciana precisa analisar
@@ -123,7 +125,8 @@ for (const t of tokensSnap.docs) {
     const ent = souAdmin ? entAtrasadas : 0,
       aval = souAdmin ? avaliacoes : 0,
       parc = souAdmin ? parcAtrasadas : 0,
-      ped = souAdmin ? pedidosPR : 0;
+      ped = souAdmin ? pedidosPR : 0,
+      num = souAdmin ? pedNumeros : 0;
     const bec = souAdmin || (mods && mods.includes("becas")) ? becasAtr + becasRet : 0;
     const avisar = paraAvisar[String(t.get("email") || "").toLowerCase()] || 0;
     const minhasOfertas = ofertas.filter(o => souAdmin || o.respEmail === String(t.get("email") || "").toLowerCase());
@@ -140,10 +143,11 @@ for (const t of tokensSnap.docs) {
       !bec &&
       !avisar &&
       !ofe &&
-      !ped
+      !ped &&
+      !num
     )
       continue;
-    const total = meus.length + meusRep.length + meusInst.length + aprova + lembrar + ent + aval + parc + bec + avisar + ofe + ped;
+    const total = meus.length + meusRep.length + meusInst.length + aprova + lembrar + ent + aval + parc + bec + avisar + ofe + ped + num;
     const atrasados =
       meus.filter(l => l.followup < hoje).length +
       meusRep.filter(r => r.followup < hoje).length +
@@ -163,6 +167,7 @@ for (const t of tokensSnap.docs) {
         `📩 ${ped} pedido${ped > 1 ? "s" : ""} de aluno repetido no PR` +
           (trocaramColegio ? ` (🏫 ${trocaramColegio} trocou de colégio)` : "")
       );
+    if (num) partes.push(`📱 ${num} pedido${num > 1 ? "s" : ""} de troca de WhatsApp de trabalho para autorizar`);
     if (lembrar) partes.push(`Lembrar ${lembrar} cliente${lembrar > 1 ? "s" : ""} do ensaio de amanhã`);
     if (ent) partes.push(`⚠️ ${ent} entrega${ent > 1 ? "s" : ""} de fotos atrasada${ent > 1 ? "s" : ""}`);
     if (aval) partes.push(`Pedir ${aval} avaliação${aval > 1 ? "ões" : ""} no Google`);

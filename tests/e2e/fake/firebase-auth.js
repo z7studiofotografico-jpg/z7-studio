@@ -1,7 +1,8 @@
 // Login falso: o e-mail vem de window.__EMAIL (definido pelo teste antes de abrir a página)
 let cbs = [];
-export const getAuth = () => ({}),
-  initializeAuth = () => ({}),
+// getAuth = o login do app; initializeAuth = a conexão extra só para cadastrar pessoas (sair dela não desloga ninguém)
+export const getAuth = () => ({ principal: true }),
+  initializeAuth = () => ({ principal: false }),
   setPersistence = async () => {},
   indexedDBLocalPersistence = {},
   inMemoryPersistence = {};
@@ -19,7 +20,8 @@ export async function createUserWithEmailAndPassword(_a, em) {
   return { user: { email: em } };
 }
 export async function sendPasswordResetEmail() {}
-export async function signOut() {
+export async function signOut(a) {
+  if (a && a.principal === false) return;
   window.__EMAIL = "";
   cbs.forEach(cb => cb(null));
 }

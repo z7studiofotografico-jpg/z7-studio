@@ -4,6 +4,7 @@ import { el, title } from "./ui.js";
 import * as U from "./util.js";
 import { faltando, situacaoTxt, enderecoTxt } from "./repasse-dados.js";
 import { avisoTel } from "./aluno-id.js";
+import { whatsDaVez, fmtTel } from "./numeros.js";
 import {
   C,
   tab,
@@ -97,7 +98,8 @@ export function card(it) {
           " · " +
           U.fmtDate(U.ds(new Date(it.ultimo.em))) +
           " às " +
-          U.hhmm(it.ultimo.em)
+          U.hhmm(it.ultimo.em) +
+          (it.ultimo.whats ? " · 📱 " + it.ultimo.whats.split(" / ").map(fmtTel).join(" / ") : "")
       )
     );
 
@@ -211,7 +213,13 @@ function desenharProximo(box, it, escolhido, blocked, li) {
           etapa: ns.then.etapa,
           followup: ns.then.days < 0 ? null : U.addDays(ns.then.days),
           atendendo: null,
-          ultimo: { por: C.me || "—", em: new Date().toISOString(), para: escolhido ? escolhido.tipo : "" }
+          ultimo: {
+            por: C.me || "—",
+            porEmail: C.email || "",
+            whats: whatsDaVez(C, segDe(it) || seg).join(" / "),
+            em: new Date().toISOString(),
+            para: escolhido ? escolhido.tipo : ""
+          }
         };
         if (ns.then.count) p.tentativas = (it.tentativas || 0) + 1;
         if (ns.then.countI) p.tentInteresse = (it.tentInteresse || 0) + 1;

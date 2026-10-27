@@ -169,6 +169,16 @@ service cloud.firestore {
         && request.resource.data.ultimo is int && request.resource.data.ultimo > resource.data.ultimo);
       allow delete: if admin();
     }
+    // WhatsApp de trabalho: a pessoa da equipe pede a troca dos próprios números; só o admin autoriza
+    // (os números liberados ficam em usuarios/{e-mail}.numeros, que só o admin grava). A pessoa só marca que viu a resposta.
+    match /numeros/{em} {
+      allow read: if admin() || (membro() && em == email());
+      allow create, update: if admin() || (membro() && em == email() && (
+        (request.resource.data.status == 'pendente' && request.resource.data.keys().hasOnly(['numeros', 'status', 'pedidoEm', 'nome'])
+          && request.resource.data.numeros is list && request.resource.data.numeros.size() <= 4)
+        || (resource != null && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['visto']))));
+      allow delete: if admin();
+    }
     // PR: depois de pago, valor, forma de pagamento e responsável só o admin muda
     match /repasse/{id} {
       // (resource == null: aluno que ainda não existe; o "+ Aluno" confere antes de criar)

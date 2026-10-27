@@ -1,6 +1,7 @@
 // PR: números do topo, lote do dia (separar contatos da fila) e a lista de escolas
 import { el, title, avisoErro } from "./ui.js";
 import * as U from "./util.js";
+import { textoUse } from "./numeros.js";
 import { C, FS, db, col, tab, seg, meta, mudarMeta, ANO, ANO_MIN, ABERTAS, baseLF, soMinha, noSeg, $, tela } from "./repasse-estado.js";
 
 export async function refreshStats() {
@@ -69,7 +70,6 @@ export function anosRepasse() {
 // Não há limite: o app só avisa quando a pessoa passa do número de Ajustes (padrão: Linha de Frente 25, Repasse 20 por dia)
 const avisoSeg = () => (seg === "lf" ? C.P.lfAvisoDia || 25 : C.P.avisoDia || 20);
 const POR_VEZ = 10; // quantos contatos cada toque separa
-const numeroSeg = () => (seg === "lf" ? C.P.lfNumero : C.P.repNumero) || "";
 export async function refreshLote() {
   const av = avisoSeg();
   try {
@@ -93,8 +93,9 @@ export async function refreshLote() {
     $("rLoteBtn").disabled = false;
     $("rLoteBtn").textContent = n ? `Separar mais ${POR_VEZ}` : `Separar ${POR_VEZ} contatos`;
     $("rLoteBtn").dataset.n = n;
-    const n0 = numeroSeg();
-    $("rLoteNum").textContent = n0 ? `📱 Use o WhatsApp ${n0}` : "";
+    // qual WhatsApp usar: o da empresa (admin) ou os da própria pessoa (equipe)
+    const n0 = textoUse(C, seg);
+    $("rLoteNum").textContent = n0;
     $("rLoteNum").hidden = !n0;
   } catch (e) {
     console.warn(e);

@@ -52,6 +52,8 @@ details.hist summary{cursor:pointer;font-size:.85rem;color:var(--accent);font-we
 .lote{display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;background:var(--surface);border:1px solid var(--line);border-left:4px solid var(--accent);border-radius:var(--r);padding:12px 14px}
 .lote b{display:block}
 .lote .lnum{display:block;margin-top:4px;font-weight:700;color:var(--accent)}
+.lnum{font-weight:700;color:var(--accent);margin:4px 0}
+.numeros .field{margin-bottom:6px}
 .lote span{color:var(--muted);font-size:.9rem}
 .lote select,.rbusca select{font:inherit;font-size:15px;padding:7px 8px;border-radius:8px;border:1px solid var(--line);background:var(--bg);color:var(--fg);max-width:100%}
 .row3{display:grid;grid-template-columns:1fr 1.3fr 1.3fr;gap:8px}

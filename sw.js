@@ -56,6 +56,8 @@ const SHELL = [
   "./js/agenda-colegios.js",
   "./js/agenda-ensaios.js",
   "./js/agenda-relatorio.js",
+  "./js/numeros.js",
+  "./js/numeros-tela.js",
   "./js/turma.js",
   "./js/formaturas.js",
   "./js/becas.js",

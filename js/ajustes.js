@@ -6,6 +6,8 @@ import { COMISSAO_PADRAO, FORMAS, taxa } from "./regras.js";
 import { formatarCampos } from "./ui.js";
 import { num, toast } from "./util.js";
 import { definirExtras as feriadosExtras, feriadosEntre } from "./feriados.js";
+import { EMPRESA_PADRAO, fmtTel } from "./numeros.js";
+import { secaoMeusNumeros } from "./numeros-tela.js";
 const $ = id => document.getElementById(id);
 // ctx = o mesmo do app (P, isAdmin, db, handleErr); o = { sair(), renderPushState(), verComo() }
 export function ligarAjustes(ctx, o) {
@@ -29,6 +31,8 @@ export function ligarAjustes(ctx, o) {
     ["pLote", "avisoDia", "int", 20],
     ["pParc", "parcelas", "int"],
     ["pLfNum", "lfNumero", "texto"],
+    ["pFunilNum", "funilNumero", "texto"],
+    ["pCobNum", "cobrancaNumero", "texto"],
     ["pRepNum", "repNumero", "texto"],
     ["pEntrega", "entrega", "texto"],
     ["pPix", "pix", "texto"],
@@ -65,7 +69,7 @@ export function ligarAjustes(ctx, o) {
   const lerAjuste = { reais: v => num(v), int: v => parseInt(String(v).replace(/\D/g, ""), 10) || 0, texto: v => String(v || "").trim() };
   $("btnPrices").onclick = () => {
     AJUSTES.forEach(([id, k]) => {
-      $(id).value = ctx.P[k] || "";
+      $(id).value = ctx.P[k] || (EMPRESA_PADRAO[k] ? fmtTel(EMPRESA_PADRAO[k]) : "");
       $(id).disabled = !ctx.isAdmin;
     });
     $("pEquipes").value = String(ctx.P.equipesDia || 1);
@@ -84,6 +88,7 @@ export function ligarAjustes(ctx, o) {
     o.renderPushState();
     if (ctx.isAdmin) mostrarErros();
     $("pVerComo").hidden = !ctx.isAdmin;
+    secaoMeusNumeros(ctx, $("pMeusNum"));
     $("sheetPrices").hidden = false;
   };
   // Tabela de comissão: PR e Formatura × forma de pagamento

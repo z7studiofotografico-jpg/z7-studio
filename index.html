@@ -52,6 +52,7 @@
     <!-- Início -->
     <section id="viewHome" class="view" hidden>
       <h1 class="hello" id="hello">Bom dia!</h1>
+      <section class="pedidos" id="hNumeros" hidden></section>
       <div class="tiles">
         <a class="tile" href="#agenda" data-mod="agenda">
           <span class="tile-ico" aria-hidden="true">📅</span>
@@ -126,6 +127,7 @@
     <!-- Funil de vendas -->
     <section id="viewFunil" class="view" hidden>
       <div class="vhead"><h2>Funil de vendas</h2><button class="btn btn-primary" id="btnNew" type="button">+ Novo lead</button></div>
+      <p class="lnum" id="funilNum" hidden></p>
 
       <details class="guide" id="guide">
         <summary>Como usar (2 minutos por dia)</summary>
@@ -207,6 +209,7 @@
     <h3>Tabela de preços</h3>
     <p class="hint" id="pricesHint">Os valores entram automaticamente nas mensagens prontas.</p>
     <button type="button" class="btn" id="pVerComo" hidden>👁 Ver o app como a equipe</button>
+    <div id="pMeusNum" hidden></div>
     <details id="pErros" hidden><summary>⚠️ Erros do app</summary><div id="pErrosLista" class="hint"></div></details>
     <div class="row2">
       <div class="field"><label for="pInd">Sozinha (R$)</label><input id="pInd" inputmode="decimal"></div>
@@ -227,6 +230,12 @@
     <div class="field"><label for="pFeriados">Outros feriados ou recessos (um por linha: dd/mm Nome, ou dd/mm/aaaa)</label><textarea id="pFeriados" rows="3" maxlength="1500" placeholder="20/01 São Sebastião&#10;26/12/2026 Recesso"></textarea>
       <details id="pFerLista"><summary>Ver todos os feriados (o app já bloqueia estes dias)</summary><div id="pFerDias" class="hint"></div></details>
       <p class="hint">Já estão inclusos os nacionais, o Carnaval, São Jorge (RJ), 21/08 (Aniversário de Nilópolis) e 08/12 (Imaculada Conceição).</p></div>
+    <h3>WhatsApp da empresa (Adriano e Luciana)</h3>
+    <p class="hint">Um número para cada frente: o app mostra em cada tela qual usar. A equipe trabalha com os próprios números (cadastrados em Equipe), nunca com estes.</p>
+    <div class="row2">
+      <div class="field"><label for="pFunilNum">Funil de vendas</label><input id="pFunilNum" maxlength="30" placeholder="(21) 99881-7771"></div>
+      <div class="field"><label for="pCobNum">Cobrança das formaturas</label><input id="pCobNum" maxlength="30" placeholder="(21) 99759-7605"></div>
+    </div>
     <h3>Comissão do vendedor (%)</h3>
     <p class="hint">PR: sobre a venda. Kits da formatura e adesão (Kit 01): sobre cada parcela paga. Só para a equipe de vendas.</p>
     <div class="comtab" id="comTab"></div>
@@ -240,7 +249,7 @@
     </div>
     <div class="row2">
       <div class="field"><label for="pLfLote">Avisar quando passar de (contatos por pessoa, por dia)</label><input id="pLfLote" inputmode="numeric" placeholder="25"></div>
-      <div class="field"><label for="pLfNum">WhatsApp usado</label><input id="pLfNum" maxlength="30" placeholder="(21) 9xxxx-xxxx"></div>
+      <div class="field"><label for="pLfNum">WhatsApp da empresa · Linha de Frente</label><input id="pLfNum" maxlength="30" placeholder="(21) 9xxxx-xxxx"></div>
     </div>
     <h3>PR · Repasse (anos anteriores)</h3>
     <div class="row2">
@@ -253,7 +262,7 @@
     </div>
     <div class="row2">
       <div class="field"><label for="pLote">Avisar quando passar de (contatos por pessoa, por dia)</label><input id="pLote" inputmode="numeric" placeholder="20"></div>
-      <div class="field"><label for="pRepNum">WhatsApp usado</label><input id="pRepNum" maxlength="30" placeholder="(21) 3774-0000"></div>
+      <div class="field"><label for="pRepNum">WhatsApp da empresa · Repasse</label><input id="pRepNum" maxlength="30" placeholder="(21) 3774-0000"></div>
     </div>
     <div class="row2">
       <div class="field"><label for="pEntrega">Como entregam</label><input id="pEntrega" maxlength="120" placeholder="em casa, na sua região, ou retirada no estúdio"></div>
@@ -302,6 +311,7 @@
         </div>
       </div>
       <div class="field" id="uModsBox"><label>O que essa pessoa pode ver</label><div class="quick" id="uMods"></div></div>
+      <div class="field" id="uNumBox"><label>WhatsApp de trabalho (da própria pessoa, não o da empresa)</label><div id="uNums"></div></div>
       <p class="err" id="uErr" hidden></p>
       <div class="panel-actions">
         <span style="flex:1"></span>

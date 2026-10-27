@@ -1824,6 +1824,84 @@ await cenario("Responsável antigo sem cadastro (admin liga a alguém da equipe)
   ok(erros.length === 0, "sem erros no console" + (erros.length ? ": " + erros.slice(0, 3).join(" | ") : ""));
 });
 
+await cenario("WhatsApp de trabalho (empresa x equipe, troca com autorização)", async () => {
+  const comNumero = () => {
+    const d = migrar(base);
+    d["usuarios/" + PEDRO] = Object.assign({}, d["usuarios/" + PEDRO], { numeros: ["21955550000"] });
+    return d;
+  };
+  {
+    // admin: número da empresa no Funil; cadastra pessoa com o próprio número (o da empresa não pode)
+    const { pg, erros, store } = await abrir(ADRIANO, migrar(base));
+    await ir(pg, "#funil");
+    ok(/WhatsApp da empresa \(21\) 99881-7771/.test(await pg.textContent("#funilNum")), "admin: Funil mostra o WhatsApp da empresa");
+    await ir(pg, "#home");
+    await pg.click("#btnTeam");
+    await pg.fill("#uNome", "Rita Nova");
+    await pg.fill("#uEmail", "rita@equipe.com");
+    const n1 = pg.locator("#uNums input").first();
+    await n1.fill("998817771");
+    await pg.click("#uSave");
+    await calmo(pg);
+    ok(/número da empresa/.test(await pg.textContent("#uErr")), "cadastro da equipe recusa o número da empresa");
+    await n1.fill("(21) 97777-1234");
+    await pg.click("#uSave");
+    await esperaNome(pg, "Rita Nova");
+    const rita = (await store())["usuarios/rita@equipe.com"];
+    ok(rita && JSON.stringify(rita.numeros) === '["21977771234"]', "pessoa cadastrada com o próprio WhatsApp de trabalho");
+    ok(erros.length === 0, "sem erros no console" + (erros.length ? ": " + erros.slice(0, 3).join(" | ") : ""));
+  }
+  {
+    // equipe: PR mostra o próprio número; pede troca em Ajustes
+    const { pg, erros, store } = await abrir(PEDRO, comNumero());
+    await ir(pg, "#pr");
+    ok(
+      /seu WhatsApp de trabalho: \(21\) 95555-0000/.test(await pg.textContent("#rLoteNum")),
+      "equipe: PR mostra o próprio WhatsApp de trabalho"
+    );
+    await ir(pg, "#home");
+    await pg.click("#btnPrices");
+    await pg.getByRole("button", { name: "📱 Pedir troca de número" }).click();
+    const sh = pg.locator(".sheet:visible").last();
+    await sh.locator("input").nth(1).fill("21966660000");
+    await sh.locator("button[type=submit]").click();
+    await calmo(pg);
+    const pd = (await store())["numeros/" + PEDRO];
+    ok(
+      pd && pd.status === "pendente" && JSON.stringify(pd.numeros) === '["21955550000","21966660000"]',
+      "equipe pede a troca (fica aguardando o admin)"
+    );
+    ok(JSON.stringify((await store())["usuarios/" + PEDRO].numeros) === '["21955550000"]', "o número só muda depois de autorizado");
+    ok(erros.length === 0, "sem erros no console" + (erros.length ? ": " + erros.slice(0, 3).join(" | ") : ""));
+  }
+  {
+    // admin autoriza na tela inicial
+    const d = comNumero();
+    d["numeros/" + PEDRO] = { numeros: ["21955550000", "21966660000"], status: "pendente", pedidoEm: "2026-10-27", nome: "Pedro Vendedor" };
+    const { pg, store } = await abrir(ADRIANO, d);
+    ok(/Pedro Vendedor pediu para trocar/.test(await pg.textContent("#hNumeros")), "admin recebe o pedido na tela inicial");
+    await pg.locator("#hNumeros").getByRole("button", { name: "✅ Autorizar" }).click();
+    await calmo(pg);
+    const s2 = await store();
+    ok(
+      JSON.stringify(s2["usuarios/" + PEDRO].numeros) === '["21955550000","21966660000"]' &&
+        s2["numeros/" + PEDRO].status === "aprovado" &&
+        s2["numeros/" + PEDRO].visto === false,
+      "autorizado: os números passam a valer"
+    );
+  }
+  {
+    // a pessoa recebe o aviso e marca que viu
+    const d = comNumero();
+    d["numeros/" + PEDRO] = { numeros: ["21966660000"], status: "aprovado", decididoPor: "Adriano Vinicius", visto: false };
+    const { pg, store } = await abrir(PEDRO, d);
+    ok(/foram liberados por Adriano/.test(await pg.textContent("#hNumeros")), "equipe recebe o aviso de que foi liberado");
+    await pg.locator("#hNumeros").getByRole("button", { name: "Entendi" }).click();
+    await calmo(pg);
+    ok((await store())["numeros/" + PEDRO].visto === true && (await pg.locator("#hNumeros").isHidden()), "o aviso some depois de visto");
+  }
+});
+
 await cenario("Cadastro sem módulos", async () => {
   const { pg } = await abrir(NOVO, Object.assign({}, base, { "config/app": { versaoDados: 4 } }));
   ok((await visiveis(pg)).length === 0, "não vê nenhum card");

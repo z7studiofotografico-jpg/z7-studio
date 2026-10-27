@@ -37,6 +37,7 @@ import { lerVerComo, faixaVerComo, escolherVerComo } from "./vercomo.js";
 import { criarNotificacoes } from "./notificacoes.js";
 import { ligarAjustes } from "./ajustes.js";
 import { criarInicio } from "./inicio.js";
+import { painelNumeros } from "./numeros-tela.js";
 import * as Equipe from "./equipe.js";
 import { definirExtras as feriadosExtras } from "./feriados.js";
 
@@ -319,7 +320,8 @@ const { renderPushState, renderPushBanner, refreshPushToken } = criarNotificacoe
 });
 ligarAjustes(ctx, { sair: () => signOut(auth), renderPushState, verComo: () => escolherVerComo(USERS, isDono, MODULOS) });
 const { renderHome, contarInst } = criarInicio(ctx, Funil);
-let usersLoaded = false;
+let usersLoaded = false,
+  painelNum = null;
 async function route() {
   if (!user || !usersLoaded) return;
   fecharRelatorio(); // trocou de tela: o relatório da tela anterior sai
@@ -557,7 +559,8 @@ Equipe.init({
   MODULOS,
   usuarios: () => USERS,
   user: () => user,
-  isAdmin: () => isAdmin
+  isAdmin: () => isAdmin,
+  ctx
 });
 
 function startData() {
@@ -579,6 +582,14 @@ function startData() {
           );
         }
         applyProfile();
+        // WhatsApp de trabalho: pedidos de troca (admin) e a resposta para quem pediu (equipe)
+        if (!painelNum) {
+          painelNum = painelNumeros(ctx, $("hNumeros"));
+          unsub.push(() => {
+            painelNum();
+            painelNum = null;
+          });
+        }
         Funil.syncLeads();
         Funil.render();
         if (!usersLoaded) {
