@@ -60,6 +60,18 @@ const base = {
     servico: "Formatura individual (estúdio)",
     origem: "WhatsApp"
   },
+  "leads/l3": {
+    nome: "Venda Da Equipe",
+    telefone: "21977776666",
+    etapa: "FECHADO",
+    valor: 700,
+    fechadoEm: dia(-1),
+    criadoEm: dia(-3),
+    atualizadoEm: new Date().toISOString(),
+    conferido: false,
+    servico: "Ensaio",
+    origem: "WhatsApp"
+  },
   "instituicoes/i1": {
     nome: "COLEGIO ALFA",
     tipo: "particular",
@@ -306,6 +318,14 @@ console.log("Adriano (admin), com os dados já atualizados no servidor:");
   if (process.env.DEBUG) console.log(await pg.inputValue("#fValor"), await pg.isDisabled("#fValor"), await pg.textContent("#formTitle"));
   await pg.click("#btnSave");
   await pg.waitForFunction(() => (window.__store.get("leads/l1") || {}).valor === 1350.5, null, { timeout: 3000 }).catch(() => {});
+  // venda fechada pela equipe: aparece "a conferir" e o admin confere
+  await pg.fill("#q", "venda da equipe");
+  await pg.waitForTimeout(600);
+  const cv = pg.locator("#list .card").filter({ hasText: "Venda Da Equipe" });
+  ok(/a conferir/.test((await cv.textContent().catch(() => "")) || ""), "venda da equipe mostra ⏳ a conferir");
+  await cv.getByText("✔ Conferir venda").click();
+  await pg.waitForFunction(() => (window.__store.get("leads/l3") || {}).conferido === true, null, { timeout: 3000 }).catch(() => {});
+  ok((await store())["leads/l3"].conferido === true, "admin confere a venda do Funil");
   // busca acha também lead antigo (fechado há mais de 60 dias, fora da lista carregada)
   await pg.fill("#q", "rosana");
   await pg.waitForTimeout(1200);
@@ -427,6 +447,18 @@ console.log("Adriano (admin), com os dados já atualizados no servidor:");
   ok(
     /Pode oferecer os kits para 1 aluno do Colegio Alfa/i.test(await pg.textContent("#fmCorpo")),
     "aviso: pode oferecer para 1 aluno do Colégio Alfa"
+  );
+  // sair e voltar: o aviso aparece lendo só as turmas com fotos prontas (sem ler todos os formandos)
+  await ir(pg, "#home");
+  await pg.evaluate(() => {
+    window.__leituras = [];
+  });
+  await ir(pg, "#formaturas");
+  await pg.waitForTimeout(800);
+  const leit = await pg.evaluate(() => window.__leituras.filter(l => l.col === "formandos"));
+  ok(
+    /Pode oferecer os kits para 1 aluno/i.test(await pg.textContent("#fmCorpo")) && !leit.some(l => l.filtros === 0),
+    "aviso de oferta sem ler a coleção inteira de formandos: " + JSON.stringify(leit)
   );
   await pg.locator("#fmChips").getByText("📸 Depois das fotos").click();
   await pg.waitForTimeout(400);

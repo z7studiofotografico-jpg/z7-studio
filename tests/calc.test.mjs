@@ -121,3 +121,14 @@ test("cada card tem os seus números: PR, Formaturas e Funil separados", () => {
   assert.equal(r.agora.form.aReceberAlb, 76500);
   assert.equal(r.agora.form.aReceberCol, 26666);
 });
+
+test("venda do funil a conferir não entra nos números até o admin conferir", () => {
+  const leads = [
+    { etapa: "FECHADO", valor: 450, fechadoEm: "2026-10-02", criadoEm: "2026-10-01", conferido: true },
+    { etapa: "FECHADO", valor: 99999, fechadoEm: "2026-10-02", criadoEm: "2026-10-01", conferido: false }
+  ];
+  const r = resumir({ leads }, "2026-10-20");
+  assert.equal(r.aConferirFunil, 1);
+  assert.equal(r.meses["2026-10"].funil.fechados, 1);
+  assert.equal(r.meses["2026-10"].funil.v, 45000);
+});

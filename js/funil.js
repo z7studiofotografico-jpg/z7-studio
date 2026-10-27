@@ -281,7 +281,11 @@ function card(l) {
           ? "Contato para hoje"
           : "Próximo contato: " + fmtDate(l.followup)
       : "Sem data de contato";
-  else fu.textContent = l.etapa === "FECHADO" ? "Fechado" + (l.fechadoEm ? " em " + fmtDate(l.fechadoEm) : "") : "Encerrado";
+  else
+    fu.textContent =
+      l.etapa === "FECHADO"
+        ? "Fechado" + (l.fechadoEm ? " em " + fmtDate(l.fechadoEm) : "") + (l.conferido === false ? " · ⏳ a conferir" : "")
+        : "Encerrado";
   el.appendChild(fu);
   if (l.notas) {
     const n = document.createElement("p");
@@ -410,6 +414,8 @@ function card(l) {
   } else if (l.etapa === "PERDIDO") {
     act.appendChild(mkBtn("Reabrir", "", () => save(l.id, { etapa: "FOLLOW-UP", followup: todayStr(), tentativas: 0 }, "Lead reaberto")));
   }
+  if (C.isAdmin && l.etapa === "FECHADO" && l.conferido === false)
+    act.appendChild(mkBtn("✔ Conferir venda", "btn-ok", () => save(l.id, { conferido: true }, "Venda conferida: já conta no Dashboard")));
   if (C.isAdmin && l.etapa !== "PERDIDO") act.appendChild(mkBtn("📅 Marcar ensaio", "", () => marcarEnsaio(l)));
   act.appendChild(mkBtn("Editar", "", () => openForm(l)));
   el.appendChild(act);
@@ -524,6 +530,10 @@ function openForm(l, preset) {
   ["fValor", "fEtapa"].forEach(id => {
     $(id).disabled = !C.isAdmin && fechado;
   });
+  // lead novo da equipe não nasce como venda: primeiro salva, depois "Fechou"
+  [...$("fEtapa").options].forEach(o => {
+    if (o.value === "FECHADO") o.disabled = !C.isAdmin && !l;
+  });
   $("btnDel").hidden = !l || !C.isAdmin;
   $("confirmDel").hidden = true;
   $("sheet").hidden = false;
@@ -635,13 +645,22 @@ function ligar() {
       if (editing) {
         if (etapa === "FECHADO") {
           if (editing.etapa !== "FECHADO" || C.isAdmin) body.fechadoEm = editing.fechadoEm || todayStr();
+          // venda fechada pela equipe entra "a conferir" (só conta no Dashboard depois que o admin confere)
+          if (editing.etapa !== "FECHADO") body.conferido = !!C.isAdmin;
           body.atendendo = null;
         }
         await updateDoc(doc(db, "leads", editing.id), body);
       } else {
         body.criadoEm = new Date().toISOString();
         body.tentativas = 0;
-        if (etapa === "FECHADO") body.fechadoEm = todayStr();
+        if (etapa === "FECHADO") {
+          if (!C.isAdmin) {
+            toast("Salve o lead primeiro e depois toque em “Fechou” no card dele.");
+            return;
+          }
+          body.fechadoEm = todayStr();
+          body.conferido = true;
+        }
         await addDoc(collection(db, "leads"), body);
       }
       toast(etapa === "FECHADO" ? "Venda registrada 🎉" : "Lead salvo");

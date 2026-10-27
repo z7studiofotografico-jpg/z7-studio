@@ -127,8 +127,11 @@ async function atualizar(bt) {
   try {
     const get = async q => (await FS.getDocs(q)).docs.map(d => Object.assign({ id: d.id }, d.data()));
     const col = n => FS.collection(db, n);
-    const [leads, prs, forms, insts, ens, becas, separados] = await Promise.all([
-      get(FS.query(col("leads"))),
+    // Funil: só os últimos 24 meses (o Dashboard guarda 24 meses), não a história inteira
+    const corte = U.addDays(-730);
+    const [leadsNovos, leadsFechados, prs, forms, insts, ens, becas, separados] = await Promise.all([
+      get(FS.query(col("leads"), FS.where("criadoEm", ">=", corte))),
+      get(FS.query(col("leads"), FS.where("fechadoEm", ">=", corte))),
       get(FS.query(col("repasse"), FS.where("etapa", "in", ["PAGO", "ENTREGUE"]))),
       get(FS.query(col("formandos"))),
       get(FS.query(col("instituicoes"))),
@@ -136,6 +139,7 @@ async function atualizar(bt) {
       get(FS.query(col("becas"))),
       get(FS.query(col("repasse"), FS.where("separadoEm", ">=", U.addDays(-730))))
     ]);
+    const leads = [...new Map([...leadsNovos, ...leadsFechados].map(l => [l.id, l])).values()];
     const porNome = Object.fromEntries(
       Object.entries(C.usuarios || {})
         .filter(([, u]) => u.nome)
@@ -617,6 +621,14 @@ function areaForm(corpo, p, nomeP) {
 function areaFunil(corpo, p, nomeP) {
   const F = p.funil || {},
     A = (resumo.agora || {}).funil || {};
+  if (resumo.aConferirFunil)
+    corpo.append(
+      el(
+        "p",
+        "wait",
+        `⏳ ${resumo.aConferirFunil} venda${resumo.aConferirFunil > 1 ? "s" : ""} do Funil a conferir: só entra${resumo.aConferirFunil > 1 ? "m" : ""} nos números depois da conferência (Funil → card da venda → ✔ Conferir venda).`
+      )
+    );
   kpis(corpo, [
     ["Leads novos", String(F.criados || 0)],
     ["Vendas fechadas", String(F.fechados || 0)],

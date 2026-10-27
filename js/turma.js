@@ -214,6 +214,7 @@ export function openTurma(ctx, inst, kits, aoFechar, opcoes) {
       function desenhar() {
         const ativos = lista.filter(ativo),
           semKit = candidatosPosFoto(lista),
+          candSet = new Set(semKit), // calculado uma vez por desenho (antes era por cartão: travava turmas grandes)
           sairam = lista.filter(f => f.status === "desistiu" || f.status === "reprovou"),
           atr = ativos.filter(atrasado);
         const nomesUnicos = new Set(lista.filter(f => !sairam.includes(f)).map(f => norm(f.nome))).size;
@@ -346,7 +347,7 @@ export function openTurma(ctx, inst, kits, aoFechar, opcoes) {
             atrasados: ativo(f) && atrasado(f),
             quitados: ativo(f) && quitado(f),
             aberto: ativo(f) && !quitado(f) && !atrasado(f),
-            semkit: semKit.includes(f),
+            semkit: candSet.has(f),
             adesao: ativo(f) && ehColacao(f),
             kits: ativo(f) && !ehColacao(f),
             sairam: sairam.includes(f)
@@ -375,10 +376,10 @@ export function openTurma(ctx, inst, kits, aoFechar, opcoes) {
           lst.append(el("div", "empty", "Ninguém nesse filtro."));
           return;
         }
-        emPartes(lst, arr, card);
+        emPartes(lst, arr, f => card(f, candSet));
       }
-      function card(f) {
-        const cand = candidatosPosFoto(lista).includes(f),
+      function card(f, candSet) {
+        const cand = candSet.has(f),
           prontas = !!(inst.contratoTurma || {}).fotosProntasEm || ehRepasse(inst, hoje());
         const comprou = ativo(f),
           sem = f.status === "semkit",

@@ -256,3 +256,23 @@ test("PR: a equipe inclui aluno à mão na fila ou separado para si, mas não co
   await assertFails(setDoc(doc(como(PEDRO), "repasse", "n4"), { nome: "NOVO 4", ano: 2099, etapa: "SEPARADO", respEmail: ANA }));
   await assertFails(setDoc(doc(como(PEDRO), "repasse", "n5"), { nome: "NOVO 5", ano: 2020, etapa: "NA FILA", respEmail: "" }));
 });
+
+test("funil: a equipe não cria lead já fechado nem em nome de outra pessoa", async () => {
+  await assertSucceeds(setDoc(doc(como(ANA), "leads", "n1"), { nome: "Novo", etapa: "NOVO LEAD", respEmail: ANA }));
+  await assertFails(setDoc(doc(como(ANA), "leads", "n2"), { nome: "Falso", etapa: "FECHADO", valor: 99999, respEmail: ANA }));
+  await assertFails(setDoc(doc(como(ANA), "leads", "n3"), { nome: "Outro", etapa: "NOVO LEAD", respEmail: PEDRO }));
+  await assertSucceeds(setDoc(doc(como(ADRIANO), "leads", "n4"), { nome: "Venda balcão", etapa: "FECHADO", valor: 450 }));
+});
+
+test("funil: venda fechada pela equipe entra a conferir e só o admin confere", async () => {
+  await setDoc(doc(como(ADRIANO), "leads", "c1"), { nome: "Cliente", etapa: "PROPOSTA ENVIADA", respEmail: ANA });
+  // fechar sem marcar "a conferir" não pode
+  await assertFails(updateDoc(doc(como(ANA), "leads", "c1"), { etapa: "FECHADO", valor: 500, fechadoEm: "2026-10-01" }));
+  await assertSucceeds(
+    updateDoc(doc(como(ANA), "leads", "c1"), { etapa: "FECHADO", valor: 500, fechadoEm: "2026-10-01", conferido: false })
+  );
+  // a equipe não confere a própria venda nem muda o valor
+  await assertFails(updateDoc(doc(como(ANA), "leads", "c1"), { conferido: true }));
+  await assertFails(updateDoc(doc(como(ANA), "leads", "c1"), { valor: 5000 }));
+  await assertSucceeds(updateDoc(doc(como(ADRIANO), "leads", "c1"), { conferido: true }));
+});

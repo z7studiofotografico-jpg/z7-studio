@@ -67,6 +67,7 @@ export function resumir(fontes, hoje, emailPorNome) {
 
   // Funil: entradas (criados), vendas (fechados) e perdidos, por mês, origem e pessoa
   const agoraFunil = { abertos: 0, atrasados: 0, emNegociacao: 0 };
+  let aConferirFunil = 0;
   leads.forEach(l => {
     const pessoa = quem(l.respEmail, l.resp),
       origem = l.origem || "Sem origem";
@@ -76,7 +77,9 @@ export function resumir(fontes, hoje, emailPorNome) {
       F.criados++;
       soma(F.origem, origem, "criados", 1);
     }
-    if (l.etapa === LEAD.FECHADO) {
+    // venda fechada pela equipe entra "a conferir": só conta depois que o admin confere
+    if (l.etapa === LEAD.FECHADO && l.conferido === false) aConferirFunil++;
+    else if (l.etapa === LEAD.FECHADO) {
       const d = l.fechadoEm || String(l.criadoEm || "").slice(0, 10),
         mf = mes(d);
       venda(d, l.valor, l.servico || "Ensaio", "Funil", pessoa);
@@ -218,6 +221,7 @@ export function resumir(fontes, hoje, emailPorNome) {
     meses,
     aReceber: reais(aReceber),
     aConferir,
+    aConferirFunil,
     marcadas: marcadas.slice(0, 40),
     agora: { funil: agoraFunil, form: agoraForm },
     geradoEm: new Date().toISOString(),

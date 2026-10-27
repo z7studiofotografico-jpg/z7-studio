@@ -74,12 +74,21 @@ const paraAvisar = {};
   });
 // Fotos prontas (últimos 60 dias): quem tem só o Kit 01 pode receber a oferta dos kits
 const ofertas = []; // { inst, n, respEmail }
-for (const d of (await db.collection("instituicoes").where("contratoTurma.fotosProntasEm", ">=", somaDias(hoje, -60)).get()).docs) {
-  const i = d.data();
-  const fs = (await db.collection("formandos").where("instId", "==", d.id).get()).docs.map(x => x.data());
-  const n = candidatosPosFoto(fs).length;
-  if (n) ofertas.push({ inst: i.nome || "", n, respEmail: String(i.respEmail || "").toLowerCase() });
+const comFotos = (await db.collection("instituicoes").where("contratoTurma.fotosProntasEm", ">=", somaDias(hoje, -60)).get()).docs;
+// uma consulta para cada 30 turmas (antes era uma por turma)
+const formsDe = {};
+for (let i = 0; i < comFotos.length; i += 30) {
+  const ids = comFotos.slice(i, i + 30).map(d => d.id);
+  (await db.collection("formandos").where("instId", "in", ids).get()).docs.forEach(x => {
+    const f = x.data();
+    (formsDe[f.instId] = formsDe[f.instId] || []).push(f);
+  });
 }
+comFotos.forEach(d => {
+  const i = d.data(),
+    n = candidatosPosFoto(formsDe[d.id] || []).length;
+  if (n) ofertas.push({ inst: i.nome || "", n, respEmail: String(i.respEmail || "").toLowerCase() });
+});
 const tokensSnap = await db.collection("tokens").get();
 console.log(`Hoje ${hoje}: ${vencidos.length} lead(s) com contato vencido, ${tokensSnap.size} aparelho(s).`);
 

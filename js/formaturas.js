@@ -39,6 +39,7 @@ let C,
   aba = "cobrancas",
   tudoCarregado = false,
   carregando = false,
+  ofertas = [], // formandos só das turmas com fotos prontas (para o aviso), sem ler a coleção inteira
   erroFn = () => {};
 const $ = id => document.getElementById(id);
 const moeda = brl;
@@ -156,14 +157,32 @@ export function show() {
       C.carteira("instituicoes", FS.where("etapa", "==", "FECHADO"), FS.limit(500)),
       s => {
         insts = mapa(s).filter(i => i.etapa === "FECHADO");
-        // turma com fotos prontas: carrega os formandos para mostrar o aviso de quem pode receber a oferta
-        if (insts.some(i => (i.contratoTurma || {}).fotosProntasEm)) carregarTudo();
+        // turma com fotos prontas: lê só os formandos dessas turmas, para o aviso de quem pode receber a oferta
+        carregarOfertas();
         render();
       },
       erro
     )
   );
   erroFn = erro;
+}
+// Formandos das turmas com fotos prontas (Linha de Frente), em grupos de 30 turmas por consulta
+async function carregarOfertas() {
+  if (!C.isAdmin) return; // a equipe já tem os próprios formandos (carteira)
+  const ids = insts.filter(i => (i.contratoTurma || {}).fotosProntasEm && !ehRepasse(i, U.todayStr())).map(i => i.id);
+  if (!ids.length) {
+    ofertas = [];
+    return;
+  }
+  try {
+    const grupos = [];
+    for (let i = 0; i < ids.length; i += 30) grupos.push(ids.slice(i, i + 30));
+    const snaps = await Promise.all(grupos.map(g => FS.getDocs(FS.query(FS.collection(db, "formandos"), FS.where("instId", "in", g)))));
+    ofertas = snaps.flatMap(sn => sn.docs.map(d => Object.assign({ id: d.id }, d.data())));
+    render();
+  } catch (e) {
+    avisoErro(e, "ver quem pode receber a oferta");
+  }
 }
 // Abas que precisam de todos os formandos: lê uma vez (sem ficar escutando a coleção inteira)
 // e lê de novo quando alguém fecha uma turma, que é onde os formandos mudam.
@@ -274,7 +293,11 @@ function render() {
     ["cobrancas", "Cobranças", cob.length],
     ["colacao", "🎓 Adesão (Kit 01)", tudoCarregado ? col.length : ""],
     ["album", "📘 Kits 02 a 05", tudoCarregado ? alb.length : ""],
-    ["posfoto", seg === "rep" ? "🔁 Oferecer no repasse" : "📸 Depois das fotos", tudoCarregado ? semKit().length : ""],
+    [
+      "posfoto",
+      seg === "rep" ? "🔁 Oferecer no repasse" : "📸 Depois das fotos",
+      tudoCarregado || (seg === "lf" && ofertas.length) ? semKit().length : ""
+    ],
     ["turmas", "Turmas", minhasInsts().length]
   ].forEach(([kk, t, n]) => {
     const b = el("button", "chip", t);
@@ -478,14 +501,16 @@ function semKit() {
   const out = [];
   insts.filter(noSeg).forEach(i => {
     if (seg === "lf" && !(i.contratoTurma || {}).fotosProntasEm) return;
-    const daTurma = forms.filter(f => f.instId === i.id && (C.isAdmin || f.respEmail === C.email));
+    // admin sem a lista completa carregada usa só as turmas com oferta (Linha de Frente)
+    const fonte = C.isAdmin && !tudoCarregado ? ofertas : forms;
+    const daTurma = fonte.filter(f => f.instId === i.id && (C.isAdmin || f.respEmail === C.email));
     candidatosPosFoto(daTurma).forEach(f => out.push(f));
   });
   return out;
 }
 // Aviso no topo: "Pode oferecer para N alunos do Colégio X"
 function avisoOferta(corpo) {
-  if (!tudoCarregado) return;
+  if (C.isAdmin ? !tudoCarregado && !ofertas.length : !tudoCarregado) return;
   const porInst = {};
   semKit().forEach(f => {
     porInst[f.instId] = (porInst[f.instId] || 0) + 1;

@@ -119,7 +119,13 @@ export function onSnapshot(q, cb) {
     if (i >= 0) listeners.splice(i, 1);
   };
 }
-export const getDocs = async q => run(q.t === "col" ? { c: q, k: [] } : q);
+// registra as leituras (o teste confere que telas não leem coleções inteiras sem precisar)
+window.__leituras = [];
+export const getDocs = async q => {
+  const qq = q.t === "col" ? { c: q, k: [] } : q;
+  window.__leituras.push({ col: qq.c.n, filtros: qq.k.filter(x => x.w).length });
+  return run(qq);
+};
 export const getDoc = async r => {
   const v = store.get(r.n + "/" + r.id);
   return { exists: () => !!v, data: () => clone(v), id: r.id, ref: r };
