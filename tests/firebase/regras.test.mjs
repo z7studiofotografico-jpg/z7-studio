@@ -490,6 +490,6 @@ test("WhatsApp de trabalho: a pessoa pede a troca dos próprios números; só o 
     updateDoc(doc(como(ADRIANO), "numeros", PEDRO), { status: "aprovado", decididoEm: "x", decididoPor: "Adriano", visto: false })
   );
   await assertSucceeds(updateDoc(doc(p, "numeros", PEDRO), { visto: true }));
-  await assertFails(updateDoc(doc(p, "numeros", PEDRO), { status: "aprovado" }));
+  await assertFails(updateDoc(doc(p, "numeros", PEDRO), { numeros: ["21900000000"] })); // depois de liberado, não troca sozinho
   await assertSucceeds(getDocs(query(c(como(ADRIANO), "numeros"), where("status", "==", "pendente"), limit(50))));
 });
