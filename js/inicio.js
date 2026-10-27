@@ -48,14 +48,13 @@ export function criarInicio(ctx, Funil) {
           query(
             collection(db, "repasse"),
             where("ano", "==", new Date().getFullYear()),
+            where("respEmail", "==", ctx.email),
             where("etapa", "in", ["SEPARADO", "CONTATADO", "INTERESSADO"]),
-            FS.limit(300)
+            FS.limit(500)
           )
         )
           .then(s => {
-            repCount.n = s.docs.filter(
-              d => (d.data().followup || "9") <= todayStr() && (!d.data().respEmail || d.data().respEmail === ctx.email)
-            ).length;
+            repCount.n = s.docs.filter(d => (d.data().followup || "9") <= todayStr()).length;
             paintRep();
           })
           .catch(e => avisoErro(e, "contar o PR"));
