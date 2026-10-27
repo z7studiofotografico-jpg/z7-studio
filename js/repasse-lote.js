@@ -72,6 +72,8 @@ const avisoSeg = () => (seg === "lf" ? C.P.lfAvisoDia || 25 : C.P.avisoDia || 20
 const POR_VEZ = 10; // quantos contatos cada toque separa
 export async function refreshLote() {
   const av = avisoSeg();
+  // qual WhatsApp usar: o da empresa (admin) ou os da própria pessoa (equipe); aparece mesmo sem internet para contar
+  pintarSeletor($("rLoteNum"), C, seg);
   try {
     const c = await FS.getCountFromServer(
       FS.query(
@@ -93,8 +95,6 @@ export async function refreshLote() {
     $("rLoteBtn").disabled = false;
     $("rLoteBtn").textContent = n ? `Separar mais ${POR_VEZ}` : `Separar ${POR_VEZ} contatos`;
     $("rLoteBtn").dataset.n = n;
-    // qual WhatsApp usar: o da empresa (admin) ou os da própria pessoa (equipe)
-    pintarSeletor($("rLoteNum"), C, seg);
   } catch (e) {
     console.warn(e);
     $("rLoteTxt").textContent = " Não foi possível contar agora.";

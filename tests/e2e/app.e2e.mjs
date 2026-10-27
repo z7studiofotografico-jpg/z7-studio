@@ -1852,6 +1852,17 @@ await cenario("WhatsApp de trabalho (empresa x equipe, troca com autorização)"
     await esperaNome(pg, "Rita Nova");
     const rita = (await store())["usuarios/rita@equipe.com"];
     ok(rita && JSON.stringify(rita.numeros) === '["21977771234"]', "pessoa cadastrada com o próprio WhatsApp de trabalho");
+    // e-mail que já está na lista: não grava de novo (apagaria os módulos e os números da pessoa)
+    const antes = JSON.stringify((await store())["usuarios/" + PEDRO]);
+    await pg.fill("#uNome", "Pedro de Novo");
+    await pg.fill("#uEmail", PEDRO);
+    await pg.locator("#uNums input").first().fill("(21) 97777-5555");
+    await pg.click("#uSave");
+    await calmo(pg);
+    ok(
+      /já está na lista/.test(await pg.textContent("#uErr")) && JSON.stringify((await store())["usuarios/" + PEDRO]) === antes,
+      "cadastro com e-mail que já existe é recusado (não apaga módulos nem números)"
+    );
     ok(erros.length === 0, "sem erros no console" + (erros.length ? ": " + erros.slice(0, 3).join(" | ") : ""));
   }
   {
@@ -1903,6 +1914,41 @@ await cenario("WhatsApp de trabalho (empresa x equipe, troca com autorização)"
         s2["numeros/" + PEDRO].visto === false,
       "autorizado: os números passam a valer"
     );
+  }
+  {
+    // Ajustes: o WhatsApp da empresa não pode ser o de trabalho de alguém da equipe
+    const { pg, store } = await abrir(ADRIANO, comNumero());
+    await pg.click("#btnPrices");
+    await pg.fill("#pLfNum", "(21) 95555-0000");
+    await pg.click("#pSave");
+    await calmo(pg);
+    ok(
+      /já é de Pedro/.test(await pg.textContent("#toast")) && !(await store())["config/app"].lfNumero,
+      "Ajustes recusa número da empresa que já é de alguém da equipe"
+    );
+  }
+  {
+    // admin muda os números direto em Equipe: o pedido que estava aguardando fica resolvido
+    const d = comNumero();
+    d["numeros/" + PEDRO] = { numeros: ["21966660000"], status: "pendente", pedidoEm: "2026-10-27", nome: "Pedro Vendedor" };
+    const { pg, store, erros } = await abrir(ADRIANO, d);
+    await pg.click("#btnTeam");
+    await pg.locator(".urow", { hasText: PEDRO }).getByRole("button", { name: "📱 Números" }).click();
+    const sh = pg.locator(".sheet:visible").last();
+    await sh.locator("input").first().fill("");
+    await sh.locator("input").nth(1).fill("");
+    await sh.locator("button[type=submit]").click();
+    await calmo(pg);
+    ok(/pelo menos um WhatsApp/.test(await sh.textContent()), "equipe não fica sem nenhum WhatsApp de trabalho");
+    await sh.locator("input").first().fill("21966660000");
+    await sh.locator("button[type=submit]").click();
+    await calmo(pg);
+    const s3 = await store();
+    ok(
+      JSON.stringify(s3["usuarios/" + PEDRO].numeros) === '["21966660000"]' && s3["numeros/" + PEDRO].status === "aprovado",
+      "admin muda direto: números valem e o pedido aguardando fica resolvido"
+    );
+    ok(erros.length === 0, "sem erros no console" + (erros.length ? ": " + erros.slice(0, 3).join(" | ") : ""));
   }
   {
     // a pessoa recebe o aviso e marca que viu

@@ -66,7 +66,6 @@ export function cartaoPedidoNumeros(C, email, p) {
     )
   );
   const conf = conferirNumeros(p.numeros || [], C.P, numerosDosOutros(C.usuarios, email));
-  if (conf.erro) c.append(el("p", "wait", "⚠️ " + conf.erro));
   const act = el("div", "actions");
   const ok = U.mkBtn("✅ Autorizar", "btn-ok btn-sm", async () => {
     try {
@@ -76,6 +75,8 @@ export function cartaoPedidoNumeros(C, email, p) {
       C.handleErr(e);
     }
   });
+  if (!conf.erro && !conf.numeros.length) conf.erro = "O pedido não tem nenhum número.";
+  if (conf.erro) c.append(el("p", "wait", "⚠️ " + conf.erro));
   ok.disabled = !!conf.erro;
   act.append(
     ok,

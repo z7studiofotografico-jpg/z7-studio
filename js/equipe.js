@@ -1,6 +1,6 @@
 // Equipe: cadastro das pessoas, papel, módulos e WhatsApp de trabalho de cada uma (só administradores).
 import { campoNumeros } from "./numeros-tela.js";
-import { fmtTel, numerosDe, conferirNumeros, numerosDosOutros } from "./numeros.js";
+import { fmtTel, numerosDe, numerosEmpresa, conferirNumeros, numerosDosOutros } from "./numeros.js";
 let D,
   numCampo = null;
 const $ = id => document.getElementById(id);
@@ -45,7 +45,13 @@ export function render() {
     if (!D.isDono(em) && em !== (D.user().email || "").toLowerCase()) {
       acts.appendChild(
         D.mkBtn(u.papel === "admin" ? "Tornar equipe" : "Tornar admin", "", () =>
-          updUser(em, { papel: u.papel === "admin" ? "equipe" : "admin" })
+          updUser(
+            em,
+            u.papel === "admin"
+              ? // quem vira equipe não fica com número da empresa (cada um trabalha com o próprio)
+                { papel: "equipe", numeros: numerosDe(u).filter(n => !numerosEmpresa(D.ctx.P).includes(n)) }
+              : { papel: "admin" }
+          )
         )
       );
       acts.appendChild(
@@ -92,10 +98,9 @@ export function render() {
         const c = document.createElement("input");
         c.type = "checkbox";
         c.checked = atuais.includes(k);
-        c.onchange = () => {
-          const novo = D.MODULOS.map(m => m[0]).filter(x => (x === k ? c.checked : atuais.includes(x)));
-          updUser(em, { modulos: novo });
-        };
+        c.value = k;
+        // lê as caixas marcadas agora (dois toques seguidos não desfazem um ao outro)
+        c.onchange = () => updUser(em, { modulos: [...mods.querySelectorAll("input:checked")].map(x => x.value) });
         l.append(c, document.createTextNode(" " + lbl));
         mods.append(l);
       });
@@ -134,21 +139,40 @@ function editarNumeros(em, u) {
     e.preventDefault();
     const adm = u.papel === "admin" || D.isDono(em);
     const conf = conferirNumeros(cn.ler(), D.ctx.P, numerosDosOutros(D.usuarios(), em, adm), adm);
-    if (conf.erro) {
-      err.textContent = conf.erro;
+    if (conf.erro || (!adm && !conf.numeros.length)) {
+      err.textContent = conf.erro || "Coloque pelo menos um WhatsApp de trabalho da pessoa.";
       err.hidden = false;
       return;
     }
-    await updUser(em, { numeros: conf.numeros, numerosEm: new Date().toISOString() });
-    sh.remove();
+    ok.disabled = true;
+    const agora = new Date().toISOString();
+    if (await updUser(em, { numeros: conf.numeros, numerosEm: agora })) {
+      sh.remove();
+      // se a pessoa tinha pedido troca, o pedido fica resolvido e ela vê o aviso com os números que valem
+      const ped = D.doc(D.db, "numeros", em);
+      D.ctx.FS.getDoc(ped)
+        .then(s => {
+          if (s.exists() && s.data().status === "pendente")
+            return D.updateDoc(ped, {
+              status: "aprovado",
+              numeros: conf.numeros,
+              decididoEm: agora,
+              decididoPor: D.ctx.me || "",
+              visto: false
+            });
+        })
+        .catch(e => console.warn("[Z7] pedido de números", e));
+    } else ok.disabled = false;
   });
 }
 async function updUser(em, patch) {
   try {
     await D.updateDoc(D.doc(D.db, "usuarios", em), patch);
     D.toast("Equipe atualizada");
+    return true;
   } catch (e) {
     D.handleErr(e);
+    return false;
   }
 }
 function paintModsForm() {
@@ -195,6 +219,12 @@ function ligar() {
     err.hidden = true;
     if (!nome || !/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(em)) {
       err.textContent = "Preencha o nome e um e-mail válido.";
+      err.hidden = false;
+      return;
+    }
+    // já cadastrado: gravar de novo apagaria os módulos e os números da pessoa
+    if (D.usuarios()[em] || D.isDono(em)) {
+      err.textContent = "Este e-mail já está na lista. Mude a pessoa pelos botões dela (Reativar, 📱 Números, módulos).";
       err.hidden = false;
       return;
     }

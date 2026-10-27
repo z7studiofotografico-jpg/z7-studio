@@ -6,7 +6,7 @@ import { COMISSAO_PADRAO, FORMAS, taxa } from "./regras.js";
 import { formatarCampos } from "./ui.js";
 import { num, toast } from "./util.js";
 import { definirExtras as feriadosExtras, feriadosEntre } from "./feriados.js";
-import { EMPRESA_PADRAO, fmtTel } from "./numeros.js";
+import { EMPRESA_PADRAO, FRENTES, fmtTel, conferirNumeros, numerosDosOutros } from "./numeros.js";
 import { secaoMeusNumeros } from "./numeros-tela.js";
 const $ = id => document.getElementById(id);
 // ctx = o mesmo do app (P, isAdmin, db, handleErr); o = { sair(), renderPushState(), verComo() }
@@ -176,6 +176,13 @@ export function ligarAjustes(ctx, o) {
     if (!ctx.isAdmin) return;
     const body = Object.fromEntries(AJUSTES.map(([id, k, t, padrao]) => [k, lerAjuste[t]($(id).value) || padrao || lerAjuste[t]("")]));
     Object.assign(body, { equipesDia: Number($("pEquipes").value) || 1, comissao: lerComissao() });
+    // WhatsApp da empresa: número válido e que não seja o de trabalho de alguém da equipe (cada um com o seu)
+    const outros = numerosDosOutros(ctx.usuarios, ctx.email, true);
+    for (const f of Object.values(FRENTES)) {
+      if (!body[f.chave]) continue;
+      const c = conferirNumeros([body[f.chave]], {}, outros, true);
+      if (c.erro) return toast(`WhatsApp da empresa · ${f.nome}: ${c.erro}`);
+    }
     try {
       await setDoc(doc(db, "config", "app"), body, { merge: true });
       $("sheetPrices").hidden = true;
