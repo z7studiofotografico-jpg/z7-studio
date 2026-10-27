@@ -324,12 +324,22 @@ test("pedido de aluno repetido: a equipe pede e vê só o seu; só o admin decid
   await assertSucceeds(updateDoc(doc(como(PEDRO), "pedidos", aviso), { visto: true }));
 });
 
-test("índice de telefones: a equipe do PR lê e só acrescenta; não apaga nem troca", async () => {
-  await semRegra(d => setDoc(doc(d, "fones", "21911112222"), { alunos: { r1: { nome: "LIA", ano: 2025 } } }));
+const semearFone = () => semRegra(d => setDoc(doc(d, "fones", "21911112222"), { alunos: { r1: { nome: "LIA", ano: 2025 } } }));
+test("índice de telefones 1: a equipe do PR lê; quem não é do PR, não", async () => {
+  await semearFone();
   await assertSucceeds(getDoc(doc(como(PEDRO), "fones", "21911112222")));
+  await assertFails(getDoc(doc(como(NOVO), "fones", "21911112222")));
+});
+test("índice de telefones 2: cria um telefone novo", async () => {
+  await assertSucceeds(setDoc(doc(como(PEDRO), "fones", "21900000000"), { alunos: { r9: { nome: "LIA", ano: 2026 } } }, { merge: true }));
+});
+test("índice de telefones 3: acrescenta um aluno num telefone que já existe", async () => {
+  await semearFone();
   await assertSucceeds(setDoc(doc(como(PEDRO), "fones", "21911112222"), { alunos: { r9: { nome: "LIA", ano: 2026 } } }, { merge: true }));
+});
+test("índice de telefones 4: não troca nem apaga", async () => {
+  await semearFone();
   await assertFails(setDoc(doc(como(PEDRO), "fones", "21911112222"), { alunos: { r1: { nome: "OUTRA", ano: 2025 } } }, { merge: true }));
   await assertFails(setDoc(doc(como(PEDRO), "fones", "21911112222"), { alunos: {} }));
   await assertFails(deleteDoc(doc(como(PEDRO), "fones", "21911112222")));
-  await assertFails(getDoc(doc(como(NOVO), "fones", "21911112222")));
 });
