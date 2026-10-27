@@ -8,7 +8,7 @@ import { openImport } from "./instituicoes-import.js";
 export { KINDS, nomeEvento, avisarColegioPorEmail, painelAvisar, msgWhatsColegio } from "./eventos.js";
 // Módulo Instituições: colégio particular, colégio público, colégio profissionalizante e faculdade.
 // Primeira versão comum aos 4 tipos: lista, cadastro, registro de visita, próximo passo com data
-// (aparece em "Para hoje" e no lembrete das 9h) e importação da planilha.
+// (aparece em "Para hoje" e no lembrete das 7h) e importação da planilha.
 let C, FS, db, col;
 let tipo = "particular",
   tab = "hoje",

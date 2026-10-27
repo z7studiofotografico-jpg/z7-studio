@@ -1,9 +1,9 @@
-name: Lembrete das 9h
+name: Lembrete das 7h
 
 on:
   schedule:
-    # 12:00 UTC = 9h em Brasília. Segunda a sábado.
-    - cron: "0 12 * * 1-6"
+    # 10:00 UTC = 7h em Brasília. Segunda a sábado.
+    - cron: "0 10 * * 1-6"
   workflow_dispatch:
     inputs:
       teste:

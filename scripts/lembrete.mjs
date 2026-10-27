@@ -1,5 +1,5 @@
 // Lembrete diário do Z7 Studio.
-// Roda no GitHub Actions às 9h (horário de Brasília): lê os leads com contato vencido
+// Roda no GitHub Actions às 7h (horário de Brasília): lê os leads com contato vencido
 // e manda uma notificação para cada aparelho cadastrado, com os leads daquela pessoa.
 import { initializeApp, cert } from "firebase-admin/app";
 import { getFirestore } from "firebase-admin/firestore";
