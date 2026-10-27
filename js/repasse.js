@@ -1134,7 +1134,10 @@ function openDados(it) {
       // aluno que já está no PR: não grava por cima. A equipe manda um pedido para o admin decidir.
       const repetido = async r => {
         if (C.isAdmin) {
-          erro.textContent = `${title(r.nome)} já está no PR (${title(r.escola)}${r.ano ? ", " + r.ano : ""}). Procure pela busca.`;
+          const troca = (r.comparacao || {}).trocouColegio
+            ? ` Atenção: parece que trocou de colégio (${title(r.escola)} → ${title(docNovo.escola)}).`
+            : "";
+          erro.textContent = `${title(r.nome)} já está no PR (${title(r.escola)}${r.ano ? ", " + r.ano : ""}). Procure pela busca.${troca}`;
           erro.hidden = false;
           return;
         }

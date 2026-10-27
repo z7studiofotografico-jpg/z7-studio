@@ -1,15 +1,38 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 globalThis.document = globalThis.document || { createElement: () => ({}) };
-const { mesmoAluno, mesclarContatos, passarPara } = await import("../js/pedidos.js");
+const { mesmoAluno, compararAluno, mesclarContatos, passarPara } = await import("../js/pedidos.js");
 
-test("mesmo aluno: nome e colégio, ou nome e telefone; irmãos com o mesmo telefone não", () => {
-  const a = { nome: "Lia Souza", escola: "Colégio Alfa", contatos: [{ tel: "21911112222" }] };
-  assert.ok(mesmoAluno(a, { nome: "LIA SOUZA", escola: "colegio alfa" }));
-  assert.ok(mesmoAluno(a, { nome: "Lia Souza", escola: "Outro", contatos: [{ tel: "21911112222" }] }));
-  assert.ok(!mesmoAluno(a, { nome: "Lia Souza", escola: "Outro" }));
-  assert.ok(!mesmoAluno(a, { nome: "Pedro Souza", escola: "Colégio Alfa", contatos: [{ tel: "21911112222" }] }));
-  assert.ok(mesmoAluno(a, { nome: "Lia S.", escola: "Colegio Alfa", telefones: ["21911112222"] }));
+test("ordem combinada: nome completo, depois telefone, depois mãe e pai, depois colégio", () => {
+  const a = {
+    nome: "Lia Souza",
+    escola: "Colégio Alfa",
+    ano: 2026,
+    contatos: [
+      { tipo: "Mãe", nome: "Rosa Souza", tel: "21911112222" },
+      { tipo: "Pai", nome: "Rui Souza", tel: "21955556666" }
+    ]
+  };
+  // nome completo diferente nunca é o mesmo (mesmo com o mesmo telefone: irmão, ou nome abreviado)
+  assert.equal(compararAluno(a, { nome: "Pedro Souza", contatos: [{ tel: "21911112222" }] }), null);
+  assert.equal(compararAluno(a, { nome: "Lia S.", telefones: ["21911112222"] }), null);
+  // telefone
+  assert.deepEqual(compararAluno(a, { nome: "LIA SOUZA", escola: "Colegio Alfa", contatos: [{ tel: "21911112222" }] }), {
+    motivo: "telefone",
+    trocouColegio: false
+  });
+  // mãe E pai (telefones novos)
+  const pais = [
+    { tipo: "Mãe", nome: "ROSA SOUZA", tel: "21900000001" },
+    { tipo: "Pai", nome: "rui souza", tel: "21900000002" }
+  ];
+  assert.equal(compararAluno(a, { nome: "Lia Souza", escola: "Colégio Alfa", contatos: pais }).motivo, "pais");
+  // só a mãe igual não basta (precisa mãe e pai)
+  assert.equal(compararAluno(a, { nome: "Lia Souza", escola: "Outro", contatos: [pais[0]] }), null);
+  // colégio (mesmo ano), sem telefone nem pais para comparar
+  assert.equal(compararAluno(a, { nome: "Lia Souza", escola: "colegio alfa", ano: 2026 }).motivo, "colegio");
+  assert.equal(compararAluno(a, { nome: "Lia Souza", escola: "colegio alfa", ano: 2024 }), null);
+  assert.equal(compararAluno(a, { nome: "Lia Souza", escola: "Outro" }), null);
 });
 test("passar para quem pediu: da fila vai separado para a pessoa, com os contatos juntos; vendido não passa", () => {
   const p = { porEmail: "ana@x.com", porNome: "Ana", dados: { contatos: [{ tipo: "Pai", nome: "Rui", tel: "21933334444" }] } };
@@ -27,46 +50,41 @@ test("passar para quem pediu: da fila vai separado para a pessoa, com os contato
   assert.deepEqual(mesclarContatos([{ tel: "1" }], [{ tel: "1" }, { tel: "2" }]), [{ tel: "1" }, { tel: "2" }]);
 });
 
-test("outro ano não é repetido (cada ano é um ensaio); identificador do pedido termina com o e-mail", async () => {
+test("mesmo nome e colégio em outro ano, sem família em comum, não é repetido; identificador do pedido", async () => {
   const { idPedido } = await import("../js/pedidos.js");
   assert.ok(!mesmoAluno({ nome: "Lia", escola: "Alfa", ano: 2024 }, { nome: "Lia", escola: "Alfa", ano: 2026 }));
   assert.ok(mesmoAluno({ nome: "Lia", escola: "Alfa", ano: 2026 }, { nome: "Lia", escola: "Alfa", ano: 2026 }));
   assert.equal(idPedido("pr", "r2", "Pedro.Silva@Vendas.com"), "pr_r2_pedro-silva-vendas-com");
 });
 
-test("aluno transferido: mesma família (telefone, mãe/pai ou endereço) em outro colégio e outro ano é o mesmo aluno", async () => {
+test("aluno que trocou de colégio: achado pelo telefone ou pela mãe e pai, e marcado para avisar o admin", async () => {
   const { alunoNovo, podeVer, entradasFones } = await import("../js/pedidos.js");
   const antigo = {
     nome: "Maria Silva",
     escola: "Colégio Velho",
     ano: 2025,
-    contatos: [{ tipo: "Mãe", nome: "Rosa Silva", tel: "21911112222" }],
-    endereco: { rua: "Rua A", numero: "10" }
+    contatos: [
+      { tipo: "Mãe", nome: "Rosa Silva", tel: "21911112222" },
+      { tipo: "Pai", nome: "José Silva", tel: "21933334444" }
+    ]
   };
-  // outro colégio e outro ano, mesmo telefone
-  assert.ok(
-    mesmoAluno(antigo, { nome: "Maria Silva", escola: "Colégio Novo", ano: 2026, contatos: [{ tipo: "Mãe", tel: "21911112222" }] })
-  );
-  // telefone novo, mas a mesma mãe
-  assert.ok(
-    mesmoAluno(antigo, {
+  assert.deepEqual(compararAluno(antigo, { nome: "Maria Silva", escola: "Colégio Novo", ano: 2026, contatos: [{ tel: "21911112222" }] }), {
+    motivo: "telefone",
+    trocouColegio: true
+  });
+  assert.deepEqual(
+    compararAluno(antigo, {
       nome: "Maria Silva",
       escola: "Colégio Novo",
-      ano: 2026,
-      contatos: [{ tipo: "Mãe", nome: "ROSA SILVA", tel: "21999990000" }]
-    })
+      contatos: [
+        { tipo: "Mãe", nome: "Rosa Silva", tel: "21999990000" },
+        { tipo: "Pai", nome: "José Silva", tel: "21999990001" }
+      ]
+    }),
+    { motivo: "pais", trocouColegio: true }
   );
-  // só o endereço em comum
-  assert.ok(mesmoAluno(antigo, { nome: "Maria S.", escola: "Novo", ano: 2026, endereco: { rua: "RUA A", numero: "10" } }));
-  // irmão: mesma mãe e telefone, outro primeiro nome
-  assert.ok(
-    !mesmoAluno(antigo, {
-      nome: "João Silva",
-      escola: "Colégio Velho",
-      ano: 2025,
-      contatos: [{ tipo: "Mãe", nome: "Rosa Silva", tel: "21911112222" }]
-    })
-  );
+  // irmão: mesmos pais e telefone, outro nome
+  assert.ok(!mesmoAluno(antigo, { nome: "João Silva", escola: "Colégio Velho", ano: 2025, contatos: antigo.contatos }));
   // homônimo em outro colégio, sem nada da família em comum
   assert.ok(
     !mesmoAluno(antigo, {
@@ -91,5 +109,8 @@ test("aluno transferido: mesma família (telefone, mãe/pai ou endereço) em out
   assert.ok(!podeVer({ papel: "equipe", modulos: ["lf"] }, 2025));
   assert.ok(podeVer({ papel: "equipe", modulos: ["lf"] }, new Date().getFullYear()));
   assert.ok(podeVer({ papel: "equipe", modulos: ["rep"] }, 2020));
-  assert.deepEqual(entradasFones("r1", antigo), [["21911112222", { alunos: { r1: { nome: "MARIA SILVA", ano: 2025 } } }]]);
+  assert.deepEqual(entradasFones("r1", antigo)[0], [
+    "21911112222",
+    { alunos: { r1: { nome: "MARIA SILVA", ano: 2025, escola: "COLEGIO VELHO" } } }
+  ]);
 });

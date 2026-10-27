@@ -245,6 +245,9 @@ const base = {
       contatos: [{ tipo: "Mãe", nome: "Clara", tel: "21966667777" }]
     },
     anteriores: [{ status: "negado", decididoEm: "2026-02-10T10:00:00Z" }],
+    escola: "COLEGIO VELHO",
+    motivo: "telefone",
+    trocouColegio: true,
     status: "pendente",
     criadoEm: "2026-01-05T10:00:00Z"
   },
@@ -415,9 +418,30 @@ async function etapa(pg, nome, fn) {
   } catch (e) {
     falhas++;
     console.log(`  ✗ [${nome}] parou com erro: ` + String((e && e.message) || e).split("\n")[0]);
-    await pg.evaluate(() => document.querySelectorAll(".sheet").forEach(x => x.remove())).catch(() => {});
+    // fecha as janelas abertas: as criadas na hora saem; as fixas da página (Ajustes, Equipe, lead) só se escondem
+    await pg.evaluate(() => document.querySelectorAll(".sheet").forEach(x => (x.id ? (x.hidden = true) : x.remove()))).catch(() => {});
     await ir(pg, "#home").catch(() => {});
   }
+}
+// "+ Aluno" no PR: abre a janela, preenche, confere o que ficou escrito (preenche de novo se algo se perdeu) e salva
+async function incluirAluno(pg, { nome, colegio, tel, contato }) {
+  await pg.getByRole("button", { name: "+ Aluno" }).click();
+  const fa = pg.locator(".sheet:visible").filter({ hasText: "Incluir aluno no PR" }).last();
+  await fa.getByLabel("Nome do aluno").waitFor();
+  await calmo(pg);
+  const campos = [
+    [fa.getByLabel("Nome do aluno"), nome],
+    [fa.getByLabel("Colégio"), colegio],
+    [fa.getByLabel("WhatsApp"), tel],
+    [fa.getByLabel("Nome", { exact: true }), contato]
+  ];
+  for (let tentativa = 0; tentativa < 3; tentativa++) {
+    for (const [c, v] of campos) if ((await c.inputValue()) !== v) await c.fill(v);
+    if ((await Promise.all(campos.map(([c]) => c.inputValue()))).every((v, i) => v === campos[i][1])) break;
+  }
+  await fa.locator("button[type=submit]").click();
+  await calmo(pg);
+  return fa;
 }
 const visiveis = pg => pg.$$eval(".tile[data-mod]", ts => ts.filter(t => !t.hidden).map(t => t.dataset.mod));
 
@@ -829,6 +853,8 @@ await cenario("Adriano (admin), com os dados já atualizados no servidor", async
     const txtMaria = await cartaoMaria.textContent();
     ok(
       /só tem a Linha de Frente/.test(txtMaria) &&
+        /Trocou de colégio: Colegio Velho → Colegio Novo/.test(txtMaria) &&
+        /🏫 1 trocou de colégio/.test(await pg.textContent("#rPedidos h3")) &&
         /já foi pedido antes/.test(txtMaria) &&
         !(await cartaoMaria.getByRole("button", { name: "Passar para Pedro" }).isVisible()),
       "pedido de aluno do Repasse por quem só tem a Linha de Frente: avisa que já foi pedido e não oferece passar"
@@ -1193,15 +1219,7 @@ await cenario("Pedro (vendedor: Linha de Frente, Agendamento, Instituições)", 
     );
     ok(await pg.locator("#rLoteBtn").isEnabled(), "botão continua liberado");
     // "+ Aluno" no PR, sem planilha: entra separado para quem incluiu
-    await pg.getByRole("button", { name: "+ Aluno" }).click();
-    await calmo(pg);
-    let fa = pg.locator(".sheet").last();
-    await fa.getByLabel("Nome do aluno").fill("Paulo Manual");
-    await fa.getByLabel("Colégio").fill("Colegio Alfa");
-    await fa.getByLabel("WhatsApp").fill("21933332222");
-    await fa.getByLabel("Nome", { exact: true }).fill("Marta");
-    await fa.locator("button[type=submit]").click();
-    await calmo(pg);
+    let fa = await incluirAluno(pg, { nome: "Paulo Manual", colegio: "Colegio Alfa", tel: "21933332222", contato: "Marta" });
     const sp = await store();
     const paulo = Object.values(sp).find(x => x.nome === "Paulo Manual");
     ok(
@@ -1210,15 +1228,7 @@ await cenario("Pedro (vendedor: Linha de Frente, Agendamento, Instituições)", 
     );
     // o mesmo aluno de novo: não sobrescreve quem já está no PR
     const nAntes = Object.values(sp).filter(x => x.nome === "Paulo Manual").length;
-    await pg.getByRole("button", { name: "+ Aluno" }).click();
-    await calmo(pg);
-    fa = pg.locator(".sheet:visible").last();
-    await fa.getByLabel("Nome do aluno").fill("Paulo Manual");
-    await fa.getByLabel("Colégio").fill("Colegio Alfa");
-    await fa.getByLabel("WhatsApp").fill("21900000000");
-    await fa.getByLabel("Nome", { exact: true }).fill("Outra");
-    await fa.locator("button[type=submit]").click();
-    await calmo(pg);
+    fa = await incluirAluno(pg, { nome: "Paulo Manual", colegio: "Colegio Alfa", tel: "21900000000", contato: "Outra" });
     const sp2 = await store();
     const paulos = Object.values(sp2).filter(x => x.nome === "Paulo Manual");
     ok(
@@ -1228,15 +1238,7 @@ await cenario("Pedro (vendedor: Linha de Frente, Agendamento, Instituições)", 
     await fa.click({ position: { x: 5, y: 5 } }); // toque fora do painel fecha
     await calmo(pg);
     // aluno que está na fila do repasse: não passa sozinho; vai um pedido para o admin decidir
-    await pg.getByRole("button", { name: "+ Aluno" }).click();
-    await calmo(pg);
-    fa = pg.locator(".sheet:visible").last();
-    await fa.getByLabel("Nome do aluno").fill("Carla Fila");
-    await fa.getByLabel("Colégio").fill("Colegio Alfa");
-    await fa.getByLabel("WhatsApp").fill("21922223333");
-    await fa.getByLabel("Nome", { exact: true }).fill("Vera");
-    await fa.locator("button[type=submit]").click();
-    await calmo(pg);
+    fa = await incluirAluno(pg, { nome: "Carla Fila", colegio: "Colegio Alfa", tel: "21922223333", contato: "Vera" });
     const sp3 = await store();
     const pedC = Object.entries(sp3).find(([k, v]) => k.startsWith("pedidos/") && v.alvoId === "r5" && v.porEmail === PEDRO);
     ok(
@@ -1249,34 +1251,20 @@ await cenario("Pedro (vendedor: Linha de Frente, Agendamento, Instituições)", 
     );
     ok(/Carla Fila.*Aguardando/i.test(await pg.textContent("#rPedidos")), "vendedor vê o pedido aguardando");
     // de novo o mesmo aluno, ainda aguardando: avisa que já foi pedido
-    await pg.getByRole("button", { name: "+ Aluno" }).click();
-    await calmo(pg);
-    fa = pg.locator(".sheet:visible").last();
-    await fa.getByLabel("Nome do aluno").fill("Carla Fila");
-    await fa.getByLabel("Colégio").fill("Colegio Alfa");
-    await fa.getByLabel("WhatsApp").fill("21922223333");
-    await fa.getByLabel("Nome", { exact: true }).fill("Vera");
-    await fa.locator("button[type=submit]").click();
-    await calmo(pg);
+    fa = await incluirAluno(pg, { nome: "Carla Fila", colegio: "Colegio Alfa", tel: "21922223333", contato: "Vera" });
     ok(
       /já foi pedido por você e está aguardando/.test(await pg.textContent("body")),
       "pedido repetido: avisa que esse aluno já foi pedido"
     );
     // aluno transferido (outro colégio, Repasse do ano passado), achado pelo telefone da família; já tinha sido pedido e negado
-    await pg.getByRole("button", { name: "+ Aluno" }).click();
-    await calmo(pg);
-    fa = pg.locator(".sheet:visible").last();
-    await fa.getByLabel("Nome do aluno").fill("Maria Transferida");
-    await fa.getByLabel("Colégio").fill("Colegio Novo");
-    await fa.getByLabel("WhatsApp").fill("21966667777");
-    await fa.getByLabel("Nome", { exact: true }).fill("Clara");
-    await fa.locator("button[type=submit]").click();
-    await calmo(pg);
+    fa = await incluirAluno(pg, { nome: "Maria Transferida", colegio: "Colegio Novo", tel: "21966667777", contato: "Clara" });
     const sp4 = await store(),
       corpo4 = await pg.textContent("body");
     ok(
       sp4["pedidos/pr_r7_pedro-vendas-com"].status === "pendente" &&
         sp4["pedidos/pr_r7_pedro-vendas-com"].anteriores.length === 1 &&
+        sp4["pedidos/pr_r7_pedro-vendas-com"].trocouColegio === true &&
+        /Parece que trocou de colégio \(Colegio Velho → Colegio Novo\)/.test(corpo4) &&
         /já foi pedido antes \(ficou onde estava/.test(corpo4) &&
         new RegExp("Maria Transferida já está cadastrado no PR \\(.*" + (hoje.getFullYear() - 1)).test(corpo4) &&
         !Object.values(sp4).some(x => x.nome === "Maria Transferida"),

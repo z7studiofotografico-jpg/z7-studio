@@ -12,37 +12,35 @@ import * as U from "./util.js";
 
 const ANO = () => new Date().getFullYear();
 const VENDIDO = ["PAGO", "ENTREGUE"];
-const PAIS = ["MAE", "PAI", "RESPONSAVEL"];
-
 // ---------- regras puras (testadas em tests/pedidos.test.mjs) ----------
 const tels = d => new Set([...(d.telefones || []), ...(d.contatos || []).map(c => c.tel)].filter(Boolean));
-const pais = d =>
-  new Set(
-    (d.contatos || [])
-      .filter(c => PAIS.includes(U.chave(c.tipo)) && U.chave(c.nome))
-      .map(c => U.chave(c.nome))
-      .concat(d.responsavel ? [U.chave(d.responsavel)] : [])
-  );
-const endereco = d => {
-  const a = d.endereco || {};
-  return a.rua && a.numero ? U.chave(a.rua) + "|" + U.chave(a.numero) : "";
+// nome da mãe e do pai (os dois; vazio se faltar algum)
+const nomeDe = (d, tipo) => U.chave(((d.contatos || []).find(c => U.chave(c.tipo) === tipo && U.chave(c.nome)) || {}).nome);
+const maeEPai = d => {
+  const m = nomeDe(d, "MAE"),
+    p = nomeDe(d, "PAI");
+  return m && p ? m + "|" + p : "";
 };
 const algum = (A, B) => [...B].some(x => A.has(x));
-// Mesmo aluno, mesmo em outro colégio (transferido) ou outro ano:
-// - mesmo nome (ou mesmo primeiro nome) e a mesma família: telefone, nome da mãe/pai ou endereço em comum;
-// - sem dados da família para comparar: mesmo nome, mesmo colégio e mesmo ano.
-// Irmãos dividem telefone e pais, mas têm primeiro nome diferente: não contam como repetidos.
-export function mesmoAluno(a, d) {
-  const na = U.chave(a.nome),
-    nd = U.chave(d.nome);
-  if (!na || !nd || na.split(" ")[0] !== nd.split(" ")[0]) return false;
-  const ea = endereco(a),
-    familia = algum(tels(a), tels(d)) || algum(pais(a), pais(d)) || (!!ea && ea === endereco(d));
-  if (familia) return true;
-  const escola = U.slug(a.escola) && U.slug(a.escola) === U.slug(d.escola),
-    ano = !a.ano || !d.ano || Number(a.ano) === Number(d.ano);
-  return na === nd && escola && ano;
+// Compara o aluno que já existe (a) com o que estão incluindo (d), na ordem combinada com o estúdio:
+// 1) o nome completo tem que ser igual (irmãos têm o mesmo telefone e os mesmos pais, mas outro nome);
+// 2) o mesmo telefone; 3) a mesma mãe E o mesmo pai; 4) o mesmo colégio (no mesmo ano).
+// Bateu pelo telefone ou pelos pais em outro colégio: é aluno que trocou de colégio (raro: avisa o admin).
+// Devolve null (não é o mesmo) ou { motivo: "telefone" | "pais" | "colegio", trocouColegio }.
+export function compararAluno(a, d) {
+  const na = U.chave(a.nome);
+  if (!na || na !== U.chave(d.nome)) return null;
+  const ea = U.slug(a.escola),
+    ed = U.slug(d.escola),
+    trocouColegio = !!(ea && ed && ea !== ed);
+  if (algum(tels(a), tels(d))) return { motivo: "telefone", trocouColegio };
+  const pa = maeEPai(a);
+  if (pa && pa === maeEPai(d)) return { motivo: "pais", trocouColegio };
+  const ano = !a.ano || !d.ano || Number(a.ano) === Number(d.ano);
+  if (ea && ea === ed && ano) return { motivo: "colegio", trocouColegio: false };
+  return null;
 }
+export const mesmoAluno = (a, d) => !!compararAluno(a, d);
 // Junta os contatos novos aos que já existem (sem repetir telefone)
 export function mesclarContatos(atuais, novos) {
   const out = (atuais || []).slice(),
@@ -110,7 +108,7 @@ export function podeVer(usuario, ano) {
 }
 // Telefones do aluno no índice "fones" (para achar a mesma família depois)
 export function entradasFones(id, d) {
-  return [...tels(d)].map(t => [t, { alunos: { [id]: { nome: U.chave(d.nome), ano: Number(d.ano) || null } } }]);
+  return [...tels(d)].map(t => [t, { alunos: { [id]: { nome: U.chave(d.nome), ano: Number(d.ano) || null, escola: U.chave(d.escola) } } }]);
 }
 export function indexarFones(FS, db, w, id, d) {
   entradasFones(id, d).forEach(([t, dados]) => w.set(FS.doc(db, "fones", t), dados, { merge: true }));
@@ -128,7 +126,8 @@ const ondeEsta = r =>
 const dia = d => (d ? String(d).slice(8, 10) + "/" + String(d).slice(5, 7) : "");
 
 // ---------- procurar e pedir ----------
-// Procura o aluno no PR: pelo nome e pela família (índice de telefones), em qualquer colégio e ano.
+// Procura o aluno no PR: pelo telefone (índice, qualquer colégio e ano) e pelo nome completo.
+// Devolve o aluno com "comparacao" ({ motivo, trocouColegio }) ou null.
 // Quem só tem a Linha de Frente não lê o Repasse: nesse caso o índice diz que existe e em que ano.
 export async function procurarRepetido(C, d) {
   const { FS, db } = C,
@@ -148,16 +147,22 @@ export async function procurarRepetido(C, d) {
     const s = await FS.getDoc(FS.doc(db, "fones", t)).catch(() => null);
     const alunos = (s && s.exists() && s.data().alunos) || {};
     for (const [id, x] of Object.entries(alunos)) {
-      if (U.chave(x.nome).split(" ")[0] !== U.chave(d.nome).split(" ")[0]) continue;
-      const r = await lerAluno(id, { nome: x.nome, ano: x.ano, telefones: [t] });
-      if (r && (r.parcial || mesmoAluno(r, d))) return r;
+      if (U.chave(x.nome) !== U.chave(d.nome)) continue; // nome completo igual (irmão tem outro nome)
+      const r = await lerAluno(id, { nome: x.nome, ano: x.ano, escola: x.escola || "", telefones: [t] });
+      const cmp = r && compararAluno(r, d);
+      if (cmp) return Object.assign(r, { comparacao: cmp });
     }
   }
   // 2) mesmo nome (quem só tem a Linha de Frente procura no ano atual)
   const s = await FS.getDocs(
     FS.query(col, FS.where("nomeBusca", "==", U.chave(d.nome)), ...(soLF ? [FS.where("ano", "==", ANO())] : []), FS.limit(20))
   );
-  return s.docs.map(x => Object.assign({ id: x.id }, x.data())).find(r => mesmoAluno(r, d)) || null;
+  for (const x of s.docs) {
+    const r = Object.assign({ id: x.id }, x.data()),
+      cmp = compararAluno(r, d);
+    if (cmp) return Object.assign(r, { comparacao: cmp });
+  }
+  return null;
 }
 // Identificador do pedido: um por aluno e por pessoa (as regras conferem que termina com o e-mail de quem pede)
 export const idPedido = (tipo, alvoId, email) => `${tipo}_${String(alvoId).slice(0, 200)}_${U.slug(email)}`;
@@ -188,6 +193,8 @@ export async function pedirAluno(C, r, d) {
         contatos: d.contatos || []
       },
       anteriores,
+      motivo: (r.comparacao || {}).motivo || "",
+      trocouColegio: !!(r.comparacao || {}).trocouColegio,
       status: "pendente",
       visto: false,
       criadoEm: new Date().toISOString()
@@ -195,7 +202,8 @@ export async function pedirAluno(C, r, d) {
     return { anterior: atual };
   });
   const onde = [title(r.escola), r.ano].filter(Boolean).join(", ");
-  const quem = `${title(r.nome)} já está cadastrado no PR${onde ? " (" + onde + ")" : ""}: ${ondeEsta(r)}.`;
+  const troca = (r.comparacao || {}).trocouColegio ? ` Parece que trocou de colégio (${title(r.escola)} → ${title(d.escola)}).` : "";
+  const quem = `${title(r.nome)} já está cadastrado no PR${onde ? " (" + onde + ")" : ""}: ${ondeEsta(r)}.${troca}`;
   if (res.ja) return `⚠️ Esse aluno já foi pedido por você e está aguardando o Adriano ou a Luciana. ${quem}`;
   if (res.anterior) {
     const st = { aprovado: "passou para você", negado: "ficou onde estava", novo: "foi cadastrado como novo" }[res.anterior.status] || "";
@@ -293,7 +301,14 @@ export function painelPedidos(C, box) {
       box.hidden = !lst.length;
       if (!lst.length) return;
       box.append(
-        el("h3", null, C.isAdmin ? `📩 ${lst.length} pedido${lst.length > 1 ? "s" : ""} de aluno repetido` : "📩 Seus pedidos de aluno")
+        el(
+          "h3",
+          null,
+          C.isAdmin
+            ? `📩 ${lst.length} pedido${lst.length > 1 ? "s" : ""} de aluno repetido` +
+                (lst.some(x => x.trocouColegio) ? ` · 🏫 ${lst.filter(x => x.trocouColegio).length} trocou de colégio` : "")
+            : "📩 Seus pedidos de aluno"
+        )
       );
       lst.forEach(p => box.append(C.isAdmin ? cartaoAdmin(C, p, lst) : cartaoEquipe(C, p)));
     },
@@ -309,6 +324,14 @@ function cartaoAdmin(C, p, todos) {
   c.append(txt, onde);
   const novos = (d.contatos || []).map(x => `${x.tipo}${x.nome ? " " + title(x.nome) : ""}: ${x.tel}`);
   if (novos.length) c.append(el("p", "hint", "Contatos que a pessoa trouxe: " + novos.join(" · ")));
+  if (p.trocouColegio)
+    c.append(
+      el(
+        "p",
+        "wait",
+        `🏫 Trocou de colégio: ${title(p.escola) || "colégio anterior"} → ${title(d.escola)} (achado pelo ${p.motivo === "pais" ? "nome da mãe e do pai" : "telefone"}). Confira e decida.`
+      )
+    );
   const ant = (p.anteriores || []).filter(a => a.status);
   if (ant.length)
     c.append(

@@ -42,7 +42,9 @@ comFormatura.docs
 // Agenda: datas esperando aprovação (só para quem aprova)
 const pendAgenda = (await db.collection("agenda").where("status", "==", "pendente").get()).size;
 // pedidos de aluno repetido no PR (a equipe tentou incluir quem já estava cadastrado): o admin decide
-const pedidosPR = (await db.collection("pedidos").where("status", "==", "pendente").get()).size;
+const pendPR = (await db.collection("pedidos").where("status", "==", "pendente").get()).docs;
+const pedidosPR = pendPR.length,
+  trocaramColegio = pendPR.filter(d => d.get("trocouColegio")).length;
 // Ensaios no estúdio: lembrar o cliente na véspera (donos) e os que a Luciana precisa analisar
 const amanha = new Intl.DateTimeFormat("en-CA", { timeZone: "America/Sao_Paulo" }).format(new Date(Date.now() + 864e5));
 const ensAmanha = (await db.collection("ensaios").where("data", "==", amanha).get()).docs
@@ -156,7 +158,11 @@ for (const t of tokensSnap.docs) {
       );
     if (meusRep.length) partes.push(`PR: ${meusRep.length}`);
     if (aprova) partes.push(`Agenda: ${aprova} para analisar`);
-    if (ped) partes.push(`📩 ${ped} pedido${ped > 1 ? "s" : ""} de aluno repetido no PR`);
+    if (ped)
+      partes.push(
+        `📩 ${ped} pedido${ped > 1 ? "s" : ""} de aluno repetido no PR` +
+          (trocaramColegio ? ` (🏫 ${trocaramColegio} trocou de colégio)` : "")
+      );
     if (lembrar) partes.push(`Lembrar ${lembrar} cliente${lembrar > 1 ? "s" : ""} do ensaio de amanhã`);
     if (ent) partes.push(`⚠️ ${ent} entrega${ent > 1 ? "s" : ""} de fotos atrasada${ent > 1 ? "s" : ""}`);
     if (aval) partes.push(`Pedir ${aval} avaliação${aval > 1 ? "ões" : ""} no Google`);

@@ -112,7 +112,10 @@ test("v8: índice de telefones do PR (e não regrava o que já está igual)", ()
   ];
   const { ops } = planejar({ repasse }, () => "");
   const f = ops.filter(o => o.col === "fones");
-  assert.deepEqual(f.find(o => o.id === "21911112222").dados.alunos, { r1: { nome: "LIA", ano: 2025 }, r2: { nome: "RUI", ano: 2026 } });
+  assert.deepEqual(f.find(o => o.id === "21911112222").dados.alunos, {
+    r1: { nome: "LIA", ano: 2025, escola: "" },
+    r2: { nome: "RUI", ano: 2026, escola: "" }
+  });
   const fones = f.map(o => ({ id: o.id, alunos: o.dados.alunos }));
   assert.equal(planejar({ repasse, fones }, () => "").ops.filter(o => o.col === "fones").length, 0);
 });

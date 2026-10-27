@@ -74,7 +74,7 @@ export function planejar(cols, emailDe) {
     JSON.stringify(
       Object.keys(o)
         .sort()
-        .map(k => [k, (o[k] || {}).nome || "", (o[k] || {}).ano || null])
+        .map(k => [k, (o[k] || {}).nome || "", (o[k] || {}).ano || null, (o[k] || {}).escola || ""])
     );
   for (const [t, alunos] of Object.entries(fones))
     if (ordenado(alunos) !== ordenado(atuaisF[t] || {})) muda("telefones do PR (índice)", "fones", t, { alunos }, "s");
