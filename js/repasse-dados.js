@@ -2,6 +2,7 @@
 // e o que falta para um aluno entrar na fila. Testado em tests/repasse-dados.test.mjs.
 import * as U from "./util.js";
 import { title } from "./ui.js";
+import { codigoBusca } from "./aluno-id.js";
 
 export const norm = U.chave,
   slug = U.slug;
@@ -95,6 +96,7 @@ export function linhaParaDoc(r, X) {
     statusOrig: s(r.status),
     vendedor: s(r.vendedor),
     codigo: s(r.codigo),
+    codigoBusca: s(r.codigo) ? codigoBusca(r.codigo) : "",
     dataEnsaio,
     ano,
     contatos: cs,

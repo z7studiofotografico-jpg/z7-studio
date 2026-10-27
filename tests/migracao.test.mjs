@@ -119,3 +119,18 @@ test("v8: índice de telefones do PR (e não regrava o que já está igual)", ()
   const fones = f.map(o => ({ id: o.id, alunos: o.dados.alunos }));
   assert.equal(planejar({ repasse, fones }, () => "").ops.filter(o => o.col === "fones").length, 0);
 });
+
+test("v9: ID do aluno do PR ganha o formato de busca (só quando falta ou mudou)", async () => {
+  const { planejar } = await import("../js/migracao.js");
+  const repasse = [
+    { id: "a", codigo: "CEPNCP - 1" },
+    { id: "b", codigo: "CEPNCP - 02", codigoBusca: "CEPNCP02" },
+    { id: "c", codigo: "" }
+  ];
+  const { ops } = planejar({ repasse }, () => "");
+  const pr = ops.filter(o => o.col === "repasse");
+  assert.deepEqual(
+    pr.map(o => [o.id, o.dados]),
+    [["a", { codigoBusca: "CEPNCP01" }]]
+  );
+});

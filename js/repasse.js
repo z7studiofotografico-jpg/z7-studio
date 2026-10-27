@@ -11,6 +11,17 @@ import * as U from "./util.js";
 import { norm, faltando, docId, situacaoTxt, enderecoTxt } from "./repasse-dados.js";
 import { openImport } from "./repasse-import.js";
 import { botaoRelatorio, contar } from "./relatorio.js";
+import {
+  siglaDe,
+  siglaUsada,
+  proximoCodigo,
+  codigoBusca,
+  pareceCodigo,
+  codigoDaBusca,
+  ordemCodigo,
+  avisoTel,
+  telRelatorio
+} from "./aluno-id.js";
 import { procurarRepetido, pedirAluno, painelPedidos, indexarFones } from "./pedidos.js";
 // Assumir o contato: quem não é admin só assume o que está sem responsável (ou já é seu)
 const assumir = it => (!C.isAdmin && it.respEmail && it.respEmail !== C.email ? {} : { resp: C.me, respEmail: C.email || "" });
@@ -420,6 +431,35 @@ function openTab(k) {
 }
 
 let cacheLF = { at: 0, docs: [] };
+// escola escolhida: na ordem do ID (como na separação das fotos); senão, por nome
+const porNome = (a, b) => (a.nome || "").localeCompare(b.nome || "", "pt-BR");
+const ordemBusca = porEscola => (porEscola ? (a, b) => (a.ano || 0) - (b.ano || 0) || ordemCodigo(a, b) : porNome);
+// aviso dos telefones que com certeza estão errados (DDD que não existe, celular sem o 9...)
+function telAvisos(it) {
+  const ruins = (it.contatos || []).map(c => [c, avisoTel(c.tel)]).filter(([, a]) => a && !/fixo/.test(a));
+  if (!ruins.length) return "";
+  return "⚠️ Telefone a conferir: " + ruins.map(([c, a]) => `${c.tipo || "contato"} (${a})`).join(", ");
+}
+// ID do aluno novo: a sigla que o colégio já usa (ou as iniciais do nome) e o próximo número do colégio naquele ano
+async function gerarCodigo(d) {
+  if (!d.escola) return "";
+  // o mesmo colégio pode estar escrito em maiúsculas (planilha) ou não (incluído à mão)
+  const jeitos = [...new Set([d.escola, d.escola.toUpperCase(), title(d.escola), U.chave(d.escola)])];
+  const filtros = [FS.where("escola", "in", jeitos)];
+  if (!C.pode("rep")) filtros.push(...baseLF());
+  const s = await FS.getDocs(FS.query(col, ...filtros, FS.limit(3000)));
+  const todos = s.docs.map(x => x.data());
+  // aluno novo entra com o nome do colégio do jeito que já está no PR (fica junto na busca por escola)
+  if (todos.length && !todos.some(x => x.escola === d.escola)) d.escola = todos[0].escola;
+  const outras = Object.keys(meta.escolas || {})
+    .filter(n => norm(n) !== norm(d.escola))
+    .map(n => siglaDe(n));
+  const sigla = siglaUsada(todos.map(x => x.codigo)) || siglaDe(d.escola, outras);
+  return proximoCodigo(
+    sigla,
+    todos.filter(x => !d.ano || x.ano === d.ano).map(x => x.codigo)
+  );
+}
 async function buscar() {
   if (tab !== "buscar") return;
   const txt = $("rQ").value.trim(),
@@ -437,15 +477,18 @@ async function buscar() {
         cacheLF = { at: Date.now(), docs: s0.docs.map(d => Object.assign({ id: d.id }, d.data())) };
       }
       const n = norm(txt),
-        dg = txt.replace(/\D/g, "");
+        dg = txt.replace(/\D/g, ""),
+        cod = pareceCodigo(txt) ? codigoDaBusca(txt) : "";
       items = cacheLF.docs
         .filter(
           it =>
             (!esc || it.escola === esc) &&
-            (!txt || (dg.length >= 8 ? (it.telefones || []).some(t => t.includes(dg.slice(-8))) : (it.nomeBusca || "").includes(n)))
+            (!txt ||
+              (cod && codigoBusca(it.codigo) === cod) ||
+              (dg.length >= 8 ? (it.telefones || []).some(t => t.includes(dg.slice(-8))) : (it.nomeBusca || "").includes(n)))
         )
-        .slice(0, 100)
-        .sort((a, b) => (a.nome || "").localeCompare(b.nome || "", "pt-BR"));
+        .slice(0, esc ? 1000 : 100)
+        .sort(ordemBusca(esc));
       renderList();
     } catch (e) {
       console.warn(e);
@@ -456,6 +499,7 @@ async function buscar() {
   let q = null;
   const dg = txt.replace(/\D/g, "");
   if (dg.length >= 8) q = FS.query(col, FS.where("telefones", "array-contains", dg.replace(/^55(?=\d{10,11}$)/, "")), FS.limit(30));
+  else if (pareceCodigo(txt)) q = FS.query(col, FS.where("codigoBusca", "==", codigoDaBusca(txt)), FS.limit(30));
   else if (txt.length >= 2) {
     const n = norm(txt);
     q = FS.query(col, FS.orderBy("nomeBusca"), FS.startAt(n), FS.endAt(n + ""), FS.limit(30));
@@ -467,7 +511,7 @@ async function buscar() {
   }
   try {
     const s = await FS.getDocs(q);
-    items = s.docs.map(d => Object.assign({ id: d.id }, d.data())).sort((a, b) => (a.nome || "").localeCompare(b.nome || "", "pt-BR"));
+    items = s.docs.map(d => Object.assign({ id: d.id }, d.data())).sort(ordemBusca(esc && !txt));
     renderList();
   } catch (e) {
     console.warn(e);
@@ -546,12 +590,14 @@ function card(it) {
 
   const meta = el("div", "meta");
   [
+    [it.codigo ? "🆔 " + it.codigo : "", "id"],
     [tab === "buscar" && segDe(it) ? segNome(segDe(it)) : "", "svc"],
     [C.nomeDe(it) ? "👤 " + U.first(C.nomeDe(it)) : "", ""],
     [title(it.escola), "svc"],
     [[it.curso, it.turma].filter(Boolean).join(" · "), ""],
     [it.ano ? String(it.ano) : "", ""],
-    [it.valor ? U.money(it.valor) : "", ""]
+    [it.valor ? U.money(it.valor) : "", ""],
+    [telAvisos(it), "warn"]
   ].forEach(([v, c]) => {
     if (v) meta.append(el("span", "tag " + c, v));
   });
@@ -1047,7 +1093,11 @@ function openDados(it) {
     ano.inputMode = "numeric";
     const r1 = el("div", "row2");
     r1.append(field("Colégio", escola), field("Ano", ano));
-    p.append(field("Nome do aluno", nome), r1);
+    // ID do aluno (separação das fotos): o app dá o próximo número do colégio; dá para trocar
+    const codigo = mk(it.codigo || "", novo ? "automático (ex.: CEPNCP - 07)" : "ex.: CEPNCP - 07");
+    codigo.maxLength = 30;
+    codigo.autocapitalize = "characters";
+    p.append(field("Nome do aluno", nome), r1, field("ID do aluno", codigo));
     // colégios que já existem no PR (para escrever igual)
     const dlE = el("datalist");
     dlE.id = "rEscolas" + Date.now();
@@ -1086,6 +1136,17 @@ function openDados(it) {
       const row = el("div", "row3");
       row.append(field("Quem", tp), field("Nome", nm), field("WhatsApp", tl));
       lista.append(row);
+      // telefone que com certeza está errado: avisa na hora (não impede salvar)
+      const av = el("p", "wait");
+      av.hidden = true;
+      lista.append(av);
+      const conferir = () => {
+        const a = tl.value.replace(/\D/g, "").length >= 4 ? avisoTel(tl.value) : "";
+        av.textContent = a ? "⚠️ Confira este número: " + a + ". Se o WhatsApp abrir dizendo que o número não existe, peça outro." : "";
+        av.hidden = !a;
+      };
+      tl.addEventListener("input", conferir);
+      conferir();
       linhas.push({ tp, nm, tl });
     };
     (it.contatos && it.contatos.length ? it.contatos : [novo ? { tipo: "Mãe" } : {}]).forEach(addLinha);
@@ -1111,6 +1172,9 @@ function openDados(it) {
         erro.hidden = false;
         return;
       }
+      // colégio que já existe no PR escrito de outro jeito (maiúsculas, acento): usa o nome que já está lá
+      const jaExiste = Object.keys(meta.escolas || {}).find(n => norm(n) === norm(d.escola));
+      if (jaExiste) d.escola = jaExiste;
       const agora = new Date().toISOString(),
         hoje = U.todayStr(),
         daEquipe = !C.isAdmin,
@@ -1155,6 +1219,8 @@ function openDados(it) {
       try {
         const achado = await procurarRepetido(C, docNovo);
         if (achado) return await repetido(achado);
+        if (!docNovo.codigo) docNovo.codigo = await gerarCodigo(docNovo).catch(e => (console.warn("[Z7] ID do aluno", e), ""));
+        docNovo.codigoBusca = docNovo.codigo ? codigoBusca(docNovo.codigo) : "";
         // cria só se ainda não existe (transação): nunca sobrescreve um aluno que já está no PR
         const ref = FS.doc(db, "repasse", docId(docNovo, Date.now()));
         const existente = await FS.runTransaction(db, async tx => {
@@ -1167,11 +1233,12 @@ function openDados(it) {
         if (existente) return await repetido(existente);
         close();
         U.toast(
-          falta.length
-            ? "Incluído. Ainda falta: " + falta.join(", ") + (C.isAdmin ? " (aba Incompletos)" : " (aba Meus incompletos)")
-            : meu
-              ? "Incluído e separado para você ✅"
-              : "Incluído na fila ✅"
+          (docNovo.codigo ? "ID " + docNovo.codigo + " · " : "") +
+            (falta.length
+              ? "Incluído. Ainda falta: " + falta.join(", ") + (C.isAdmin ? " (aba Incompletos)" : " (aba Meus incompletos)")
+              : meu
+                ? "Incluído e separado para você ✅"
+                : "Incluído na fila ✅")
         );
         refreshStats();
         refreshLote();
@@ -1199,6 +1266,8 @@ function openDados(it) {
         contatos: cs,
         telefones: cs.map(c => c.tel)
       };
+      const cod = codigo.value.trim().toUpperCase();
+      if (novo || cod !== (it.codigo || "")) Object.assign(patch, { codigo: cod, codigoBusca: cod ? codigoBusca(cod) : "" });
       const falta = faltando(patch);
       if (novo) {
         // falta algo (ex.: nome da mãe)? avisa antes; tocando de novo, salva assim mesmo (vai para Incompletos)
@@ -1453,10 +1522,23 @@ const NOMES_ABA = {
 function relatorioPR() {
   const txt = id => ($(id) ? $(id).textContent : "–");
   const dataBR = d => (d ? U.fmtDate(d) + "/" + String(d).slice(0, 4) : "");
-  const lista = items.slice().sort((a, b) => String(a.followup || "9").localeCompare(String(b.followup || "9")));
+  const esc = $("rEscola") ? $("rEscola").value : "";
+  // escola escolhida na busca: lista na ordem do ID (para a separação das fotos)
+  const lista = items
+    .slice()
+    .sort(tab === "buscar" && esc ? ordemBusca(true) : (a, b) => String(a.followup || "9").localeCompare(String(b.followup || "9")));
+  const tels = x =>
+    (x.contatos || [])
+      .slice(0, 2)
+      .map(c => (c.tipo ? c.tipo + ": " : "") + telRelatorio(c.tel))
+      .join(" / ");
   return {
     titulo: "PR · " + segNome(seg),
-    subtitulo: "Aba " + (NOMES_ABA[tab] || tab) + (C.isAdmin ? "" : " · os contatos que você vê"),
+    subtitulo:
+      "Aba " +
+      (NOMES_ABA[tab] || tab) +
+      (tab === "buscar" && esc ? " · " + title(esc) : "") +
+      (C.isAdmin ? "" : " · os contatos que você vê"),
     secoes: [
       {
         titulo: "Números",
@@ -1474,15 +1556,16 @@ function relatorioPR() {
       {
         titulo: "Contatos (" + lista.length + ")",
         tabela: {
-          cols: ["Aluno", "Colégio", "Ano", "Etapa", "Responsável", "Próximo contato", "Telefone"],
+          cols: ["ID", "Aluno", "Colégio", "Ano", "Etapa", "Responsável", "Próximo contato", "Telefones"],
           linhas: lista.map(x => [
+            x.codigo || "",
             title(x.nome),
             title(x.escola),
             x.ano || "",
             x.etapa,
             C.nomeDe(x) || "—",
             dataBR(x.followup),
-            ((x.contatos || [])[0] || {}).tel || ""
+            tels(x)
           ])
         },
         vazio: "Nenhum contato nesta aba."

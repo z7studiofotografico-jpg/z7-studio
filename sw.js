@@ -35,6 +35,7 @@ const SHELL = [
   "./js/erros.js",
   "./js/fontes-resumo.js",
   "./js/relatorio.js",
+  "./js/aluno-id.js",
   "./js/turma.js",
   "./js/formaturas.js",
   "./js/becas.js",

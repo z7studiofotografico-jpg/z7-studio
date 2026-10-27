@@ -308,6 +308,7 @@ for (let i = 0; i < 30; i++)
     ano: hoje.getFullYear(),
     etapa: "NA FILA",
     escola: "COLEGIO ALFA",
+    codigo: "CA - " + String(i + 1).padStart(2, "0"), // ID do aluno, como vem da planilha
     contatos: [{ tipo: "Mãe", tel: "2199999" + String(1000 + i) }]
   };
 // Os dados antigos são atualizados no servidor (scripts/migrar.mjs); aqui aplicamos o mesmo plano antes de abrir o app
@@ -723,6 +724,10 @@ await cenario("Adriano (admin), com os dados já atualizados no servidor", async
       compras.length === 2 && nova && nova.kitId === "k04" && nova.valor === 1000 && nova.compraDe && compras.some(x => x.kitId === "k01"),
       "compra a mais registrada (R$ 1.000,00 combinado) e o Kit 01 continua"
     );
+    ok(
+      nova && nova.codigo && nova.codigo === (compras.find(x => x.kitId === "k01") || {}).codigo,
+      "compra a mais fica com o mesmo ID do aluno (" + (nova && nova.codigo) + ")"
+    );
     await pg.locator(".panel.wide").getByRole("button", { name: "Fechar" }).click();
     await calmo(pg);
     // "+ Formando" direto no card Formaturas (sem planilha): escolhe a turma e já abre o cadastro
@@ -738,6 +743,8 @@ await cenario("Adriano (admin), com os dados já atualizados no servidor", async
     await calmo(pg);
     s = await store();
     const eva = Object.values(s).find(x => x.nome === "Eva Direto");
+    // ID do aluno: COLEGIO ALFA e COLEGIO ANTIGO têm as mesmas iniciais (CA): fica com o último nome inteiro
+    ok(eva && /^CALFA - \d\d$/.test(eva.codigo || ""), "formando novo ganha o ID da turma: " + (eva && eva.codigo));
     ok(eva && eva.instId === "i1" && eva.kitId === "k01", "+ Formando no card Formaturas: incluído na turma com o Kit 01");
     await pg.locator(".panel.wide").getByRole("button", { name: "Fechar" }).click();
     await calmo(pg);
@@ -1317,6 +1324,12 @@ await cenario("Pedro (vendedor: Linha de Frente, Agendamento, Instituições)", 
       paulo && paulo.etapa === "SEPARADO" && paulo.respEmail === PEDRO && paulo.manual && paulo.contatos.length === 1,
       "+ Aluno no PR: incluído e já separado para o vendedor"
     );
+    ok(
+      paulo && paulo.codigo === "CA - 31" && paulo.codigoBusca === "CA31" && paulo.escola === "COLEGIO ALFA",
+      "+ Aluno: ganha o próximo ID do colégio e o nome do colégio como já está no PR (" +
+        (paulo && paulo.codigo + " · " + paulo.escola) +
+        ")"
+    );
     // o mesmo aluno de novo: não sobrescreve quem já está no PR
     const nAntes = Object.values(sp).filter(x => x.nome === "Paulo Manual").length;
     fa = await incluirAluno(pg, { nome: "Paulo Manual", colegio: "Colegio Alfa", tel: "21900000000", contato: "Outra" });
@@ -1540,9 +1553,67 @@ await cenario("Relatórios para imprimir (um por card)", async () => {
     );
   };
   {
-    const { pg, erros } = await abrir(ADRIANO, migrar(base));
+    const { pg, erros, store } = await abrir(ADRIANO, migrar(base));
     await calmo(pg);
     for (const [h, t] of telas) await etapa(pg, "relatório " + h, () => confere(pg, h, t, "admin"));
+    // ID do aluno e telefone errado no PR
+    await etapa(pg, "ID do aluno e telefone no PR", async () => {
+      await ir(pg, "#pr");
+      await pg.locator("#rChips").getByRole("button", { name: "Buscar" }).click();
+      await calmo(pg);
+      await pg.fill("#rQ", "ca 05");
+      await pg
+        .waitForFunction(() => /ALUNO 4|Aluno 4/.test(document.getElementById("rList").textContent), null, { timeout: 4000 })
+        .catch(() => {});
+      ok(
+        /Aluno 4/i.test(await pg.textContent("#rList")) && /CA - 05/.test(await pg.textContent("#rList")),
+        "busca pelo ID (“ca 05”) acha o aluno"
+      );
+      await pg.getByRole("button", { name: "+ Aluno" }).click();
+      const fa = pg.locator(".sheet:visible").filter({ hasText: "Incluir aluno no PR" }).last();
+      await fa.getByLabel("WhatsApp").fill("20988887777");
+      ok(/DDD 20 não existe/.test(await fa.textContent()), "telefone errado: avisa na hora no cadastro");
+      await pg.evaluate(() => document.querySelectorAll(".sheet").forEach(x => (x.id ? (x.hidden = true) : x.remove())));
+      await incluirAluno(pg, { nome: "Zuleica Nova", colegio: "Colegio Alfa", tel: "20988887777", contato: "Rita" });
+      const z = Object.values(await store()).find(x => x.nome === "Zuleica Nova");
+      ok(z && /^CA - 3\d$/.test(z.codigo || ""), "admin: aluno novo também ganha ID (" + (z && z.codigo) + ")");
+      await pg.fill("#rQ", "Zuleica");
+      await pg
+        .waitForFunction(() => /Zuleica/i.test(document.getElementById("rList").textContent), null, { timeout: 4000 })
+        .catch(() => {});
+      ok(/Telefone a conferir/.test(await pg.textContent("#rList")), "cartão do PR avisa o telefone a conferir");
+      await pg.getByRole("button", { name: "🖨️ Relatório" }).first().click();
+      await pg.waitForSelector("#relatorio .rel-tab", { timeout: 5000 });
+      const t = await pg.textContent("#relatorio");
+      ok(/CA - 3\d/.test(t) && /⚠️ DDD 20 não existe/.test(t), "relatório do PR traz o ID e o aviso do telefone");
+      await pg.locator("#relatorio").getByRole("button", { name: "Fechar" }).click();
+    });
+    // lista da turma para imprimir
+    await etapa(pg, "lista da turma", async () => {
+      await ir(pg, "#formaturas");
+      await pg
+        .locator("#fmChips, .chips")
+        .getByText(/^Turmas/)
+        .first()
+        .click();
+      await calmo(pg);
+      await pg
+        .locator("#fmCorpo .card")
+        .filter({ hasText: /Colegio Alfa/i })
+        .getByText(/Ver formandos|Abrir turma|Formandos/)
+        .first()
+        .click();
+      await calmo(pg);
+      await pg.locator(".panel.wide").getByRole("button", { name: "🖨️ Lista da turma" }).click();
+      await pg.waitForSelector("#relatorio .rel-tab", { timeout: 5000 });
+      const t = await pg.textContent("#relatorio");
+      ok(
+        /Turma · Colegio Alfa/i.test(t) && /Lucas Silva/i.test(t) && /\(21\) 97777-6666/.test(t),
+        "lista da turma: aluno, telefone e colunas para imprimir"
+      );
+      await pg.locator("#relatorio").getByRole("button", { name: "Fechar" }).click();
+      await pg.evaluate(() => document.querySelectorAll(".sheet").forEach(x => (x.id ? (x.hidden = true) : x.remove())));
+    });
     // o relatório do Dashboard leva os números da tela
     await etapa(pg, "conteúdo do dashboard", async () => {
       await ir(pg, "#vendas");

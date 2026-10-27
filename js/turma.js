@@ -42,6 +42,8 @@ import { msgCobranca, msgOfertaKit } from "./mensagens.js";
 import { contratoTurma, kitsTurma, importarFormandos } from "./turma-ajustes.js";
 import { el, title, norm, field, inp, inpReais, sel, sheet, botoes, wa, avisoErro, emPartes } from "./ui.js";
 import * as U from "./util.js";
+import { siglaDe, siglaUsada, proximoCodigo, ordemCodigo, avisoTel, telRelatorio } from "./aluno-id.js";
+import { abrirRelatorio } from "./relatorio.js";
 let C,
   FS,
   db,
@@ -170,6 +172,7 @@ export function openTurma(ctx, inst, kits, aoFechar, opcoes) {
       p.append(qtdBox);
       const bar = el("div", "actions");
       bar.append(U.mkBtn("+ Formando", "btn-primary", () => form()));
+      bar.append(U.mkBtn("🖨️ Lista da turma", "", () => abrirRelatorio(relatorioTurma(), C.me)));
       if (C.isAdmin) bar.append(U.mkBtn("Importar planilha", "", () => importarFormandos(C, inst, lista)));
       if (C.isAdmin)
         bar.append(
@@ -198,7 +201,7 @@ export function openTurma(ctx, inst, kits, aoFechar, opcoes) {
           lista = snap.docs
             .map(d => Object.assign({ id: d.id }, d.data()))
             .filter(f => f.instId === inst.id)
-            .sort((a, b) => (a.nome || "").localeCompare(b.nome || "", "pt-BR"));
+            .sort(ordemCodigo); // na ordem do ID (como na separação das fotos); sem ID, por nome no fim
           desenhar();
         },
         e => {
@@ -361,7 +364,7 @@ export function openTurma(ctx, inst, kits, aoFechar, opcoes) {
         if (busca)
           arr = arr.filter(
             f =>
-              norm(f.nome + " " + f.tel + " " + f.serie).includes(busca) ||
+              norm(f.nome + " " + f.tel + " " + f.serie + " " + (f.codigo || "")).includes(busca) ||
               (busca.replace(/\D/g, "") &&
                 String(f.tel || "")
                   .replace(/\D/g, "")
@@ -415,6 +418,7 @@ export function openTurma(ctx, inst, kits, aoFechar, opcoes) {
         );
         e.append(top);
         const meta = el("div", "meta");
+        if (f.codigo) meta.append(el("span", "tag id", "🆔 " + f.codigo));
         [
           f.serie,
           sem ? "" : f.kit || (ehKit01(f) ? "Kit 01 · Beca + canudo (adesão)" : "Kit"),
@@ -425,6 +429,8 @@ export function openTurma(ctx, inst, kits, aoFechar, opcoes) {
         ]
           .filter(Boolean)
           .forEach((t, i) => meta.append(el("span", "tag" + (i === 1 ? " svc" : ""), t)));
+        const aTel = avisoTel(f.tel);
+        if (aTel && !/fixo/.test(aTel)) meta.append(el("span", "tag warn", "⚠️ Telefone a conferir: " + aTel));
         e.append(meta);
         if (comprou)
           e.append(
@@ -475,6 +481,78 @@ export function openTurma(ctx, inst, kits, aoFechar, opcoes) {
         return e;
       }
 
+      // Sigla da turma: a que o colégio já usa, a do cadastro ou as iniciais do nome
+      function siglaTurma() {
+        return inst.sigla || siglaUsada(lista.map(x => x.codigo)) || (opcoes && opcoes.sigla) || siglaDe(inst.nome);
+      }
+      // ID de quem entra: o mesmo do aluno se ele já está na turma (outro kit), senão o próximo número
+      function codigoNovo(nm, base) {
+        if (base && base.codigo) return base.codigo;
+        const mesmo = lista.find(x => x.codigo && U.chave(x.nome) === U.chave(nm));
+        if (mesmo) return mesmo.codigo;
+        return proximoCodigo(
+          siglaTurma(),
+          lista.map(x => x.codigo)
+        );
+      }
+      // Lista da turma para imprimir: um aluno por linha (com todos os kits), na ordem do ID
+      function relatorioTurma() {
+        const alunos = {};
+        lista
+          .filter(f => f.status !== "desistiu" && f.status !== "reprovou")
+          .forEach(f => {
+            const k = U.chave(f.nome);
+            const a = (alunos[k] = alunos[k] || { nome: f.nome, codigo: "", tel: "", serie: "", kits: [], aberto: 0, atr: false });
+            a.codigo = a.codigo || f.codigo || "";
+            a.tel = a.tel || f.tel || "";
+            a.serie = a.serie || f.serie || "";
+            if (f.status === "semkit") a.kits.push("ainda não comprou");
+            else {
+              a.kits.push((f.kit || "Kit").split(" · ")[0]);
+              a.aberto += emAberto(f);
+              a.atr = a.atr || atrasado(f);
+            }
+          });
+        const arr = Object.values(alunos).sort(ordemCodigo);
+        const ruins = arr.filter(a => avisoTel(a.tel) && !/fixo/.test(avisoTel(a.tel)));
+        return {
+          titulo: "Turma · " + title(inst.nome),
+          subtitulo: [
+            inst.formatura && inst.formatura.data
+              ? "Formatura " + U.fmtDate(inst.formatura.data) + "/" + inst.formatura.data.slice(0, 4)
+              : "",
+            arr.length + (arr.length === 1 ? " aluno" : " alunos")
+          ]
+            .filter(Boolean)
+            .join(" · "),
+          secoes: [
+            {
+              titulo: "Alunos",
+              tabela: {
+                cols: ["ID", "Formando", "Série", "WhatsApp", "Kits", "Em aberto"],
+                linhas: arr.map(a => [
+                  a.codigo,
+                  title(a.nome),
+                  a.serie,
+                  telRelatorio(a.tel),
+                  a.kits.join(", "),
+                  a.aberto ? brl(a.aberto) + (a.atr ? " (atrasado)" : "") : "—"
+                ])
+              },
+              vazio: "Nenhum formando cadastrado."
+            },
+            ...(ruins.length
+              ? [
+                  {
+                    titulo: "Telefones a conferir (" + ruins.length + ")",
+                    nota: "Estes números com certeza têm erro (DDD que não existe, celular sem o 9, número repetido). Peça o número certo.",
+                    tabela: { cols: ["ID", "Formando", "Telefone"], linhas: ruins.map(a => [a.codigo, title(a.nome), telRelatorio(a.tel)]) }
+                  }
+                ]
+              : [])
+          ]
+        };
+      }
       function form(f, preset) {
         const adm = C.isAdmin,
           base = preset && preset.base,
@@ -492,6 +570,26 @@ export function openTurma(ctx, inst, kits, aoFechar, opcoes) {
           const r1 = el("div", "row2");
           r1.append(field("Nome", nome), field("WhatsApp", tel));
           fp.append(r1);
+          // telefone que com certeza está errado: avisa na hora (não impede salvar)
+          const avTel = el("p", "wait");
+          fp.append(avTel);
+          const conferirTel = () => {
+            const a = tel.value.replace(/\D/g, "").length >= 4 ? avisoTel(tel.value) : "";
+            avTel.textContent = a
+              ? "⚠️ Confira este número: " + a + ". Se o WhatsApp abrir dizendo que o número não existe, peça outro."
+              : "";
+            avTel.hidden = !a;
+          };
+          tel.addEventListener("input", conferirTel);
+          conferirTel();
+          // ID do aluno (separação das fotos): o app dá o próximo número da turma; o admin pode trocar
+          const codigoIn = inp(
+            f ? f.codigo || "" : base ? base.codigo || "" : "",
+            f ? "ex.: CEPNCP - 07" : "automático (ex.: CEPNCP - 07)",
+            30
+          );
+          codigoIn.disabled = (!!f || !!base) && !adm;
+          fp.append(field("ID do aluno", codigoIn));
           // Kit do contrato: todo formando entra pelo menos com o Kit 01 (adesão)
           const kitAtual =
             f && f.status !== "semkit" ? f.kitId || (ehKit01(f) ? "k01" : f.kit ? "outro" : "k01") : preset.venda ? "k04" : "k01";
@@ -715,7 +813,9 @@ export function openTurma(ctx, inst, kits, aoFechar, opcoes) {
                 return;
               }
               const saiu = st.value === "desistiu" || st.value === "reprovou";
+              const codigo = codigoIn.value.trim().toUpperCase() || (f ? f.codigo || "" : codigoNovo(nome.value, base));
               const body = {
+                codigo,
                 contrato: k && ehAdesao(k.id) ? "adesao" : "album",
                 kitId: kit.value,
                 kit: k ? k.nome : kitTxt.value.trim(),
@@ -753,6 +853,15 @@ export function openTurma(ctx, inst, kits, aoFechar, opcoes) {
                     proxVenc: proxVenc(Object.assign({}, f, body, { pagamentos: pags }))
                   })
                 );
+                // ID trocado: os outros kits do mesmo aluno ficam com o mesmo ID
+                if (adm && codigo !== (f.codigo || "")) {
+                  const outros = lista.filter(x => x.id !== f.id && U.chave(x.nome) === U.chave(f.nome) && (x.codigo || "") !== codigo);
+                  if (outros.length) {
+                    const b = FS.writeBatch(db);
+                    outros.forEach(x => b.update(FS.doc(db, "formandos", x.id), { codigo, atualizadoEm: agora }));
+                    await b.commit();
+                  }
+                }
               } else {
                 const n = adm ? Math.min(P, n0(jaPagas.value)) : 0,
                   vals = dividir(v, P);

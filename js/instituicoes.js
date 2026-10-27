@@ -5,6 +5,7 @@ import { openEvento, reservarVarios, liberar, msgErroData, camposEvento, linhaEv
 import * as U from "./util.js";
 import { openImport } from "./instituicoes-import.js";
 import { botaoRelatorio, contar } from "./relatorio.js";
+import { siglaDe } from "./aluno-id.js";
 // (o Agendamento importa estas daqui; continuam disponíveis)
 export { KINDS, nomeEvento, avisarColegioPorEmail, painelAvisar, msgWhatsColegio } from "./eventos.js";
 // Módulo Instituições: colégio particular, colégio público, colégio profissionalizante e faculdade.
@@ -603,6 +604,15 @@ function openForm(it) {
           )
         : null;
     if (tipoSel) p.append(field("É faculdade ou curso profissionalizante?", tipoSel));
+    // Sigla do ID dos alunos (CEPNCP - 01...): em branco, o app usa as iniciais do nome
+    const sigla = inp(it ? it.sigla || "" : "", "", 16);
+    sigla.autocapitalize = "characters";
+    const sugere = () => {
+      sigla.placeholder = "automática: " + (siglaDe(nome.value) || "iniciais do nome");
+    };
+    nome.addEventListener("input", sugere);
+    sugere();
+    p.append(field("Sigla do ID dos alunos", sigla));
     const a = (it && it.endereco) || {};
     const rua = inp(title(a.rua)),
       num = inp(a.numero, "", 20),
@@ -758,6 +768,7 @@ function openForm(it) {
       const body = {
         nome: nome.value.trim(),
         nomeBusca: norm(nome.value),
+        sigla: sigla.value.replace(/[^A-Za-z0-9]/g, "").toUpperCase(),
         tipo: tipoK,
         endereco: { rua: rua.value.trim(), numero: num.value.trim(), bairro: bai.value.trim(), cidade: cid.value.trim() },
         mediaAlunos: somar() || null,

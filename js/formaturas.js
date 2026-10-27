@@ -27,6 +27,7 @@ import { editorPrecos } from "./precos.js";
 import * as Ev from "./eventos.js";
 import * as U from "./util.js";
 import { botaoRelatorio } from "./relatorio.js";
+import { siglaDe, telRelatorio } from "./aluno-id.js";
 // Leitura sob demanda: ao abrir, só as parcelas que vencem até o fim do mês (campo proxVenc);
 // a lista completa de formandos só é lida quando alguém abre as abas Adesão, Kits ou Turmas.
 let C,
@@ -201,13 +202,20 @@ async function carregarTudo(forcar) {
   }
 }
 // Abre a turma com os kits do tipo de colégio e, ao fechar, atualiza os números
+// (a sigla do ID dos alunos considera os outros colégios: iniciais repetidas usam o último nome inteiro)
 const abrirTurma = (i, novo) =>
   openTurma(
     C,
     i,
     Ev.produtos(i.tipo).filter(x => !x.formatura),
     () => carregarTudo(true),
-    { novo: !!novo }
+    {
+      novo: !!novo,
+      sigla: siglaDe(
+        i.nome,
+        insts.filter(x => x.id !== i.id).map(x => x.sigla || siglaDe(x.nome))
+      )
+    }
   );
 
 // Linha de Frente (turmas deste ano) ou Repasse (anos anteriores)
@@ -651,10 +659,12 @@ async function relatorioFormaturas() {
       {
         titulo: "Cobranças em atraso",
         tabela: {
-          cols: ["Formando", "Colégio", "Kit", "Parcela", "Valor", "Venceu"],
+          cols: ["ID", "Formando", "Colégio", "WhatsApp", "Kit", "Parcela", "Valor", "Venceu"],
           linhas: atr.map(({ f, venc }) => [
+            f.codigo || "",
             title(f.nome),
             title(f.instNome),
+            telRelatorio(f.tel),
             f.kit || (ehKit01(f) ? "Kit 01" : "Kit"),
             `${pagasDe(f) + 1}/${nParcelas(f)}`,
             moeda(valorParcela(f, pagasDe(f) + 1)),

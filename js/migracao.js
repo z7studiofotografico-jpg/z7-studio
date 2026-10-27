@@ -3,7 +3,8 @@
 import { pagamentosDe, proxVenc } from "./regras.js";
 import { norm } from "./ui.js";
 import { entradasFones } from "./pedidos.js";
-export const VERSAO_DADOS = 8;
+import { codigoBusca } from "./aluno-id.js";
+export const VERSAO_DADOS = 9;
 
 // cols = { instituicoes, formandos, repasse, agenda, ensaios, leads }: listas de { id, ...dados }
 // emailDe(nome) → e-mail da pessoa com esse nome ("" se não achar)
@@ -64,8 +65,13 @@ export function planejar(cols, emailDe) {
     if (ult && !(f.ultimoPag >= ult)) patch.ultimoPag = ult;
     if (Object.keys(patch).length) muda("formandos", "formandos", f.id, patch);
   }
-  for (const x of cols.repasse || [])
-    if (x.resp && !x.respEmail && emailDe(x.resp)) muda("PR", "repasse", x.id, { respEmail: emailDe(x.resp) });
+  for (const x of cols.repasse || []) {
+    const patch = {};
+    if (x.resp && !x.respEmail && emailDe(x.resp)) patch.respEmail = emailDe(x.resp);
+    // v9: ID do aluno (ex.: "CEPNCP - 01") no formato de busca, para achar o aluno digitando o ID
+    if (x.codigo && x.codigoBusca !== codigoBusca(x.codigo)) patch.codigoBusca = codigoBusca(x.codigo);
+    if (Object.keys(patch).length) muda("PR", "repasse", x.id, patch);
+  }
   // v8: índice de telefones do PR (acha a mesma família em outro ano ou colégio, ex.: aluno transferido)
   const fones = {};
   for (const x of cols.repasse || []) for (const [t, d] of entradasFones(x.id, x)) Object.assign((fones[t] = fones[t] || {}), d.alunos);

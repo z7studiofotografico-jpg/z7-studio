@@ -71,7 +71,11 @@ function secao(s) {
       const tb = el("tbody");
       linhas.forEach(l => {
         const x = el("tr");
-        l.forEach(v => x.append(el("td", null, v == null ? "" : String(v))));
+        // texto curto (ID, ano, data, valor) não quebra no meio
+        l.forEach(v => {
+          const t = v == null ? "" : String(v);
+          x.append(el("td", t.length <= 12 ? "curto" : null, t));
+        });
         tb.append(x);
       });
       t.append(th, tb);
