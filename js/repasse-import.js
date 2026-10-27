@@ -5,6 +5,20 @@ import * as U from "./util.js";
 let C, FS, db;
 const loadXLSX = () => carregarLib("xlsx");
 
+// Quais destes identificadores já estão no PR: consultas de 30 em 30 (limite do Firestore), 5 ao mesmo tempo
+export async function jaExistem(FS, col, ids) {
+  const grupos = [];
+  for (let i = 0; i < ids.length; i += 30) grupos.push(ids.slice(i, i + 30));
+  const achados = new Set();
+  for (let i = 0; i < grupos.length; i += 5)
+    await Promise.all(
+      grupos
+        .slice(i, i + 5)
+        .map(async g => (await FS.getDocs(FS.query(col, FS.where(FS.documentId(), "in", g)))).docs.forEach(d => achados.add(d.id)))
+    );
+  return achados;
+}
+
 // ui = { sheet, field, actions, meta } (janelinhas do PR e escolas/anos já importados); aoTerminar() recarrega escolas e números
 export function openImport(ctx, ui, aoTerminar) {
   C = ctx;
@@ -139,22 +153,23 @@ export function openImport(ctx, ui, aoTerminar) {
       out.append(prog);
       try {
         // Quem já existe mantém a etapa e o histórico; só os dados da planilha são atualizados.
-        const exist = new Set();
-        const cnt = await FS.getCountFromServer(col);
-        if (cnt.data().count) {
-          prog.textContent = "Conferindo quem já está no app…";
-          (await FS.getDocs(col)).docs.forEach(d => exist.add(d.id));
-        }
-        const ids = new Set();
+        // Confere só os alunos desta planilha (de 30 em 30), e não o PR inteiro.
+        const ids = new Set(),
+          idDe = sel.map((d, i) => {
+            let id = docId(d, i);
+            while (ids.has(id)) id += "-" + i;
+            ids.add(id);
+            return id;
+          });
+        prog.textContent = "Conferindo quem já está no app…";
+        const exist = await jaExistem(FS, col, idDe);
         const agora = new Date().toISOString();
         let novos = 0,
           atual = 0;
         const escolas = Object.assign({}, meta.escolas || {}),
           anos = Object.assign({}, meta.anos || {});
         const ops = sel.map((d, i) => {
-          let id = docId(d, i);
-          while (ids.has(id)) id += "-" + i;
-          ids.add(id);
+          const id = idDe[i];
           if (exist.has(id)) {
             atual++;
             return [id, Object.assign({}, d, { atualizadoEm: agora }), true];

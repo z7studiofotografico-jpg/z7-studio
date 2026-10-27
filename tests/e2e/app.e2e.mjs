@@ -785,6 +785,26 @@ await cenario("Adriano (admin), com os dados já atualizados no servidor", async
     );
     await pg.locator(".sheet:visible").getByRole("button", { name: "Fechar" }).click();
     await pg.waitForTimeout(200);
+    // a mesma planilha de novo: atualiza (não duplica) e não lê o PR inteiro
+    await pg.evaluate(() => {
+      window.__leituras = [];
+    });
+    await pg.getByRole("button", { name: "Importar planilha" }).click();
+    await pg.waitForTimeout(300);
+    await pg.locator(".sheet:visible input[type=file]").setInputFiles({ name: "pr.csv", mimeType: "text/csv", buffer: Buffer.from(csv) });
+    await pg.waitForFunction(() => /2 formandos encontrados/.test(document.body.textContent), null, { timeout: 8000 }).catch(() => {});
+    await pg.locator(".sheet:visible button[type=submit]").click();
+    await pg.waitForFunction(() => /Pronto!/.test(document.body.textContent), null, { timeout: 8000 }).catch(() => {});
+    s = await store();
+    const leitPR = await pg.evaluate(() => window.__leituras.filter(l => l.col === "repasse"));
+    ok(
+      Object.values(s).filter(x => x.nome === "Joana Planilha").length === 1 &&
+        /2 atualizados/.test(await pg.textContent("body")) &&
+        !leitPR.some(l => l.filtros === 0),
+      "importar de novo: atualiza sem duplicar e sem ler o PR inteiro"
+    );
+    await pg.locator(".sheet:visible").getByRole("button", { name: "Fechar" }).click();
+    await pg.waitForTimeout(200);
   });
   await etapa(pg, "Importar instituições", async () => {
     // Instituições: importar planilha (módulo instituicoes-import.js)

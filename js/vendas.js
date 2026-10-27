@@ -3,6 +3,7 @@
 // alguém toca em "Atualizar agora". O cálculo fica em js/calc.js (o mesmo no app e no script).
 // Valores em centavos até a hora de mostrar. Gráficos com Chart.js, carregado só aqui.
 import { resumir, periodo as somaPeriodo, comissaoDe } from "./calc.js";
+import { lerFontes } from "./fontes-resumo.js";
 import { brl, reais, taxa } from "./regras.js";
 import { el, title, carregarLib } from "./ui.js";
 import * as U from "./util.js";
@@ -125,27 +126,17 @@ async function atualizar(bt) {
     bt.textContent = "Atualizando…";
   }
   try {
-    const get = async q => (await FS.getDocs(q)).docs.map(d => Object.assign({ id: d.id }, d.data()));
-    const col = n => FS.collection(db, n);
-    // Funil: só os últimos 24 meses (o Dashboard guarda 24 meses), não a história inteira
-    const corte = U.addDays(-730);
-    const [leadsNovos, leadsFechados, prs, forms, insts, ens, becas, separados] = await Promise.all([
-      get(FS.query(col("leads"), FS.where("criadoEm", ">=", corte))),
-      get(FS.query(col("leads"), FS.where("fechadoEm", ">=", corte))),
-      get(FS.query(col("repasse"), FS.where("etapa", "in", ["PAGO", "ENTREGUE"]))),
-      get(FS.query(col("formandos"))),
-      get(FS.query(col("instituicoes"))),
-      get(FS.query(col("ensaios"), FS.where("data", ">=", U.addDays(-730)))),
-      get(FS.query(col("becas"))),
-      get(FS.query(col("repasse"), FS.where("separadoEm", ">=", U.addDays(-730))))
-    ]);
-    const leads = [...new Map([...leadsNovos, ...leadsFechados].map(l => [l.id, l])).values()];
+    const ler = async (c, filtros) =>
+      (await FS.getDocs(FS.query(FS.collection(db, c), ...filtros.map(([a, o, v]) => FS.where(a, o, v))))).docs.map(d =>
+        Object.assign({ id: d.id }, d.data())
+      );
+    const fontes = await lerFontes(ler, U.todayStr(), Number((C.P || {}).versaoDados) || 0);
     const porNome = Object.fromEntries(
       Object.entries(C.usuarios || {})
         .filter(([, u]) => u.nome)
         .map(([em, u]) => [u.nome, em])
     );
-    resumo = resumir({ leads, prs, forms, insts, ens, becas, separados }, U.todayStr(), porNome);
+    resumo = resumir(fontes, U.todayStr(), porNome);
     await FS.setDoc(FS.doc(db, "resumos", "dashboard"), resumo);
     await carregarChart().catch(() => {});
     desenhar();

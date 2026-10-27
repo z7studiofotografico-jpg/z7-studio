@@ -65,6 +65,8 @@ function run(q) {
           return w.v.includes(a);
         case "array-contains":
           return (a || []).includes(w.v);
+        case "array-contains-any":
+          return (a || []).some(v => w.v.includes(v));
       }
       return true;
     });

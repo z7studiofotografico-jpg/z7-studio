@@ -66,3 +66,28 @@ test("v6: Kit 01 vira 'adesao' e o preço antigo de colação da turma vira o Ki
   assert.equal(op("formandos", "f2"), undefined);
   assert.equal(conta["formandos antigos sem kit (não mudados)"], 1);
 });
+
+test("v7: guarda a data do último pagamento (para o resumo não ler todos os formandos)", () => {
+  const { ops } = planejar(
+    {
+      formandos: [
+        {
+          id: "f1",
+          respEmail: "",
+          proxVenc: "",
+          pagamentos: [
+            { data: "2025-03-05", valor: 1 },
+            { data: "2025-05-05", valor: 1 }
+          ]
+        },
+        { id: "f2", respEmail: "", proxVenc: "", pagamentos: [{ data: "2025-03-05", valor: 1 }], ultimoPag: "2025-03-05" },
+        { id: "f3", respEmail: "", proxVenc: "", pagamentos: [] }
+      ]
+    },
+    () => ""
+  );
+  const de = id => (ops.find(o => o.col === "formandos" && o.id === id) || {}).dados;
+  assert.equal(de("f1").ultimoPag, "2025-05-05");
+  assert.equal(de("f2"), undefined);
+  assert.equal(de("f3"), undefined);
+});

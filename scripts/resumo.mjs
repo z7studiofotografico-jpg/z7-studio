@@ -4,7 +4,7 @@
 import { initializeApp, cert } from "firebase-admin/app";
 import { getFirestore } from "firebase-admin/firestore";
 import { resumir } from "../js/calc.js";
-import { somaDias } from "../js/regras.js";
+import { lerFontes } from "../js/fontes-resumo.js";
 
 if (!process.env.FIREBASE_SERVICE_ACCOUNT) {
   console.error("Falta o segredo FIREBASE_SERVICE_ACCOUNT no GitHub.");
@@ -20,21 +20,11 @@ if (atual && atual.hoje === hoje && !process.env.FORCAR) {
   process.exit(0);
 }
 const ler = async q => (await q.get()).docs.map(d => Object.assign({ id: d.id }, d.data()));
-// Funil: só os últimos 24 meses (o Dashboard guarda 24 meses)
-const corte = somaDias(hoje, -730);
-const [leadsNovos, leadsFechados, prs, forms, insts, ens, becas, separados] = await Promise.all([
-  ler(db.collection("leads").where("criadoEm", ">=", corte)),
-  ler(db.collection("leads").where("fechadoEm", ">=", corte)),
-  ler(db.collection("repasse").where("etapa", "in", ["PAGO", "ENTREGUE"])),
-  ler(db.collection("formandos")),
-  ler(db.collection("instituicoes")),
-  ler(db.collection("ensaios").where("data", ">=", somaDias(hoje, -730))),
-  ler(db.collection("becas")),
-  ler(db.collection("repasse").where("separadoEm", ">=", somaDias(hoje, -730)))
-]);
-const leads = [...new Map([...leadsNovos, ...leadsFechados].map(l => [l.id, l])).values()];
+// o que ler está em js/fontes-resumo.js (o mesmo do botão "Atualizar agora")
+const versao = Number(((await db.collection("config").doc("app").get()).data() || {}).versaoDados) || 0;
+const fontes = await lerFontes((c, filtros) => ler(filtros.reduce((q, [a, o, v]) => q.where(a, o, v), db.collection(c))), hoje, versao);
 const porNome = Object.fromEntries((await ler(db.collection("usuarios"))).filter(u => u.nome).map(u => [u.nome, u.id]));
-const r = resumir({ leads, prs, forms, insts, ens, becas, separados }, hoje, porNome);
+const r = resumir(fontes, hoje, porNome);
 // só grava se mudou alguma coisa (além do horário)
 const semHora = x => JSON.stringify(Object.assign({}, x, { geradoEm: null, hoje: null }));
 if (atual && semHora(atual) === semHora(r)) {

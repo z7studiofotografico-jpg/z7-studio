@@ -2,7 +2,7 @@
 // Usado por scripts/migrar.mjs (no GitHub) e testado em tests/migracao.test.mjs.
 import { pagamentosDe, proxVenc } from "./regras.js";
 import { norm } from "./ui.js";
-export const VERSAO_DADOS = 6;
+export const VERSAO_DADOS = 7;
 
 // cols = { instituicoes, formandos, repasse, agenda, ensaios, leads }: listas de { id, ...dados }
 // emailDe(nome) → e-mail da pessoa com esse nome ("" se não achar)
@@ -51,6 +51,13 @@ export function planejar(cols, emailDe) {
     const pv = proxVenc({ ...f, pagamentos: pags });
     if (f.proxVenc !== pv) patch.proxVenc = pv;
     if (f.respEmail == null) patch.respEmail = emailDe(f.resp) || (insts[f.instId] || {}).respEmail || "";
+    // v7: data do último pagamento (o resumo da madrugada lê só quem pagou nos últimos 24 meses)
+    const ult = pags
+      .map(p => p.data)
+      .filter(Boolean)
+      .sort()
+      .pop();
+    if (ult && !(f.ultimoPag >= ult)) patch.ultimoPag = ult;
     if (Object.keys(patch).length) muda("formandos", "formandos", f.id, patch);
   }
   for (const x of cols.repasse || [])
