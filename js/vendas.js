@@ -685,9 +685,14 @@ async function mostrarMeu(v) {
   corpo.id = "vdCorpo";
   corpo.append(el("div", "empty", "Carregando…"));
   v.append(corpo);
-  let fatia = null;
+  let fatia = null,
+    falhou = false;
   const desenharMeu = () => {
     corpo.innerHTML = "";
+    if (falhou) {
+      corpo.append(el("div", "empty", "Não foi possível carregar os seus números agora. Verifique a internet e abra de novo."));
+      return;
+    }
     if (!fatia) {
       corpo.append(
         el(
@@ -770,6 +775,7 @@ async function mostrarMeu(v) {
     fatia = s.exists() ? s.data() : null;
   } catch (e) {
     console.warn("[Z7] meu desempenho", e);
+    falhou = true;
   }
   desenharMeu();
 }

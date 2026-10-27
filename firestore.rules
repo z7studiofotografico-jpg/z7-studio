@@ -71,7 +71,8 @@ service cloud.firestore {
     }
 
     match /instituicoes/{id} {
-      allow read: if admin() || (pode('colegios') && minhaOuLivre());
+      // quem só tem Formaturas também lê as turmas da carteira (para ver os formandos), mas não muda o cadastro
+      allow read: if admin() || ((pode('colegios') || pode('formaturas')) && minhaOuLivre());
       allow create: if admin() || (pode('colegios') && request.resource.data.get('respEmail', email()) == email());
       // valores da turma (kits, contrato) e responsável: só admin (o responsável recebe a comissão da turma)
       allow update: if admin() || (pode('colegios') && minhaOuLivre() && respOk() && !mudou(['kits', 'contratoTurma'])

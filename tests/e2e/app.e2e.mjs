@@ -37,7 +37,9 @@ const ok = (cond, msg) => {
 };
 const ADRIANO = "z7studiofotografico@gmail.com",
   PEDRO = "pedro@vendas.com",
-  NOVO = "novo@equipe.com";
+  NOVO = "novo@equipe.com",
+  ANA = "ana@equipe.com",
+  FORM = "form@equipe.com";
 const hoje = new Date(),
   iso = d => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
 import { feriado } from "../../js/feriados.js";
@@ -51,6 +53,8 @@ const dia = n => {
 const base = {
   ["usuarios/" + PEDRO]: { nome: "Pedro Vendedor", papel: "equipe", ativo: true, modulos: ["lf", "agenda", "colegios"] },
   ["usuarios/" + NOVO]: { nome: "Novo", papel: "equipe", ativo: true },
+  ["usuarios/" + ANA]: { nome: "Ana Vendedora", papel: "equipe", ativo: true, modulos: ["becas", "agenda", "funil", "rep"] },
+  ["usuarios/" + FORM]: { nome: "Fabi Formaturas", papel: "equipe", ativo: true, modulos: ["formaturas"] },
   "config/app": { individual: 450, sinal: 100, prazo: 15, comissao: {} },
   "leads/l1": {
     nome: "Erica Souza",
@@ -915,6 +919,10 @@ await cenario("Adriano (admin), com os dados já atualizados no servidor", async
         s["fones/21966667777"].alunos[mariaNova[0].slice(8)],
       "cadastrado como novo para o vendedor (o antigo continua no Repasse) e telefone no índice"
     );
+    ok(
+      mariaNova && /^\d\dCN-01$/.test(mariaNova[1].codigo || ""),
+      "aluno cadastrado como novo também ganha o ID (" + (mariaNova && mariaNova[1].codigo) + ")"
+    );
     // PR: importar planilha (módulo repasse-import.js)
     await pg.getByRole("button", { name: "Importar planilha" }).click();
     await calmo(pg);
@@ -1693,6 +1701,90 @@ await cenario("Relatórios para imprimir (um por card)", async () => {
     ok(erros.length === 0, "sem erros no console" + (erros.length ? ": " + erros.slice(0, 3).join(" | ") : ""));
   }
 });
+
+// Varredura: cada perfil abre todas as telas que vê, todas as abas e filtros, o relatório e os formulários de "+ ...",
+// sem gravar nada. Nenhum erro no console, nenhuma tela de "Erro no app".
+const TELAS = {
+  agenda: "#agenda",
+  becas: "#becas",
+  colegios: "#instituicoes",
+  formaturas: "#formaturas",
+  pr: "#pr",
+  vendas: "#vendas",
+  funil: "#funil"
+};
+for (const [quem, email] of [
+  ["admin", ADRIANO],
+  ["Pedro (LF, agenda, colégios)", PEDRO],
+  ["Ana (becas, agenda, funil, repasse)", ANA],
+  ["Fabi (só formaturas)", FORM]
+])
+  await cenario("Varredura de telas: " + quem, async () => {
+    const { pg, erros } = await abrir(email, migrar(base));
+    const vistos = await visiveis(pg);
+    const telas = vistos.map(m => TELAS[m]).filter(Boolean);
+    if (vistos.includes("colegios")) telas.push("#inst-particular", "#inst-publico", "#inst-superior");
+    const ruins = [];
+    let cliques = 0;
+    const confere = async onde => {
+      const t = await pg.evaluate(() => {
+        const v = document.querySelector("main section:not([hidden])") || document.body;
+        return v.innerText;
+      });
+      if (/Erro no app|Cole as regras|não foi possível carregar|Não foi possível carregar/i.test(t))
+        ruins.push(onde + ": " + t.slice(0, 120));
+    };
+    for (const h of telas) {
+      await etapa(pg, quem + " " + h, async () => {
+        await ir(pg, h);
+        await confere(h);
+        // abas e filtros da tela
+        const abas = await pg.$$eval("section:not([hidden]) .chip, section:not([hidden]) .seg", bs =>
+          bs.filter(b => b.offsetParent).map((b, i) => i)
+        );
+        for (const i of abas.slice(0, 14)) {
+          const b = pg.locator("section:not([hidden]) .chip, section:not([hidden]) .seg").nth(i);
+          if (await b.isVisible().catch(() => false)) {
+            await b.click({ timeout: 3000 }).catch(() => {});
+            cliques++;
+            await calmo(pg);
+          }
+        }
+        await confere(h + " (abas)");
+        // relatório
+        const rel = pg.locator("section:not([hidden])").getByRole("button", { name: "🖨️ Relatório" }).first();
+        if (await rel.isVisible().catch(() => false)) {
+          await rel.click();
+          await pg.waitForSelector("#relatorio", { timeout: 5000 }).catch(() => ruins.push(h + ": relatório não abriu"));
+          await pg
+            .locator("#relatorio")
+            .getByRole("button", { name: "Fechar" })
+            .click()
+            .catch(() => {});
+        }
+        // formulários "+ ..." da tela: abre e cancela
+        const mais = await pg.locator("section:not([hidden]) button").filter({ hasText: /^\+ / }).all();
+        for (const b of mais.slice(0, 4)) {
+          if (!(await b.isVisible().catch(() => false))) continue;
+          await b.click({ timeout: 3000 }).catch(() => {});
+          cliques++;
+          await calmo(pg);
+          await pg.evaluate(() => document.querySelectorAll(".sheet").forEach(x => (x.id ? (x.hidden = true) : x.remove())));
+          await pg.evaluate(() => {
+            const s = document.getElementById("sheet");
+            if (s) s.hidden = true;
+          });
+        }
+        await confere(h + " (formulários)");
+      });
+    }
+    ok(
+      ruins.length === 0,
+      `${quem}: ${telas.length} telas e ${cliques} abas/formulários sem aviso de erro` +
+        (ruins.length ? " — " + ruins.slice(0, 4).join(" | ") : "")
+    );
+    ok(erros.length === 0, quem + ": sem erros no console" + (erros.length ? ": " + erros.slice(0, 4).join(" | ") : ""));
+  });
 
 await cenario("Cadastro sem módulos", async () => {
   const { pg } = await abrir(NOVO, Object.assign({}, base, { "config/app": { versaoDados: 4 } }));

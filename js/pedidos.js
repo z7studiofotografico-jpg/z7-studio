@@ -9,6 +9,7 @@
 import { el, title } from "./ui.js";
 import { faltando, docId } from "./repasse-dados.js";
 import * as U from "./util.js";
+import { siglaDe, siglaUsada, reservarCodigo, codigoBusca } from "./aluno-id.js";
 
 const ANO = () => new Date().getFullYear();
 const VENDIDO = ["PAGO", "ENTREGUE"];
@@ -125,6 +126,51 @@ const ondeEsta = r =>
           : "está na fila do repasse";
 const dia = d => (d ? String(d).slice(8, 10) + "/" + String(d).slice(5, 7) : "");
 
+// ---------- ID do aluno do PR (26CEPNCP-01) ----------
+// A sigla: a que o colégio já usa nos alunos do ano; senão a do cadastro do colégio (Instituições);
+// senão a de outro ano; senão as iniciais do nome (com o último nome inteiro se repetir com outro colégio).
+// O número é reservado no banco (nunca repete). Também acerta o nome do colégio para o jeito que já está no PR.
+export async function gerarCodigoPR(C, d, nomesEscolas) {
+  if (!d.escola) return "";
+  const { FS, db } = C,
+    col = FS.collection(db, "repasse"),
+    ano = Number(d.ano) || ANO();
+  const jeitos = [...new Set([d.escola, d.escola.toUpperCase(), title(d.escola), U.chave(d.escola)])];
+  const doAno = (await FS.getDocs(FS.query(col, FS.where("escola", "in", jeitos), FS.where("ano", "==", ano), FS.limit(3000)))).docs.map(
+    x => x.data()
+  );
+  if (doAno.length && !doAno.some(x => x.escola === d.escola)) d.escola = doAno[0].escola;
+  let sigla = siglaUsada(doAno.map(x => x.codigo));
+  // (quem não é admin só lê os colégios livres e os seus: a consulta já vai com esse filtro)
+  if (!sigla && (C.isAdmin || C.pode("colegios") || C.pode("formaturas")))
+    try {
+      const s = await FS.getDocs(
+        FS.query(
+          FS.collection(db, "instituicoes"),
+          FS.where("nomeBusca", "==", U.chave(d.escola)),
+          ...(C.isAdmin ? [] : [FS.where("respEmail", "in", ["", C.email])]),
+          FS.limit(1)
+        )
+      );
+      sigla = (s.docs[0] && s.docs[0].data().sigla) || "";
+    } catch (e) {
+      console.warn("[Z7] sigla do colégio", e);
+    }
+  if (!sigla && (C.isAdmin || C.pode("rep")))
+    sigla = siglaUsada((await FS.getDocs(FS.query(col, FS.where("escola", "in", jeitos), FS.limit(200)))).docs.map(x => x.data().codigo));
+  if (!sigla) {
+    const outras = (nomesEscolas || []).filter(n => U.chave(n) !== U.chave(d.escola)).map(n => siglaDe(n));
+    sigla = siglaDe(d.escola, outras);
+  }
+  return reservarCodigo(
+    FS,
+    db,
+    ano,
+    sigla,
+    doAno.map(x => x.codigo)
+  );
+}
+
 // ---------- procurar e pedir ----------
 // Procura o aluno no PR: pelo telefone (índice, qualquer colégio e ano) e pelo nome completo.
 // Devolve o aluno com "comparacao" ({ motivo, trocouColegio }) ou null.
@@ -193,7 +239,7 @@ export async function pedirAluno(C, r, d) {
         contatos: d.contatos || []
       },
       anteriores,
-      motivo: (r.comparacao || {}).motivo || "",
+      achadoPor: (r.comparacao || {}).motivo || "", // telefone | pais | colegio
       trocouColegio: !!(r.comparacao || {}).trocouColegio,
       status: "pendente",
       visto: false,
@@ -215,6 +261,13 @@ export async function pedirAluno(C, r, d) {
 // ---------- decidir (só admin) ----------
 // acao: "passar" (o aluno passa para quem pediu) | "manter" (fica onde está) | "novo" (cadastra outro, para quem pediu)
 export async function decidir(C, p, acao) {
+  // aluno cadastrado como novo também ganha o ID (reservado antes, fora da transação)
+  let codigo = "";
+  if (acao === "novo") {
+    const d = Object.assign({}, p.dados || {});
+    codigo = await gerarCodigoPR(C, d).catch(e => (console.warn("[Z7] ID do aluno", e), ""));
+    if (d.escola) p = Object.assign({}, p, { dados: Object.assign({}, p.dados, { escola: d.escola }) });
+  }
   const { FS, db } = C,
     pRef = FS.doc(db, "pedidos", p.id),
     rRef = FS.doc(db, "repasse", p.alvoId),
@@ -230,7 +283,10 @@ export async function decidir(C, p, acao) {
       return "negado";
     }
     if (acao === "novo") {
-      const novo = alunoNovo(ped, hoje, agora),
+      const novo = Object.assign(alunoNovo(Object.assign({}, ped, { dados: p.dados || ped.dados }), hoje, agora), {
+          codigo,
+          codigoBusca: codigo ? codigoBusca(codigo) : ""
+        }),
         nRef = FS.doc(db, "repasse", docId(novo, Date.now()) + "-" + Date.now().toString(36));
       tx.set(nRef, novo);
       indexarFones(FS, db, tx, nRef.id, novo);
@@ -239,13 +295,13 @@ export async function decidir(C, p, acao) {
     }
     const rs = await tx.get(rRef);
     if (!rs.exists()) {
-      tx.update(pRef, Object.assign({ status: "negado", motivo: "o aluno não existe mais" }, decisao));
+      tx.update(pRef, Object.assign({ status: "negado", motivoDecisao: "o aluno não existe mais" }, decisao));
       return "sumiu";
     }
     const antes = rs.data(),
       patch = passarPara(antes, ped, hoje);
     if (!patch) {
-      tx.update(pRef, Object.assign({ status: "negado", motivo: "o aluno já foi vendido" }, decisao));
+      tx.update(pRef, Object.assign({ status: "negado", motivoDecisao: "o aluno já foi vendido" }, decisao));
       return "vendido";
     }
     tx.update(rRef, patch);
@@ -329,7 +385,7 @@ function cartaoAdmin(C, p, todos) {
       el(
         "p",
         "wait",
-        `🏫 Trocou de colégio: ${title(p.escola) || "colégio anterior"} → ${title(d.escola)} (achado pelo ${p.motivo === "pais" ? "nome da mãe e do pai" : "telefone"}). Confira e decida.`
+        `🏫 Trocou de colégio: ${title(p.escola) || "colégio anterior"} → ${title(d.escola)} (achado pelo ${(p.achadoPor || p.motivo) === "pais" ? "nome da mãe e do pai" : "telefone"}). Confira e decida.`
       )
     );
   const ant = (p.anteriores || []).filter(a => a.status);
@@ -381,6 +437,8 @@ function cartaoAdmin(C, p, todos) {
     });
   return c;
 }
+// motivo da decisão para a equipe (pedidos antigos guardavam em "motivo", junto com como o aluno foi achado)
+const motivoDecisao = p => p.motivoDecisao || (["telefone", "pais", "colegio"].includes(p.motivo) ? "" : p.motivo || "");
 function cartaoEquipe(C, p) {
   const c = el("div", "notes");
   const aluno = title((p.dados && p.dados.nome) || p.aluno);
@@ -396,7 +454,7 @@ function cartaoEquipe(C, p) {
             ? `✅ ${aluno} passou para você: já está na sua lista.`
             : p.status === "novo"
               ? `✅ ${aluno} foi cadastrado como novo para você: já está na sua lista.`
-              : `${aluno} ficou onde estava${p.motivo ? " (" + p.motivo + ")" : ""}. Não precisa trabalhar esse contato.`
+              : `${aluno} ficou onde estava${motivoDecisao(p) ? " (" + motivoDecisao(p) + ")" : ""}. Não precisa trabalhar esse contato.`
     )
   );
   if (p.status !== "pendente")

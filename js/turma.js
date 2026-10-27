@@ -234,7 +234,8 @@ export function openTurma(ctx, inst, kits, aoFechar, opcoes) {
               : `Previsão de alunos (média): ${inst.mediaAlunos ? "~" + inst.mediaAlunos : "não informada"} · cadastrados aqui: ${nomesUnicos}`
           )
         );
-        if (nomesUnicos && nomesUnicos !== inst.alunosConfirmados) {
+        // confirmar a quantidade muda o cadastro do colégio: só quem cuida dos colégios (ou o admin)
+        if (nomesUnicos && nomesUnicos !== inst.alunosConfirmados && (C.isAdmin || C.pode("colegios"))) {
           const b = U.mkBtn(`✔ Confirmar quantidade certa: ${nomesUnicos} alunos`, "btn-verde", async () => {
             try {
               await FS.updateDoc(FS.doc(db, "instituicoes", inst.id), {

@@ -11,19 +11,8 @@ import * as U from "./util.js";
 import { norm, faltando, docId, situacaoTxt, enderecoTxt } from "./repasse-dados.js";
 import { openImport } from "./repasse-import.js";
 import { botaoRelatorio, contar } from "./relatorio.js";
-import {
-  siglaDe,
-  siglaUsada,
-  reservarCodigo,
-  codigoBusca,
-  comAno,
-  pareceCodigo,
-  codigosDaBusca,
-  ordemCodigo,
-  avisoTel,
-  telRelatorio
-} from "./aluno-id.js";
-import { procurarRepetido, pedirAluno, painelPedidos, indexarFones } from "./pedidos.js";
+import { codigoBusca, comAno, pareceCodigo, codigosDaBusca, ordemCodigo, avisoTel, telRelatorio } from "./aluno-id.js";
+import { procurarRepetido, pedirAluno, painelPedidos, indexarFones, gerarCodigoPR } from "./pedidos.js";
 // Assumir o contato: quem não é admin só assume o que está sem responsável (ou já é seu)
 const assumir = it => (!C.isAdmin && it.respEmail && it.respEmail !== C.email ? {} : { resp: C.me, respEmail: C.email || "" });
 
@@ -441,30 +430,8 @@ function telAvisos(it) {
   if (!ruins.length) return "";
   return "⚠️ Telefone a conferir: " + ruins.map(([c, a]) => `${c.tipo || "contato"} (${a})`).join(", ");
 }
-// ID do aluno novo: a sigla que o colégio já usa (ou as iniciais do nome) e o próximo número do colégio naquele ano
-async function gerarCodigo(d) {
-  if (!d.escola) return "";
-  // o mesmo colégio pode estar escrito em maiúsculas (planilha) ou não (incluído à mão)
-  const jeitos = [...new Set([d.escola, d.escola.toUpperCase(), title(d.escola), U.chave(d.escola)])];
-  const filtros = [FS.where("escola", "in", jeitos)];
-  if (!C.pode("rep")) filtros.push(...baseLF());
-  const s = await FS.getDocs(FS.query(col, ...filtros, FS.limit(3000)));
-  const todos = s.docs.map(x => x.data());
-  // aluno novo entra com o nome do colégio do jeito que já está no PR (fica junto na busca por escola)
-  if (todos.length && !todos.some(x => x.escola === d.escola)) d.escola = todos[0].escola;
-  const outras = Object.keys(meta.escolas || {})
-    .filter(n => norm(n) !== norm(d.escola))
-    .map(n => siglaDe(n));
-  const sigla = siglaUsada(todos.map(x => x.codigo)) || siglaDe(d.escola, outras);
-  // número reservado no banco: dois cadastros ao mesmo tempo nunca pegam o mesmo ID
-  return reservarCodigo(
-    FS,
-    db,
-    d.ano || ANO(),
-    sigla,
-    todos.filter(x => !d.ano || x.ano === d.ano).map(x => x.codigo)
-  );
-}
+// ID do aluno novo (26CEPNCP-01): ver gerarCodigoPR em pedidos.js
+const gerarCodigo = d => gerarCodigoPR(C, d, Object.keys(meta.escolas || {}));
 async function buscar() {
   if (tab !== "buscar") return;
   const txt = $("rQ").value.trim(),
@@ -536,6 +503,15 @@ async function buscar() {
   }
 }
 
+// Os contatos que a aba mostra (a lista e o relatório usam a mesma regra)
+function naTela() {
+  let arr = tab === "buscar" ? items.slice() : items.filter(noSeg);
+  if (tab === "hoje") {
+    const t0 = U.todayStr();
+    arr = arr.filter(it => (ABERTAS.includes(it.etapa) || it.etapa === "ENTREGUE") && it.followup && it.followup <= t0);
+  }
+  return arr;
+}
 function renderList(loading, emptyMsg) {
   const list = $("rList");
   list.innerHTML = "";
@@ -546,11 +522,7 @@ function renderList(loading, emptyMsg) {
     list.append(e);
     return;
   }
-  let arr = tab === "buscar" ? items.slice() : items.filter(noSeg);
-  if (tab === "hoje") {
-    const t0 = U.todayStr();
-    arr = arr.filter(it => (ABERTAS.includes(it.etapa) || it.etapa === "ENTREGUE") && it.followup && it.followup <= t0);
-  }
+  const arr = naTela();
   if (!arr.length) {
     const e = el("div", "empty");
     e.style.gridColumn = "1/-1";
@@ -1542,9 +1514,9 @@ function relatorioPR() {
   const dataBR = d => (d ? U.fmtDate(d) + "/" + String(d).slice(0, 4) : "");
   const esc = $("rEscola") ? $("rEscola").value : "";
   // escola escolhida na busca: lista na ordem do ID (para a separação das fotos)
-  const lista = items
-    .slice()
-    .sort(tab === "buscar" && esc ? ordemBusca(true) : (a, b) => String(a.followup || "9").localeCompare(String(b.followup || "9")));
+  const lista = naTela().sort(
+    tab === "buscar" && esc ? ordemBusca(true) : (a, b) => String(a.followup || "9").localeCompare(String(b.followup || "9"))
+  );
   const tels = x =>
     [...(x.contatos || []).map(c => (c.tipo ? c.tipo + ": " : "") + telRelatorio(c.tel)), x.email || ""].filter(Boolean).join(" / ");
   return {

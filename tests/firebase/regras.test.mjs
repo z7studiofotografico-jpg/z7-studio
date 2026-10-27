@@ -2,13 +2,27 @@
 import { test, before, after, beforeEach } from "node:test";
 import fs from "node:fs";
 import { initializeTestEnvironment, assertSucceeds, assertFails } from "@firebase/rules-unit-testing";
-import { doc, getDoc, setDoc, updateDoc, deleteDoc, collection, getDocs, query, where } from "firebase/firestore";
+import {
+  doc,
+  getDoc,
+  setDoc,
+  updateDoc,
+  deleteDoc,
+  collection,
+  getDocs,
+  query,
+  where,
+  orderBy,
+  limit,
+  getCountFromServer
+} from "firebase/firestore";
 
 const ADRIANO = "z7studiofotografico@gmail.com",
   LUCIANA = "lucianafanjos@gmail.com",
   PEDRO = "pedro@vendas.com",
   ANA = "ana@equipe.com",
-  NOVO = "novo@equipe.com";
+  NOVO = "novo@equipe.com",
+  FORM = "form@equipe.com";
 let env;
 const como = em => env.authenticatedContext(em, { email: em }).firestore();
 const semRegra = fn => env.withSecurityRulesDisabled(c => fn(c.firestore()));
@@ -28,6 +42,7 @@ beforeEach(async () => {
     await setDoc(doc(db, "usuarios", PEDRO), { nome: "Pedro", papel: "equipe", ativo: true, modulos: ["lf", "agenda", "colegios"] });
     await setDoc(doc(db, "usuarios", ANA), { nome: "Ana", papel: "equipe", ativo: true, modulos: ["becas", "agenda", "funil", "rep"] });
     await setDoc(doc(db, "usuarios", NOVO), { nome: "Novo", papel: "equipe", ativo: true });
+    await setDoc(doc(db, "usuarios", FORM), { nome: "Fabi", papel: "equipe", ativo: true, modulos: ["formaturas"] });
     await setDoc(doc(db, "instituicoes", "i1"), { nome: "ALFA", etapa: "FECHADO", resp: "Pedro", respEmail: PEDRO });
     await setDoc(doc(db, "instituicoes", "i2"), { nome: "BETA", etapa: "A VISITAR", resp: "", respEmail: "" });
     await setDoc(doc(db, "instituicoes", "i3"), { nome: "GAMA", etapa: "VISITADO", resp: "Ana", respEmail: ANA });
@@ -377,4 +392,62 @@ test("ID do aluno: quem cadastra aluno reserva o próximo número; o contador s�
   await assertSucceeds(setDoc(doc(db, "ids", "26BETA"), { ultimo: 1 }));
   await assertFails(deleteDoc(doc(db, "ids", "26ALFA")));
   await assertFails(getDoc(doc(como(NOVO), "ids", "26ALFA")));
+});
+
+// As mesmas consultas que o app faz para quem é da equipe (se a regra recusar, a pessoa veria erro na tela)
+const ANO = new Date().getFullYear();
+const c = (db, n) => collection(db, n);
+test("consultas da equipe 1: Funil (leads livres e os seus)", async () => {
+  const db = como(ANA);
+  await assertSucceeds(
+    getDocs(query(c(db, "leads"), where("respEmail", "==", ""), where("etapa", "in", ["NOVO LEAD", "FOLLOW-UP"]), limit(2000)))
+  );
+  await assertSucceeds(getDocs(query(c(db, "leads"), where("respEmail", "==", ANA), limit(2000))));
+  await assertFails(getDocs(query(c(db, "leads"), where("etapa", "in", ["NOVO LEAD"]), limit(2000))));
+});
+test("consultas da equipe 2: carteira de colégios, formandos e contagens da tela inicial", async () => {
+  for (const em of [PEDRO, FORM]) {
+    const db = como(em);
+    await assertSucceeds(getDocs(query(c(db, "instituicoes"), where("respEmail", "in", ["", em]), limit(3000))));
+    await assertSucceeds(getDocs(query(c(db, "formandos"), where("respEmail", "==", em), limit(3000))));
+  }
+  // sigla do colégio no "+ Aluno": procura o colégio pelo nome, dentro da carteira
+  await assertSucceeds(
+    getDocs(query(c(como(PEDRO), "instituicoes"), where("nomeBusca", "==", "ALFA"), where("respEmail", "in", ["", PEDRO]), limit(1)))
+  );
+  // só formaturas: lê as turmas da carteira (card Formaturas), mas não mexe no cadastro do colégio
+  await assertSucceeds(getDoc(doc(como(FORM), "instituicoes", "i2")));
+  await assertFails(updateDoc(doc(como(FORM), "instituicoes", "i2"), { notas: "x" }));
+  const p = como(PEDRO);
+  await assertSucceeds(getCountFromServer(query(c(p, "agenda"), where("status", "==", "pendente"))));
+  await assertSucceeds(getDocs(query(c(p, "agenda"), where("data", ">=", "2026-01-01"), orderBy("data"), limit(400))));
+  await assertSucceeds(getDocs(query(c(p, "ensaios"), where("data", ">=", "2026-01-01"), orderBy("data"), limit(600))));
+  await assertSucceeds(getDocs(query(c(como(ANA), "becas"), where("status", "in", ["reservado", "retirado"]), limit(500))));
+  await assertSucceeds(getDocs(query(c(como(ANA), "becas"), where("devolucao", ">=", "2026-01-01"), orderBy("devolucao"), limit(400))));
+});
+test("consultas da equipe 3: PR da Linha de Frente (só o ano atual)", async () => {
+  const db = como(PEDRO);
+  await assertSucceeds(
+    getDocs(query(c(db, "repasse"), where("ano", "==", ANO), where("etapa", "in", ["SEPARADO", "CONTATADO", "INTERESSADO"]), limit(300)))
+  );
+  await assertSucceeds(getCountFromServer(query(c(db, "repasse"), where("etapa", "==", "NA FILA"), where("ano", "==", ANO))));
+  await assertSucceeds(getDocs(query(c(db, "repasse"), where("nomeBusca", "==", "LIA"), where("ano", "==", ANO), limit(20))));
+  await assertSucceeds(getDocs(query(c(db, "repasse"), where("escola", "in", ["ALFA", "Alfa"]), where("ano", "==", ANO), limit(3000))));
+  await assertSucceeds(
+    getDocs(
+      query(c(db, "repasse"), where("ano", "==", ANO), where("etapa", "==", "INCOMPLETO"), where("respEmail", "==", PEDRO), limit(200))
+    )
+  );
+  await assertSucceeds(getDocs(query(c(db, "pedidos"), where("porEmail", "==", PEDRO), limit(30))));
+  await assertSucceeds(getDoc(doc(db, "fones", "21911112222")));
+  // sem o filtro do ano, a Linha de Frente não lê o PR
+  await assertFails(getDocs(query(c(db, "repasse"), where("escola", "in", ["ALFA"]), limit(3000))));
+});
+test("consultas da equipe 4: Repasse (todos os anos) e ID do aluno", async () => {
+  const db = como(ANA);
+  await assertSucceeds(getDocs(query(c(db, "repasse"), where("escola", "in", ["ALFA", "Alfa"]), limit(3000))));
+  await assertSucceeds(getDocs(query(c(db, "repasse"), where("codigoBusca", "in", ["26ALFA01", "ALFA01"]), limit(30))));
+  await assertSucceeds(getDocs(query(c(db, "repasse"), where("followup", "<=", "2026-12-31"), orderBy("followup"), limit(150))));
+  await assertSucceeds(setDoc(doc(db, "ids", "26ALFA"), { ultimo: 1 }));
+  await assertSucceeds(setDoc(doc(como(FORM), "ids", "26BETA"), { ultimo: 1 }));
 });
