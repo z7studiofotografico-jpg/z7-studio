@@ -3,7 +3,6 @@
 //   pagamentos: [{ data, valor, por }], pagas (= quantidade de pagamentos), proxVenc, status, resp, respEmail, vendidoEm }
 // Regras de parcela e dinheiro: js/regras.js. Só o administrador registra pagamento e muda valores.
 import {
-  lerReais,
   brl,
   dividir,
   pagamentosDe,
@@ -19,36 +18,30 @@ import {
   proxVenc,
   ehKit01,
   ativo,
-  SITUACOES,
-  FORMAS
+  SITUACOES
 } from "./regras.js";
 import {
   kitsDe,
-  plano,
   ehAdesao,
   ehRepasse,
   anoDaTurma,
   previsaoEntrega,
   quitadoEm,
-  devolucao,
-  proximoVenc,
-  vendaSugerida,
   diferencasDaTurma,
   candidatosPosFoto,
-  MINIMO_FORMANDOS,
-  DEVOLVE_DESISTENCIA
+  MINIMO_FORMANDOS
 } from "./contrato.js";
 import { msgCobranca, msgOfertaKit } from "./mensagens.js";
 import { contratoTurma, kitsTurma, importarFormandos } from "./turma-ajustes.js";
-import { el, title, norm, field, inp, inpReais, sel, sheet, botoes, wa, avisoErro, emPartes } from "./ui.js";
+import { el, title, norm, inp, sheet, wa, avisoErro, emPartes } from "./ui.js";
 import * as U from "./util.js";
-import { siglaDe, siglaUsada, reservarCodigo, comAno, ordemCodigo, avisoTel, telRelatorio, contatoRel } from "./aluno-id.js";
+import { ordemCodigo, avisoTel, telRelatorio, contatoRel } from "./aluno-id.js";
 import { abrirRelatorio } from "./relatorio.js";
+import { formFormando } from "./turma-formando.js";
 let C,
   FS,
   db,
   unsub = null;
-const n0 = v => Number(v) || 0;
 const hoje = () => U.todayStr();
 export const atrasado = f => atrasadoEm(f, hoje());
 export { quitado, ehKit01, vencDa };
@@ -86,17 +79,6 @@ export async function registrarPagamento(ctx, f) {
   U.toast(r.ja ? "Esse formando já está quitado" : `Parcela ${r.n} de ${U.first(title(f.nome))} registrada`);
 }
 // Desfaz o último pagamento (lançado por engano)
-async function desfazerPagamento(f) {
-  const ref = FS.doc(db, "formandos", f.id);
-  await FS.runTransaction(db, async tx => {
-    const s = await tx.get(ref);
-    const atual = Object.assign({ id: f.id }, s.data());
-    const lst = pagamentosDe(atual).slice(0, -1),
-      novo = Object.assign({}, atual, { pagamentos: lst });
-    tx.update(ref, { pagamentos: lst, pagas: lst.length, proxVenc: proxVenc(novo), atualizadoEm: new Date().toISOString() });
-  });
-  U.toast("Último pagamento desfeito");
-}
 
 // Mensagem de cobrança no WhatsApp (usada aqui e no card Formaturas)
 export function cobrarWa(ctx, f) {
@@ -153,61 +135,62 @@ export function oferecerKit(ctx, inst, f) {
   wa(f.tel, msg, U.toast);
 }
 // opcoes.novo = abre já com o formulário de formando novo (botão "+ Formando" do card Formaturas)
+// o formulário do formando fica em turma-formando.js
+const abrirFormando = (T, f, preset) => formFormando(C, T, f, preset);
 export function openTurma(ctx, inst, kits, aoFechar, opcoes) {
   usar(ctx);
   const col = FS.collection(db, "formandos");
-  let lista = [],
-    filtro = "todos",
-    busca = "";
+  // a turma aberta: o que as partes da tela (lista, cartões, formulário, relatório) compartilham
+  const T = { inst, opcoes: opcoes || {}, lista: [], filtro: "todos", busca: "" };
   const close = sheet(
     null,
     (p, fechar) => {
       const head = el("div", "vhead");
-      head.append(el("h2", null, "Formandos · " + title(inst.nome)), U.mkBtn("Fechar", "btn-sm", fechar));
+      head.append(el("h2", null, "Formandos · " + title(T.inst.nome)), U.mkBtn("Fechar", "btn-sm", fechar));
       p.append(head);
-      const resumo = el("div", "kpis");
-      p.append(resumo);
+      T.resumo = el("div", "kpis");
+      p.append(T.resumo);
       // Quantidade de alunos: começa pela média (combinada com o colégio); depois das fotos confirma a certa
-      const qtdBox = el("div", "notes");
-      p.append(qtdBox);
+      T.qtdBox = el("div", "notes");
+      p.append(T.qtdBox);
       const bar = el("div", "actions");
-      bar.append(U.mkBtn("+ Formando", "btn-primary", () => form()));
-      bar.append(U.mkBtn("🖨️ Lista da turma", "", () => abrirRelatorio(relatorioTurma(), C.me)));
-      if (C.isAdmin) bar.append(U.mkBtn("Importar planilha", "", () => importarFormandos(C, inst, lista)));
+      bar.append(U.mkBtn("+ Formando", "btn-primary", () => abrirFormando(T)));
+      bar.append(U.mkBtn("🖨️ Lista da turma", "", () => abrirRelatorio(relatorioTurma(T), C.me)));
+      if (C.isAdmin) bar.append(U.mkBtn("Importar planilha", "", () => importarFormandos(C, T.inst, T.lista)));
       if (C.isAdmin)
         bar.append(
-          U.mkBtn("📅 Contrato da turma", "", () => contratoTurma(C, inst, desenhar)),
-          U.mkBtn("📋 Kits desta turma", "", () => kitsTurma(C, inst, desenhar))
+          U.mkBtn("📅 Contrato da turma", "", () => contratoTurma(C, T.inst, () => desenhar(T))),
+          U.mkBtn("📋 Kits desta turma", "", () => kitsTurma(C, T.inst, () => desenhar(T)))
         );
       p.append(bar);
       if (!C.isAdmin)
         p.append(el("p", "hint", "Você cadastra os formandos. Pagamentos e valores são lançados pelo Adriano ou pela Luciana."));
-      const chips = el("div", "chips");
-      p.append(chips);
+      T.chips = el("div", "T.chips");
+      p.append(T.chips);
       const q = inp("", "Buscar nome ou telefone");
       q.type = "search";
       q.className = "search";
       q.oninput = () => {
-        busca = norm(q.value);
-        desenhar();
+        T.busca = norm(q.value);
+        desenhar(T);
       };
       p.append(q);
-      const lst = el("div", "grid");
-      p.append(lst);
-      if (opcoes && opcoes.novo) setTimeout(() => form(), 0);
+      T.lst = el("div", "grid");
+      p.append(T.lst);
+      if (T.opcoes.novo) setTimeout(() => abrirFormando(T), 0);
       unsub = FS.onSnapshot(
-        C.isAdmin ? FS.query(col, FS.where("instId", "==", inst.id), FS.limit(2000)) : C.carteira("formandos"),
+        C.isAdmin ? FS.query(col, FS.where("instId", "==", T.inst.id), FS.limit(2000)) : C.carteira("formandos"),
         snap => {
-          lista = snap.docs
+          T.lista = snap.docs
             .map(d => Object.assign({ id: d.id }, d.data()))
-            .filter(f => f.instId === inst.id)
+            .filter(f => f.instId === T.inst.id)
             .sort(ordemCodigo); // na ordem do ID (como na separação das fotos); sem ID, por nome no fim
-          desenhar();
+          desenhar(T);
         },
         e => {
           avisoErro(e, "carregar os formandos");
-          lst.innerHTML = "";
-          lst.append(
+          T.lst.innerHTML = "";
+          T.lst.append(
             el(
               "div",
               "empty",
@@ -218,701 +201,6 @@ export function openTurma(ctx, inst, kits, aoFechar, opcoes) {
           );
         }
       );
-
-      function desenhar() {
-        const ativos = lista.filter(ativo),
-          semKit = candidatosPosFoto(lista),
-          candSet = new Set(semKit), // calculado uma vez por desenho (antes era por cartão: travava turmas grandes)
-          sairam = lista.filter(f => f.status === "desistiu" || f.status === "reprovou"),
-          atr = ativos.filter(atrasado);
-        const nomesUnicos = new Set(lista.filter(f => !sairam.includes(f)).map(f => norm(f.nome))).size;
-        qtdBox.innerHTML = "";
-        qtdBox.append(
-          document.createTextNode(
-            inst.alunosConfirmados
-              ? `Alunos confirmados: ${inst.alunosConfirmados} · cadastrados aqui: ${nomesUnicos}`
-              : `Previsão de alunos (média): ${inst.mediaAlunos ? "~" + inst.mediaAlunos : "não informada"} · cadastrados aqui: ${nomesUnicos}`
-          )
-        );
-        // confirmar a quantidade muda o cadastro do colégio: só quem cuida dos colégios (ou o admin)
-        if (nomesUnicos && nomesUnicos !== inst.alunosConfirmados && (C.isAdmin || C.pode("colegios"))) {
-          const b = U.mkBtn(`✔ Confirmar quantidade certa: ${nomesUnicos} alunos`, "btn-verde", async () => {
-            try {
-              await FS.updateDoc(FS.doc(db, "instituicoes", inst.id), {
-                alunosConfirmados: nomesUnicos,
-                alunosEstimado: false,
-                alunosConfirmadosEm: hoje(),
-                atualizadoEm: new Date().toISOString()
-              });
-              inst.alunosConfirmados = nomesUnicos;
-              U.toast("Quantidade de alunos confirmada");
-              desenhar();
-            } catch (e) {
-              C.handleErr(e);
-            }
-          });
-          b.style.marginLeft = "8px";
-          qtdBox.append(b);
-        }
-        // contrato item 4.3: mínimo de 30 formandos na solenidade
-        const total = inst.alunosConfirmados || nomesUnicos;
-        if (total && total < MINIMO_FORMANDOS)
-          qtdBox.append(
-            el(
-              "p",
-              "wait",
-              `⚠️ Turma com ${total} formandos: o contrato pede no mínimo ${MINIMO_FORMANDOS}. Renegociar com o colégio (item 4.3).`
-            )
-          );
-        const ct = inst.contratoTurma || {};
-        // valores e vezes desta turma (aviso), marcando o que é diferente da tabela padrão
-        const dif = diferencasDaTurma(C.P, inst),
-          kt = kitsDe(C.P, inst).filter(k => Number(k.ant.valor));
-        const av = el("div", dif.length ? "wait" : "notes");
-        av.append(
-          el("b", null, dif.length ? "⚠️ Valores desta turma (diferentes da tabela padrão):" : "Valores desta turma (tabela padrão):")
-        );
-        kt.forEach(k => {
-          const n = Math.max(1, Number(k.ant.parcelas) || 1),
-            px = q => {
-              const nn = Math.max(1, Number((k[q] || {}).parcelas) || 1);
-              return Number((k[q] || {}).valor) ? `${nn}x de ${brl(dividir(k[q].valor, nn)[nn - 1])}` : "";
-            };
-          const txt =
-            `${k.nome.split(" · ")[0]}: ${n}x de ${brl(dividir(k.ant.valor, n)[n - 1])} (${brl(k.ant.valor)})` +
-            (px("pos") ? ` · depois das fotos ${px("pos")}` : "") +
-            (px("rep") ? ` · repasse ${px("rep")}` : "");
-          const mudou = dif.some(d => d.startsWith(k.id + "|"));
-          av.append(el("div", null, (mudou ? "✏️ " : "• ") + txt));
-        });
-        qtdBox.append(av);
-        if (ehRepasse(inst, hoje()))
-          qtdBox.append(
-            el(
-              "p",
-              "hint",
-              `🔁 Turma de ${anoDaTurma(inst)} (Repasse): quem ficou só com o Kit 01 pode receber a oferta no preço de repasse (${semKit.length}).`
-            )
-          );
-        else if (ct.fotosProntasEm)
-          qtdBox.append(
-            el(
-              "p",
-              "hint",
-              `📸 Fotos prontas desde ${U.fmtDate(ct.fotosProntasEm)}: pode oferecer os kits para quem tem só o Kit 01 (${semKit.length}).`
-            )
-          );
-        qtdBox.append(
-          el(
-            "p",
-            "hint",
-            ct.inicio
-              ? `Contrato da turma: parcelas todo dia 05 a partir de ${U.fmtDate(ct.inicio)}/${ct.inicio.slice(0, 4)}. Quem entra depois paga em menos parcelas e termina junto.`
-              : "Contrato da turma: 1º vencimento ainda não definido (o Adriano define em “📅 Contrato da turma”). Até lá, começa no próximo dia 05."
-          )
-        );
-        const ant = ativos.filter(f => f.venda !== "pos").length,
-          pos = ativos.filter(f => f.venda === "pos").length;
-        const vendido = somar(ativos.map(f => f.valor)),
-          rec = somar(ativos.map(recebido));
-        resumo.innerHTML = "";
-        [
-          ["Formandos", String(nomesUnicos)],
-          ["Antecipado · depois das fotos", `${ant} · ${pos}`],
-          ["Só Kit 01 (oferecer depois)", String(semKit.length)],
-          ["Vendido", brl(vendido)],
-          ["Recebido", brl(rec)],
-          ["Em aberto", brl(somar(ativos.map(emAberto)))],
-          ["Atrasados", String(atr.length)]
-        ].forEach(([t, v], i) => {
-          const c = el("div", "kpi" + (i === 6 && atr.length ? " late" : ""));
-          c.append(el("small", null, t), el("b", null, v));
-          resumo.append(c);
-        });
-        chips.innerHTML = "";
-        [
-          ["todos", "Todos", lista.length - sairam.length],
-          ["atrasados", "Atrasados", atr.length],
-          ["aberto", "Em dia", ativos.filter(f => !quitado(f) && !atrasado(f)).length],
-          ["quitados", "Quitados", ativos.filter(quitado).length],
-          ["semkit", "📸 Só Kit 01", semKit.length],
-          ["adesao", "🎓 Adesão (Kit 01)", ativos.filter(ehKit01).length],
-          ["kits", "📘 Kits 02 a 05", ativos.filter(f => !ehKit01(f)).length],
-          ["sairam", "Desistiram / reprovaram", sairam.length]
-        ].forEach(([k, t, n]) => {
-          const b = el("button", "chip", t);
-          b.type = "button";
-          b.setAttribute("aria-pressed", String(filtro === k));
-          b.append(el("span", "n", String(n)));
-          b.onclick = () => {
-            filtro = k;
-            desenhar();
-          };
-          chips.append(b);
-        });
-        const passa = f =>
-          ({
-            todos: !sairam.includes(f),
-            atrasados: ativo(f) && atrasado(f),
-            quitados: ativo(f) && quitado(f),
-            aberto: ativo(f) && !quitado(f) && !atrasado(f),
-            semkit: candSet.has(f),
-            adesao: ativo(f) && ehKit01(f),
-            kits: ativo(f) && !ehKit01(f),
-            sairam: sairam.includes(f)
-          })[filtro];
-        let arr = lista.filter(passa);
-        if (busca)
-          arr = arr.filter(
-            f =>
-              norm(f.nome + " " + f.tel + " " + f.serie + " " + (f.codigo || "")).includes(busca) ||
-              (busca.replace(/\D/g, "") &&
-                String(f.tel || "")
-                  .replace(/\D/g, "")
-                  .includes(busca.replace(/\D/g, "")))
-          );
-        lst.innerHTML = "";
-        if (!lista.length) {
-          const e = el("div", "empty");
-          e.append(
-            el("strong", null, "Nenhum formando ainda"),
-            el("span", null, "Toque em “+ Formando”" + (C.isAdmin ? " ou importe a planilha da turma." : "."))
-          );
-          lst.append(e);
-          return;
-        }
-        if (!arr.length) {
-          lst.append(el("div", "empty", "Ninguém nesse filtro."));
-          return;
-        }
-        emPartes(lst, arr, f => card(f, candSet));
-      }
-      function card(f, candSet) {
-        const cand = candSet.has(f),
-          prontas = !!(inst.contratoTurma || {}).fotosProntasEm || ehRepasse(inst, hoje());
-        const comprou = ativo(f),
-          sem = f.status === "semkit",
-          saiu = !comprou && !sem;
-        const at = comprou && atrasado(f),
-          q0 = comprou && quitado(f),
-          pg = pagasDe(f),
-          np = nParcelas(f);
-        const e = el("article", "card " + (saiu ? "" : at ? "late" : q0 ? "won" : sem ? "today" : ""));
-        const top = el("div", "card-top");
-        top.append(
-          el("h3", "name", title(f.nome)),
-          el(
-            "span",
-            "stage",
-            saiu
-              ? SITUACOES[f.status].toUpperCase()
-              : sem
-                ? "AINDA NÃO COMPROU"
-                : f.entregueEm
-                  ? "ENTREGUE"
-                  : q0
-                    ? "QUITADO"
-                    : at
-                      ? "ATRASADO"
-                      : "EM DIA"
-          )
-        );
-        e.append(top);
-        const meta = el("div", "meta");
-        if (f.codigo) meta.append(el("span", "tag id", "🆔 " + f.codigo));
-        [
-          f.serie,
-          sem ? "" : f.kit || (ehKit01(f) ? "Kit 01 · Beca + canudo (adesão)" : "Kit"),
-          comprou ? (f.venda === "pos" ? "Depois das fotos" : "Antecipado") : "",
-          f.valor && !sem ? brl(f.valor) : "",
-          comprou ? f.formaPag : "",
-          f.tel
-        ]
-          .filter(Boolean)
-          .forEach((t, i) => meta.append(el("span", "tag" + (i === 1 ? " svc" : ""), t)));
-        const aTel = avisoTel(f.tel);
-        if (aTel && !/fixo/.test(aTel)) meta.append(el("span", "tag warn", "⚠️ Telefone a conferir: " + aTel));
-        e.append(meta);
-        if (comprou)
-          e.append(
-            el(
-              "div",
-              "fu " + (at ? "late" : ""),
-              q0
-                ? `${np}/${np} parcelas pagas ✓`
-                : `${pg}/${np} pagas · ${brl(valorParcela(f, pg + 1))} por parcela` +
-                    (f.primeiroVenc ? ` · ${at ? "venceu" : "vence"} ${U.fmtDate(vencDa(f, pg + 1))}` : "")
-            )
-          );
-        // entrega: só com o contrato quitado (item 4.4), em até 120 dias úteis (item 3.1)
-        if (q0)
-          e.append(
-            el(
-              "div",
-              "fu ok",
-              f.entregueEm
-                ? `📦 Entregue em ${U.fmtDate(f.entregueEm)}/${f.entregueEm.slice(0, 4)}`
-                : `📦 Quitado em ${U.fmtDate(quitadoEm(f))} · entrega até ${U.fmtDate(previsaoEntrega(f))}/${previsaoEntrega(f).slice(0, 4)}`
-            )
-          );
-        if (saiu && f.devolucao) e.append(el("div", "fu", `↩️ Devolução: ${brl(f.devolucao.valor)} (${f.devolucao.regra})`));
-        if (f.obs) e.append(el("p", "notes", f.obs));
-        const act = el("div", "actions");
-        if (C.isAdmin && comprou && !q0)
-          act.append(U.mkBtn("✅ Parcela paga", "btn-ok", () => registrarPagamento(C, f).catch(er => C.handleErr(er))));
-        if (comprou && !q0 && f.tel) act.append(U.mkBtn("💬 Cobrar", at ? "btn-primary" : "", () => cobrarWa(C, f)));
-        if (C.isAdmin && q0 && !f.entregueEm)
-          act.append(
-            U.mkBtn("📦 Marcar entregue", "btn-verde", () =>
-              FS.updateDoc(FS.doc(db, "formandos", f.id), { entregueEm: hoje(), atualizadoEm: new Date().toISOString() })
-                .then(() => U.toast("Entrega registrada"))
-                .catch(er => C.handleErr(er))
-            )
-          );
-        // venda depois das fotos: quem tem só o Kit 01, quando as fotos ficaram prontas
-        if (cand && prontas && f.tel) act.append(U.mkBtn("💬 Oferecer kit", "btn-primary", () => oferecerKit(C, inst, f)));
-        if (cand && prontas) act.append(U.mkBtn("🖼️ Prévia", "", () => abrirPrevia(C, inst, f)));
-        const vendaOferta = ehRepasse(inst, hoje()) ? "rep" : "pos";
-        if (cand && prontas)
-          act.append(
-            U.mkBtn("🛒 Comprou kit", "btn-ok", () => (sem ? form(f, { venda: vendaOferta }) : form(null, { venda: vendaOferta, base: f })))
-          );
-        act.append(U.mkBtn("Editar", "", () => form(f)));
-        e.append(act);
-        return e;
-      }
-
-      // Sigla da turma: a que o colégio já usa, a do cadastro ou as iniciais do nome
-      function siglaTurma() {
-        return inst.sigla || siglaUsada(lista.map(x => x.codigo)) || (opcoes && opcoes.sigla) || siglaDe(inst.nome);
-      }
-      // ID de quem entra: o mesmo do aluno se ele já está na turma (outro kit), senão o próximo número
-      // ano da turma (o da formatura): vai na frente do ID
-      const anoTurma = () => anoDaTurma(inst) || Number(hoje().slice(0, 4));
-      // número reservado no banco: dois cadastros ao mesmo tempo nunca pegam o mesmo ID
-      async function codigoNovo(nm, base) {
-        if (base && base.codigo) return base.codigo;
-        const mesmo = lista.find(x => x.codigo && U.chave(x.nome) === U.chave(nm));
-        if (mesmo) return mesmo.codigo;
-        return reservarCodigo(
-          FS,
-          db,
-          anoTurma(),
-          siglaTurma(),
-          lista.map(x => x.codigo)
-        );
-      }
-      // Lista da turma para imprimir: um aluno por linha (com todos os kits), na ordem do ID
-      function relatorioTurma() {
-        const alunos = {};
-        lista
-          .filter(f => f.status !== "desistiu" && f.status !== "reprovou")
-          .forEach(f => {
-            const k = U.chave(f.nome);
-            const a = (alunos[k] = alunos[k] || {
-              nome: f.nome,
-              codigo: "",
-              tel: "",
-              email: "",
-              serie: "",
-              kits: [],
-              aberto: 0,
-              atr: false
-            });
-            a.email = a.email || f.email || "";
-            a.codigo = a.codigo || f.codigo || "";
-            a.tel = a.tel || f.tel || "";
-            a.serie = a.serie || f.serie || "";
-            if (f.status === "semkit") a.kits.push("ainda não comprou");
-            else {
-              a.kits.push((f.kit || "Kit").split(" · ")[0]);
-              a.aberto += emAberto(f);
-              a.atr = a.atr || atrasado(f);
-            }
-          });
-        const arr = Object.values(alunos).sort(ordemCodigo);
-        const ruins = arr.filter(a => avisoTel(a.tel) && !/fixo/.test(avisoTel(a.tel)));
-        return {
-          titulo: "Turma · " + title(inst.nome),
-          subtitulo: [
-            inst.formatura && inst.formatura.data
-              ? "Formatura " + U.fmtDate(inst.formatura.data) + "/" + inst.formatura.data.slice(0, 4)
-              : "",
-            arr.length + (arr.length === 1 ? " aluno" : " alunos")
-          ]
-            .filter(Boolean)
-            .join(" · "),
-          secoes: [
-            {
-              titulo: "Alunos",
-              tabela: {
-                cols: ["ID", "Formando", "Série", "Telefone / e-mail", "Kits", "Em aberto"],
-                linhas: arr.map(a => [
-                  a.codigo,
-                  title(a.nome),
-                  a.serie,
-                  contatoRel(a.tel, a.email),
-                  a.kits.join(", "),
-                  a.aberto ? brl(a.aberto) + (a.atr ? " (atrasado)" : "") : "—"
-                ])
-              },
-              vazio: "Nenhum formando cadastrado."
-            },
-            ...(ruins.length
-              ? [
-                  {
-                    titulo: "Telefones a conferir (" + ruins.length + ")",
-                    nota: "Estes números com certeza têm erro (DDD que não existe, celular sem o 9, número repetido). Peça o número certo.",
-                    tabela: { cols: ["ID", "Formando", "Telefone"], linhas: ruins.map(a => [a.codigo, title(a.nome), telRelatorio(a.tel)]) }
-                  }
-                ]
-              : [])
-          ]
-        };
-      }
-      function form(f, preset) {
-        const adm = C.isAdmin,
-          base = preset && preset.base,
-          kitsTodos = kitsDe(C.P, inst);
-        preset = preset || {};
-        // na venda depois das fotos (compra a mais de quem já tem o Kit 01) só aparecem os kits 02 a 05
-        const kits = preset.venda ? kitsTodos.filter(k => !ehAdesao(k.id)) : kitsTodos;
-        const tituloVenda = preset.venda === "rep" ? "Venda no repasse" : "Venda depois das fotos";
-        sheet(preset.venda ? tituloVenda : f ? "Editar formando" : "Novo formando", (fp, fechar) => {
-          const nome = inp(f ? title(f.nome) : base ? title(base.nome) : "", "nome do formando");
-          nome.required = true;
-          nome.disabled = !!f && !adm;
-          const tel = inp(f ? f.tel : base ? base.tel : "", "WhatsApp do responsável", 30);
-          tel.inputMode = "tel";
-          const r1 = el("div", "row2");
-          r1.append(field("Nome", nome), field("WhatsApp", tel));
-          fp.append(r1);
-          // telefone que com certeza está errado: avisa na hora (não impede salvar)
-          const avTel = el("p", "wait");
-          fp.append(avTel);
-          const conferirTel = () => {
-            const a = tel.value.replace(/\D/g, "").length >= 4 ? avisoTel(tel.value) : "";
-            avTel.textContent = a
-              ? "⚠️ Confira este número: " + a + ". Se o WhatsApp abrir dizendo que o número não existe, peça outro."
-              : "";
-            avTel.hidden = !a;
-          };
-          tel.addEventListener("input", conferirTel);
-          conferirTel();
-          // ID do aluno (separação das fotos): o app dá o próximo número da turma; o admin pode trocar
-          const codigoIn = inp(
-            f ? f.codigo || "" : base ? base.codigo || "" : "",
-            f ? "ex.: 26CEPNCP-07" : "automático (ex.: 26CEPNCP-07)",
-            30
-          );
-          codigoIn.disabled = (!!f || !!base) && !adm;
-          fp.append(field("ID do aluno", codigoIn));
-          // Kit do contrato: todo formando entra pelo menos com o Kit 01 (adesão)
-          const kitAtual =
-            f && f.status !== "semkit" ? f.kitId || (ehKit01(f) ? "k01" : f.kit ? "outro" : "k01") : preset.venda ? "k04" : "k01";
-          const kit = sel([...kits.map(k => [k.id, k.nome]), ["outro", "Outro kit (digitar)"]], preset.kitId || kitAtual);
-          const venda = sel(
-            [
-              ["ant", "Antecipada (preço do contrato)"],
-              ["pos", "Depois das fotos (preço maior)"],
-              ["rep", "Repasse (turma de ano anterior)"]
-            ],
-            preset.venda || (f && f.venda) || vendaSugerida(inst, hoje())
-          );
-          const r0 = el("div", "row2");
-          r0.append(field("Kit", kit), field("Venda", venda));
-          fp.append(r0);
-          const kitTxt = inp(f && kitAtual === "outro" ? f.kit : "", "nome do kit", 80);
-          const fKitTxt = field("Qual kit", kitTxt);
-          fp.append(fKitTxt);
-          const serie = sel(["Pré", "5º ano", "9º ano", "Ensino médio", "Outra"], f ? f.serie : base ? base.serie : "", "série");
-          // depois da formatura, o antecipado não vale mais
-          const avisoVenda = el("p", "wait");
-          fp.append(avisoVenda);
-          const confereVenda = () => {
-            const passou = vendaSugerida(inst, hoje()) === "pos";
-            avisoVenda.hidden = !(passou && venda.value === "ant");
-            avisoVenda.textContent = `A formatura foi em ${U.fmtDate(inst.formatura && inst.formatura.data)}: depois dela vale o preço depois das fotos (o antecipado era até o dia da formatura).`;
-          };
-          fp.append(field("Série", serie));
-          const valor = inpReais(f ? f.valor : "");
-          const parc = inp(f ? f.parcelas || "" : "1", "1", 3);
-          parc.inputMode = "numeric";
-          const jaPagas = inp("0", "0", 3);
-          jaPagas.inputMode = "numeric";
-          const r3 = el("div", f ? "row2" : "row3");
-          r3.append(field("Valor total", valor), field("Parcelas", parc));
-          if (!f && adm) r3.append(field("Parcelas já pagas", jaPagas));
-          fp.append(r3);
-          const venc = el("input");
-          venc.type = "date";
-          venc.value = f ? f.primeiroVenc || "" : proximoVenc(hoje());
-          const fpg = sel(FORMAS, f ? f.formaPag : "", "forma de pagamento");
-          const st = sel(
-            [
-              ["ativo", "Comprou"],
-              ["desistiu", "Desistiu"],
-              ["reprovou", "Reprovou"]
-            ],
-            f && ["desistiu", "reprovou"].includes(f.status) ? f.status : "ativo"
-          );
-          const r4 = el("div", "row3");
-          r4.append(field("1º vencimento", venc), field("Pagamento", fpg), field("Situação", st));
-          fp.append(r4);
-          const parcInfo = el("p", "hint");
-          fp.append(parcInfo);
-          // Devolução (contrato item 5.0): desistência devolve 70% do pago; reprovação, o pago menos os serviços já feitos
-          const pago = f ? recebido(f) : 0;
-          const serv = inpReais(f && f.devolucao ? f.devolucao.servicos : "");
-          const fServ = field("Serviços já feitos (descontar)", serv);
-          const devInfo = el("p", "wait");
-          fp.append(fServ, devInfo);
-          let avisoPlano = "";
-          const atualizaInfo = () => {
-            const v = lerReais(valor.value),
-              n = Math.max(1, n0(parc.value));
-            const ps = dividir(v, n);
-            parcInfo.textContent = v
-              ? `${n}x de ${brl(ps[ps.length - 1])}${ps[0] !== ps[ps.length - 1] ? ` (a 1ª de ${brl(ps[0])})` : ""} · vencimento todo dia ${venc.value.slice(8) || "05"}`
-              : "";
-            if (v && avisoPlano) parcInfo.textContent += " · ⚠️ " + avisoPlano;
-            const sai = st.value === "desistiu" || st.value === "reprovou";
-            fServ.hidden = st.value !== "reprovou";
-            devInfo.hidden = !sai || !pago;
-            if (sai && pago)
-              devInfo.textContent =
-                st.value === "desistiu"
-                  ? `Desistência: devolver ${DEVOLVE_DESISTENCIA}% do que pagou (${brl(pago)}) = ${brl(devolucao("desistiu", pago))}.`
-                  : `Reprovação: devolver o que pagou (${brl(pago)}) menos os serviços já feitos = ${brl(devolucao("reprovou", pago, lerReais(serv.value)))}. Precisa do documento da secretaria.`;
-          };
-          // Preenche valor, parcelas e 1º vencimento pela tabela do contrato (antecipado: termina junto com a turma)
-          const aplicarPlano = () => {
-            const outro = kit.value === "outro";
-            confereVenda();
-            fKitTxt.hidden = !outro;
-            venda.disabled = !!f && !adm && !preset.venda;
-            if (outro) return atualizaInfo();
-            const k = kits.find(x => x.id === kit.value),
-              pl = plano(k, venda.value, (inst.contratoTurma || {}).inicio, hoje());
-            if (!pl) {
-              parcInfo.textContent = "";
-              valor.value = "";
-              U.toast(
-                venda.value === "pos" ? "Defina o preço depois das fotos deste kit em “📋 Kits e preços”" : "Kit sem preço na tabela"
-              );
-              return;
-            }
-            valor.value = String(pl.valor).replace(".", ",");
-            valor.dispatchEvent(new Event("focusout", { bubbles: true }));
-            parc.value = pl.parcelas;
-            venc.value = pl.primeiroVenc;
-            avisoPlano = pl.aviso;
-            if (pl.aviso) U.toast(pl.aviso);
-            if (ehAdesao(k.id)) fpg.value = fpg.value || "Pix";
-            atualizaInfo();
-          };
-          valor.addEventListener("input", atualizaInfo);
-          parc.addEventListener("input", atualizaInfo);
-          serv.addEventListener("input", atualizaInfo);
-          st.addEventListener("change", atualizaInfo);
-          kit.addEventListener("change", aplicarPlano);
-          venda.addEventListener("change", aplicarPlano);
-          if (!f || preset.venda) aplicarPlano();
-          else {
-            fKitTxt.hidden = kit.value !== "outro";
-            confereVenda();
-            atualizaInfo();
-          }
-          // Depois de cadastrado, só o admin muda dinheiro e contrato (na venda depois das fotos, a equipe escolhe o kit)
-          if (f && !adm)
-            (preset.venda ? [valor, parc, venc, st] : [kit, venda, serie, valor, parc, venc, fpg, st]).forEach(i => {
-              i.disabled = true;
-            });
-          if (f && !adm && !preset.venda) fp.append(el("p", "hint", "Valores, kit e situação só o Adriano ou a Luciana mudam."));
-          // Pagamentos já lançados (só admin desfaz)
-          if (f && pagasDe(f)) {
-            const box = el("div", "notes");
-            box.textContent =
-              "Pagamentos: " +
-              pagamentosDe(f)
-                .map((pg, i) => `${i + 1}ª ${brl(pg.valor)} em ${pg.data ? U.fmtDate(pg.data) : "—"}`)
-                .join(" · ");
-            fp.append(box);
-            if (adm) {
-              const b = el("button", "btn btn-sm", "Desfazer o último pagamento");
-              b.type = "button";
-              b.onclick = async () => {
-                if (!fp._desf) {
-                  fp._desf = true;
-                  b.textContent = "Toque de novo para desfazer";
-                  return;
-                }
-                try {
-                  await desfazerPagamento(f);
-                  fechar();
-                } catch (er) {
-                  C.handleErr(er);
-                }
-              };
-              fp.append(b);
-            }
-          }
-          const obs = el("textarea");
-          obs.rows = 2;
-          obs.maxLength = 500;
-          obs.value = f ? f.obs || "" : "";
-          fp.append(field("Observação", obs));
-          const err = el("p", "err");
-          err.hidden = true;
-          fp.append(err);
-          const a = botoes(fechar, preset.venda ? "Registrar venda" : "Salvar");
-          if (preset.venda)
-            fp.insertBefore(
-              el(
-                "p",
-                "hint",
-                `Compra a mais${preset.venda === "rep" ? " no repasse" : ", depois das fotos"}: o Kit 01 que o aluno já tem continua como está. O valor vem da tabela da turma e pode ser mudado se combinaram outro.`
-              ),
-              fp.firstChild.nextSibling
-            );
-          if (f && adm) {
-            const del = el("button", "btn btn-danger", "Excluir");
-            del.type = "button";
-            del.onclick = async () => {
-              if (!fp._del) {
-                fp._del = true;
-                del.textContent = "Toque de novo";
-                return;
-              }
-              try {
-                await FS.deleteDoc(FS.doc(db, "formandos", f.id));
-                fechar();
-                U.toast("Excluído");
-              } catch (er) {
-                C.handleErr(er);
-              }
-            };
-            a.prepend(del);
-          }
-          fp.append(a);
-          setTimeout(() => (f ? tel : nome).focus(), 30);
-          fp.addEventListener("submit", async ev => {
-            ev.preventDefault();
-            err.hidden = true;
-            const agora = new Date().toISOString();
-            try {
-              if (f && !adm && !preset.venda) {
-                await FS.updateDoc(FS.doc(db, "formandos", f.id), { tel: tel.value.trim(), obs: obs.value.trim(), atualizadoEm: agora });
-                fechar();
-                U.toast("Salvo");
-                return;
-              }
-              // formando repetido na turma: não cadastra de novo (para outro kit, use "🛒 Comprou kit" no cartão dele)
-              if (!f && !preset.base) {
-                const igual = lista.find(x => ativo(x) && U.chave(x.nome) === U.chave(nome.value));
-                if (igual) {
-                  err.textContent = `${title(igual.nome)} já está cadastrado nesta turma. Para vender outro kit, use “🛒 Comprou kit” no cartão dele.`;
-                  err.hidden = false;
-                  return;
-                }
-              }
-              const k = kits.find(x => x.id === kit.value);
-              const P = Math.max(1, n0(parc.value)),
-                v = lerReais(valor.value);
-              if (!v) {
-                err.textContent = "Coloque o valor do kit.";
-                err.hidden = false;
-                return;
-              }
-              if (P < pagasDe(f || {})) {
-                err.textContent = `Já tem ${pagasDe(f)} parcelas pagas; o número de parcelas não pode ser menor.`;
-                err.hidden = false;
-                return;
-              }
-              const saiu = st.value === "desistiu" || st.value === "reprovou";
-              // ID digitado sem o ano ganha o ano da turma (CEPNCP-7 → 26CEPNCP-07)
-              const codigo = codigoIn.value.trim()
-                ? comAno(codigoIn.value.trim().toUpperCase(), anoTurma())
-                : f
-                  ? f.codigo || ""
-                  : await codigoNovo(nome.value, base);
-              const body = {
-                codigo,
-                contrato: k && ehAdesao(k.id) ? "adesao" : "album",
-                kitId: kit.value,
-                kit: k ? k.nome : kitTxt.value.trim(),
-                venda: venda.value,
-                nome: nome.value.trim(),
-                tel: tel.value.trim(),
-                serie: serie.value,
-                valor: v,
-                parcelas: P,
-                primeiroVenc: venc.value,
-                formaPag: fpg.value,
-                status: st.value,
-                obs: obs.value.trim(),
-                atualizadoEm: agora
-              };
-              if (saiu && pago) {
-                const regra = st.value === "desistiu" ? `desistência: ${DEVOLVE_DESISTENCIA}% do pago` : "reprovação: pago menos serviços";
-                body.devolucao = {
-                  valor: devolucao(st.value, pago, lerReais(serv.value)),
-                  servicos: lerReais(serv.value),
-                  regra,
-                  em: hoje()
-                };
-              }
-              if (f && f.status === "semkit") body.vendidoEm = hoje();
-              if (base) body.compraDe = base.id; // compra a mais de quem já tinha o Kit 01
-              if (f) {
-                // os pagamentos não mudam aqui; recalcula só o próximo vencimento
-                const pags = pagamentosDe(f);
-                await FS.updateDoc(
-                  FS.doc(db, "formandos", f.id),
-                  Object.assign(body, {
-                    pagamentos: pags,
-                    pagas: pags.length,
-                    proxVenc: proxVenc(Object.assign({}, f, body, { pagamentos: pags }))
-                  })
-                );
-                // ID trocado: os outros kits do mesmo aluno ficam com o mesmo ID
-                if (adm && codigo !== (f.codigo || "")) {
-                  const outros = lista.filter(x => x.id !== f.id && U.chave(x.nome) === U.chave(f.nome) && (x.codigo || "") !== codigo);
-                  if (outros.length) {
-                    const b = FS.writeBatch(db);
-                    outros.forEach(x => b.update(FS.doc(db, "formandos", x.id), { codigo, atualizadoEm: agora }));
-                    await b.commit();
-                  }
-                }
-              } else {
-                const n = adm ? Math.min(P, n0(jaPagas.value)) : 0,
-                  vals = dividir(v, P);
-                const pags = Array.from({ length: n }, (_, i) => ({ data: hoje(), valor: vals[i], por: C.email || "" }));
-                const novo = Object.assign(body, {
-                  pagamentos: pags,
-                  pagas: n,
-                  instId: inst.id,
-                  instNome: inst.nome,
-                  instTipo: inst.tipo || "",
-                  ano: Number(hoje().slice(0, 4)),
-                  resp: inst.resp || C.me || "",
-                  respEmail: inst.respEmail || (adm ? "" : C.email || ""),
-                  vendidoEm: hoje(),
-                  criadoEm: agora,
-                  por: C.me || ""
-                });
-                novo.proxVenc = proxVenc(novo);
-                await FS.addDoc(col, novo);
-              }
-              fechar();
-              U.toast(preset.venda ? "Venda registrada 🎉" : f ? "Salvo" : "Formando incluído");
-            } catch (er) {
-              C.handleErr(er);
-            }
-          });
-        });
-      }
-      // 1º vencimento da turma (as parcelas antecipadas de todos terminam no mesmo mês) e prazo da venda depois das fotos
     },
     {
       div: true,
@@ -927,4 +215,335 @@ export function openTurma(ctx, inst, kits, aoFechar, opcoes) {
     }
   );
   return close;
+}
+function desenhar(T) {
+  const ativos = T.lista.filter(ativo),
+    semKit = candidatosPosFoto(T.lista),
+    candSet = new Set(semKit), // calculado uma vez por desenho (antes era por cartão: travava turmas grandes)
+    sairam = T.lista.filter(f => f.status === "desistiu" || f.status === "reprovou"),
+    atr = ativos.filter(atrasado);
+  const nomesUnicos = new Set(T.lista.filter(f => !sairam.includes(f)).map(f => norm(f.nome))).size;
+  T.qtdBox.innerHTML = "";
+  T.qtdBox.append(
+    document.createTextNode(
+      T.inst.alunosConfirmados
+        ? `Alunos confirmados: ${T.inst.alunosConfirmados} · cadastrados aqui: ${nomesUnicos}`
+        : `Previsão de alunos (média): ${T.inst.mediaAlunos ? "~" + T.inst.mediaAlunos : "não informada"} · cadastrados aqui: ${nomesUnicos}`
+    )
+  );
+  // confirmar a quantidade muda o cadastro do colégio: só quem cuida dos colégios (ou o admin)
+  if (nomesUnicos && nomesUnicos !== T.inst.alunosConfirmados && (C.isAdmin || C.pode("colegios"))) {
+    const b = U.mkBtn(`✔ Confirmar quantidade certa: ${nomesUnicos} alunos`, "btn-verde", async () => {
+      try {
+        await FS.updateDoc(FS.doc(db, "instituicoes", T.inst.id), {
+          alunosConfirmados: nomesUnicos,
+          alunosEstimado: false,
+          alunosConfirmadosEm: hoje(),
+          atualizadoEm: new Date().toISOString()
+        });
+        T.inst.alunosConfirmados = nomesUnicos;
+        U.toast("Quantidade de alunos confirmada");
+        desenhar(T);
+      } catch (e) {
+        C.handleErr(e);
+      }
+    });
+    b.style.marginLeft = "8px";
+    T.qtdBox.append(b);
+  }
+  // contrato item 4.3: mínimo de 30 formandos na solenidade
+  const total = T.inst.alunosConfirmados || nomesUnicos;
+  if (total && total < MINIMO_FORMANDOS)
+    T.qtdBox.append(
+      el(
+        "p",
+        "wait",
+        `⚠️ Turma com ${total} formandos: o contrato pede no mínimo ${MINIMO_FORMANDOS}. Renegociar com o colégio (item 4.3).`
+      )
+    );
+  const ct = T.inst.contratoTurma || {};
+  // valores e vezes desta turma (aviso), marcando o que é diferente da tabela padrão
+  const dif = diferencasDaTurma(C.P, T.inst),
+    kt = kitsDe(C.P, T.inst).filter(k => Number(k.ant.valor));
+  const av = el("div", dif.length ? "wait" : "notes");
+  av.append(el("b", null, dif.length ? "⚠️ Valores desta turma (diferentes da tabela padrão):" : "Valores desta turma (tabela padrão):"));
+  kt.forEach(k => {
+    const n = Math.max(1, Number(k.ant.parcelas) || 1),
+      px = q => {
+        const nn = Math.max(1, Number((k[q] || {}).parcelas) || 1);
+        return Number((k[q] || {}).valor) ? `${nn}x de ${brl(dividir(k[q].valor, nn)[nn - 1])}` : "";
+      };
+    const txt =
+      `${k.nome.split(" · ")[0]}: ${n}x de ${brl(dividir(k.ant.valor, n)[n - 1])} (${brl(k.ant.valor)})` +
+      (px("pos") ? ` · depois das fotos ${px("pos")}` : "") +
+      (px("rep") ? ` · repasse ${px("rep")}` : "");
+    const mudou = dif.some(d => d.startsWith(k.id + "|"));
+    av.append(el("div", null, (mudou ? "✏️ " : "• ") + txt));
+  });
+  T.qtdBox.append(av);
+  if (ehRepasse(T.inst, hoje()))
+    T.qtdBox.append(
+      el(
+        "p",
+        "hint",
+        `🔁 Turma de ${anoDaTurma(T.inst)} (Repasse): quem ficou só com o Kit 01 pode receber a oferta no preço de repasse (${semKit.length}).`
+      )
+    );
+  else if (ct.fotosProntasEm)
+    T.qtdBox.append(
+      el(
+        "p",
+        "hint",
+        `📸 Fotos prontas desde ${U.fmtDate(ct.fotosProntasEm)}: pode oferecer os kits para quem tem só o Kit 01 (${semKit.length}).`
+      )
+    );
+  T.qtdBox.append(
+    el(
+      "p",
+      "hint",
+      ct.inicio
+        ? `Contrato da turma: parcelas todo dia 05 a partir de ${U.fmtDate(ct.inicio)}/${ct.inicio.slice(0, 4)}. Quem entra depois paga em menos parcelas e termina junto.`
+        : "Contrato da turma: 1º vencimento ainda não definido (o Adriano define em “📅 Contrato da turma”). Até lá, começa no próximo dia 05."
+    )
+  );
+  const ant = ativos.filter(f => f.venda !== "pos").length,
+    pos = ativos.filter(f => f.venda === "pos").length;
+  const vendido = somar(ativos.map(f => f.valor)),
+    rec = somar(ativos.map(recebido));
+  T.resumo.innerHTML = "";
+  [
+    ["Formandos", String(nomesUnicos)],
+    ["Antecipado · depois das fotos", `${ant} · ${pos}`],
+    ["Só Kit 01 (oferecer depois)", String(semKit.length)],
+    ["Vendido", brl(vendido)],
+    ["Recebido", brl(rec)],
+    ["Em aberto", brl(somar(ativos.map(emAberto)))],
+    ["Atrasados", String(atr.length)]
+  ].forEach(([t, v], i) => {
+    const c = el("div", "kpi" + (i === 6 && atr.length ? " late" : ""));
+    c.append(el("small", null, t), el("b", null, v));
+    T.resumo.append(c);
+  });
+  T.chips.innerHTML = "";
+  [
+    ["todos", "Todos", T.lista.length - sairam.length],
+    ["atrasados", "Atrasados", atr.length],
+    ["aberto", "Em dia", ativos.filter(f => !quitado(f) && !atrasado(f)).length],
+    ["quitados", "Quitados", ativos.filter(quitado).length],
+    ["semkit", "📸 Só Kit 01", semKit.length],
+    ["adesao", "🎓 Adesão (Kit 01)", ativos.filter(ehKit01).length],
+    ["kits", "📘 Kits 02 a 05", ativos.filter(f => !ehKit01(f)).length],
+    ["sairam", "Desistiram / reprovaram", sairam.length]
+  ].forEach(([k, t, n]) => {
+    const b = el("button", "chip", t);
+    b.type = "button";
+    b.setAttribute("aria-pressed", String(T.filtro === k));
+    b.append(el("span", "n", String(n)));
+    b.onclick = () => {
+      T.filtro = k;
+      desenhar(T);
+    };
+    T.chips.append(b);
+  });
+  const passa = f =>
+    ({
+      todos: !sairam.includes(f),
+      atrasados: ativo(f) && atrasado(f),
+      quitados: ativo(f) && quitado(f),
+      aberto: ativo(f) && !quitado(f) && !atrasado(f),
+      semkit: candSet.has(f),
+      adesao: ativo(f) && ehKit01(f),
+      kits: ativo(f) && !ehKit01(f),
+      sairam: sairam.includes(f)
+    })[T.filtro];
+  let arr = T.lista.filter(passa);
+  if (T.busca)
+    arr = arr.filter(
+      f =>
+        norm(f.nome + " " + f.tel + " " + f.serie + " " + (f.codigo || "")).includes(T.busca) ||
+        (T.busca.replace(/\D/g, "") &&
+          String(f.tel || "")
+            .replace(/\D/g, "")
+            .includes(T.busca.replace(/\D/g, "")))
+    );
+  T.lst.innerHTML = "";
+  if (!T.lista.length) {
+    const e = el("div", "empty");
+    e.append(
+      el("strong", null, "Nenhum formando ainda"),
+      el("span", null, "Toque em “+ Formando”" + (C.isAdmin ? " ou importe a planilha da turma." : "."))
+    );
+    T.lst.append(e);
+    return;
+  }
+  if (!arr.length) {
+    T.lst.append(el("div", "empty", "Ninguém nesse filtro."));
+    return;
+  }
+  emPartes(T.lst, arr, f => card(T, f, candSet));
+}
+function card(T, f, candSet) {
+  const cand = candSet.has(f),
+    prontas = !!(T.inst.contratoTurma || {}).fotosProntasEm || ehRepasse(T.inst, hoje());
+  const comprou = ativo(f),
+    sem = f.status === "semkit",
+    saiu = !comprou && !sem;
+  const at = comprou && atrasado(f),
+    q0 = comprou && quitado(f),
+    pg = pagasDe(f),
+    np = nParcelas(f);
+  const e = el("article", "card " + (saiu ? "" : at ? "late" : q0 ? "won" : sem ? "today" : ""));
+  const top = el("div", "card-top");
+  top.append(
+    el("h3", "name", title(f.nome)),
+    el(
+      "span",
+      "stage",
+      saiu
+        ? SITUACOES[f.status].toUpperCase()
+        : sem
+          ? "AINDA NÃO COMPROU"
+          : f.entregueEm
+            ? "ENTREGUE"
+            : q0
+              ? "QUITADO"
+              : at
+                ? "ATRASADO"
+                : "EM DIA"
+    )
+  );
+  e.append(top);
+  const meta = el("div", "meta");
+  if (f.codigo) meta.append(el("span", "tag id", "🆔 " + f.codigo));
+  [
+    f.serie,
+    sem ? "" : f.kit || (ehKit01(f) ? "Kit 01 · Beca + canudo (adesão)" : "Kit"),
+    comprou ? (f.venda === "pos" ? "Depois das fotos" : "Antecipado") : "",
+    f.valor && !sem ? brl(f.valor) : "",
+    comprou ? f.formaPag : "",
+    f.tel
+  ]
+    .filter(Boolean)
+    .forEach((t, i) => meta.append(el("span", "tag" + (i === 1 ? " svc" : ""), t)));
+  const aTel = avisoTel(f.tel);
+  if (aTel && !/fixo/.test(aTel)) meta.append(el("span", "tag warn", "⚠️ Telefone a conferir: " + aTel));
+  e.append(meta);
+  if (comprou)
+    e.append(
+      el(
+        "div",
+        "fu " + (at ? "late" : ""),
+        q0
+          ? `${np}/${np} parcelas pagas ✓`
+          : `${pg}/${np} pagas · ${brl(valorParcela(f, pg + 1))} por parcela` +
+              (f.primeiroVenc ? ` · ${at ? "venceu" : "vence"} ${U.fmtDate(vencDa(f, pg + 1))}` : "")
+      )
+    );
+  // entrega: só com o contrato quitado (item 4.4), em até 120 dias úteis (item 3.1)
+  if (q0)
+    e.append(
+      el(
+        "div",
+        "fu ok",
+        f.entregueEm
+          ? `📦 Entregue em ${U.fmtDate(f.entregueEm)}/${f.entregueEm.slice(0, 4)}`
+          : `📦 Quitado em ${U.fmtDate(quitadoEm(f))} · entrega até ${U.fmtDate(previsaoEntrega(f))}/${previsaoEntrega(f).slice(0, 4)}`
+      )
+    );
+  if (saiu && f.devolucao) e.append(el("div", "fu", `↩️ Devolução: ${brl(f.devolucao.valor)} (${f.devolucao.regra})`));
+  if (f.obs) e.append(el("p", "notes", f.obs));
+  const act = el("div", "actions");
+  if (C.isAdmin && comprou && !q0)
+    act.append(U.mkBtn("✅ Parcela paga", "btn-ok", () => registrarPagamento(C, f).catch(er => C.handleErr(er))));
+  if (comprou && !q0 && f.tel) act.append(U.mkBtn("💬 Cobrar", at ? "btn-primary" : "", () => cobrarWa(C, f)));
+  if (C.isAdmin && q0 && !f.entregueEm)
+    act.append(
+      U.mkBtn("📦 Marcar entregue", "btn-verde", () =>
+        FS.updateDoc(FS.doc(db, "formandos", f.id), { entregueEm: hoje(), atualizadoEm: new Date().toISOString() })
+          .then(() => U.toast("Entrega registrada"))
+          .catch(er => C.handleErr(er))
+      )
+    );
+  // venda depois das fotos: quem tem só o Kit 01, quando as fotos ficaram prontas
+  if (cand && prontas && f.tel) act.append(U.mkBtn("💬 Oferecer kit", "btn-primary", () => oferecerKit(C, T.inst, f)));
+  if (cand && prontas) act.append(U.mkBtn("🖼️ Prévia", "", () => abrirPrevia(C, T.inst, f)));
+  const vendaOferta = ehRepasse(T.inst, hoje()) ? "rep" : "pos";
+  if (cand && prontas)
+    act.append(
+      U.mkBtn("🛒 Comprou kit", "btn-ok", () =>
+        sem ? abrirFormando(T, f, { venda: vendaOferta }) : abrirFormando(T, null, { venda: vendaOferta, base: f })
+      )
+    );
+  act.append(U.mkBtn("Editar", "", () => abrirFormando(T, f)));
+  e.append(act);
+  return e;
+}
+
+// Lista da turma para imprimir: um aluno por linha (com todos os kits), na ordem do ID
+function relatorioTurma(T) {
+  const alunos = {};
+  T.lista
+    .filter(f => f.status !== "desistiu" && f.status !== "reprovou")
+    .forEach(f => {
+      const k = U.chave(f.nome);
+      const a = (alunos[k] = alunos[k] || {
+        nome: f.nome,
+        codigo: "",
+        tel: "",
+        email: "",
+        serie: "",
+        kits: [],
+        aberto: 0,
+        atr: false
+      });
+      a.email = a.email || f.email || "";
+      a.codigo = a.codigo || f.codigo || "";
+      a.tel = a.tel || f.tel || "";
+      a.serie = a.serie || f.serie || "";
+      if (f.status === "semkit") a.kits.push("ainda não comprou");
+      else {
+        a.kits.push((f.kit || "Kit").split(" · ")[0]);
+        a.aberto += emAberto(f);
+        a.atr = a.atr || atrasado(f);
+      }
+    });
+  const arr = Object.values(alunos).sort(ordemCodigo);
+  const ruins = arr.filter(a => avisoTel(a.tel) && !/fixo/.test(avisoTel(a.tel)));
+  return {
+    titulo: "Turma · " + title(T.inst.nome),
+    subtitulo: [
+      T.inst.formatura && T.inst.formatura.data
+        ? "Formatura " + U.fmtDate(T.inst.formatura.data) + "/" + T.inst.formatura.data.slice(0, 4)
+        : "",
+      arr.length + (arr.length === 1 ? " aluno" : " alunos")
+    ]
+      .filter(Boolean)
+      .join(" · "),
+    secoes: [
+      {
+        titulo: "Alunos",
+        tabela: {
+          cols: ["ID", "Formando", "Série", "Telefone / e-mail", "Kits", "Em aberto"],
+          linhas: arr.map(a => [
+            a.codigo,
+            title(a.nome),
+            a.serie,
+            contatoRel(a.tel, a.email),
+            a.kits.join(", "),
+            a.aberto ? brl(a.aberto) + (a.atr ? " (atrasado)" : "") : "—"
+          ])
+        },
+        vazio: "Nenhum formando cadastrado."
+      },
+      ...(ruins.length
+        ? [
+            {
+              titulo: "Telefones a conferir (" + ruins.length + ")",
+              nota: "Estes números com certeza têm erro (DDD que não existe, celular sem o 9, número repetido). Peça o número certo.",
+              tabela: { cols: ["ID", "Formando", "Telefone"], linhas: ruins.map(a => [a.codigo, title(a.nome), telRelatorio(a.tel)]) }
+            }
+          ]
+        : [])
+    ]
+  };
 }

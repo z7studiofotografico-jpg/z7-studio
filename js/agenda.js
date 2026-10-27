@@ -8,50 +8,53 @@
 // - Visitas do vendedor: vêm do "Voltar para visita" das Instituições. Só informam, não bloqueiam o dia.
 // - Feriados: o estúdio não trabalha (bloqueia ensaio e colégio).
 // - Entregas: depois do ensaio, acompanha a edição até entregar, com o prazo, e pede a avaliação no Google.
-import { avisarColegioPorEmail, nomeEvento, agendarColegio, painelAvisar } from "./instituicoes.js";
-import { ENDERECO, ESTUDIO } from "./mensagens.js";
+// Partes: agenda-estado.js, agenda-entregas.js, agenda-colegios.js, agenda-ensaios.js, agenda-relatorio.js,
+// agenda-form.js (janelas de ensaio e compromisso) e agenda-tempo.js (contas de horário).
+import { nomeEvento } from "./eventos.js";
+import { agendarColegio } from "./instituicoes-agendar.js";
 import { feriado, feriadosEntre } from "./feriados.js";
-import { el, title, field, sheet, botoes, wa, avisoErro } from "./ui.js";
+import { el, title, avisoErro } from "./ui.js";
 import * as U from "./util.js";
 import { botaoRelatorio } from "./relatorio.js";
-import { contatoRel } from "./aluno-id.js";
 import { initForm, openEnsaio, openComp } from "./agenda-form.js";
-import { TIPOS_ENSAIO, diaTxt, fimDe, resumoDiaEm } from "./agenda-tempo.js";
-export { openEnsaio, TIPOS_ENSAIO };
-let C,
+import { TIPOS_ENSAIO, diaTxt } from "./agenda-tempo.js";
+import {
+  C,
   FS,
   db,
   col,
   colE,
-  privados = {};
-let unsubs = [],
-  items = [],
-  ensaios = [],
-  passados = [],
-  comps = [],
-  visitas = [],
-  becas = [],
-  filtro = "tudo",
-  mesVis = "",
-  selDia = "";
-export const ETAPAS_ENTREGA = ["Ensaio feito", "Fotos escolhidas", "Em edição", "Pronto", "Entregue"];
-const $ = id => document.getElementById(id);
-const CAMPO = { formatura: "formatura", fotos: "diaFotos" };
-const ICO = { formatura: "🎓", fotos: "📸" };
-const MESES = ["janeiro", "fevereiro", "março", "abril", "maio", "junho", "julho", "agosto", "setembro", "outubro", "novembro", "dezembro"];
-const SEMANA = ["dom", "seg", "ter", "qua", "qui", "sex", "sáb"];
-const resumoDia = (data, ignora) => resumoDiaEm({ ensaios, items, comps }, data, ignora, nomeEvento);
-const quando = d => (d === U.todayStr() ? "hoje" : d === U.addDays(1) ? "amanhã" : "");
-const vejoEnsaios = () => true;
-const marco = () => C.isAdmin;
-const vejoVisitas = () => C.pode("colegios");
-
+  privados,
+  items,
+  ensaios,
+  comps,
+  visitas,
+  becas,
+  filtro,
+  mesVis,
+  selDia,
+  mudar,
+  iniciar,
+  tela,
+  $,
+  ICO,
+  MESES,
+  SEMANA,
+  quando,
+  marco,
+  vejoEnsaios,
+  vejoVisitas
+} from "./agenda-estado.js";
+import { cardEntrega, entregasAbertas } from "./agenda-entregas.js";
+import { linhaColegio, avisar, cardPedido } from "./agenda-colegios.js";
+import { linhaVisita, linhaEnsaio, cardAnalisar, cardRemarcar, linhaComp } from "./agenda-ensaios.js";
+import { relatorioAgenda } from "./agenda-relatorio.js";
+export { openEnsaio, TIPOS_ENSAIO };
+export { ETAPAS_ENTREGA } from "./agenda-estado.js";
+let unsubs = [];
 export function init(ctx) {
-  C = ctx;
-  FS = ctx.FS;
-  db = ctx.db;
-  col = FS.collection(db, "agenda");
-  colE = FS.collection(db, "ensaios");
+  iniciar(ctx);
+  tela.render = render;
   initForm(ctx, () => ({ ensaios, items, comps }));
 }
 
@@ -69,7 +72,12 @@ export function show() {
       U.mkBtn("+ Compromisso", "btn-amarelo btn-sm", () => openComp()),
       U.mkBtn("+ Marcar ensaio", "btn-primary btn-sm", () => openEnsaio())
     );
-  hb.append(botaoRelatorio(relatorioAgenda, () => C.me));
+  hb.append(
+    botaoRelatorio(
+      () => relatorioAgenda(entradas),
+      () => C.me
+    )
+  );
   head.append(hb);
   v.append(head);
   v.append(
@@ -95,13 +103,8 @@ export function show() {
   v.append(prox);
   prox.append(el("div", "empty", "Carregando…"));
   hide();
-  items = [];
-  ensaios = [];
-  passados = [];
-  comps = [];
-  visitas = [];
-  becas = [];
-  if (!mesVis) mesVis = U.todayStr().slice(0, 7);
+  mudar({ items: [], ensaios: [], passados: [], comps: [], visitas: [], becas: [] });
+  if (!mesVis) mudar({ mesVis: U.todayStr().slice(0, 7) });
   const hoje = U.todayStr();
   const erro = (err, o) => {
     avisoErro(err, "carregar " + o);
@@ -118,7 +121,7 @@ export function show() {
     FS.onSnapshot(
       FS.query(col, FS.where("data", ">=", hoje), FS.orderBy("data"), FS.limit(400)),
       snap => {
-        items = snap.docs.map(d => Object.assign({ id: d.id }, d.data()));
+        mudar({ items: snap.docs.map(d => Object.assign({ id: d.id }, d.data())) });
         render();
       },
       e => erro(e, "agenda")
@@ -131,9 +134,9 @@ export function show() {
         FS.query(colE, FS.where("data", ">=", U.addDays(-90)), FS.orderBy("data"), FS.limit(600)),
         snap => {
           const todos = snap.docs.map(d => Object.assign({ id: d.id }, d.data(), privados[d.id] || {}));
-          ensaios = todos.filter(x => x.kind !== "pessoal" && x.data >= hoje);
-          comps = todos.filter(x => x.kind === "pessoal" && x.data >= hoje);
-          passados = todos.filter(x => x.kind !== "pessoal" && x.data < hoje && x.status !== "remarcar" && x.status !== "faltou");
+          mudar({ ensaios: todos.filter(x => x.kind !== "pessoal" && x.data >= hoje) });
+          mudar({ comps: todos.filter(x => x.kind === "pessoal" && x.data >= hoje) });
+          mudar({ passados: todos.filter(x => x.kind !== "pessoal" && x.data < hoje && x.status !== "remarcar" && x.status !== "faltou") });
           render();
         },
         e => erro(e, "ensaios")
@@ -145,8 +148,8 @@ export function show() {
       FS.onSnapshot(
         FS.query(FS.collection(db, "privado"), FS.limit(1000)),
         snap => {
-          privados = Object.fromEntries(snap.docs.map(d => [d.id, d.data()]));
-          comps = comps.map(x => Object.assign({}, x, privados[x.id] || {}));
+          mudar({ privados: Object.fromEntries(snap.docs.map(d => [d.id, d.data()])) });
+          mudar({ comps: comps.map(x => Object.assign({}, x, privados[x.id] || {})) });
           render();
         },
         e => avisoErro(e, "ler os compromissos particulares")
@@ -158,9 +161,11 @@ export function show() {
       FS.onSnapshot(
         FS.query(FS.collection(db, "becas"), FS.where("devolucao", ">=", hoje), FS.orderBy("devolucao"), FS.limit(400)),
         snap => {
-          becas = snap.docs
-            .map(d => Object.assign({ id: d.id }, d.data()))
-            .filter(x => x.status !== "cancelado" && x.status !== "devolvido");
+          mudar({
+            becas: snap.docs
+              .map(d => Object.assign({ id: d.id }, d.data()))
+              .filter(x => x.status !== "cancelado" && x.status !== "devolvido")
+          });
           render();
         },
         e => avisoErro(e, "carregar as becas")
@@ -173,16 +178,18 @@ export function show() {
           ? FS.query(FS.collection(db, "instituicoes"), FS.where("followup", ">=", hoje), FS.orderBy("followup"), FS.limit(400))
           : C.carteira("instituicoes"),
         snap => {
-          visitas = snap.docs
-            .map(d => Object.assign({ id: d.id }, d.data()))
-            .filter(
-              x =>
-                x.followup &&
-                x.followup >= hoje &&
-                x.etapa !== "FECHADO" &&
-                x.etapa !== "NÃO FECHOU" &&
-                (x.proximoPasso === "Voltar para visita" || x.followupHora || x.etapa === "AGENDAR VISITA")
-            );
+          mudar({
+            visitas: snap.docs
+              .map(d => Object.assign({ id: d.id }, d.data()))
+              .filter(
+                x =>
+                  x.followup &&
+                  x.followup >= hoje &&
+                  x.etapa !== "FECHADO" &&
+                  x.etapa !== "NÃO FECHOU" &&
+                  (x.proximoPasso === "Voltar para visita" || x.followupHora || x.etapa === "AGENDAR VISITA")
+              )
+          });
           render();
         },
         e => erro(e, "visitas")
@@ -217,7 +224,7 @@ function renderChips() {
     b.setAttribute("aria-pressed", String(filtro === k));
     b.append(el("span", "n", String(n)));
     b.onclick = () => {
-      filtro = k;
+      mudar({ filtro: k });
       render();
     };
     c.append(b);
@@ -436,16 +443,14 @@ function renderMes(box, ent) {
   const nav = el("div", "calnav");
   const ant = U.mkBtn("‹", "btn-sm", () => {
     const d = new Date(y, m - 2, 1);
-    mesVis = `${d.getFullYear()}-${U.pad(d.getMonth() + 1)}`;
-    selDia = "";
+    mudar({ mesVis: `${d.getFullYear()}-${U.pad(d.getMonth() + 1)}`, selDia: "" });
     render();
   });
   ant.disabled = mesVis <= hoje.slice(0, 7);
   ant.setAttribute("aria-label", "Mês anterior");
   const prx = U.mkBtn("›", "btn-sm", () => {
     const d = new Date(y, m, 1);
-    mesVis = `${d.getFullYear()}-${U.pad(d.getMonth() + 1)}`;
-    selDia = "";
+    mudar({ mesVis: `${d.getFullYear()}-${U.pad(d.getMonth() + 1)}`, selDia: "" });
     render();
   });
   prx.setAttribute("aria-label", "Próximo mês");
@@ -479,7 +484,7 @@ function renderMes(box, ent) {
       .forEach(([k, n]) => b.append(el("span", "ic", n > 1 ? k + n : k)));
     b.setAttribute("aria-label", `${diaTxt(ds)}: ${lst.length ? lst.length + " compromisso" + (lst.length > 1 ? "s" : "") : "livre"}`);
     b.onclick = () => {
-      selDia = selDia === ds ? "" : ds;
+      mudar({ selDia: selDia === ds ? "" : ds });
       render();
     };
     cal.append(b);
@@ -512,554 +517,10 @@ function renderMes(box, ent) {
   }
 }
 
-// ---------- Entregas das fotos ----------
-function etapaEntrega(x) {
-  return (x.entrega && x.entrega.etapa) || "Ensaio feito";
-}
-function entregasAbertas() {
-  return passados
-    .filter(
-      x => etapaEntrega(x) !== "Entregue" || (C.P.linkAvaliacao && !x.avaliacaoPedida && x.entrega.em && x.entrega.em <= U.addDays(-3))
-    )
-    .sort((a, b) => prazoDe(a).localeCompare(prazoDe(b)));
-}
-function prazoDe(x) {
-  const [y, m, d] = x.data.split("-").map(Number);
-  const dt = new Date(y, m - 1, d + (Number(C.P.prazo) || 15));
-  return `${dt.getFullYear()}-${U.pad(dt.getMonth() + 1)}-${U.pad(dt.getDate())}`;
-}
-function diasAte(d) {
-  const [y, m, dd] = d.split("-").map(Number);
-  const [a, b, c] = U.todayStr().split("-").map(Number);
-  return Math.round((new Date(y, m - 1, dd) - new Date(a, b - 1, c)) / 864e5);
-}
-function cardEntrega(x) {
-  const et = etapaEntrega(x),
-    entregue = et === "Entregue";
-  const pz = prazoDe(x),
-    falta = diasAte(pz);
-  const cls = entregue ? "won" : falta < 0 ? "late" : falta <= 3 ? "today" : "";
-  const e = el("article", "card " + cls);
-  const top = el("div", "card-top");
-  top.append(el("h3", "name", `📷 ${title(x.cliente)}`), el("span", "stage", entregue ? "AVALIAÇÃO" : et.toUpperCase()));
-  e.append(top);
-  e.append(el("div", "meta"));
-  e.lastChild.append(el("span", "tag svc", x.tipo || "Ensaio"), el("span", "tag", "Ensaio em " + U.fmtDate(x.data)));
-  if (!entregue) {
-    e.append(
-      el(
-        "div",
-        "fu " + (falta < 0 ? "late" : falta <= 3 ? "today" : ""),
-        falta < 0
-          ? `Atrasado ${-falta} dia${falta < -1 ? "s" : ""} (prazo era ${U.fmtDate(pz)})`
-          : falta === 0
-            ? "Prazo de entrega: hoje"
-            : `Faltam ${falta} dia${falta > 1 ? "s" : ""} para entregar (até ${U.fmtDate(pz)})`
-      )
-    );
-    const passos = el("div", "passos");
-    const i = ETAPAS_ENTREGA.indexOf(et);
-    ETAPAS_ENTREGA.forEach((p, k) => passos.append(el("span", k <= i ? "on" : "", p)));
-    e.append(passos);
-  } else e.append(el("div", "fu", `Entregue em ${U.fmtDate(x.entrega.em)}. Hora de pedir a avaliação no Google ⭐`));
-  const act = el("div", "actions");
-  if (!entregue) {
-    const i = ETAPAS_ENTREGA.indexOf(et),
-      prox = ETAPAS_ENTREGA[i + 1];
-    act.append(U.mkBtn(prox === "Entregue" ? "✅ Entregue" : "Avançar: " + prox, "btn-ok", () => avancarEntrega(x, prox)));
-    if (prox === "Entregue" && x.tel)
-      act.append(
-        U.mkBtn("📲 Avisar que está pronto", "", () =>
-          abrirWa(
-            x.tel,
-            `Oi, ${U.first(title(x.cliente))}! Suas fotos do ensaio estão prontas 🎉📸 Quer que eu envie por aqui ou prefere buscar no estúdio?`
-          )
-        )
-      );
-    if (et === "Ensaio feito")
-      act.append(
-        U.mkBtn("Cliente faltou", "", async () => {
-          try {
-            await FS.updateDoc(FS.doc(db, "ensaios", x.id), { status: "faltou" });
-            U.toast("Marcado como falta");
-          } catch (er) {
-            C.handleErr(er);
-          }
-        })
-      );
-  } else {
-    act.append(
-      U.mkBtn("⭐ Pedir avaliação", "btn-primary", async () => {
-        abrirWa(
-          x.tel,
-          `Oi, ${U.first(title(x.cliente))}! Que bom que você fez o seu ensaio com a gente 💛 Se puder, deixa uma avaliação rapidinha no Google? Ajuda muito o nosso estúdio: ${C.P.linkAvaliacao}`
-        );
-        try {
-          await FS.updateDoc(FS.doc(db, "ensaios", x.id), { avaliacaoPedida: true, avaliacaoEm: U.todayStr() });
-        } catch (er) {
-          avisoErro(er, "marcar a avaliação como pedida", U.toast);
-        }
-      })
-    );
-    act.append(
-      U.mkBtn("Não pedir", "", async () => {
-        try {
-          await FS.updateDoc(FS.doc(db, "ensaios", x.id), { avaliacaoPedida: true, avaliacaoEm: "" });
-        } catch (er) {
-          C.handleErr(er);
-        }
-      })
-    );
-  }
-  e.append(act);
-  return e;
-}
-async function avancarEntrega(x, etapa) {
-  try {
-    await FS.updateDoc(FS.doc(db, "ensaios", x.id), { entrega: { etapa, em: U.todayStr(), por: C.me || "" } });
-    U.toast(etapa === "Entregue" ? "Entregue ✅ Em 3 dias o app lembra de pedir a avaliação" : "Agora: " + etapa);
-  } catch (e) {
-    C.handleErr(e);
-  }
-}
-const abrirWa = (tel, msg) => wa(tel, msg, U.toast);
-
-// ---------- Colégios ----------
-function linhaColegio(x) {
-  const r = el("div", "agrow");
-  const t = el("div", "agtxt");
-  t.append(el("b", null, `${ICO[x.kind] || "📌"} ${nomeEvento(x.kind, x.instNome)}`));
-  const det = [x.hora, x.onde && x.onde + (x.local ? " · " + x.local : "")].filter(Boolean).join(" · ");
-  if (det) t.append(el("span", null, det));
-  if (x.status === "pendente") t.append(el("span", "wait", "⏳ Aguardando a Luciana aprovar"));
-  if (x.contato && (x.contato.nome || x.contato.tel))
-    t.append(
-      el(
-        "span",
-        null,
-        `👤 ${[x.contato.nome && title(x.contato.nome), x.contato.cargo].filter(Boolean).join(" · ")}${x.alunos ? ` · ~${x.alunos} alunos` : ""}`
-      )
-    );
-  const fim = el("div", "agact");
-  fim.append(el("span", "tag " + (x.status === "confirmado" ? "ok" : "svc"), x.status === "confirmado" ? "Confirmado" : "Aguardando"));
-  // A mensagem sai do WhatsApp de quem agendou: só essa pessoa tem o botão
-  const meu = (x.pedidoEmail || "") === C.email;
-  if (x.contato && x.contato.tel && meu)
-    fim.append(
-      U.mkBtn(
-        x.status === "confirmado" && !x.avisadoWhats ? "📲 Avisar colégio" : "📲 Avisar",
-        x.status === "confirmado" && !x.avisadoWhats ? "btn-verde btn-sm" : "btn-sm",
-        () => avisar(x)
-      )
-    );
-  else if (x.status === "confirmado" && x.contato && x.contato.tel && !x.avisadoWhats && x.pedidoPor)
-    t.append(el("span", "wait", `📲 ${U.first(x.pedidoPor)} vai avisar o colégio`));
-  r.append(t, fim);
-  return r;
-}
-// Abre a mensagem pronta e, se a data já está confirmada, marca que o colégio foi avisado
-function avisar(arg, extra) {
-  const lst = Array.isArray(arg) ? arg : [arg],
-    x = lst[0];
-  painelAvisar(C, x.instNome, lst, x.contato, x.alunos, extra, async () => {
-    const conf = lst.filter(y => y.status === "confirmado");
-    if (!conf.length) return;
-    try {
-      const b = FS.writeBatch(db);
-      conf.forEach(y => b.update(FS.doc(db, "agenda", y.id), { avisadoWhats: true, avisadoEm: new Date().toISOString() }));
-      await b.commit();
-    } catch (e) {
-      avisoErro(e, "marcar o colégio como avisado");
-    }
-  });
-}
-function cardPedido(gr) {
-  gr.sort((a, b) => a.data.localeCompare(b.data));
-  const x0 = gr[0];
-  const e = el("article", "card today");
-  const top = el("div", "card-top");
-  top.append(el("h3", "name", title(x0.instNome)), el("span", "stage", "APROVAR"));
-  e.append(top);
-  gr.forEach(x =>
-    e.append(
-      el(
-        "div",
-        "fu today",
-        `${ICO[x.kind] || "📌"} ${nomeEvento(x.kind, x.instNome)}: ${diaTxt(x.data)}/${x.data.slice(0, 4)}${x.hora ? " às " + x.hora : ""}${x.onde ? " · " + x.onde : ""}${x.local ? " (" + x.local + ")" : ""}`
-      )
-    )
-  );
-  const outros = gr.map(x => ensaios.filter(y => y.data === x.data && y.status !== "remarcar")).flat();
-  if (outros.length)
-    e.append(
-      el(
-        "p",
-        "wait",
-        "⚠️ Nesse dia já tem ensaio no estúdio: " + outros.map(y => `${y.hora || "sem hora"} ${U.first(y.cliente)}`).join(", ")
-      )
-    );
-  const cps = gr.map(x => comps.filter(y => y.data === x.data)).flat();
-  if (cps.length)
-    e.append(
-      el(
-        "p",
-        "wait",
-        "⚠️ Compromisso nesse dia: " +
-          cps.map(y => `${y.titulo || "Compromisso"} (${y.deQuem || ""}) ${y.diaInteiro ? "dia inteiro" : y.hora}`).join(", ")
-      )
-    );
-  const det = [gr.map(x => x.obs).filter(Boolean)[0], x0.pedidoPor && "Pedido por " + U.first(x0.pedidoPor)].filter(Boolean).join("\n");
-  if (det) e.append(el("p", "notes", det));
-  const act = el("div", "actions");
-  act.append(U.mkBtn(gr.length > 1 ? "✅ Aprovar as " + gr.length + " datas" : "✅ Aprovar", "btn-ok", () => aprovarGrupo(gr)));
-  act.append(U.mkBtn("❌ Recusar", "btn-danger", () => recusar(gr)));
-  e.append(act);
-  return e;
-}
-async function aprovarGrupo(gr) {
-  try {
-    const agora = new Date().toISOString();
-    // agenda e instituição mudam juntas (ou nenhuma muda)
-    const b = FS.writeBatch(db);
-    for (const x of gr) {
-      b.update(FS.doc(db, "agenda", x.id), { status: "confirmado", aprovadoPor: C.me || "", aprovadoEm: agora });
-      if (x.instId && CAMPO[x.kind])
-        b.update(FS.doc(db, "instituicoes", x.instId), { [CAMPO[x.kind] + ".status"]: "confirmado", atualizadoEm: agora });
-    }
-    await b.commit();
-    let n = 0;
-    try {
-      n = await avisarColegioPorEmail(gr[0].instId, C);
-    } catch (e) {
-      avisoErro(e, "preparar o e-mail para o colégio", U.toast);
-    }
-    const txt = `Aprovado ✅${n ? ` · e-mail com as datas vai para ${n} contato${n > 1 ? "s" : ""}` : " · o colégio não tem e-mail cadastrado"}`;
-    // quem agendou recebe o aviso para mandar a confirmação do próprio WhatsApp
-    const meus = gr.filter(x => (x.pedidoEmail || "") === C.email && x.contato && x.contato.tel);
-    if (meus.length)
-      avisar(
-        meus.map(x => Object.assign({}, x, { status: "confirmado" })),
-        txt
-      );
-    else U.toast(txt + (gr[0].pedidoPor ? ` · ${U.first(gr[0].pedidoPor)} avisa o colégio pelo WhatsApp` : ""));
-  } catch (e) {
-    C.handleErr(e);
-  }
-}
-
-function recusar(arg) {
-  const gr = Array.isArray(arg) ? arg : [arg],
-    x = gr[0];
-  sheet(gr.length > 1 ? "Recusar as datas" : "Recusar data", (p, close) => {
-    p.append(
-      el(
-        "p",
-        "hint",
-        `${title(x.instNome)} · ${gr.map(g => nomeEvento(g.kind, g.instNome) + " " + diaTxt(g.data)).join(" + ")}. ${gr.length > 1 ? "Os dias ficam" : "O dia fica"} livre${gr.length > 1 ? "s" : ""} de novo.`
-      )
-    );
-    const mot = el("input");
-    mot.maxLength = 200;
-    mot.placeholder = "ex.: já tenho ensaio nesse dia";
-    const sug = el("input");
-    sug.type = "date";
-    sug.min = U.todayStr();
-    p.append(
-      field("Motivo", mot),
-      field(gr.length > 1 ? "Sugerir outro dia para a formatura (opcional)" : "Sugerir outro dia (opcional)", sug),
-      botoes(close, "Recusar e liberar o dia", "btn-danger")
-    );
-    setTimeout(() => mot.focus(), 30);
-    p.addEventListener("submit", async ev => {
-      ev.preventDefault();
-      close();
-      try {
-        const b = FS.writeBatch(db);
-        for (const y of gr) {
-          b.delete(FS.doc(db, "agenda", y.id));
-          if (y.instId && CAMPO[y.kind]) {
-            const k = CAMPO[y.kind];
-            b.update(FS.doc(db, "instituicoes", y.instId), {
-              [k + ".status"]: "recusado",
-              [k + ".motivoRecusa"]: mot.value.trim(),
-              [k + ".sugestao"]: y.kind === "formatura" || gr.length === 1 ? sug.value || "" : "",
-              atualizadoEm: new Date().toISOString()
-            });
-          }
-        }
-        await b.commit();
-        U.toast(gr.length > 1 ? "Datas recusadas. Os dias ficaram livres." : "Data recusada. O dia ficou livre.");
-      } catch (e) {
-        C.handleErr(e);
-      }
-    });
-  });
-}
-
-// ---------- Visitas do vendedor (só informam) ----------
-function linhaVisita(x) {
-  const r = el("div", "agrow");
-  const t = el("div", "agtxt");
-  t.append(
-    el(
-      "b",
-      null,
-      `🚗 ${x.proximoPasso === "Voltar para visita" || x.etapa === "AGENDAR VISITA" ? "Visita" : x.proximoPasso || "Retorno"}: ${title(x.nome)}`
-    )
-  );
-  const det = [
-    x.followupHora,
-    C.nomeDe(x) && "👤 " + U.first(C.nomeDe(x)),
-    x.proximoPasso && x.proximoPasso !== "Voltar para visita" ? x.proximoPasso : ""
-  ]
-    .filter(Boolean)
-    .join(" · ");
-  if (det) t.append(el("span", null, det));
-  r.append(t, el("span", "tag", "Visita"));
-  return r;
-}
-
-// ---------- Ensaios no estúdio ----------
-function linhaEnsaio(x) {
-  const r = el("div", "agrow");
-  const t = el("div", "agtxt");
-  t.append(el("b", null, `📷 ${x.hora ? x.hora + "–" + fimDe(x) : "Sem horário"} · ${title(x.cliente)}`));
-  t.append(el("span", null, [x.tipo, marco() ? (x.sinalPago ? "💰 sinal pago" : "⚠️ sem sinal") : "", x.obs].filter(Boolean).join(" · ")));
-  if (x.status === "analisar")
-    t.append(el("span", "wait", "⏳ A Luciana vai analisar: " + (x.conflito || "o dia já tem outro compromisso")));
-  if (!marco()) {
-    r.append(t, el("span", "tag", "Estúdio"));
-    return r;
-  }
-  const act = el("div", "agact");
-  const q = quando(x.data);
-  if (x.tel && (q || !x.lembrado)) {
-    const b = U.mkBtn(x.lembrado ? "✓ Lembrado" : "📲 Lembrar", x.lembrado ? "btn-sm" : q ? "btn-sm btn-ok" : "btn-sm", () => lembrar(x));
-    b.title = "Abre o WhatsApp com a mensagem de lembrete pronta";
-    act.append(b);
-  }
-  act.append(U.mkBtn("Editar", "btn-sm", () => openEnsaio(x)));
-  r.append(t, act);
-  return r;
-}
-function cardAnalisar(x) {
-  const e = el("article", "card today");
-  const top = el("div", "card-top");
-  top.append(el("h3", "name", `📷 ${title(x.cliente)}`), el("span", "stage", "ANALISAR"));
-  e.append(top);
-  e.append(
-    el(
-      "div",
-      "fu today",
-      `${diaTxt(x.data)}/${x.data.slice(0, 4)} · ${x.hora ? x.hora + "–" + fimDe(x) : "sem horário"} · ${x.tipo || "Ensaio"}`
-    )
-  );
-  const dia = resumoDia(x.data, x.id);
-  e.append(
-    el(
-      "p",
-      "notes",
-      (dia.length ? "Nesse dia também:\n" + dia.join("\n") : "") +
-        (x.marcadoPor ? `\nMarcado por ${U.first(x.marcadoPor)}` : "") +
-        (x.obs ? "\n" + x.obs : "")
-    )
-  );
-  const act = el("div", "actions");
-  act.append(
-    U.mkBtn("✅ Pode marcar", "btn-ok", async () => {
-      try {
-        await FS.updateDoc(FS.doc(db, "ensaios", x.id), {
-          status: "confirmado",
-          analisadoPor: C.me || "",
-          analisadoEm: new Date().toISOString()
-        });
-        U.toast("Ensaio confirmado ✅");
-      } catch (er) {
-        C.handleErr(er);
-      }
-    })
-  );
-  act.append(U.mkBtn("❌ Não dá", "btn-danger", () => naoDa(x)));
-  e.append(act);
-  return e;
-}
-function naoDa(x) {
-  sheet("Não dá nesse horário", (p, close) => {
-    p.append(el("p", "hint", `${title(x.cliente)} · ${diaTxt(x.data)} ${x.hora || ""}. O Adriano vê o motivo e remarca com o cliente.`));
-    const mot = el("input");
-    mot.maxLength = 200;
-    mot.placeholder = "ex.: tenho formatura à noite, melhor de manhã";
-    p.append(field("Motivo / sugestão", mot), botoes(close, "Pedir para remarcar", "btn-danger"));
-    setTimeout(() => mot.focus(), 30);
-    p.addEventListener("submit", async ev => {
-      ev.preventDefault();
-      close();
-      try {
-        await FS.updateDoc(FS.doc(db, "ensaios", x.id), {
-          status: "remarcar",
-          motivo: mot.value.trim(),
-          analisadoPor: C.me || "",
-          analisadoEm: new Date().toISOString()
-        });
-        U.toast("Pedido de remarcar enviado");
-      } catch (e) {
-        C.handleErr(e);
-      }
-    });
-  });
-}
-function cardRemarcar(x) {
-  const e = el("article", "card late");
-  const top = el("div", "card-top");
-  top.append(el("h3", "name", `📷 ${title(x.cliente)}`), el("span", "stage", "REMARCAR"));
-  e.append(top);
-  e.append(el("div", "fu late", `${diaTxt(x.data)} · ${x.hora || "sem horário"} · ${x.tipo || "Ensaio"}`));
-  e.append(
-    el("p", "notes", `${x.analisadoPor ? U.first(x.analisadoPor) : "A Luciana"} pediu para remarcar${x.motivo ? ": " + x.motivo : "."}`)
-  );
-  const act = el("div", "actions");
-  act.append(U.mkBtn("Remarcar", "btn-primary", () => openEnsaio(x)));
-  if (x.tel) act.append(U.mkBtn("💬 WhatsApp", "", () => window.open("https://wa.me/" + U.digits(x.tel), "_blank", "noopener")));
-  e.append(act);
-  return e;
-}
-function msgLembrete(x) {
-  const q = quando(x.data);
-  const dia = q ? `${q} (${diaTxt(x.data)})` : diaTxt(x.data);
-  return `Olá, ${U.first(title(x.cliente))}! Aqui é do ${ESTUDIO.nome} 📸\nPassando para lembrar do seu ensaio ${dia}${x.hora ? " às " + x.hora : ""}, aqui no estúdio: ${ENDERECO}.\nSe tiver algum imprevisto, é só me avisar por aqui. Até lá! 😊`;
-}
-async function lembrar(x) {
-  const tel = U.digits(x.tel);
-  if (!tel) {
-    U.toast("Esse ensaio está sem WhatsApp");
-    return;
-  }
-  window.open(`https://wa.me/${tel}?text=${encodeURIComponent(msgLembrete(x))}`, "_blank", "noopener");
-  if (!x.lembrado) {
-    try {
-      await FS.updateDoc(FS.doc(db, "ensaios", x.id), { lembrado: true, lembradoEm: new Date().toISOString(), lembradoPor: C.me || "" });
-    } catch (e) {
-      avisoErro(e, "marcar como lembrado");
-    }
-  }
-}
-
-// ---------- Compromissos (consulta médica, outros afazeres) ----------
-function linhaComp(x) {
-  const r = el("div", "agrow");
-  const t = el("div", "agtxt");
-  const oculto = x.particular && !marco();
-  t.append(
-    el(
-      "b",
-      null,
-      oculto ? `🔒 ${x.deQuem || "Compromisso"}: ocupado` : `📌 ${x.titulo || "Compromisso"}${x.deQuem ? " · " + x.deQuem : ""}`
-    )
-  );
-  t.append(
-    el(
-      "span",
-      null,
-      [
-        x.diaInteiro ? "Dia inteiro" : x.hora ? x.hora + "–" + fimDe(x) : "",
-        !oculto && x.obs,
-        x.particular && marco() ? "🔒 particular" : ""
-      ]
-        .filter(Boolean)
-        .join(" · ")
-    )
-  );
-  if (!marco()) {
-    r.append(t, el("span", "tag " + (x.diaInteiro ? "late" : ""), x.diaInteiro ? "Dia bloqueado" : "Ocupado"));
-    return r;
-  }
-  const act = el("div", "agact");
-  if (x.diaInteiro) act.append(el("span", "tag late", "Dia bloqueado"));
-  act.append(U.mkBtn("Editar", "btn-sm", () => openComp(x)));
-  r.append(t, act);
-  return r;
-}
 // Para o cartão da tela inicial
 export async function contarPendentes(ctx) {
   const s = await ctx.FS.getDocs(
     ctx.FS.query(ctx.FS.collection(ctx.db, "agenda"), ctx.FS.where("status", "==", "pendente"), ctx.FS.limit(200))
   );
   return s.size;
-}
-
-// Relatório para reunião: tudo do mês que está no calendário, com o filtro escolhido
-const NOME_FILTRO = { tudo: "Tudo", colegio: "Colégios", ensaio: "Ensaios", comp: "Compromissos", visita: "Visitas", beca: "Becas" };
-// Contato de cada compromisso para o relatório (nome, telefone e e-mail quando tem)
-function contatoRelatorio(it) {
-  const x = it.x;
-  const c = it.t === "c" ? x.contato || {} : it.t === "v" ? (x.contatos || [])[0] || {} : null;
-  if (c) return [c.nome && title(c.nome), contatoRel(c.tel, c.email)].filter(Boolean).join(" · ");
-  if (it.t === "e") return marco() ? contatoRel(x.tel, x.email) : "";
-  if (it.t === "b") return contatoRel(x.tel, x.email);
-  return "";
-}
-function linhaRelatorio(it) {
-  const x = it.x;
-  if (it.t === "c")
-    return [nomeEvento(x.kind, x.instNome), [x.hora, x.onde, x.status === "confirmado" ? "Confirmado" : "Aguardando aprovação"]];
-  if (it.t === "e")
-    return [
-      `Ensaio: ${title(x.cliente)}`,
-      [x.hora && x.hora + "–" + fimDe(x), x.tipo, marco() ? (x.sinalPago ? "sinal pago" : "sem sinal") : ""]
-    ];
-  if (it.t === "p") {
-    const oculto = x.particular && !marco();
-    return [
-      oculto ? `${x.deQuem || "Compromisso"}: ocupado` : `${x.titulo || "Compromisso"}${x.deQuem ? " · " + x.deQuem : ""}`,
-      [x.diaInteiro ? "Dia inteiro" : x.hora && x.hora + "–" + fimDe(x), !oculto && x.obs]
-    ];
-  }
-  if (it.t === "b")
-    return [
-      `${it.ret ? "Retirada" : "Devolução"} de becas: ${title(x.cliente)}`,
-      [it.ret && x.retiradaHora, `${x.qtd || 1} beca(s)`, x.evento]
-    ];
-  if (it.t === "f") return [`Feriado: ${x.nome || ""}`, []];
-  return [`Visita: ${title(x.nome)}`, [x.followupHora, C.nomeDe(x) && U.first(C.nomeDe(x)), x.proximoPasso]];
-}
-function relatorioAgenda() {
-  const mes = mesVis || U.todayStr().slice(0, 7);
-  const [y, m] = mes.split("-").map(Number);
-  const doMes = entradas(U.todayStr()).filter(it => (it.data || "").startsWith(mes));
-  const TIPO = { c: "Colégio", e: "Ensaio", p: "Compromisso", b: "Becas", f: "Feriado", v: "Visita" };
-  const conta = t => doMes.filter(it => it.t === t).length;
-  return {
-    titulo: `Agenda de ${MESES[m - 1]} de ${y}`,
-    subtitulo: "Mostrando: " + (NOME_FILTRO[filtro] || filtro),
-    secoes: [
-      {
-        titulo: "Resumo do mês",
-        kpis: [
-          ["Colégios", conta("c")],
-          ["Ensaios", conta("e")],
-          ["Compromissos", conta("p")],
-          ["Visitas", conta("v")],
-          ["Becas", conta("b")]
-        ].filter(([, n]) => n)
-      },
-      {
-        titulo: "Dia a dia",
-        nota: mes === U.todayStr().slice(0, 7) ? "Deste mês, de hoje em diante." : "",
-        tabela: {
-          cols: ["Dia", "Tipo", "O quê", "Detalhes", "Contato"],
-          linhas: doMes.map(it => {
-            const [oque, det] = linhaRelatorio(it);
-            return [
-              `${U.fmtDate(it.data)} (${SEMANA[new Date(it.data + "T12:00").getDay()]})`,
-              TIPO[it.t] || "",
-              oque,
-              det.filter(Boolean).join(" · "),
-              contatoRelatorio(it)
-            ];
-          })
-        },
-        vazio: "Nada marcado neste mês."
-      }
-    ]
-  };
 }

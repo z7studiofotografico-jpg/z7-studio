@@ -68,3 +68,30 @@ test("index.html não tem código dentro da página (o código fica em js/app.js
   const inline = [...html.matchAll(/<script(?![^>]*\bsrc=)[^>]*>([\s\S]*?)<\/script>/g)].filter(m => m[1].trim());
   assert.equal(inline.length, 0);
 });
+
+// Organização: arquivos pequenos o bastante para ler e mudar com segurança, e sem dependência circular
+// (A importa B que importa A: a ordem de carregar vira armadilha e uma parte não dá para testar sozinha).
+test("nenhum arquivo do app passa de 850 linhas", () => {
+  const dir = new URL("../js/", import.meta.url);
+  for (const f of fs.readdirSync(dir).filter(x => x.endsWith(".js"))) {
+    const n = fs.readFileSync(new URL(f, dir), "utf8").split("\n").length;
+    assert.ok(n <= 850, `${f} tem ${n} linhas: divida em partes`);
+  }
+});
+test("os arquivos do app não dependem um do outro em círculo", () => {
+  const dir = new URL("../js/", import.meta.url);
+  const deps = {};
+  for (const f of fs.readdirSync(dir).filter(x => x.endsWith(".js"))) {
+    const s = fs.readFileSync(new URL(f, dir), "utf8");
+    deps[f] = [...s.matchAll(/(?:import|export)[^"';]*?from\s+"\.\/([\w-]+\.js)"/g)].map(m => m[1]);
+  }
+  const estado = {};
+  const visita = (f, caminho) => {
+    if (estado[f] === 2) return;
+    assert.ok(estado[f] !== 1, "dependência circular: " + [...caminho, f].join(" → "));
+    estado[f] = 1;
+    (deps[f] || []).forEach(d => visita(d, [...caminho, f]));
+    estado[f] = 2;
+  };
+  Object.keys(deps).forEach(f => visita(f, []));
+});

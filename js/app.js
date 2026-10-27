@@ -1,4 +1,5 @@
-// App Z7 Studio: login, rotas entre as telas, cartões do Início, Ajustes e notificações.
+// App Z7 Studio: login, perfil (quem é e o que pode ver), rotas entre as telas e o botão voltar.
+// Partes: inicio.js (números dos cartões), ajustes.js, notificacoes.js, vercomo.js.
 // (Saiu de dentro do index.html para ter lint e ficar fácil de achar.)
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
 import {
@@ -22,21 +23,22 @@ import {
   onSnapshot,
   updateDoc,
   setDoc,
-  query,
-  where,
-  getCountFromServer
+  where
 } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
 import * as FS from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
-import { getMessaging, getToken, onMessage, isSupported } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-messaging.js";
-import { COMISSAO_PADRAO, FORMAS, taxa } from "./regras.js";
-import { avisoErro, ligarCamposReais, formatarCampos } from "./ui.js";
-import { todayStr, addDays, num, first, toast, showNotice, mkBtn } from "./util.js";
+import { getMessaging, onMessage } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-messaging.js";
+import { avisoErro, ligarCamposReais } from "./ui.js";
+import { first, toast, showNotice, mkBtn } from "./util.js";
 ligarCamposReais();
 import * as Funil from "./funil.js";
 import { ligarErros, telaFalhou } from "./erros.js";
 import { fecharRelatorio } from "./relatorio.js";
+import { lerVerComo, faixaVerComo, escolherVerComo } from "./vercomo.js";
+import { criarNotificacoes } from "./notificacoes.js";
+import { ligarAjustes } from "./ajustes.js";
+import { criarInicio } from "./inicio.js";
 import * as Equipe from "./equipe.js";
-import { definirExtras as feriadosExtras, feriadosEntre } from "./feriados.js";
+import { definirExtras as feriadosExtras } from "./feriados.js";
 
 const $ = id => document.getElementById(id);
 const CFG = self.Z7_CONFIG || {};
@@ -92,78 +94,8 @@ const MODULOS = [
   ["formaturas", "Formaturas"],
   ["becas", "Aluguel de becas"]
 ];
-// ---------- Ver como a equipe (só admin) ----------
-// Mostra o app como uma pessoa da equipe vê (os mesmos cards, filtros e telas), sem gravar nada.
-// Fica guardado só nesta aba (sessionStorage); "Sair" volta ao normal.
-let verComo = null;
-try {
-  verComo = JSON.parse(sessionStorage.getItem("z7verComo") || "null");
-} catch (_) {
-  verComo = null;
-}
+let verComo = lerVerComo();
 const emailReal = () => ((user && user.email) || "").toLowerCase();
-const PESSOA_TESTE = { email: "teste-de-app@z7.local", nome: "Teste de App", ativo: true, papel: "equipe" };
-function entrarVerComo(pessoa) {
-  try {
-    sessionStorage.setItem("z7verComo", JSON.stringify(pessoa));
-  } catch (_) {
-    return toast("Este navegador não deixou guardar a visualização.");
-  }
-  history.replaceState(null, "", "#home"); // sem criar entrada nova no histórico (o voltar continua certo)
-  location.reload();
-}
-function sairVerComo() {
-  try {
-    sessionStorage.removeItem("z7verComo");
-  } catch (_) {}
-  history.replaceState(null, "", "#home");
-  location.reload();
-}
-function faixaVerComo() {
-  if (!verComo || $("faixaVerComo")) return;
-  const f = document.createElement("div");
-  f.id = "faixaVerComo";
-  f.className = "notice";
-  f.setAttribute("role", "status");
-  const t = document.createElement("span");
-  t.textContent = `👁 Vendo o app como ${verComo.nome} (equipe). Só visualização: nada é gravado.`;
-  f.append(t, mkBtn("Sair", "btn-sm", sairVerComo));
-  document.body.prepend(f);
-}
-function escolherVerComo() {
-  const lista = Object.entries(USERS)
-    .filter(([em, u]) => u.ativo !== false && u.papel !== "admin" && !isDono(em) && Array.isArray(u.modulos) && u.modulos.length)
-    .map(([em, u]) => Object.assign({ email: em }, u));
-  const todos = Object.assign({}, PESSOA_TESTE, { modulos: MODULOS.map(m => m[0]) });
-  const sh = document.createElement("div"),
-    p = document.createElement("div");
-  sh.className = "sheet";
-  p.className = "panel";
-  sh.append(p);
-  const h = document.createElement("h2");
-  h.textContent = "Ver o app como a equipe";
-  const dica = document.createElement("p");
-  dica.className = "hint";
-  dica.textContent = "Escolha quem. O app abre como essa pessoa vê (só visualização, nada é gravado).";
-  p.append(h, dica);
-  [todos, ...lista].forEach(u => {
-    const b = mkBtn(
-      `${u.nome}${u === todos ? " (todos os módulos da equipe)" : ""} · ${(u.modulos || []).map(k => (MODULOS.find(m => m[0] === k) || [k, k])[1]).join(", ")}`,
-      "btn",
-      () => entrarVerComo({ email: u.email, nome: u.nome, ativo: true, papel: "equipe", modulos: u.modulos })
-    );
-    b.style.display = "block";
-    b.style.margin = "6px 0";
-    b.style.textAlign = "left";
-    p.append(b);
-  });
-  p.append(mkBtn("Cancelar", "btn", () => sh.remove()));
-  sh.addEventListener("click", e => {
-    if (e.target === sh) sh.remove();
-  });
-  document.body.append(sh);
-}
-
 function pode(m) {
   if (isAdmin) return true;
   const p = verComo || USERS[emailReal()];
@@ -186,7 +118,7 @@ function applyProfile() {
   if (verComo) {
     isAdmin = false;
     me = verComo.nome;
-    faixaVerComo();
+    faixaVerComo(verComo);
   }
   renderMe();
   if (me !== prev && !verComo) refreshPushToken();
@@ -202,248 +134,6 @@ function handleErr(e) {
 }
 
 // ---------- desenho da tela ----------
-
-// ---------- ajustes ----------
-// Campos de Ajustes: [id do campo, chave em config/app, tipo, padrão]. Um campo novo = uma linha aqui.
-const AJUSTES = [
-  ["pInd", "individual", "reais"],
-  ["pSinal", "sinal", "reais"],
-  ["pG36", "g36", "reais"],
-  ["pG7", "g7", "reais"],
-  ["pFotos", "fotos", "int", 30],
-  ["pPrazo", "prazo", "int", 15],
-  ["pLfLote", "lfAvisoDia", "int", 25],
-  ["pLfParc", "lfParcelas", "int"],
-  ["pLfPix", "lfPix", "reais"],
-  ["pLfCartao", "lfCartao", "reais"],
-  ["pKit", "kitPreco", "reais"],
-  ["pKitPromo", "kitPromo", "reais"],
-  ["pKitCartao", "kitCartao", "reais"],
-  ["pKitFinal", "kitFinal", "reais"],
-  ["pLote", "avisoDia", "int", 20],
-  ["pParc", "parcelas", "int"],
-  ["pLfNum", "lfNumero", "texto"],
-  ["pRepNum", "repNumero", "texto"],
-  ["pEntrega", "entrega", "texto"],
-  ["pPix", "pix", "texto"],
-  ["pPixLF", "pixLF", "texto"],
-  ["pPixRep", "pixRep", "texto"],
-  ["pPixFinal", "pixFinal", "texto"],
-  ["pPixSinal", "pixSinal", "texto"],
-  ["pLink", "linkCartao", "texto"],
-  ["pLinkFinal", "linkCartaoFinal", "texto"],
-  ["pLinkLF", "linkCartaoLF", "texto"],
-  ["pAval", "linkAvaliacao", "texto"],
-  ["pFeriados", "feriadosExtras", "texto"]
-];
-// Ajustes (só admin): os últimos erros do app registrados pelos aparelhos (defeitos, não falta de internet)
-async function mostrarErros() {
-  try {
-    const s = await FS.getDocs(FS.query(collection(db, "erros"), FS.orderBy("em", "desc"), FS.limit(15)));
-    $("pErros").hidden = !s.size;
-    $("pErros").querySelector("summary").textContent = `⚠️ Erros do app (${s.size}${s.size === 15 ? "+" : ""})`;
-    const box = $("pErrosLista");
-    box.innerHTML = "";
-    s.docs.forEach(d => {
-      const x = d.data(),
-        p = document.createElement("p");
-      p.textContent = `${String(x.em || "")
-        .slice(0, 16)
-        .replace("T", " ")} · ${x.email} · ${x.tela || x.onde}: ${x.msg}`;
-      box.append(p);
-    });
-  } catch (e) {
-    console.warn("[Z7] erros", e);
-  }
-}
-const lerAjuste = { reais: v => num(v), int: v => parseInt(String(v).replace(/\D/g, ""), 10) || 0, texto: v => String(v || "").trim() };
-$("btnPrices").onclick = () => {
-  AJUSTES.forEach(([id, k]) => {
-    $(id).value = P[k] || "";
-    $(id).disabled = !isAdmin;
-  });
-  $("pEquipes").value = String(P.equipesDia || 1);
-  feriadosExtras(P.feriadosExtras);
-  listarFeriados();
-  montarComissao();
-  formatarCampos($("sheetPrices"));
-  $("pEquipes").disabled = !isAdmin;
-  document.querySelectorAll("#comTab input").forEach(i => {
-    i.disabled = !isAdmin;
-  });
-  $("pSave").hidden = !isAdmin;
-  $("pricesHint").textContent = isAdmin
-    ? "Os valores entram automaticamente nas mensagens prontas."
-    : "Só administradores mudam os preços.";
-  renderPushState();
-  if (isAdmin) mostrarErros();
-  $("pVerComo").hidden = !isAdmin;
-  $("sheetPrices").hidden = false;
-};
-// Tabela de comissão: PR e Formatura × forma de pagamento
-const COM_FORMAS = FORMAS,
-  COM_PADRAO = COMISSAO_PADRAO;
-// Lista em Ajustes: todos os feriados deste ano e do próximo (nacionais, Carnaval, RJ, Nilópolis e os de "Outros feriados")
-function listarFeriados() {
-  const box = $("pFerDias");
-  box.textContent = "";
-  const y = new Date().getFullYear(),
-    SEM = ["dom", "seg", "ter", "qua", "qui", "sex", "sáb"];
-  [y, y + 1].forEach(ano => {
-    const h = document.createElement("b");
-    h.textContent = String(ano);
-    h.style.display = "block";
-    h.style.marginTop = "8px";
-    box.append(h);
-    feriadosEntre(`${ano}-01-01`, `${ano}-12-31`).forEach(f => {
-      const [a, m, d] = f.data.split("-");
-      const l = document.createElement("div");
-      l.textContent = `${d}/${m} (${SEM[new Date(+a, m - 1, +d).getDay()]}) · ${f.nome}`;
-      box.append(l);
-    });
-  });
-}
-$("pFeriados").addEventListener("input", () => {
-  feriadosExtras($("pFeriados").value);
-  listarFeriados();
-});
-function montarComissao() {
-  const t = $("comTab");
-  t.innerHTML = "";
-  const cfg = P.comissao || {};
-  ["", "PR", "Álbum de formatura"].forEach(h => {
-    const s = document.createElement("span");
-    s.className = "th";
-    s.textContent = h;
-    t.appendChild(s);
-  });
-  COM_FORMAS.forEach(f => {
-    const s = document.createElement("span");
-    s.textContent = f;
-    t.appendChild(s);
-    ["pr", "form"].forEach(l => {
-      const i = document.createElement("input");
-      i.inputMode = "decimal";
-      i.dataset.pct = "1";
-      i.dataset.l = l;
-      i.dataset.f = f;
-      i.setAttribute("aria-label", `Comissão ${l === "pr" ? "PR" : "Álbum de formatura"} no ${f}`);
-      const v = cfg[l] && cfg[l][f];
-      i.value = String(v != null && v !== "" ? v : COM_PADRAO[l][f]).replace(".", ",");
-      t.appendChild(i);
-    });
-  });
-  const s = document.createElement("span");
-  s.textContent = "🎓 Adesão · Kit 01 (por parcela paga)";
-  s.style.gridColumn = "1 / 3";
-  t.appendChild(s);
-  const ic = document.createElement("input");
-  ic.inputMode = "decimal";
-  ic.dataset.pct = "1";
-  ic.id = "comAdesao";
-  ic.setAttribute("aria-label", "Comissão da adesão (Kit 01)");
-  ic.value = String(taxa({ comissao: cfg }, "adesao")).replace(".", ",");
-  t.appendChild(ic);
-}
-function lerComissao() {
-  const o = { pr: {}, form: {} };
-  document.querySelectorAll("#comTab input[data-l]").forEach(i => {
-    o[i.dataset.l][i.dataset.f] = num(i.value);
-  });
-  o.adesao = num($("comAdesao").value);
-  return o;
-}
-$("pCancel").onclick = () => {
-  $("sheetPrices").hidden = true;
-};
-$("pSair").onclick = async () => {
-  $("sheetPrices").hidden = true;
-  await signOut(auth);
-};
-$("pPush").onclick = () => enablePush(true);
-$("formPrices").addEventListener("submit", async e => {
-  e.preventDefault();
-  if (!isAdmin) return;
-  const body = Object.fromEntries(AJUSTES.map(([id, k, t, padrao]) => [k, lerAjuste[t]($(id).value) || padrao || lerAjuste[t]("")]));
-  Object.assign(body, { equipesDia: Number($("pEquipes").value) || 1, comissao: lerComissao() });
-  try {
-    await setDoc(doc(db, "config", "app"), body, { merge: true });
-    $("sheetPrices").hidden = true;
-    toast("Preços salvos");
-  } catch (err) {
-    handleErr(err);
-  }
-});
-
-// ---------- notificações ----------
-const isIOS = /iphone|ipad|ipod/i.test(navigator.userAgent);
-const standalone = matchMedia("(display-mode: standalone)").matches || navigator.standalone === true;
-function pushSupported() {
-  return "Notification" in window && "serviceWorker" in navigator && "PushManager" in window;
-}
-function renderPushState() {
-  const el = $("pushState");
-  if (isIOS && !standalone) {
-    el.textContent = "No iPhone, primeiro adicione o app à Tela de Início e abra por lá. Só assim as notificações funcionam.";
-    $("pPush").hidden = true;
-    return;
-  }
-  if (!pushSupported()) {
-    el.textContent = "Este navegador não recebe notificações.";
-    $("pPush").hidden = true;
-    return;
-  }
-  const p = Notification.permission;
-  el.textContent =
-    p === "granted"
-      ? "Notificações ativadas neste aparelho."
-      : p === "denied"
-        ? "As notificações foram bloqueadas. Libere nas configurações do navegador ou do celular."
-        : "Notificações desativadas neste aparelho.";
-  $("pPush").hidden = p === "granted" || p === "denied";
-}
-function renderPushBanner() {
-  $("pushBanner").hidden = !(pushSupported() && Notification.permission === "default" && (!isIOS || standalone));
-}
-async function enablePush(fromClick) {
-  if (!pushSupported() || !swReg) return;
-  try {
-    if (!(await isSupported())) {
-      if (fromClick) toast("Este aparelho não recebe notificações.");
-      return;
-    }
-    const perm = Notification.permission === "default" ? await Notification.requestPermission() : Notification.permission;
-    renderPushBanner();
-    renderPushState();
-    if (perm !== "granted") {
-      if (fromClick) toast("Notificações não autorizadas");
-      return;
-    }
-    const token = await getToken(getMessaging(app), { vapidKey: CFG.vapidKey, serviceWorkerRegistration: swReg });
-    if (!token) return;
-    await setDoc(doc(db, "tokens", token), {
-      nome: me || "",
-      email: user?.email || "",
-      aparelho: navigator.userAgent.slice(0, 160),
-      atualizadoEm: new Date().toISOString()
-    });
-    try {
-      localStorage.setItem("z7token", token);
-    } catch (_) {}
-    if (fromClick) toast("Notificações ativadas ✅");
-  } catch (e) {
-    if (fromClick) toast("Não foi possível ativar as notificações.");
-    console.warn(e);
-  }
-}
-function refreshPushToken() {
-  if (pushSupported() && Notification.permission === "granted") enablePush(false);
-}
-$("btnPush").onclick = () => enablePush(true);
-$("pVerComo").onclick = () => {
-  $("sheetPrices").hidden = true;
-  escolherVerComo();
-};
 
 // ---------- navegação entre módulos ----------
 const VIEWS = {
@@ -619,6 +309,16 @@ const ctx = {
 };
 ligarErros(ctx);
 Funil.init(ctx);
+const { renderPushState, renderPushBanner, refreshPushToken } = criarNotificacoes({
+  app,
+  db,
+  CFG,
+  swReg: () => swReg,
+  me: () => me,
+  user: () => user
+});
+ligarAjustes(ctx, { sair: () => signOut(auth), renderPushState, verComo: () => escolherVerComo(USERS, isDono, MODULOS) });
+const { renderHome, contarInst } = criarInicio(ctx, Funil);
 let usersLoaded = false;
 async function route() {
   if (!user || !usersLoaded) return;
@@ -805,202 +505,6 @@ addEventListener("popstate", e => {
 if (!history.state || !history.state.z7) {
   history.replaceState({ z7base: 1 }, "", location.href);
   guarda();
-}
-
-let repCount = { at: 0, n: null };
-function renderHome() {
-  const h = new Date().getHours();
-  $("hello").textContent = (h < 12 ? "Bom dia" : h < 18 ? "Boa tarde" : "Boa noite") + (me ? ", " + first(me) : "") + "!";
-  const { late, today } = Funil.contagem();
-  $("tVendas").textContent = isAdmin ? "Abrir" : "Meu desempenho";
-  document.querySelectorAll(".tile[data-mod]").forEach(t => {
-    t.hidden = !pode(t.dataset.mod);
-  });
-  $("tFunil").textContent =
-    late + today ? `${late + today} para hoje` + (late ? ` · ${late} atrasado${late > 1 ? "s" : ""}` : "") : "Nada pendente hoje ✓";
-  if (Date.now() - repCount.at > 5 * 60000) {
-    repCount.at = Date.now();
-    if (pode("rep"))
-      getCountFromServer(query(collection(db, "repasse"), where("followup", "<=", todayStr())))
-        .then(c => {
-          repCount.n = c.data().count;
-          paintRep();
-        })
-        .catch(e => avisoErro(e, "contar o PR"));
-    else if (pode("lf"))
-      FS.getDocs(
-        query(
-          collection(db, "repasse"),
-          where("ano", "==", new Date().getFullYear()),
-          where("etapa", "in", ["SEPARADO", "CONTATADO", "INTERESSADO"]),
-          FS.limit(300)
-        )
-      )
-        .then(s => {
-          repCount.n = s.docs.filter(
-            d => (d.data().followup || "9") <= todayStr() && (!d.data().respEmail || d.data().respEmail === ctx.email)
-          ).length;
-          paintRep();
-        })
-        .catch(e => avisoErro(e, "contar o PR"));
-  }
-  // pedidos de aluno repetido no PR esperando a decisão do admin
-  if (isAdmin && Date.now() - (repCount.pedAt || 0) > 60000) {
-    repCount.pedAt = Date.now();
-    getCountFromServer(query(collection(db, "pedidos"), where("status", "==", "pendente")))
-      .then(c => {
-        repCount.ped = c.data().count;
-        paintRep();
-      })
-      .catch(() => {});
-  }
-  paintRep();
-  contarInst();
-  contarAgenda();
-  contarFormBecas();
-}
-// Cartões Formaturas e Becas: parcelas atrasadas e devoluções atrasadas
-let fbCount = { at: 0 };
-function contarFormBecas() {
-  if (Date.now() - fbCount.at < 60000) return;
-  fbCount.at = Date.now();
-  const hoje = todayStr();
-  // Parcelas atrasadas = próximo vencimento em aberto (proxVenc) antes de hoje. O admin conta no servidor, sem baixar nada.
-  const pinta = n => {
-    $("tFormaturas").textContent = n ? `⚠️ ${n} parcela${n > 1 ? "s" : ""} atrasada${n > 1 ? "s" : ""}` : "Abrir";
-  };
-  if (pode("formaturas")) {
-    if (isAdmin)
-      getCountFromServer(query(collection(db, "formandos"), where("proxVenc", ">", ""), where("proxVenc", "<", hoje)))
-        .then(c => pinta(c.data().count))
-        .catch(e => avisoErro(e, "contar parcelas atrasadas"));
-    else
-      FS.getDocs(query(collection(db, "formandos"), where("respEmail", "==", ctx.email), FS.limit(2000)))
-        .then(s => pinta(s.docs.map(d => d.data()).filter(f => f.proxVenc && f.proxVenc < hoje).length))
-        .catch(e => avisoErro(e, "contar parcelas atrasadas"));
-  }
-  if (pode("becas"))
-    FS.getDocs(query(collection(db, "becas"), where("status", "in", ["reservado", "retirado"]), FS.limit(500)))
-      .then(s => {
-        const l = s.docs.map(d => d.data()),
-          at = l.filter(b => b.status === "retirado" && b.devolucao && b.devolucao < hoje).length,
-          ret = l.filter(b => b.status === "reservado" && b.retirada && b.retirada <= addDays(1)).length;
-        const p = [];
-        if (at) p.push(`⚠️ ${at} devolução${at > 1 ? "ões" : ""} atrasada${at > 1 ? "s" : ""}`);
-        if (ret) p.push(`${ret} retirada${ret > 1 ? "s" : ""} hoje/amanhã`);
-        $("tBecas").textContent = p.join(" · ") || "Abrir";
-      })
-      .catch(e => avisoErro(e, "contar as becas"));
-}
-// Cartão do Agendamento: para a Luciana, quantas datas esperam aprovação
-let agCount = { at: 0 };
-function contarAgenda() {
-  if (!pode("agenda") && !pode("colegios")) return;
-  if (Date.now() - agCount.at < 60000) return;
-  agCount.at = Date.now();
-  const eu = ctx.aprovador;
-  const falhou = (onde, v) => e => {
-    avisoErro(e, onde);
-    return v;
-  };
-  const ens = isAdmin
-    ? FS.getDocs(query(collection(db, "ensaios"), where("data", "==", addDays(1)), FS.limit(100)))
-        .then(s => s.docs.map(d => d.data()))
-        .catch(falhou("ver os ensaios de amanhã", []))
-    : Promise.resolve([]);
-  const ana =
-    isAdmin && eu
-      ? getCountFromServer(query(collection(db, "ensaios"), where("status", "==", "analisar")))
-          .then(c => c.data().count)
-          .catch(falhou("contar ensaios para analisar", 0))
-      : Promise.resolve(0);
-  const prz = Number(P.prazo) || 15;
-  const atr = isAdmin
-    ? FS.getDocs(query(collection(db, "ensaios"), where("data", ">=", addDays(-90)), FS.limit(600)))
-        .then(
-          s =>
-            s.docs
-              .map(d => d.data())
-              .filter(
-                e =>
-                  e.kind !== "pessoal" &&
-                  e.status !== "faltou" &&
-                  e.status !== "remarcar" &&
-                  e.data <= addDays(-prz) &&
-                  !(e.entrega && e.entrega.etapa === "Entregue")
-              ).length
-        )
-        .catch(falhou("contar entregas", 0))
-    : Promise.resolve(0);
-  Promise.all([
-    getCountFromServer(query(collection(db, "agenda"), where("status", "==", "pendente")))
-      .then(c => c.data().count)
-      .catch(falhou("contar datas pendentes", 0)),
-    ana,
-    ens,
-    atr
-  ]).then(([n, a, amanha, at]) => {
-    const p = [];
-    if (eu && n + a) p.push(`${n + a} para analisar`);
-    else if (n) p.push(`${n} aguardando a Luciana`);
-    const lem = amanha.filter(e => e.status !== "remarcar" && !e.lembrado && e.tel).length;
-    if (lem) p.push(`${lem} lembrete${lem > 1 ? "s" : ""} para amanhã`);
-    if (at) p.push(`⚠️ ${at} entrega${at > 1 ? "s" : ""} atrasada${at > 1 ? "s" : ""}`);
-    $("tAgenda").textContent = p.join(" · ") || "Abrir";
-  });
-}
-// Retornos de hoje por tipo de instituição (cartões da tela Instituições e da tela inicial)
-let instCount = { at: 0, por: null };
-function contarInst(force) {
-  if (!pode("colegios")) return;
-  if (!force && Date.now() - instCount.at < 120000 && instCount.por) return paintInst();
-  instCount.at = Date.now();
-  const hj = todayStr();
-  (isAdmin
-    ? Promise.all([
-        FS.getDocs(query(collection(db, "instituicoes"), where("followup", "<=", hj), FS.limit(500))),
-        FS.getDocs(query(collection(db, "instituicoes"), where("formatura.status", "in", ["pendente", "confirmado"]), FS.limit(500)))
-      ])
-    : FS.getDocs(ctx.carteira("instituicoes")).then(s => {
-        const docs = s.docs;
-        const f = fn => ({ docs: docs.filter(d => fn(d.data())) });
-        return [f(x => x.followup && x.followup <= hj), f(x => x.formatura && ["pendente", "confirmado"].includes(x.formatura.status))];
-      })
-  )
-    .then(([s1, s2]) => {
-      const por = {},
-        vistos = new Set();
-      s1.docs.forEach(d => {
-        const x = d.data();
-        if (x.etapa !== "FECHADO") {
-          por[x.tipo] = (por[x.tipo] || 0) + 1;
-          vistos.add(d.id);
-        }
-      });
-      // pendência: formatura sem o dia de medir beca + ensaio
-      s2.docs.forEach(d => {
-        const x = d.data();
-        const df = x.diaFotos;
-        if (!vistos.has(d.id) && !(df && df.data && df.status !== "recusado")) por[x.tipo] = (por[x.tipo] || 0) + 1;
-      });
-      instCount.por = por;
-      paintInst();
-    })
-    .catch(e => avisoErro(e, "contar os retornos das instituições"));
-}
-function paintInst() {
-  const por = instCount.por || {};
-  document.querySelectorAll(".tile[data-inst]").forEach(t => {
-    const n = t.dataset.inst === "superior" ? (por.faculdade || 0) + (por.profissionalizante || 0) : por[t.dataset.inst] || 0;
-    t.querySelector(".tile-n").textContent = n ? `${n} para hoje` : "Nada pendente hoje ✓";
-  });
-  const tot = Object.values(por).reduce((a, b) => a + b, 0),
-    tile = document.querySelector('.tile[data-mod="colegios"] .tile-n');
-  if (tile) tile.textContent = instCount.por ? (tot ? `${tot} para hoje` : "Nada pendente hoje ✓") : "Abrir";
-}
-function paintRep() {
-  const base = repCount.n == null ? "" : repCount.n ? `${repCount.n} para hoje` : "Nada pendente hoje ✓";
-  $("tRepasse").textContent = base + (repCount.ped ? ` · 📩 ${repCount.ped} pedido${repCount.ped > 1 ? "s" : ""} de aluno repetido` : "");
 }
 
 // ---------- login ----------

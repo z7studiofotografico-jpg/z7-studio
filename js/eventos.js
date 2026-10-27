@@ -4,7 +4,7 @@
 import { feriado } from "./feriados.js";
 import { ASSINATURA_EMAIL, ESTUDIO, assuntoDatas } from "./mensagens.js";
 import { el, title, field, inp, sel, sheet, botoes as actions, avisoErro, wa, parseTel } from "./ui.js";
-import { TIPOS, CARGOS } from "./instituicoes.js";
+import { TIPOS, CARGOS } from "./instituicoes-dados.js";
 import * as U from "./util.js";
 let C, FS, db;
 export function init(ctx) {
