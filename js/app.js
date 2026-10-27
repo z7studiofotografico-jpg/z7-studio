@@ -91,9 +91,81 @@ const MODULOS = [
   ["formaturas", "Formaturas"],
   ["becas", "Aluguel de becas"]
 ];
+// ---------- Ver como a equipe (só admin) ----------
+// Mostra o app como uma pessoa da equipe vê (os mesmos cards, filtros e telas), sem gravar nada.
+// Fica guardado só nesta aba (sessionStorage); "Sair" volta ao normal.
+let verComo = null;
+try {
+  verComo = JSON.parse(sessionStorage.getItem("z7verComo") || "null");
+} catch (_) {
+  verComo = null;
+}
+const emailReal = () => ((user && user.email) || "").toLowerCase();
+const PESSOA_TESTE = { email: "teste-de-app@z7.local", nome: "Teste de App", ativo: true, papel: "equipe" };
+function entrarVerComo(pessoa) {
+  try {
+    sessionStorage.setItem("z7verComo", JSON.stringify(pessoa));
+  } catch (_) {
+    return toast("Este navegador não deixou guardar a visualização.");
+  }
+  location.hash = "#home";
+  location.reload();
+}
+function sairVerComo() {
+  try {
+    sessionStorage.removeItem("z7verComo");
+  } catch (_) {}
+  location.hash = "#home";
+  location.reload();
+}
+function faixaVerComo() {
+  if (!verComo || $("faixaVerComo")) return;
+  const f = document.createElement("div");
+  f.id = "faixaVerComo";
+  f.className = "notice";
+  f.setAttribute("role", "status");
+  const t = document.createElement("span");
+  t.textContent = `👁 Vendo o app como ${verComo.nome} (equipe). Só visualização: nada é gravado.`;
+  f.append(t, mkBtn("Sair", "btn-sm", sairVerComo));
+  document.body.prepend(f);
+}
+function escolherVerComo() {
+  const lista = Object.entries(USERS)
+    .filter(([em, u]) => u.ativo !== false && u.papel !== "admin" && !isDono(em) && Array.isArray(u.modulos) && u.modulos.length)
+    .map(([em, u]) => Object.assign({ email: em }, u));
+  const todos = Object.assign({}, PESSOA_TESTE, { modulos: MODULOS.map(m => m[0]) });
+  const sh = document.createElement("div"),
+    p = document.createElement("div");
+  sh.className = "sheet";
+  p.className = "panel";
+  sh.append(p);
+  const h = document.createElement("h2");
+  h.textContent = "Ver o app como a equipe";
+  const dica = document.createElement("p");
+  dica.className = "hint";
+  dica.textContent = "Escolha quem. O app abre como essa pessoa vê (só visualização, nada é gravado).";
+  p.append(h, dica);
+  [todos, ...lista].forEach(u => {
+    const b = mkBtn(
+      `${u.nome}${u === todos ? " (todos os módulos da equipe)" : ""} · ${(u.modulos || []).map(k => (MODULOS.find(m => m[0] === k) || [k, k])[1]).join(", ")}`,
+      "btn",
+      () => entrarVerComo({ email: u.email, nome: u.nome, ativo: true, papel: "equipe", modulos: u.modulos })
+    );
+    b.style.display = "block";
+    b.style.margin = "6px 0";
+    b.style.textAlign = "left";
+    p.append(b);
+  });
+  p.append(mkBtn("Cancelar", "btn", () => sh.remove()));
+  sh.addEventListener("click", e => {
+    if (e.target === sh) sh.remove();
+  });
+  document.body.append(sh);
+}
+
 function pode(m) {
   if (isAdmin) return true;
-  const p = USERS[((user && user.email) || "").toLowerCase()];
+  const p = verComo || USERS[emailReal()];
   if (!p || p.ativo === false || !Array.isArray(p.modulos)) return false;
   // Dashboard: quem é da equipe (com algum módulo) vê o próprio desempenho
   if (m === "vendas") return p.modulos.length > 0;
@@ -108,12 +180,20 @@ function applyProfile() {
   const prev = me;
   me = p && p.nome ? p.nome : isDono(em) ? DONOS[em] : "";
   isAdmin = isDono(em) || !!(p && p.papel === "admin" && p.ativo !== false);
+  // "Ver como a equipe" só vale para administrador; para os outros é ignorado
+  if (verComo && !isAdmin) verComo = null;
+  if (verComo) {
+    isAdmin = false;
+    me = verComo.nome;
+    faixaVerComo();
+  }
   renderMe();
-  if (me !== prev) refreshPushToken();
+  if (me !== prev && !verComo) refreshPushToken();
 }
 
 function handleErr(e) {
   console.warn("[Z7]", e);
+  if (e && e.code === "ver-como") return; // o aviso já apareceu
   if (!navigator.onLine || (e && (e.code === "unavailable" || (e.code === "failed-precondition" && /offline/i.test(e.message || "")))))
     toast("Sem internet agora. Isso precisa de conexão: tente de novo quando voltar o sinal.");
   else if (e && e.code === "permission-denied") toast("Você não tem permissão para fazer isso. Fale com o Adriano.");
@@ -196,6 +276,7 @@ $("btnPrices").onclick = () => {
     : "Só administradores mudam os preços.";
   renderPushState();
   if (isAdmin) mostrarErros();
+  $("pVerComo").hidden = !isAdmin;
   $("sheetPrices").hidden = false;
 };
 // Tabela de comissão: PR e Formatura × forma de pagamento
@@ -358,6 +439,10 @@ function refreshPushToken() {
   if (pushSupported() && Notification.permission === "granted") enablePush(false);
 }
 $("btnPush").onclick = () => enablePush(true);
+$("pVerComo").onclick = () => {
+  $("sheetPrices").hidden = true;
+  escolherVerComo();
+};
 
 // ---------- navegação entre módulos ----------
 const VIEWS = {
@@ -418,8 +503,34 @@ const FSv = Object.assign({}, FS, {
     const s = await FS.getDocs(q);
     confereLimite(q, s);
     return s;
+  },
+  // "Ver como a equipe": nenhuma gravação sai do app
+  setDoc: soLeitura("setDoc"),
+  updateDoc: soLeitura("updateDoc"),
+  addDoc: soLeitura("addDoc"),
+  deleteDoc: soLeitura("deleteDoc"),
+  runTransaction: soLeitura("runTransaction"),
+  writeBatch(...a) {
+    const b = FS.writeBatch(...a);
+    if (!verComo) return b;
+    const nada = {
+      set: () => nada,
+      update: () => nada,
+      delete: () => nada,
+      commit: soLeitura("commit")
+    };
+    return nada;
   }
 });
+function soLeitura(nome) {
+  return (...a) => {
+    if (verComo) {
+      toast("👁 Só visualização: nada foi gravado.");
+      return Promise.reject(Object.assign(new Error("Modo visualização"), { code: "ver-como" }));
+    }
+    return FS[nome](...a);
+  };
+}
 function confereLimite(q, s) {
   const n = limites.get(q);
   if (!n || !s || s.size < n) return;
@@ -438,7 +549,10 @@ const ctx = {
     return isAdmin;
   },
   get aprovador() {
-    return APROVADORES.includes(((user && user.email) || "").toLowerCase());
+    return !verComo && APROVADORES.includes(emailReal());
+  },
+  get verComo() {
+    return verComo;
   },
   get user() {
     return user;
@@ -459,7 +573,7 @@ const ctx = {
       .map(([em]) => em);
   },
   get email() {
-    return ((user && user.email) || "").toLowerCase();
+    return verComo ? verComo.email : emailReal();
   },
   get usuarios() {
     return USERS;

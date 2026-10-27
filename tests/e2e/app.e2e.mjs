@@ -1393,6 +1393,47 @@ await cenario("Erro no app (não é falta de internet)", async () => {
   ok(/Erros do app \(1\)/.test(await pg.textContent("#pErros")), "Ajustes mostra os erros registrados");
 });
 
+await cenario("Ver o app como a equipe (admin, só visualização)", async () => {
+  const { pg, erros } = await abrir(ADRIANO, migrar(base));
+  await pg.click("#btnPrices");
+  await calmo(pg);
+  await pg.click("#pVerComo");
+  await pg.getByRole("button", { name: /Teste de App/ }).click();
+  await pg.waitForSelector("#faixaVerComo", { timeout: 8000 });
+  await calmo(pg);
+  const vs = await visiveis(pg);
+  ok(
+    /Vendo o app como Teste de App/.test(await pg.textContent("#faixaVerComo")) &&
+      vs.includes("funil") &&
+      vs.includes("vendas") &&
+      (await pg.locator("#btnTeam").isHidden()),
+    "abre como a equipe vê (cards da equipe, sem Equipe/admin): " + vs.join(", ")
+  );
+  await ir(pg, "#vendas");
+  ok(/Meu desempenho/.test(await pg.textContent("#viewVendas")), "Dashboard aparece como Meu desempenho");
+  // tentar gravar: nada sai do app
+  await ir(pg, "#funil");
+  const antes = await pg.evaluate(() => window.__store.size);
+  await pg.getByRole("button", { name: "+ Novo lead" }).click();
+  await pg.waitForFunction(() => document.activeElement && document.activeElement.id === "fNome", null, { timeout: 2000 }).catch(() => {});
+  await pg.fill("#fNome", "Lead De Teste");
+  await pg.fill("#fTel", "21999998888");
+  await pg.click("#btnSave");
+  await calmo(pg);
+  ok(
+    (await pg.evaluate(() => window.__store.size)) === antes && /Só visualização/.test(await pg.textContent("#toast")),
+    "só visualização: tentar salvar não grava nada"
+  );
+  await pg.evaluate(() => {
+    document.getElementById("sheet").hidden = true; // fecha o formulário do lead
+  });
+  await pg.locator("#faixaVerComo").getByRole("button", { name: "Sair" }).click();
+  await pg.waitForFunction(() => !document.getElementById("faixaVerComo"), null, { timeout: 8000 }).catch(() => {});
+  await calmo(pg);
+  ok(!(await pg.locator("#btnTeam").isHidden()), "Sair volta a ser admin");
+  ok(erros.length === 0, "sem erros no console" + (erros.length ? ": " + erros.slice(0, 3).join(" | ") : ""));
+});
+
 await cenario("Cadastro sem módulos", async () => {
   const { pg } = await abrir(NOVO, Object.assign({}, base, { "config/app": { versaoDados: 4 } }));
   ok((await visiveis(pg)).length === 0, "não vê nenhum card");
