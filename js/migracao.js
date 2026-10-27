@@ -18,11 +18,14 @@ export function planejar(cols, emailDe) {
   // todo documento tem "respEmail" (mesmo vazio), senão a carteira da equipe não o encontra
   for (const x of cols.instituicoes || []) {
     insts[x.id] = x;
+    const patch = {};
     if (x.respEmail == null) {
-      const re = emailDe(x.resp);
-      insts[x.id] = { ...x, respEmail: re };
-      muda("instituições", "instituicoes", x.id, { respEmail: re });
+      patch.respEmail = emailDe(x.resp);
+      insts[x.id] = { ...x, respEmail: patch.respEmail };
     }
+    // v7: nome de busca no formato único (maiúsculas, sem acento)
+    if (x.nome && x.nomeBusca != null && x.nomeBusca !== norm(x.nome)) patch.nomeBusca = norm(x.nome);
+    if (Object.keys(patch).length) muda("instituições", "instituicoes", x.id, patch);
   }
   // v6: o preço antigo de "colação" da turma vira o preço do Kit 01 na tabela da turma
   for (const x of cols.instituicoes || []) {

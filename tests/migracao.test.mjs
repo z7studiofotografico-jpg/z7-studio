@@ -28,13 +28,13 @@ test("atualização dos dados antigos: responsável por e-mail, parcelas, privad
   assert.deepEqual(de("agenda", "2026-11-10"), [{ pedidoEmail: "pedro@x.com" }]);
   assert.equal(de("privado", "c1")[0].titulo, "Consulta médica");
   assert.deepEqual(de("ensaios", "c1"), [{ titulo: "", obs: "" }]);
-  assert.deepEqual(de("leads", "l1"), [{ nomeBusca: "erica souza", respEmail: "pedro@x.com" }]);
+  assert.deepEqual(de("leads", "l1"), [{ nomeBusca: "ERICA SOUZA", respEmail: "pedro@x.com" }]);
   assert.equal(conta.formandos, 1);
   // rodar de novo sobre o resultado não muda nada
   const depois = planejar(
     {
       instituicoes: [{ id: "i1", respEmail: "pedro@x.com" }],
-      leads: [{ id: "l1", nome: "Érica Souza", nomeBusca: "erica souza", respEmail: "" }]
+      leads: [{ id: "l1", nome: "Érica Souza", nomeBusca: "ERICA SOUZA", respEmail: "" }]
     },
     emailDe
   );
@@ -90,4 +90,17 @@ test("v7: guarda a data do último pagamento (para o resumo não ler todos os fo
   assert.equal(de("f1").ultimoPag, "2025-05-05");
   assert.equal(de("f2"), undefined);
   assert.equal(de("f3"), undefined);
+});
+
+test("v7: nome de busca no formato único (maiúsculas) em leads e instituições", () => {
+  const { ops } = planejar(
+    {
+      instituicoes: [{ id: "i1", respEmail: "", nome: "Colégio Ação", nomeBusca: "colegio acao" }],
+      leads: [{ id: "l1", respEmail: "", nome: "Érica  Souza", nomeBusca: "erica  souza" }]
+    },
+    () => ""
+  );
+  const de = (c, id) => (ops.find(o => o.col === c && o.id === id) || {}).dados;
+  assert.equal(de("instituicoes", "i1").nomeBusca, "COLEGIO ACAO");
+  assert.equal(de("leads", "l1").nomeBusca, "ERICA SOUZA");
 });

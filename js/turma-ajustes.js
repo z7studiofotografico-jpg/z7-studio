@@ -17,7 +17,7 @@ function setCtx(ctx) {
 // Uma linha da planilha → formando (puro, testado em tests/turma-ajustes.test.mjs).
 // Kit pelo número (01 a 05); sem kit = Kit 01 (adesão é obrigatória).
 const pega = (r, ...ks) => {
-  const e = Object.entries(r).find(([k]) => ks.some(x => norm(k).includes(x)));
+  const e = Object.entries(r).find(([k]) => ks.some(x => norm(k).includes(norm(x))));
   return e ? e[1] : "";
 };
 const isoDe = v =>
@@ -32,7 +32,7 @@ export function formandoDaLinha(r, kits, inst, hojeIso) {
   const kTxt = String(pega(r, "kit", "produto", "pacote")).trim(),
     num = (kTxt.match(/0?([1-5])\b/) || [])[1],
     k = num ? kits.find(x => x.id === "k0" + num) : null,
-    cola = /cola|adesao/.test(norm(pega(r, "contrato", "colacao", "tipo")));
+    cola = /COLA|ADESAO/.test(norm(pega(r, "contrato", "colacao", "tipo")));
   const kk = k || (cola ? kits.find(x => x.id === "k01") : null);
   const valor = lerReais(pega(r, "valor", "preco", "total")) || (kk ? Number(kk.ant.valor) || 0 : 0);
   const kk1 = kk || (!kTxt ? kits.find(x => x.id === "k01") : null);

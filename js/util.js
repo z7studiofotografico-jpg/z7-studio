@@ -22,8 +22,8 @@ export function hhmm(iso) {
 // Dinheiro no padrão brasileiro (contas em centavos ficam em regras.js)
 export const money = brl;
 export const num = lerReais;
-// Telefone com 55 na frente, para o wa.me
-// Texto em maiúsculas, sem acento e sem espaço sobrando (para comparar nomes); slug = para identificadores
+// Texto em maiúsculas, sem acento e sem espaço sobrando: a ÚNICA forma de comparar e buscar nomes no app
+// (também é o formato gravado em "nomeBusca"). slug = para identificadores.
 export function chave(s) {
   return String(s || "")
     .normalize("NFD")
@@ -38,6 +38,7 @@ export function slug(s) {
     .replace(/^-|-$/g, "")
     .toLowerCase();
 }
+// Telefone com 55 na frente, para o wa.me
 export function digits(t) {
   let d = (t || "").replace(/\D/g, "");
   if (d.length === 10 || d.length === 11) d = "55" + d;

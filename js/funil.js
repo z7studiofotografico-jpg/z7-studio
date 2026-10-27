@@ -451,14 +451,18 @@ function buscarNoServidor(q) {
     ultimaBusca = nq;
     try {
       const { query, where, limit, getDocs } = C.FS;
-      const s = await getDocs(
-        query(collection(db, "leads"), where("nomeBusca", ">=", nq), where("nomeBusca", "<=", nq + "\uf8ff"), limit(20))
-      );
+      const porPrefixo = p =>
+        getDocs(query(collection(db, "leads"), where("nomeBusca", ">=", p), where("nomeBusca", "<=", p + "\uf8ff"), limit(20)));
+      // at\u00e9 a atualiza\u00e7\u00e3o de dados v7 rodar, os leads antigos t\u00eam o nomeBusca em min\u00fasculas: procura dos dois jeitos
+      const legado = (Number((C.P || {}).versaoDados) || 0) < 7;
+      const res = await Promise.all([porPrefixo(nq), ...(legado ? [porPrefixo(nq.toLowerCase())] : [])]);
       let novos = 0;
-      s.docs.forEach(d => {
-        if (!antigos.has(d.id)) novos++;
-        antigos.set(d.id, Object.assign({ id: d.id }, d.data()));
-      });
+      res
+        .flatMap(s => s.docs)
+        .forEach(d => {
+          if (!antigos.has(d.id)) novos++;
+          antigos.set(d.id, Object.assign({ id: d.id }, d.data()));
+        });
       if (novos) render();
     } catch (e) {
       avisoErro(e, "buscar leads antigos");

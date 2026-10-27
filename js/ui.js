@@ -1,4 +1,5 @@
 import { campoReais } from "./regras.js";
+import { chave } from "./util.js";
 // Peças de tela usadas por todos os módulos (antes cada arquivo tinha a sua cópia).
 export function el(tag, cls, text) {
   const e = document.createElement(tag);
@@ -12,12 +13,8 @@ export function title(s) {
     .replace(/(^|[\s(-])(\p{L})/gu, (m, a, b) => a + b.toUpperCase())
     .replace(/\b(Da|De|Do|Das|Dos|E)\b/g, w => w.toLowerCase());
 }
-export const norm = s =>
-  String(s || "")
-    .normalize("NFD")
-    .replace(/[̀-ͯ]/g, "")
-    .toLowerCase()
-    .trim();
+// comparar e buscar nomes: a mesma função de util.js (antes havia duas, uma minúscula e outra maiúscula)
+export const norm = chave;
 let fid = 0;
 export function field(lbl, i) {
   const f = el("div", "field");
