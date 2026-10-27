@@ -86,6 +86,36 @@ const base = {
     vendidoEm: dia(-40)
   },
   "instituicoes/i2": { nome: "COLEGIO BETA", tipo: "particular", etapa: "A VISITAR", resp: "", respEmail: "", contatos: [], visitas: [] },
+  // turma do ano passado (Repasse) com uma aluna que ficou só com o Kit 01
+  "instituicoes/i9": {
+    nome: "COLEGIO ANTIGO",
+    tipo: "particular",
+    etapa: "FECHADO",
+    fechadoEm: hoje.getFullYear() - 1 + "-03-01",
+    formatura: { data: hoje.getFullYear() - 1 + "-11-20", status: "confirmado" },
+    resp: "",
+    respEmail: "",
+    contatos: [],
+    visitas: []
+  },
+  "formandos/f9": {
+    instId: "i9",
+    instNome: "COLEGIO ANTIGO",
+    nome: "LIA ANTIGA",
+    tel: "21955554444",
+    kitId: "k01",
+    kit: "Kit 01 · Beca + canudo (adesão)",
+    contrato: "colacao",
+    valor: 65,
+    parcelas: 1,
+    pagas: 1,
+    pagamentos: [{ data: hoje.getFullYear() - 1 + "-06-05", valor: 65 }],
+    primeiroVenc: hoje.getFullYear() - 1 + "-06-05",
+    status: "ativo",
+    venda: "ant",
+    respEmail: "",
+    vendidoEm: hoje.getFullYear() - 1 + "-05-20"
+  },
   "leads/l9": {
     nome: "Rosana Antiga",
     etapa: "FECHADO",
@@ -388,11 +418,16 @@ console.log("Adriano (admin), com os dados já atualizados no servidor:");
   if (process.env.FOTOS) await fk.screenshot({ path: process.env.FOTOS + "/kits.png" });
   await fk.getByLabel(/Kit 04.* · valor depois das fotos$/).fill("1.100,00");
   await fk.getByLabel(/Kit 04.* · parcelas depois das fotos$/).fill("6");
+  await fk.getByLabel(/Kit 04.* · valor repasse$/).fill("700");
+  await fk.getByLabel(/Kit 04.* · parcelas repasse$/).fill("5");
   await fk.locator("button[type=submit]").click();
   await pg.waitForTimeout(400);
   s = await store();
   const k4 = (s["config/app"].kitsFormatura || []).find(k => k.id === "k04");
-  ok(k4 && k4.pos.valor === 1100 && k4.pos.parcelas === 6 && k4.ant.valor === 850, "tabela: Kit 04 depois das fotos R$ 1.100,00 em 6x");
+  ok(
+    k4 && k4.pos.valor === 1100 && k4.pos.parcelas === 6 && k4.ant.valor === 850 && k4.rep.valor === 700 && k4.rep.parcelas === 5,
+    "tabela: Kit 04 depois das fotos R$ 1.100,00 em 6x e repasse R$ 700,00 em 5x"
+  );
   ok(
     /Pode oferecer os kits para 1 aluno do Colegio Alfa/i.test(await pg.textContent("#fmCorpo")),
     "aviso: pode oferecer para 1 aluno do Colégio Alfa"
@@ -451,6 +486,45 @@ console.log("Adriano (admin), com os dados já atualizados no servidor:");
     "compra a mais registrada (R$ 1.000,00 combinado) e o Kit 01 continua"
   );
   await pg.locator(".panel.wide").getByRole("button", { name: "Fechar" }).click();
+  await pg.waitForTimeout(200);
+  // Repasse: turmas de anos anteriores, quem ficou só com o Kit 01, preço de repasse
+  await pg.locator("#viewFormaturas .segs").getByText("Repasse", { exact: true }).click();
+  await pg.waitForTimeout(400);
+  await pg.locator("#fmChips").getByText("🔁 Oferecer no repasse").click();
+  await pg.waitForTimeout(400);
+  let rt = await pg.textContent("#fmCorpo");
+  ok(/Lia Antiga/.test(rt) && !/Caio Kit Um/.test(rt), "Repasse mostra só quem ficou com o Kit 01 nas turmas de anos anteriores");
+  await pg.locator("#fmCorpo .card").filter({ hasText: "Lia" }).getByText("💬 Oferecer kit").click();
+  await pg.waitForTimeout(200);
+  const msgRep = decodeURIComponent(await pg.evaluate(() => window.__aberto || ""));
+  ok(
+    new RegExp("formatura de " + (hoje.getFullYear() - 1)).test(msgRep) && /Kit 04.*5x de R\$ 140,00/.test(msgRep),
+    "mensagem do repasse com o preço de repasse (5x de R$ 140,00)"
+  );
+  await pg.locator("#fmCorpo .card").filter({ hasText: "Lia" }).getByText("Abrir turma").click();
+  await pg.waitForTimeout(500);
+  await pg.locator(".panel.wide .card").filter({ hasText: "Lia" }).getByText("🛒 Comprou kit").click();
+  await pg.waitForTimeout(200);
+  fk = pg.locator(".sheet").last();
+  ok(
+    (await fk.getByLabel("Valor total").inputValue()) === "700,00" &&
+      (await fk.getByLabel("Parcelas", { exact: true }).inputValue()) === "5",
+    "venda no repasse: Kit 04 R$ 700,00 em 5x"
+  );
+  await fk.locator("button[type=submit]").click();
+  await pg.waitForTimeout(300);
+  s = await store();
+  const lia = Object.values(s).filter(x => x.nome === "Lia Antiga" || x.nome === "LIA ANTIGA");
+  ok(
+    lia.some(x => x.venda === "rep" && x.valor === 700 && x.kitId === "k04"),
+    "venda do repasse registrada"
+  );
+  await pg.locator(".panel.wide").getByRole("button", { name: "Fechar" }).click();
+  await pg.waitForTimeout(200);
+  await pg
+    .locator("#viewFormaturas .segs")
+    .getByText(/Linha de Frente/)
+    .click();
   await pg.waitForTimeout(200);
   // Dashboard
   await ir(pg, "#vendas");

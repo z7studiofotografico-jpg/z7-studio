@@ -4,7 +4,8 @@
 import { centavos, reais, somaMeses, somaDias, pagamentosDe, quitado } from "./regras.js";
 import { feriado } from "./feriados.js";
 
-// Tabela padrão (contrato de 27/04/2026). "pos" = preço para quem compra depois de ver as fotos (o Adriano define em Kits e preços).
+// Tabela padrão (contrato de 27/04/2026). "pos" = preço para quem compra depois de ver as fotos; "rep" = preço do Repasse
+// (turmas de anos anteriores). O Adriano e a Luciana definem em Kits e preços.
 // O Kit 01 é a adesão (beca + canudo): entra na comissão da colação.
 export const KITS_PADRAO = [
   { id: "k01", nome: "Kit 01 · Beca + canudo (adesão)", ant: { valor: 65, parcelas: 1 }, pos: { valor: 0, parcelas: 0 } },
@@ -30,7 +31,7 @@ export function kitsPadrao(P) {
   const salvos = P && Array.isArray(P.kitsFormatura) ? P.kitsFormatura : [];
   return KITS_PADRAO.map(k => salvos.find(x => x.id === k.id) || k)
     .concat(salvos.filter(x => !KITS_PADRAO.some(k => k.id === x.id)))
-    .map(x => ({ ...x, ant: { ...(x.ant || {}) }, pos: { ...(x.pos || {}) } }));
+    .map(x => ({ ...x, ant: { ...(x.ant || {}) }, pos: { ...(x.pos || {}) }, rep: { ...(x.rep || {}) } }));
 }
 export function kitsDe(P, inst) {
   const base = kitsPadrao(P);
@@ -38,7 +39,7 @@ export function kitsDe(P, inst) {
   if (!daTurma) return base;
   return base.map(k => {
     const t = daTurma.find(x => x.id === k.id);
-    return t ? { ...k, ant: { ...k.ant, ...(t.ant || {}) }, pos: { ...k.pos, ...(t.pos || {}) } } : k;
+    return t ? { ...k, ant: { ...k.ant, ...(t.ant || {}) }, pos: { ...k.pos, ...(t.pos || {}) }, rep: { ...k.rep, ...(t.rep || {}) } } : k;
   });
 }
 // O que a turma tem diferente da tabela padrão (para o aviso na turma)
@@ -48,7 +49,7 @@ export function diferencasDaTurma(P, inst) {
     out = [];
   t.forEach(k => {
     const b = base.find(x => x.id === k.id) || k;
-    ["ant", "pos"].forEach(q => {
+    ["ant", "pos", "rep"].forEach(q => {
       if (centavos(k[q].valor) !== centavos(b[q].valor) || (Number(k[q].parcelas) || 0) !== (Number(b[q].parcelas) || 0))
         out.push(k.id + "|" + q);
     });
@@ -57,8 +58,13 @@ export function diferencasDaTurma(P, inst) {
 }
 // Kit 01 (com ou sem canudo) é a adesão: todo formando entra pelo menos com ele
 export const ehAdesao = kitId => kitId === "k01" || kitId === "k01s";
-// Antecipado vale até o dia da formatura; depois dela, o preço é o de depois das fotos
-export const vendaSugerida = (inst, hoje) => (inst && inst.formatura && inst.formatura.data && hoje > inst.formatura.data ? "pos" : "ant");
+// Ano da turma: o da formatura (ou o do fechamento). Turma de ano anterior = Repasse (vira sozinho em 1º de janeiro)
+export const anoDaTurma = inst =>
+  Number(String((inst && ((inst.formatura && inst.formatura.data) || inst.fechadoEm || inst.criadoEm)) || "").slice(0, 4)) || 0;
+export const ehRepasse = (inst, hoje) => !!anoDaTurma(inst) && anoDaTurma(inst) < Number(String(hoje).slice(0, 4));
+// Antecipado vale até o dia da formatura; depois dela, o preço é o de depois das fotos; turma de ano anterior, o de repasse
+export const vendaSugerida = (inst, hoje) =>
+  ehRepasse(inst, hoje) ? "rep" : inst && inst.formatura && inst.formatura.data && hoje > inst.formatura.data ? "pos" : "ant";
 
 // Próximo dia 05 a partir de hoje (o de hoje vale se ainda não passou)
 export function proximoVenc(hoje, dia = DIA_VENC) {
@@ -75,10 +81,11 @@ const mesesEntre = (a, b) => (Number(b.slice(0, 4)) - Number(a.slice(0, 4))) * 1
 // inicioTurma = 1º vencimento da turma ("AAAA-MM-05"); devolve { valor, parcelas, primeiroVenc } ou null se o kit não tem preço.
 export function plano(kit, venda, inicioTurma, hoje) {
   if (!kit) return null;
-  const t = venda === "pos" ? kit.pos : kit.ant;
+  const t = venda === "pos" ? kit.pos : venda === "rep" ? kit.rep : kit.ant;
   if (!t || !centavos(t.valor)) return null;
   const prox = proximoVenc(hoje);
-  if (venda === "pos") return { valor: reais(centavos(t.valor)), parcelas: Math.max(1, Number(t.parcelas) || 1), primeiroVenc: prox };
+  if (venda === "pos" || venda === "rep")
+    return { valor: reais(centavos(t.valor)), parcelas: Math.max(1, Number(t.parcelas) || 1), primeiroVenc: prox };
   const inicio = inicioTurma && inicioTurma > prox ? inicioTurma : prox;
   const fim = somaMeses(inicioTurma || prox, Math.max(1, Number(t.parcelas) || 1) - 1);
   const n = Math.max(1, Math.min(Number(t.parcelas) || 1, mesesEntre(inicio, fim) + 1));

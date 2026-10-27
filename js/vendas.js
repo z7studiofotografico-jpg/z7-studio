@@ -577,11 +577,13 @@ function areaForm(corpo, p, nomeP) {
   ]);
   corpo.append(el("p", "hint", "A receber e atrasados são de hoje (não dependem do período)."));
   const vAnt = F.vendAnt || {},
-    vPos = F.vendPos || {};
-  const b0 = caixa(corpo, "Antecipado × depois das fotos", nomeP + " · vendas de kits");
+    vPos = F.vendPos || {},
+    vRep = F.vendRep || {};
+  const b0 = caixa(corpo, "Antecipado × depois das fotos × repasse", nomeP + " · vendas de kits");
   lista(b0, [
     [`Antecipado (contrato) · ${vAnt.n || 0}`, moeda(vAnt.v || 0)],
-    [`Depois das fotos · ${vPos.n || 0}`, moeda(vPos.v || 0)]
+    [`Depois das fotos · ${vPos.n || 0}`, moeda(vPos.v || 0)],
+    [`Repasse (turmas de anos anteriores) · ${vRep.n || 0}`, moeda(vRep.v || 0)]
   ]);
   const b1 = caixa(corpo, "Recebido por contrato", nomeP);
   lista(b1, [

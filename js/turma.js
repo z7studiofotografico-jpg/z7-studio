@@ -27,6 +27,8 @@ import {
   kitsPadrao,
   plano,
   ehAdesao,
+  ehRepasse,
+  anoDaTurma,
   previsaoEntrega,
   quitadoEm,
   devolucao,
@@ -108,11 +110,13 @@ export function cobrarWa(f) {
 // Mensagem para quem tem só o Kit 01: as fotos ficaram prontas, kits no preço depois das fotos (tabela da turma)
 // Kits no preço depois das fotos (tabela da turma), uma linha por kit
 export function linhasKitsPos(P, inst) {
+  // turma de ano anterior: preço de repasse
+  const q = ehRepasse(inst, hoje()) ? "rep" : "pos";
   return kitsDe(P, inst)
-    .filter(k => !ehAdesao(k.id) && k.pos && Number(k.pos.valor))
+    .filter(k => !ehAdesao(k.id) && k[q] && Number(k[q].valor))
     .map(k => {
-      const n = Math.max(1, Number(k.pos.parcelas) || 1);
-      return `• ${k.nome}: ${n > 1 ? `${n}x de ${brl(dividir(k.pos.valor, n)[n - 1])} (${brl(k.pos.valor)})` : brl(k.pos.valor)}`;
+      const n = Math.max(1, Number(k[q].parcelas) || 1);
+      return `• ${k.nome}: ${n > 1 ? `${n}x de ${brl(dividir(k[q].valor, n)[n - 1])} (${brl(k[q].valor)})` : brl(k[q].valor)}`;
     });
 }
 // Prévia da formatura (todas as fotos do kit e prévia do álbum), com os kits na mensagem
@@ -132,14 +136,13 @@ export async function abrirPrevia(ctx, inst, f) {
 }
 export function oferecerKit(ctx, inst, f) {
   setCtx(ctx);
-  const ks = kitsDe(C.P, inst).filter(k => !ehAdesao(k.id) && k.pos && Number(k.pos.valor));
-  if (!ks.length) return U.toast("Defina os preços depois das fotos em “📋 Kits e preços” (card Formaturas)");
-  const lin = ks.map(k => {
-    const n = Math.max(1, Number(k.pos.parcelas) || 1);
-    return `• ${k.nome}: ${n > 1 ? `${n}x de ${brl(dividir(k.pos.valor, n)[n - 1])} (${brl(k.pos.valor)})` : brl(k.pos.valor)}`;
-  });
+  const rep = ehRepasse(inst, hoje()),
+    lin = linhasKitsPos(C.P, inst);
+  if (!lin.length) return U.toast(`Defina os preços ${rep ? "de repasse" : "depois das fotos"} em “📋 Kits e preços” (card Formaturas)`);
   const nome = U.first(title(f.nome));
-  const msg = `Oi, ${nome}! Aqui é do ${ESTUDIO.nome} 📸 As fotos da formatura do ${title(inst.nome)} ficaram prontas e estão lindas! Quer garantir as suas?\n\n${lin.join("\n")}\n\nPosso te mandar uma prévia? 😊`;
+  const msg = rep
+    ? `Oi, ${nome}! Aqui é do ${ESTUDIO.nome} 📸 Ainda guardamos as fotos da sua formatura de ${anoDaTurma(inst)} no ${title(inst.nome)}. Que tal ter todas elas tratadas e impressas?\n\n${lin.join("\n")}\n\nPosso te mandar uma prévia? 😊`
+    : `Oi, ${nome}! Aqui é do ${ESTUDIO.nome} 📸 As fotos da formatura do ${title(inst.nome)} ficaram prontas e estão lindas! Quer garantir as suas?\n\n${lin.join("\n")}\n\nPosso te mandar uma prévia? 😊`;
   wa(f.tel, msg, U.toast);
 }
 export function openTurma(ctx, inst, kits, aoFechar) {
@@ -259,13 +262,27 @@ export function openTurma(ctx, inst, kits, aoFechar) {
         );
         kt.forEach(k => {
           const n = Math.max(1, Number(k.ant.parcelas) || 1),
-            np = Math.max(1, Number(k.pos.parcelas) || 1);
-          const txt = `${k.nome.split(" · ")[0]}: ${n}x de ${brl(dividir(k.ant.valor, n)[n - 1])} (${brl(k.ant.valor)})${Number(k.pos.valor) ? ` · depois das fotos ${np}x de ${brl(dividir(k.pos.valor, np)[np - 1])}` : ""}`;
+            px = q => {
+              const nn = Math.max(1, Number((k[q] || {}).parcelas) || 1);
+              return Number((k[q] || {}).valor) ? `${nn}x de ${brl(dividir(k[q].valor, nn)[nn - 1])}` : "";
+            };
+          const txt =
+            `${k.nome.split(" · ")[0]}: ${n}x de ${brl(dividir(k.ant.valor, n)[n - 1])} (${brl(k.ant.valor)})` +
+            (px("pos") ? ` · depois das fotos ${px("pos")}` : "") +
+            (px("rep") ? ` · repasse ${px("rep")}` : "");
           const mudou = dif.some(d => d.startsWith(k.id + "|"));
           av.append(el("div", null, (mudou ? "✏️ " : "• ") + txt));
         });
         qtdBox.append(av);
-        if (ct.fotosProntasEm)
+        if (ehRepasse(inst, hoje()))
+          qtdBox.append(
+            el(
+              "p",
+              "hint",
+              `🔁 Turma de ${anoDaTurma(inst)} (Repasse): quem ficou só com o Kit 01 pode receber a oferta no preço de repasse (${semKit.length}).`
+            )
+          );
+        else if (ct.fotosProntasEm)
           qtdBox.append(
             el(
               "p",
@@ -360,7 +377,7 @@ export function openTurma(ctx, inst, kits, aoFechar) {
       }
       function card(f) {
         const cand = candidatosPosFoto(lista).includes(f),
-          prontas = !!(inst.contratoTurma || {}).fotosProntasEm;
+          prontas = !!(inst.contratoTurma || {}).fotosProntasEm || ehRepasse(inst, hoje());
         const comprou = ativo(f),
           sem = f.status === "semkit",
           saiu = !comprou && !sem;
@@ -440,8 +457,11 @@ export function openTurma(ctx, inst, kits, aoFechar) {
         // venda depois das fotos: quem tem só o Kit 01, quando as fotos ficaram prontas
         if (cand && prontas && f.tel) act.append(U.mkBtn("💬 Oferecer kit", "btn-primary", () => oferecerKit(C, inst, f)));
         if (cand && prontas) act.append(U.mkBtn("🖼️ Prévia", "", () => abrirPrevia(C, inst, f)));
+        const vendaOferta = ehRepasse(inst, hoje()) ? "rep" : "pos";
         if (cand && prontas)
-          act.append(U.mkBtn("🛒 Comprou kit", "btn-ok", () => (sem ? form(f, { venda: "pos" }) : form(null, { venda: "pos", base: f }))));
+          act.append(
+            U.mkBtn("🛒 Comprou kit", "btn-ok", () => (sem ? form(f, { venda: vendaOferta }) : form(null, { venda: vendaOferta, base: f })))
+          );
         act.append(U.mkBtn("Editar", "", () => form(f)));
         e.append(act);
         return e;
@@ -454,7 +474,8 @@ export function openTurma(ctx, inst, kits, aoFechar) {
         preset = preset || {};
         // na venda depois das fotos (compra a mais de quem já tem o Kit 01) só aparecem os kits 02 a 05
         const kits = preset.venda ? kitsTodos.filter(k => !ehAdesao(k.id)) : kitsTodos;
-        sheet(f ? (preset.venda ? "Venda depois das fotos" : "Editar formando") : "Novo formando", (fp, fechar) => {
+        const tituloVenda = preset.venda === "rep" ? "Venda no repasse" : "Venda depois das fotos";
+        sheet(preset.venda ? tituloVenda : f ? "Editar formando" : "Novo formando", (fp, fechar) => {
           const nome = inp(f ? title(f.nome) : base ? title(base.nome) : "", "nome do formando");
           nome.required = true;
           nome.disabled = !!f && !adm;
@@ -470,7 +491,8 @@ export function openTurma(ctx, inst, kits, aoFechar) {
           const venda = sel(
             [
               ["ant", "Antecipada (preço do contrato)"],
-              ["pos", "Depois das fotos (preço maior)"]
+              ["pos", "Depois das fotos (preço maior)"],
+              ["rep", "Repasse (turma de ano anterior)"]
             ],
             preset.venda || (f && f.venda) || vendaSugerida(inst, hoje())
           );
@@ -624,7 +646,7 @@ export function openTurma(ctx, inst, kits, aoFechar) {
               el(
                 "p",
                 "hint",
-                "Compra a mais, depois das fotos: o Kit 01 que o aluno já tem continua como está. O valor vem da tabela da turma e pode ser mudado se combinaram outro."
+                `Compra a mais${preset.venda === "rep" ? " no repasse" : ", depois das fotos"}: o Kit 01 que o aluno já tem continua como está. O valor vem da tabela da turma e pode ser mudado se combinaram outro.`
               ),
               fp.firstChild.nextSibling
             );
@@ -793,36 +815,32 @@ export function openTurma(ctx, inst, kits, aoFechar) {
           atual = kitsDe(C.P, inst);
         sheet("Kits desta turma · " + title(inst.nome), (fp, fechar) => {
           fp.append(el("p", "hint", "Valores e vezes só deste colégio. O que ficar igual à tabela padrão segue a tabela padrão."));
+          const COL = [
+            ["ant", "Antecipado"],
+            ["pos", "Depois das fotos"],
+            ["rep", "Repasse"]
+          ];
           const linhas = atual.map(k => {
             const b = padrao.find(x => x.id === k.id) || k;
             const f0 = el("div", "field");
             f0.append(el("label", null, k.nome));
-            const av = inpReais(k.ant.valor || ""),
-              an = inp(k.ant.parcelas || "", "1", 3),
-              pv = inpReais(k.pos.valor || ""),
-              pn = inp(k.pos.parcelas || "", "1", 3);
-            [an, pn].forEach(i => (i.inputMode = "numeric"));
-            av.setAttribute("aria-label", k.nome + " · valor antecipado (turma)");
-            an.setAttribute("aria-label", k.nome + " · parcelas antecipado (turma)");
-            pv.setAttribute("aria-label", k.nome + " · valor depois das fotos (turma)");
-            pn.setAttribute("aria-label", k.nome + " · parcelas depois das fotos (turma)");
-            const r = el("div", "row2"),
-              x1 = el("div", "field"),
-              x2 = el("div", "field");
-            x1.append(el("small", null, `Antecipado (padrão: ${b.ant.parcelas || 1}x · ${brl(b.ant.valor || 0)})`), av, an);
-            x2.append(
-              el(
-                "small",
-                null,
-                `Depois das fotos (padrão: ${Number(b.pos.valor) ? `${b.pos.parcelas || 1}x · ${brl(b.pos.valor)}` : "—"})`
-              ),
-              pv,
-              pn
-            );
-            r.append(x1, x2);
+            const r = el("div", "row3"),
+              ins = {};
+            COL.forEach(([q, nomeQ]) => {
+              const v = inpReais((k[q] || {}).valor || ""),
+                n = inp((k[q] || {}).parcelas || "", "1", 3);
+              n.inputMode = "numeric";
+              v.setAttribute("aria-label", `${k.nome} · valor ${nomeQ.toLowerCase()} (turma)`);
+              n.setAttribute("aria-label", `${k.nome} · parcelas ${nomeQ.toLowerCase()} (turma)`);
+              const bq = b[q] || {},
+                c = el("div", "field");
+              c.append(el("small", null, `${nomeQ} (padrão: ${Number(bq.valor) ? `${bq.parcelas || 1}x · ${brl(bq.valor)}` : "—"})`), v, n);
+              r.append(c);
+              ins[q] = { v, n };
+            });
             f0.append(r);
             fp.append(f0);
-            return { k, b, av, an, pv, pn };
+            return { k, b, ins };
           });
           const a = botoes(fechar, "Salvar tabela da turma");
           const volta = el("button", "btn", "Voltar à tabela padrão");
@@ -842,19 +860,20 @@ export function openTurma(ctx, inst, kits, aoFechar) {
           fp.append(a);
           fp.addEventListener("submit", async ev => {
             ev.preventDefault();
+            const igual = (x, y) =>
+              Math.round((Number(x.valor) || 0) * 100) === Math.round((Number((y || {}).valor) || 0) * 100) &&
+              (Number(x.parcelas) || 0) === (Number((y || {}).parcelas) || 0);
             const kits = linhas
-              .map(({ k, b, av, an, pv, pn }) => {
-                const ant = { valor: lerReais(av.value), parcelas: Math.max(1, parseInt(an.value, 10) || 1) },
-                  pos = { valor: lerReais(pv.value), parcelas: lerReais(pv.value) ? Math.max(1, parseInt(pn.value, 10) || 1) : 0 };
-                const igual = (x, y) =>
-                  Math.round((Number(x.valor) || 0) * 100) === Math.round((Number(y.valor) || 0) * 100) &&
-                  (Number(x.parcelas) || 0) === (Number(y.parcelas) || 0);
+              .map(({ k, b, ins }) => {
                 const o = { id: k.id };
-                if (!igual(ant, b.ant)) o.ant = ant;
-                if (!igual(pos, b.pos)) o.pos = pos;
+                COL.forEach(([q]) => {
+                  const val = lerReais(ins[q].v.value),
+                    x = { valor: val, parcelas: val || q === "ant" ? Math.max(1, parseInt(ins[q].n.value, 10) || 1) : 0 };
+                  if (!igual(x, b[q])) o[q] = x;
+                });
                 return o;
               })
-              .filter(o => o.ant || o.pos);
+              .filter(o => o.ant || o.pos || o.rep);
             try {
               await FS.updateDoc(FS.doc(db, "instituicoes", inst.id), { kits, atualizadoEm: new Date().toISOString() });
               inst.kits = kits;

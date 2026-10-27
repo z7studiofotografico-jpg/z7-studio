@@ -1,6 +1,8 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import {
+  anoDaTurma,
+  ehRepasse,
   KITS_PADRAO,
   kitsDe,
   plano,
@@ -83,5 +85,24 @@ test("oferta depois das fotos: só quem tem apenas o Kit 01", async () => {
   assert.deepEqual(
     candidatosPosFoto(l).map(f => f.id),
     ["a", "d", "f"]
+  );
+});
+
+test("repasse: turma de ano anterior vira repasse em 1º de janeiro, com tabela própria", () => {
+  const inst = { formatura: { data: "2026-11-20" } };
+  assert.equal(anoDaTurma(inst), 2026);
+  assert.equal(ehRepasse(inst, "2026-12-31"), false);
+  assert.equal(ehRepasse(inst, "2027-01-01"), true);
+  assert.equal(vendaSugerida(inst, "2027-01-02"), "rep");
+  const k = kitsDe({ kitsFormatura: [{ id: "k04", rep: { valor: 690, parcelas: 5 } }] }).find(x => x.id === "k04");
+  assert.deepEqual(plano(k, "rep", "", "2027-01-10"), { valor: 690, parcelas: 5, primeiroVenc: "2027-02-05" });
+  assert.equal(
+    plano(
+      KITS_PADRAO.find(x => x.id === "k04"),
+      "rep",
+      "",
+      "2027-01-10"
+    ),
+    null
   );
 });

@@ -6,7 +6,7 @@
 //  - Turmas: colégios fechados, com acesso à lista de formandos
 // Quem não é administrador vê só as turmas dos colégios que fechou.
 import { setCtx, openTurma, cobrarWa, registrarPagamento, atrasado, oferecerKit, abrirPrevia } from "./turma.js";
-import { kitsPadrao, candidatosPosFoto } from "./contrato.js";
+import { kitsPadrao, candidatosPosFoto, ehRepasse, anoDaTurma } from "./contrato.js";
 import {
   ativo,
   brl,
@@ -71,6 +71,32 @@ export function show() {
   v.append(
     el("p", "hint", "Kits do contrato de formatura (venda antecipada e depois das fotos) dos colégios fechados. O PR fica no card próprio.")
   );
+  // Como no PR: Linha de Frente = turmas deste ano; Repasse = turmas de anos anteriores (vira sozinho em 1º de janeiro)
+  const segs = el("div", "segs");
+  segs.setAttribute("role", "tablist");
+  const ano = U.todayStr().slice(0, 4);
+  [
+    ["lf", "Linha de Frente " + ano, "turmas deste ano"],
+    ["rep", "Repasse", "turmas de anos anteriores"]
+  ].forEach(([kk, t, sub]) => {
+    const b = el("button", "seg");
+    b.type = "button";
+    b.setAttribute("role", "tab");
+    b.setAttribute("aria-selected", String(seg === kk));
+    b.append(el("b", null, t), el("small", null, sub));
+    b.onclick = () => {
+      seg = kk;
+      try {
+        localStorage.setItem("z7fmseg", kk);
+      } catch (_) {
+        /* sem armazenamento: fica só nesta sessão */
+      }
+      segs.querySelectorAll("button").forEach(x => x.setAttribute("aria-selected", String(x === b)));
+      render();
+    };
+    segs.append(b);
+  });
+  v.append(segs);
   const k = el("div", "kpis");
   k.id = "fmKpis";
   v.append(k);
@@ -163,12 +189,25 @@ const abrirTurma = i =>
     () => carregarTudo(true)
   );
 
-// Só as turmas que a pessoa pode ver
+// Linha de Frente (turmas deste ano) ou Repasse (anos anteriores)
+let seg = (() => {
+  try {
+    return localStorage.getItem("z7fmseg") || "lf";
+  } catch (_) {
+    return "lf";
+  }
+})();
+const noSeg = i => (seg === "rep") === ehRepasse(i, U.todayStr());
+// Só as turmas que a pessoa pode ver, do bloco escolhido
 function minhasInsts() {
-  return C.isAdmin ? insts : insts.filter(i => C.ehMeu(i));
+  return (C.isAdmin ? insts : insts.filter(i => C.ehMeu(i))).filter(noSeg);
 }
 function meusForms(lista) {
-  return (lista || forms).filter(f => ativo(f) && (C.isAdmin || f.respEmail === C.email));
+  const ids = new Set(minhasInsts().map(i => i.id)),
+    todas = new Set(insts.map(i => i.id));
+  return (lista || forms).filter(
+    f => ativo(f) && (C.isAdmin || f.respEmail === C.email) && (ids.has(f.instId) || (seg === "lf" && !todas.has(f.instId)))
+  );
 }
 
 function render() {
@@ -202,7 +241,7 @@ function render() {
     ["cobrancas", "Cobranças", cob.length],
     ["colacao", "🎓 Adesão (Kit 01)", tudoCarregado ? col.length : ""],
     ["album", "📘 Kits 02 a 05", tudoCarregado ? alb.length : ""],
-    ["posfoto", "📸 Depois das fotos", tudoCarregado ? semKit().length : ""],
+    ["posfoto", seg === "rep" ? "🔁 Oferecer no repasse" : "📸 Depois das fotos", tudoCarregado ? semKit().length : ""],
     ["turmas", "Turmas", minhasInsts().length]
   ].forEach(([kk, t, n]) => {
     const b = el("button", "chip", t);
@@ -225,7 +264,7 @@ function render() {
   else if (aba === "turmas") renderTurmas(corpo);
   else if (aba === "posfoto") renderPosFoto(corpo);
   else renderContrato(corpo, aba);
-  if (aba !== "posfoto") avisoOferta(corpo);
+  if (aba !== "posfoto" && seg === "lf") avisoOferta(corpo);
 }
 
 // Parcelas atrasadas e as que vencem até o fim do mês
@@ -401,10 +440,11 @@ function renderTurmas(corpo) {
 
 // ---------- venda depois das fotos ----------
 // Quem tem só o Kit 01, nas turmas com as fotos prontas (o Adriano ou a Luciana marcam em "📅 Contrato da turma")
+// No Repasse: quem ficou só com o Kit 01 nas turmas de anos anteriores (não precisa marcar fotos prontas)
 function semKit() {
   const out = [];
-  insts.forEach(i => {
-    if (!(i.contratoTurma || {}).fotosProntasEm) return;
+  insts.filter(noSeg).forEach(i => {
+    if (seg === "lf" && !(i.contratoTurma || {}).fotosProntasEm) return;
     const daTurma = forms.filter(f => f.instId === i.id && (C.isAdmin || f.respEmail === C.email));
     candidatosPosFoto(daTurma).forEach(f => out.push(f));
   });
@@ -437,7 +477,9 @@ function renderPosFoto(corpo) {
     el(
       "p",
       "hint",
-      "Quem tem só o Kit 01, nas turmas com as fotos prontas: mande a prévia e os kits no preço depois das fotos. Quando comprar, toque em “Abrir turma” → 🛒 Comprou kit."
+      seg === "rep"
+        ? "Repasse: quem ficou só com o Kit 01 nas turmas de anos anteriores. Mande a prévia e os kits no preço de repasse. Quando comprar, toque em “Abrir turma” → 🛒 Comprou kit."
+        : "Quem tem só o Kit 01, nas turmas com as fotos prontas: mande a prévia e os kits no preço depois das fotos. Quando comprar, toque em “Abrir turma” → 🛒 Comprou kit."
     )
   );
   const lst = semKit().sort((a, b) => (a.instNome || "").localeCompare(b.instNome || "") || (a.nome || "").localeCompare(b.nome || ""));
@@ -448,7 +490,9 @@ function renderPosFoto(corpo) {
       el(
         "span",
         null,
-        "Quando as fotos de uma turma ficarem prontas, marque em Turmas → Formandos → 📅 Contrato da turma → 📸 Fotos prontas."
+        seg === "rep"
+          ? "Aqui aparecem os alunos de turmas de anos anteriores que ficaram só com o Kit 01."
+          : "Quando as fotos de uma turma ficarem prontas, marque em Turmas → Formandos → 📅 Contrato da turma → 📸 Fotos prontas."
       )
     );
     corpo.append(e);
@@ -460,7 +504,10 @@ function renderPosFoto(corpo) {
     const pr = (inst.contratoTurma || {}).fotosProntasEm;
     const e = el("article", "card today");
     const top = el("div", "card-top");
-    top.append(el("h3", "name", title(f.nome)), el("span", "stage", pr ? "FOTOS PRONTAS " + U.fmtDate(pr) : "OFERECER"));
+    top.append(
+      el("h3", "name", title(f.nome)),
+      el("span", "stage", seg === "rep" ? "REPASSE " + anoDaTurma(inst) : pr ? "FOTOS PRONTAS " + U.fmtDate(pr) : "OFERECER")
+    );
     e.append(top);
     const meta = el("div", "meta");
     [title(f.instNome), f.kit || "Kit 01", f.serie, f.tel].filter(Boolean).forEach(t => meta.append(el("span", "tag", t)));
@@ -476,6 +523,12 @@ function renderPosFoto(corpo) {
 }
 
 // ---------- tabela de kits (contrato) ----------
+// Três preços por kit: antecipado (contrato), depois das fotos (Linha de Frente) e repasse (turmas de anos anteriores)
+export const COLUNAS_PRECO = [
+  ["ant", "Antecipado"],
+  ["pos", "Depois das fotos"],
+  ["rep", "Repasse"]
+];
 function openKits() {
   const kits = kitsPadrao(C.P);
   sheet("Kits e preços (tabela padrão)", (p, close) => {
@@ -483,40 +536,40 @@ function openKits() {
       el(
         "p",
         "hint",
-        "Tabela padrão para todas as turmas (cada turma pode ter a sua em Formandos → 📋 Kits desta turma). Antecipado = preço do contrato, até o dia da formatura. Depois das fotos = valor a mais para quem tem só o Kit 01; deixe em branco o kit que não é oferecido depois."
+        "Tabela padrão para todas as turmas (cada turma pode ter a sua em Formandos → 📋 Kits desta turma). Antecipado = preço do contrato, até o dia da formatura. Depois das fotos = valor a mais para quem tem só o Kit 01. Repasse = preço para quem ficou só com o Kit 01 em turmas de anos anteriores. Deixe em branco o que não é oferecido."
       )
     );
     const linhas = kits.map(k => {
       const f = el("div", "field");
       f.append(el("label", null, k.nome));
-      const av = inpReais(k.ant.valor || ""),
-        an = inp(k.ant.parcelas || "", "1", 3),
-        pv = inpReais(k.pos.valor || ""),
-        pn = inp(k.pos.parcelas || "", "1", 3);
-      [an, pn].forEach(i => (i.inputMode = "numeric"));
-      av.setAttribute("aria-label", k.nome + " · valor antecipado");
-      pv.setAttribute("aria-label", k.nome + " · valor depois das fotos");
-      an.setAttribute("aria-label", k.nome + " · parcelas antecipado");
-      pn.setAttribute("aria-label", k.nome + " · parcelas depois das fotos");
-      [av, an, pv, pn].forEach(i => (i.disabled = !C.isAdmin));
-      const r = el("div", "row2");
-      const a = el("div", "field"),
-        b = el("div", "field");
-      a.append(el("small", null, "Antecipado: valor total e parcelas"), av, an);
-      b.append(el("small", null, "Depois das fotos: valor total e parcelas"), pv, pn);
-      r.append(a, b);
+      const r = el("div", "row3"),
+        ins = {};
+      COLUNAS_PRECO.forEach(([q, nomeQ]) => {
+        const v = inpReais((k[q] || {}).valor || ""),
+          n = inp((k[q] || {}).parcelas || "", "1", 3);
+        n.inputMode = "numeric";
+        v.setAttribute("aria-label", `${k.nome} · valor ${nomeQ.toLowerCase()}`);
+        n.setAttribute("aria-label", `${k.nome} · parcelas ${nomeQ.toLowerCase()}`);
+        [v, n].forEach(i => (i.disabled = !C.isAdmin));
+        const c = el("div", "field");
+        c.append(el("small", null, nomeQ + ": valor e parcelas"), v, n);
+        r.append(c);
+        ins[q] = { v, n };
+      });
       const info = el("p", "hint");
       const upd = () => {
-        const t = (v, n) =>
-          lerReais(v) ? `${Math.max(1, Number(n) || 1)}x de ${brl(dividir(lerReais(v), Math.max(1, Number(n) || 1)).pop())}` : "—";
-        const dif = lerReais(av.value) && lerReais(pv.value) ? Math.round((lerReais(pv.value) / lerReais(av.value) - 1) * 100) : null;
-        info.textContent = `Antecipado ${t(av.value, an.value)} · depois das fotos ${t(pv.value, pn.value)}${dif != null ? ` (${dif >= 0 ? "+" : ""}${dif}%)` : ""}`;
+        const t = q => {
+          const val = lerReais(ins[q].v.value),
+            nn = Math.max(1, Number(ins[q].n.value) || 1);
+          return val ? `${nn}x de ${brl(dividir(val, nn).pop())}` : "—";
+        };
+        info.textContent = COLUNAS_PRECO.map(([q, nomeQ]) => `${nomeQ} ${t(q)}`).join(" · ");
       };
-      [av, an, pv, pn].forEach(i => i.addEventListener("input", upd));
+      Object.values(ins).forEach(({ v, n }) => [v, n].forEach(i => i.addEventListener("input", upd)));
       upd();
       f.append(r, info);
       p.append(f);
-      return { k, av, an, pv, pn };
+      return { k, ins };
     });
     const a = botoes(close, "Salvar tabela");
     if (!C.isAdmin) a.ok.hidden = true;
@@ -524,11 +577,16 @@ function openKits() {
     p.addEventListener("submit", async ev => {
       ev.preventDefault();
       if (!C.isAdmin) return;
-      const nova = linhas.map(({ k, av, an, pv, pn }) => ({
+      const preco = ({ v, n }, obrig) => {
+        const val = lerReais(v.value);
+        return { valor: val, parcelas: val || obrig ? Math.max(1, parseInt(n.value, 10) || 1) : 0 };
+      };
+      const nova = linhas.map(({ k, ins }) => ({
         id: k.id,
         nome: k.nome,
-        ant: { valor: lerReais(av.value), parcelas: Math.max(1, parseInt(an.value, 10) || 1) },
-        pos: { valor: lerReais(pv.value), parcelas: lerReais(pv.value) ? Math.max(1, parseInt(pn.value, 10) || 1) : 0 }
+        ant: preco(ins.ant, true),
+        pos: preco(ins.pos),
+        rep: preco(ins.rep)
       }));
       try {
         await FS.setDoc(FS.doc(db, "config", "app"), { kitsFormatura: nova }, { merge: true });

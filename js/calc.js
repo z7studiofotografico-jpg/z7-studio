@@ -14,7 +14,17 @@ const soma = (o, k, campo, v) => {
 };
 // Números de cada card, por mês (valores em centavos)
 const novoPR = () => ({ v: 0, n: 0, separados: 0, lf: {}, rep: {}, forma: {}, pessoas: {} });
-const novoForm = () => ({ vendCol: {}, vendAlb: {}, vendAnt: {}, vendPos: {}, recCol: 0, recAlb: 0, colegios: 0, pessoas: {} });
+const novoForm = () => ({
+  vendCol: {},
+  vendAlb: {},
+  vendAnt: {},
+  vendPos: {},
+  vendRep: {},
+  recCol: 0,
+  recAlb: 0,
+  colegios: 0,
+  pessoas: {}
+});
 const novoFunil = () => ({ criados: 0, fechados: 0, perdidos: 0, v: 0, origem: {}, servico: {}, pessoas: {} });
 // fontes = { leads, prs, forms, insts, ens, becas } (listas de documentos); hoje = "AAAA-MM-DD"
 // emailPorNome: { "Pedro Vendedor": "pedro@..." } para juntar registros antigos (só com o nome) na mesma pessoa
@@ -152,8 +162,9 @@ export function resumir(fontes, hoje, emailPorNome) {
       soma(Fo, col ? "vendCol" : "vendAlb", "v", cv);
       soma(Fo, col ? "vendCol" : "vendAlb", "n", 1);
       // venda antecipada (contrato) × depois das fotos (preço maior)
-      soma(Fo, f.venda === "pos" ? "vendPos" : "vendAnt", "v", cv);
-      soma(Fo, f.venda === "pos" ? "vendPos" : "vendAnt", "n", 1);
+      const tipoVenda = f.venda === "pos" ? "vendPos" : f.venda === "rep" ? "vendRep" : "vendAnt";
+      soma(Fo, tipoVenda, "v", cv);
+      soma(Fo, tipoVenda, "n", 1);
       if (pessoa) soma(Fo.pessoas, pessoa, "vend", cv);
     }
     pagamentosDe(f).forEach(p => {
