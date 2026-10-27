@@ -151,7 +151,7 @@ test("vendedor não troca o responsável de colégio de outra pessoa, mas assume
   await assertFails(updateDoc(doc(db, "instituicoes", "i3"), { respEmail: PEDRO, resp: "Pedro" }));
   await assertSucceeds(updateDoc(doc(db, "instituicoes", "i2"), { respEmail: PEDRO, resp: "Pedro", etapa: "VISITADO" }));
   await assertFails(updateDoc(doc(db, "instituicoes", "i3"), { etapa: "PROPOSTA ENVIADA" })); // colégio da Ana
-  await assertFails(updateDoc(doc(db, "instituicoes", "i1"), { colacao: { valor: 1 } }));
+  await assertFails(updateDoc(doc(db, "instituicoes", "i1"), { kits: [{ id: "k01", ant: { valor: 1, parcelas: 1 } }] }));
   await assertFails(updateDoc(doc(db, "instituicoes", "i2"), { respEmail: ANA }));
 });
 test("PR pago: vendedor não muda valor, forma de pagamento nem responsável", async () => {
