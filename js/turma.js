@@ -145,7 +145,8 @@ export function oferecerKit(ctx, inst, f) {
     : `Oi, ${nome}! Aqui é do ${ESTUDIO.nome} 📸 As fotos da formatura do ${title(inst.nome)} ficaram prontas e estão lindas! Quer garantir as suas?\n\n${lin.join("\n")}\n\nPosso te mandar uma prévia? 😊`;
   wa(f.tel, msg, U.toast);
 }
-export function openTurma(ctx, inst, kits, aoFechar) {
+// opcoes.novo = abre já com o formulário de formando novo (botão "+ Formando" do card Formaturas)
+export function openTurma(ctx, inst, kits, aoFechar, opcoes) {
   setCtx(ctx);
   const col = FS.collection(db, "formandos");
   let lista = [],
@@ -185,6 +186,7 @@ export function openTurma(ctx, inst, kits, aoFechar) {
       p.append(q);
       const lst = el("div", "grid");
       p.append(lst);
+      if (opcoes && opcoes.novo) setTimeout(() => form(), 0);
       unsub = FS.onSnapshot(
         C.isAdmin ? FS.query(col, FS.where("instId", "==", inst.id), FS.limit(2000)) : C.carteira("formandos"),
         snap => {

@@ -246,3 +246,13 @@ test("valores da turma (kits e contrato) só o admin muda", async () => {
     updateDoc(doc(como(ADRIANO), "instituicoes", "i1"), { kits: [], contratoTurma: { inicio: "2026-06-05", fotosProntasEm: "2026-12-01" } })
   );
 });
+
+test("PR: a equipe inclui aluno à mão na fila ou separado para si, mas não como venda", async () => {
+  await assertSucceeds(setDoc(doc(como(ANA), "repasse", "n1"), { nome: "NOVO", ano: 2099, etapa: "NA FILA", resp: "", respEmail: "" }));
+  await assertSucceeds(
+    setDoc(doc(como(PEDRO), "repasse", "n2"), { nome: "NOVO 2", ano: 2099, etapa: "SEPARADO", resp: "Pedro", respEmail: PEDRO })
+  );
+  await assertFails(setDoc(doc(como(PEDRO), "repasse", "n3"), { nome: "NOVO 3", ano: 2099, etapa: "PAGO", valor: 350, respEmail: PEDRO }));
+  await assertFails(setDoc(doc(como(PEDRO), "repasse", "n4"), { nome: "NOVO 4", ano: 2099, etapa: "SEPARADO", respEmail: ANA }));
+  await assertFails(setDoc(doc(como(PEDRO), "repasse", "n5"), { nome: "NOVO 5", ano: 2020, etapa: "NA FILA", respEmail: "" }));
+});

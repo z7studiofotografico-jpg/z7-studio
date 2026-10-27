@@ -115,7 +115,10 @@ service cloud.firestore {
         // a venda entra "a conferir": só o admin marca como conferida (a comissão só conta depois)
         && (!mudou(['conferido']) || request.resource.data.conferido == false)
         && !(resource.data.etapa in ['PAGO', 'ENTREGUE'] && mudou(['valor', 'formaPag', 'pagoEm', 'resp', 'respEmail'])));
-      allow create: if pode('rep') || admin();
+      // a equipe inclui aluno à mão (sem planilha): entra na fila ou separado para si, nunca como venda
+      allow create: if admin() || ((pode('rep') || (pode('lf') && anoAtual(request.resource.data)))
+        && request.resource.data.get('etapa', '') in ['NA FILA', 'INCOMPLETO', 'SEPARADO']
+        && request.resource.data.get('respEmail', '') in ['', email()]);
       // venda paga ou entregue não some pela mão da equipe
       allow delete: if admin() || (pode('rep') && !(resource.data.get('etapa', '') in ['PAGO', 'ENTREGUE']));
     }

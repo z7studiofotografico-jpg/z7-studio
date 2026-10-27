@@ -63,6 +63,7 @@ export function show() {
   // preços mínimos dos kits e da formatura (antes ficavam em Instituições)
   const hb = el("div", "agact");
   hb.append(
+    U.mkBtn("+ Formando", "btn-primary btn-sm", () => novoFormando()),
     U.mkBtn("📋 Kits e preços", "btn-sm", () => openKits()),
     U.mkBtn("💲 Preços mínimos", "btn-sm", () => Ev.openPrecos())
   );
@@ -181,12 +182,13 @@ async function carregarTudo(forcar) {
   }
 }
 // Abre a turma com os kits do tipo de colégio e, ao fechar, atualiza os números
-const abrirTurma = i =>
+const abrirTurma = (i, novo) =>
   openTurma(
     C,
     i,
     Ev.produtos(i.tipo).filter(x => !x.formatura),
-    () => carregarTudo(true)
+    () => carregarTudo(true),
+    { novo: !!novo }
   );
 
 // Linha de Frente (turmas deste ano) ou Repasse (anos anteriores)
@@ -198,6 +200,37 @@ let seg = (() => {
   }
 })();
 const noSeg = i => (seg === "rep") === ehRepasse(i, U.todayStr());
+// "+ Formando" direto no card: escolhe a turma e já abre o cadastro (sem precisar importar planilha)
+function novoFormando() {
+  const lista = (C.isAdmin ? insts : insts.filter(i => C.ehMeu(i)))
+    .slice()
+    .sort((a, b) => (a.nome || "").localeCompare(b.nome || "", "pt-BR"));
+  if (!lista.length) return U.toast("Nenhum colégio fechado ainda. Feche o colégio em Instituições para criar a turma.");
+  if (lista.length === 1) return abrirTurma(lista[0], true);
+  sheet("Incluir formando", (p, close) => {
+    const s0 = el("select");
+    lista.forEach(i => {
+      const o = el("option", null, title(i.nome) + (ehRepasse(i, U.todayStr()) ? ` (Repasse ${anoDaTurma(i)})` : ""));
+      o.value = i.id;
+      s0.append(o);
+    });
+    const f = el("div", "field");
+    const l = el("label", null, "Turma (colégio)");
+    s0.id = "fmNovoTurma";
+    l.htmlFor = s0.id;
+    f.append(l, s0);
+    p.append(f);
+    p.append(botoes(close, "Continuar"));
+    p.addEventListener("submit", ev => {
+      ev.preventDefault();
+      close();
+      abrirTurma(
+        lista.find(i => i.id === s0.value),
+        true
+      );
+    });
+  });
+}
 // Só as turmas que a pessoa pode ver, do bloco escolhido
 function minhasInsts() {
   return (C.isAdmin ? insts : insts.filter(i => C.ehMeu(i))).filter(noSeg);

@@ -300,14 +300,10 @@ console.log("Adriano (admin), com os dados já atualizados no servidor:");
   await ir(pg, "#funil");
   ok((await pg.locator("#list .card").count()) === 1, "Funil abre (módulo novo) com o lead");
   await pg.locator("#list .card").getByText("Editar").click();
+  // o formulário põe o cursor no Nome 30 ms depois de abrir: espera, senão o texto cai no campo errado
+  await pg.waitForFunction(() => document.activeElement && document.activeElement.id === "fNome", null, { timeout: 2000 }).catch(() => {});
   await pg.fill("#fValor", "1.350,50");
-  if (process.env.DEBUG)
-    console.log(
-      "DEBUG antes de salvar:",
-      await pg.inputValue("#fValor"),
-      await pg.isDisabled("#fValor"),
-      await pg.textContent("#formTitle")
-    );
+  if (process.env.DEBUG) console.log(await pg.inputValue("#fValor"), await pg.isDisabled("#fValor"), await pg.textContent("#formTitle"));
   await pg.click("#btnSave");
   await pg.waitForFunction(() => (window.__store.get("leads/l1") || {}).valor === 1350.5, null, { timeout: 3000 }).catch(() => {});
   // busca acha também lead antigo (fechado há mais de 60 dias, fora da lista carregada)
@@ -485,6 +481,22 @@ console.log("Adriano (admin), com os dados já atualizados no servidor:");
     compras.length === 2 && nova && nova.kitId === "k04" && nova.valor === 1000 && nova.compraDe && compras.some(x => x.kitId === "k01"),
     "compra a mais registrada (R$ 1.000,00 combinado) e o Kit 01 continua"
   );
+  await pg.locator(".panel.wide").getByRole("button", { name: "Fechar" }).click();
+  await pg.waitForTimeout(200);
+  // "+ Formando" direto no card Formaturas (sem planilha): escolhe a turma e já abre o cadastro
+  await pg.getByRole("button", { name: "+ Formando" }).first().click();
+  await pg.waitForTimeout(300);
+  fk = pg.locator(".sheet").last();
+  await fk.getByLabel("Turma (colégio)").selectOption("i1");
+  await fk.locator("button[type=submit]").click();
+  await pg.waitForTimeout(600);
+  fk = pg.locator(".sheet").last();
+  await fk.getByLabel("Nome").fill("Eva Direto");
+  await fk.locator("button[type=submit]").click();
+  await pg.waitForTimeout(400);
+  s = await store();
+  const eva = Object.values(s).find(x => x.nome === "Eva Direto");
+  ok(eva && eva.instId === "i1" && eva.kitId === "k01", "+ Formando no card Formaturas: incluído na turma com o Kit 01");
   await pg.locator(".panel.wide").getByRole("button", { name: "Fechar" }).click();
   await pg.waitForTimeout(200);
   // Repasse: turmas de anos anteriores, quem ficou só com o Kit 01, preço de repasse
@@ -844,6 +856,22 @@ console.log("Pedro (vendedor: Linha de Frente, Agendamento, Instituições):");
     "mostra o aviso depois de 25 na Linha de Frente"
   );
   ok(await pg.locator("#rLoteBtn").isEnabled(), "botão continua liberado");
+  // "+ Aluno" no PR, sem planilha: entra separado para quem incluiu
+  await pg.getByRole("button", { name: "+ Aluno" }).click();
+  await pg.waitForTimeout(300);
+  let fa = pg.locator(".sheet").last();
+  await fa.getByLabel("Nome do aluno").fill("Paulo Manual");
+  await fa.getByLabel("Colégio").fill("Colegio Alfa");
+  await fa.getByLabel("WhatsApp").fill("21933332222");
+  await fa.getByLabel("Nome", { exact: true }).fill("Marta");
+  await fa.locator("button[type=submit]").click();
+  await pg.waitForTimeout(500);
+  const sp = await store();
+  const paulo = Object.values(sp).find(x => x.nome === "Paulo Manual");
+  ok(
+    paulo && paulo.etapa === "SEPARADO" && paulo.respEmail === PEDRO && paulo.manual && paulo.contatos.length === 1,
+    "+ Aluno no PR: incluído e já separado para o vendedor"
+  );
   await ir(pg, "#inst-particular");
   await pg.waitForTimeout(400);
   await pg.locator("#iChips").getByText("Todas").click();

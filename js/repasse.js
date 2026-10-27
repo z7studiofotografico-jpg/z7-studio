@@ -263,6 +263,7 @@ function mount() {
   const head = el("div", "vhead");
   head.append(el("h2", null, "PR"));
   const hb = el("div", "quick");
+  hb.append(U.mkBtn("+ Aluno", "btn-primary", () => openDados(null)));
   hb.append(U.mkBtn("🖼️ Prévia e fotos", "", () => openMockup({ preco: precoTxt(), toast: U.toast })));
   const imp = U.mkBtn("Importar planilha", "", () => openImport());
   imp.id = "rImport";
@@ -1054,8 +1055,11 @@ function entregaCampos(p, it) {
   };
   return box;
 }
+// Dados do formando; sem "it" = aluno novo incluído à mão (sem planilha)
 function openDados(it) {
-  sheet("Dados do formando", (p, close) => {
+  const novo = !it;
+  it = it || { nome: "", escola: "", ano: seg === "lf" ? ANO() : ANO() - 1, contatos: [] };
+  sheet(novo ? "Incluir aluno no PR" : "Dados do formando", (p, close) => {
     const mk = (v, ph) => {
       const i = el("input");
       i.value = v || "";
@@ -1070,6 +1074,27 @@ function openDados(it) {
     const r1 = el("div", "row2");
     r1.append(field("Colégio", escola), field("Ano", ano));
     p.append(field("Nome do aluno", nome), r1);
+    // colégios que já existem no PR (para escrever igual)
+    const dlE = el("datalist");
+    dlE.id = "rEscolas" + Date.now();
+    Object.keys(meta.escolas || {}).forEach(n => {
+      const o = el("option");
+      o.value = title(n);
+      dlE.append(o);
+    });
+    escola.setAttribute("list", dlE.id);
+    p.append(dlE);
+    let curso = null,
+      turma = null,
+      paraMim = null;
+    if (novo) {
+      nome.required = true;
+      curso = mk("", "ex.: Ensino Médio");
+      turma = mk("", "ex.: 3001");
+      const r2 = el("div", "row2");
+      r2.append(field("Curso / série", curso), field("Turma", turma));
+      p.append(r2);
+    }
     p.append(el("h3", null, "Contatos"));
     const linhas = [];
     const lista = el("div", "imp");
@@ -1090,13 +1115,69 @@ function openDados(it) {
       lista.append(row);
       linhas.push({ tp, nm, tl });
     };
-    (it.contatos && it.contatos.length ? it.contatos : [{}]).forEach(addLinha);
+    (it.contatos && it.contatos.length ? it.contatos : [novo ? { tipo: "Mãe" } : {}]).forEach(addLinha);
     const add = U.mkBtn("+ Adicionar contato", "", () => addLinha());
     p.append(add);
+    if (novo && !C.isAdmin) {
+      const l = el("label", "chk");
+      paraMim = el("input");
+      paraMim.type = "checkbox";
+      paraMim.checked = true;
+      l.append(paraMim, document.createTextNode(" Já separar para mim (entra em Para hoje)"));
+      p.append(l);
+    }
     const erro = el("p", "err");
     erro.hidden = true;
     p.append(erro);
     p.append(actions(close, "Salvar"));
+    // aluno novo: entra na fila (ou já separado para quem incluiu), como se tivesse vindo da planilha
+    async function criar(d, falta) {
+      if (!d.nome) {
+        erro.textContent = "Coloque o nome do aluno.";
+        erro.hidden = false;
+        return;
+      }
+      const agora = new Date().toISOString(),
+        hoje = U.todayStr(),
+        meu = paraMim && paraMim.checked && !falta.length;
+      const docNovo = Object.assign(d, {
+        curso: curso ? curso.value.trim() : "",
+        turma: turma ? turma.value.trim() : "",
+        dataEnsaio: "",
+        endereco: {},
+        obs: "",
+        etapa: falta.length ? "INCOMPLETO" : meu ? "SEPARADO" : "NA FILA",
+        followup: meu ? hoje : null,
+        tentativas: 0,
+        tentInteresse: 0,
+        resp: meu ? C.me || "" : "",
+        respEmail: meu ? C.email || "" : "",
+        ...(meu ? { separadoEm: hoje, separadoSeg: d.ano >= ANO() ? "lf" : "rep" } : {}),
+        manual: true,
+        incluidoPor: C.email || "",
+        importadoEm: agora,
+        atualizadoEm: agora
+      });
+      try {
+        // mesmo colégio + mesmo nome já existe? não sobrescreve: cria outro registro
+        let id = docId(docNovo, Date.now());
+        if ((await FS.getDoc(FS.doc(db, "repasse", id)).catch(() => null))?.exists?.()) id += "-" + Date.now().toString(36);
+        await FS.setDoc(FS.doc(db, "repasse", id), docNovo);
+        close();
+        U.toast(
+          falta.length
+            ? "Incluído. Ainda falta: " + falta.join(", ") + " (aba Incompletos)"
+            : meu
+              ? "Incluído e separado para você ✅"
+              : "Incluído na fila ✅"
+        );
+        refreshStats();
+        refreshLote();
+        openTab(meu ? "hoje" : falta.length && C.isAdmin ? "incompletos" : tab);
+      } catch (e) {
+        C.handleErr(e);
+      }
+    }
     p.addEventListener("submit", ev => {
       ev.preventDefault();
       const cs = [];
@@ -1117,6 +1198,16 @@ function openDados(it) {
         telefones: cs.map(c => c.tel)
       };
       const falta = faltando(patch);
+      if (novo) {
+        // falta algo (ex.: nome da mãe)? avisa antes; tocando de novo, salva assim mesmo (vai para Incompletos)
+        if (falta.length && !p._mesmoAssim) {
+          p._mesmoAssim = true;
+          erro.textContent = `Falta: ${falta.join(", ")}. Complete, ou toque em Salvar de novo para incluir assim mesmo (fica em Incompletos até completar).`;
+          erro.hidden = false;
+          return;
+        }
+        return criar(patch, falta);
+      }
       if (it.etapa === "INCOMPLETO" || it.etapa === "NA FILA") patch.etapa = falta.length ? "INCOMPLETO" : "NA FILA";
       close();
       save(
