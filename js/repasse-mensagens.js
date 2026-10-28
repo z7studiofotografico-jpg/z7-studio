@@ -3,10 +3,12 @@ import { title } from "./ui.js";
 import { ESTUDIO } from "./mensagens.js";
 import * as U from "./util.js";
 import { C, segDe, eu, ofertaTxt, entregaTxt, sextaTxt } from "./repasse-estado.js";
+import { RESP_CADASTRO } from "./repasse-dados.js";
 
 export function passo(it, c) {
   const F = U.first(title(it.nome));
-  const cn = c && c.nome ? U.first(title(c.nome)) : "";
+  // "Responsável pelo aluno de cadastro" não é nome: a mensagem começa só com "Olá!"
+  const cn = c && c.nome && c.nome !== RESP_CADASTRO ? U.first(title(c.nome)) : "";
   const oi = cn ? `Olá, ${cn}!` : "Olá!";
   const souEu = `Aqui é ${eu()}, do ${ESTUDIO.nome} 📸`;
   const quem = c && c.tipo === "Formando" ? "o seu ensaio de formatura" : `o ensaio de formatura de ${F}`;

@@ -36,3 +36,71 @@ test("situação e endereço do cartão do PR", async () => {
   assert.equal(enderecoTxt({ etapa: "PAGO", entregaTipo: "Entrega em casa", endereco: end }), "Rua da Paz, 10 · Centro · Nilópolis");
   assert.equal(enderecoTxt({ etapa: "PAGO", entregaTipo: "Retirada no estúdio", endereco: end }), "");
 });
+
+test("planilha antiga (2021): TELEFONE 1 aluno, 2 mãe, 3 pai; sem nome vira 'Responsável pelo aluno de cadastro'; ano escolhido na importação", async () => {
+  const { linhaParaDoc, faltando, RESP_CADASTRO, MAPA, hkey } = await import("../js/repasse-dados.js");
+  const cab = [
+    "FOTOZOOM",
+    "ESCOLA / FAC.",
+    "CURSO",
+    "STATUS",
+    "VENDEDOR",
+    "ID",
+    "FORMANDO ",
+    "DATA ",
+    "TELEFONE 1",
+    "TELEFONE 2",
+    "TELEFONE 3",
+    "TELEFONE 4"
+  ];
+  const cols = cab.map(h => MAPA[hkey(h)] || null);
+  const linha = v => {
+    const o = {};
+    cols.forEach((k, i) => k && o[k] == null && (o[k] = v[i]));
+    return o;
+  };
+  const X = { SSF: { parse_date_code: () => null } };
+  const a = linhaParaDoc(
+    linha([
+      "4821",
+      "CIEP 384 GONÇALVES DIAS",
+      "3º ANO",
+      "-",
+      "-",
+      "7",
+      "TAMARA CORREA",
+      "",
+      "22 99963-8860",
+      "22 99926-6331",
+      "22 999831848",
+      ""
+    ]),
+    X,
+    2021
+  );
+  assert.equal(a.ano, 2021);
+  assert.deepEqual(
+    a.contatos.map(c => [c.tipo, c.nome, c.tel]),
+    [
+      ["Mãe", RESP_CADASTRO, "22999266331"],
+      ["Pai", RESP_CADASTRO, "22999831848"],
+      ["Formando", "", "22999638860"]
+    ]
+  );
+  assert.deepEqual(faltando(a), []);
+  assert.equal(a.codigo, "21CIEP384-07");
+  assert.match(a.obs, /FotoZoom: 4821/);
+  // DATA de venda em outro ano não muda o ano das fotos escolhido
+  const b = linhaParaDoc(
+    linha(["", "E.M. ALEXANDRE FARAH", "9 ANO", "VENDIDO", "ROBERTO", "EMAF - 21", "RIANNY VICTORIA", "10/3/2022", "21966472002"]),
+    X,
+    2021
+  );
+  assert.equal(b.ano, 2021);
+  assert.equal(b.codigo, "21EMAF-21");
+  // só o telefone do aluno: entra na fila com o responsável "do cadastro"
+  assert.equal(b.responsavel, RESP_CADASTRO);
+  assert.deepEqual(faltando(b), []);
+  // sem ano escolhido, continua usando a DATA (planilhas do ano atual)
+  assert.equal(linhaParaDoc(linha(["", "X", "", "", "", "1", "ANA", "10/3/2022", "21966472002"]), X).ano, 2022);
+});

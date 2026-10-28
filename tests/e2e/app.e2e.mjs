@@ -986,6 +986,54 @@ await cenario("Adriano (admin), com os dados já atualizados no servidor", async
     );
     await pg.locator(".sheet:visible").getByRole("button", { name: "Fechar" }).click();
     await calmo(pg);
+    // planilhas antigas (2021): vários arquivos de uma vez, ano escolhido, TELEFONE 1/2/3 = aluno/mãe/pai, VENDIDO fica de fora
+    await pg.getByRole("button", { name: "Importar planilha" }).click();
+    await calmo(pg);
+    const cab = "FOTOZOOM;ESCOLA / FAC.;CURSO;STATUS;VENDEDOR;ID;FORMANDO ;DATA ;TELEFONE 1;TELEFONE 2;TELEFONE 3;TELEFONE 4\n";
+    await pg.locator(".sheet:visible input[type=file]").setInputFiles([
+      {
+        name: "01 - PR - CIEP 384 GONÇALVES DIAS (ARARUAMA).csv",
+        mimeType: "text/csv",
+        buffer: Buffer.from(
+          cab +
+            "4821;CIEP 384 GONÇALVES DIAS;3º ANO;-;-;7;TAMARA CORREA;;22 99963-8860;22 99926-6331;;\n;CIEP 384 GONÇALVES DIAS;3º ANO;VENDIDO;ROBERTO;1;CAMILLI VENDIDA;10/10/2021;22 99911-1111;;;\n"
+        )
+      },
+      {
+        name: "05 - PR - E.M ALEXANDRE FARAH (ANCHIETA).csv",
+        mimeType: "text/csv",
+        buffer: Buffer.from(cab + ";E.M. ALEXANDRE FARAH;9 ANO;-;ROBERTO;EMAF - 02;GABRIEL ANTIGO;;21990021393;;;\n")
+      }
+    ]);
+    await pg.waitForFunction(() => /3 formandos encontrados/.test(document.body.textContent), null, { timeout: 8000 }).catch(() => {});
+    const imp = pg.locator(".sheet:visible").last();
+    ok(/2 arquivos/.test(await imp.textContent()), "importar PR: lê vários arquivos de uma vez");
+    await imp.getByLabel("Ano das fotos (de todos os alunos destes arquivos)").fill("2021");
+    await calmo(pg);
+    ok(
+      !(await imp.locator("label.chk", { hasText: "VENDIDO" }).locator("input").isChecked()) &&
+        /3 completos e 0 incompletos/.test(await imp.textContent()),
+      "quem já comprou (VENDIDO) vem desmarcado; sem nome da mãe/pai não trava (responsável do cadastro)"
+    );
+    await imp.locator("button[type=submit]").click();
+    await pg.waitForFunction(() => /Pronto!/.test(document.body.textContent), null, { timeout: 8000 }).catch(() => {});
+    s = await store();
+    const tamara = Object.values(s).find(x => x.nome === "TAMARA CORREA"),
+      gabriel = Object.values(s).find(x => x.nome === "GABRIEL ANTIGO");
+    ok(
+      tamara &&
+        tamara.ano === 2021 &&
+        tamara.etapa === "NA FILA" &&
+        tamara.codigo === "21CIEP384-07" &&
+        tamara.contatos.some(c => c.tipo === "Mãe" && c.nome === "Responsável pelo aluno de cadastro") &&
+        gabriel &&
+        gabriel.ano === 2021 &&
+        gabriel.codigo === "21EMAF-02" &&
+        !Object.values(s).some(x => x.nome === "CAMILLI VENDIDA"),
+      "2021 importado: ano, ID com a sigla, mãe 'do cadastro', e quem comprou ficou de fora"
+    );
+    await pg.locator(".sheet:visible").getByRole("button", { name: "Fechar" }).click();
+    await calmo(pg);
   });
   await etapa(pg, "Importar instituições", async () => {
     // Instituições: importar planilha (módulo instituicoes-import.js)

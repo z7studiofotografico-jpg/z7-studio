@@ -33,116 +33,155 @@ export function openImport(ctx, ui, aoTerminar) {
       el(
         "p",
         "hint",
-        "Escolha o arquivo Excel (.xlsx) ou CSV com as colunas da planilha de formandos. Os dados vão direto do seu aparelho para o banco do app."
+        "Escolha um ou vários arquivos Excel (.xlsx) ou CSV com as colunas da planilha de formandos (pode selecionar todas as planilhas de um ano de uma vez). Os dados vão direto do seu aparelho para o banco do app."
       )
     );
     const inp = el("input");
     inp.type = "file";
     inp.accept = ".xlsx,.xls,.csv";
-    p.append(field("Arquivo", inp));
+    inp.multiple = true;
+    p.append(field("Arquivos", inp));
+    // Ano das fotos: vale para todos os alunos destes arquivos (nas planilhas antigas a DATA é a da venda)
+    const anoIn = el("input");
+    anoIn.type = "number";
+    anoIn.min = "2015";
+    anoIn.max = String(new Date().getFullYear() + 1);
+    anoIn.placeholder = "ex.: 2021";
+    const fAno = field("Ano das fotos (de todos os alunos destes arquivos)", anoIn);
+    fAno.hidden = true;
+    p.append(fAno);
     const out = el("div", "imp");
     p.append(out);
     const acts = actions(close, "Importar");
     const ok = acts.querySelector("button[type=submit]");
     ok.disabled = true;
     p.append(acts);
-    let rows = [];
+    let rows = [],
+      brutos = [],
+      X = null,
+      porArquivo = [];
     inp.onchange = async () => {
       out.innerHTML = "";
       ok.disabled = true;
       rows = [];
-      const f = inp.files[0];
-      if (!f) return;
-      out.append(el("p", "hint", "Lendo a planilha…"));
+      brutos = [];
+      porArquivo = [];
+      const fs = [...inp.files];
+      if (!fs.length) return;
+      out.append(el("p", "hint", "Lendo as planilhas…"));
       try {
-        const X = await loadXLSX();
-        const wb = X.read(await f.arrayBuffer(), { type: "array", cellDates: true });
-        const sh = wb.Sheets[wb.SheetNames[0]];
-        const m = X.utils.sheet_to_json(sh, { header: 1, defval: "", raw: true });
-        const hi = m.findIndex(r => r.some(c => hkey(c) === "FORMANDO"));
-        if (hi < 0) throw new Error("Não achei a coluna FORMANDO na primeira aba.");
-        const cols = m[hi].map(h => MAPA[hkey(h)] || null);
-        for (const r of m.slice(hi + 1)) {
-          const o = {};
-          cols.forEach((k, i) => {
-            if (k && o[k] == null) o[k] = r[i];
-          });
-          if (!String(o.nome || "").trim()) continue;
-          rows.push(linhaParaDoc(o, X));
+        X = await loadXLSX();
+        for (const f of fs) {
+          const wb = X.read(await f.arrayBuffer(), { type: "array", cellDates: true });
+          const sh = wb.Sheets[wb.SheetNames[0]];
+          const m = X.utils.sheet_to_json(sh, { header: 1, defval: "", raw: true });
+          const hi = m.findIndex(r => r.some(c => hkey(c) === "FORMANDO"));
+          if (hi < 0) throw new Error(`Não achei a coluna FORMANDO na primeira aba de “${f.name}”.`);
+          const cols = m[hi].map(h => MAPA[hkey(h)] || null);
+          let n = 0;
+          for (const r of m.slice(hi + 1)) {
+            const o = {};
+            cols.forEach((k, i) => {
+              if (k && o[k] == null) o[k] = r[i];
+            });
+            if (!String(o.nome || "").trim()) continue;
+            brutos.push(o);
+            n++;
+          }
+          porArquivo.push(`${f.name.replace(/\.(xlsx|xls|csv)$/i, "")}: ${n}`);
         }
-        out.innerHTML = "";
-        const incompletos = rows.filter(r => faltando(r).length);
-        out.append(
-          el(
-            "p",
-            null,
-            `${rows.length} formandos encontrados: ${rows.length - incompletos.length} completos e ${incompletos.length} incompletos.`
-          )
-        );
-        if (incompletos.length) {
+        // ano sugerido: o que estiver no nome dos arquivos (ex.: "2021"); senão o mais comum nas datas
+        const doNome = fs.map(f => (f.name.match(/\b(20[12]\d)\b/) || [])[1]).find(Boolean);
+        if (!anoIn.value) {
           const cont = {};
-          incompletos.forEach(r =>
-            faltando(r).forEach(f => {
-              cont[f] = (cont[f] || 0) + 1;
-            })
-          );
-          out.append(
-            el(
-              "p",
-              "hint",
-              "Os incompletos não entram na fila: ficam na aba Incompletos para vocês completarem. Falta " +
-                Object.entries(cont)
-                  .map(([f, n]) => `${f} em ${n}`)
-                  .join(", ") +
-                "."
-            )
-          );
-        }
-        const porStatus = {};
-        rows.forEach(r => {
-          const k = r.statusOrig || "(vazio)";
-          porStatus[k] = (porStatus[k] || 0) + 1;
-        });
-        out.append(
-          el("p", "hint", "Quais STATUS entram no Repasse? Deixe marcado só quem NÃO comprou (CAÍDO). Quem está como VENDIDO já tem o kit.")
-        );
-        const box = el("div", "quick");
-        const temCaido = Object.keys(porStatus).some(k => /CA[IÍ]D/i.test(norm(k)));
-        Object.entries(porStatus)
-          .sort((a, b) => b[1] - a[1])
-          .forEach(([k, n]) => {
-            const l = el("label", "chk");
-            const c = el("input");
-            c.type = "checkbox";
-            c.checked = temCaido ? /CAID/.test(norm(k)) : true;
-            c.value = k;
-            l.append(c, document.createTextNode(` ${k} (${n})`));
-            box.append(l);
+          brutos.forEach(o => {
+            const a = (linhaParaDoc(o, X).ano || "").toString();
+            if (a) cont[a] = (cont[a] || 0) + 1;
           });
-        out.append(box);
-        const porAno = {};
-        rows.forEach(r => {
-          const k = r.ano || "sem data";
-          porAno[k] = (porAno[k] || 0) + 1;
-        });
-        out.append(
-          el(
-            "p",
-            "hint",
-            "Por ano: " +
-              Object.entries(porAno)
-                .sort()
-                .reverse()
-                .map(([a, n]) => `${a}: ${n}`)
-                .join(" · ")
-          )
-        );
-        ok.disabled = false;
+          anoIn.value = doNome || (Object.entries(cont).sort((a, b) => b[1] - a[1])[0] || [""])[0];
+        }
+        fAno.hidden = false;
+        montar();
       } catch (e) {
         out.innerHTML = "";
         out.append(el("p", "err", "Não consegui ler o arquivo: " + (e.message || e)));
       }
     };
+    anoIn.oninput = () => brutos.length && montar();
+    function montar() {
+      rows = brutos.map(o => linhaParaDoc(o, X, anoIn.value));
+      out.innerHTML = "";
+      if (porArquivo.length > 1) out.append(el("p", "hint", `${porArquivo.length} arquivos · ` + porArquivo.join(" · ")));
+      const incompletos = rows.filter(r => faltando(r).length);
+      out.append(
+        el(
+          "p",
+          null,
+          `${rows.length} formandos encontrados: ${rows.length - incompletos.length} completos e ${incompletos.length} incompletos.`
+        )
+      );
+      if (incompletos.length) {
+        const cont = {};
+        incompletos.forEach(r =>
+          faltando(r).forEach(f => {
+            cont[f] = (cont[f] || 0) + 1;
+          })
+        );
+        out.append(
+          el(
+            "p",
+            "hint",
+            "Os incompletos não entram na fila: ficam na aba Incompletos para vocês completarem. Falta " +
+              Object.entries(cont)
+                .map(([f, n]) => `${f} em ${n}`)
+                .join(", ") +
+              "."
+          )
+        );
+      }
+      const porStatus = {};
+      rows.forEach(r => {
+        const k = r.statusOrig || "(vazio)";
+        porStatus[k] = (porStatus[k] || 0) + 1;
+      });
+      out.append(
+        el("p", "hint", "Quais STATUS entram no Repasse? Deixe marcado só quem NÃO comprou (CAÍDO). Quem está como VENDIDO já tem o kit.")
+      );
+      const box = el("div", "quick");
+      const temCaido = Object.keys(porStatus).some(k => /CA[IÍ]D/i.test(norm(k)));
+      Object.entries(porStatus)
+        .sort((a, b) => b[1] - a[1])
+        .forEach(([k, n]) => {
+          const l = el("label", "chk");
+          const c = el("input");
+          c.type = "checkbox";
+          // quem já comprou (VENDIDO, VENDIDO SITE…) vem desmarcado
+          c.checked = temCaido ? /CAID/.test(norm(k)) : !/VENDID/.test(norm(k));
+          c.value = k;
+          l.append(c, document.createTextNode(` ${k} (${n})`));
+          box.append(l);
+        });
+      out.append(box);
+      const porAno = {};
+      rows.forEach(r => {
+        const k = r.ano || "sem data";
+        porAno[k] = (porAno[k] || 0) + 1;
+      });
+      out.append(
+        el(
+          "p",
+          "hint",
+          "Por ano: " +
+            Object.entries(porAno)
+              .sort()
+              .reverse()
+              .map(([a, n]) => `${a}: ${n}`)
+              .join(" · ")
+        )
+      );
+      ok.disabled = !rows.every(r => r.ano);
+      if (ok.disabled) out.append(el("p", "err", "Coloque o ano das fotos acima."));
+    }
     p.addEventListener("submit", async ev => {
       ev.preventDefault();
       if (!rows.length) return;

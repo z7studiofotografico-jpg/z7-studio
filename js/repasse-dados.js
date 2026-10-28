@@ -2,7 +2,7 @@
 // e o que falta para um aluno entrar na fila. Testado em tests/repasse-dados.test.mjs.
 import * as U from "./util.js";
 import { title } from "./ui.js";
-import { codigoBusca, comAno } from "./aluno-id.js";
+import { codigoBusca, comAno, fmtCodigo, siglaDe } from "./aluno-id.js";
 
 export const norm = U.chave,
   slug = U.slug;
@@ -31,6 +31,14 @@ export const MAPA = {
   DATA: "data",
   CELULAR1: "c1",
   CEL1: "c1",
+  // planilhas antigas: TELEFONE 1 = aluno, TELEFONE 2 = mãe, TELEFONE 3 = pai, TELEFONE 4 = outro
+  TELEFONE1: "c1",
+  TEL1: "c1",
+  TELEFONE2: "c2",
+  TEL2: "c2",
+  TELEFONE3: "c3",
+  TEL3: "c3",
+  FOTOZOOM: "fotozoom",
   CEL2MAE: "c2",
   CELULAR2MAE: "c2",
   CEL3PAI: "c3",
@@ -80,13 +88,23 @@ export function parseData(v, X) {
   }
   return "";
 }
-export function linhaParaDoc(r, X) {
+// Nome usado quando a planilha não traz o nome da mãe nem do pai (o contato existe, só não tem nome)
+export const RESP_CADASTRO = "Responsável pelo aluno de cadastro";
+// anoFixo: o ano das fotos escolhido na importação (nas planilhas antigas a DATA é a da venda, não a do ensaio)
+export function linhaParaDoc(r, X, anoFixo) {
   const dataEnsaio = parseData(r.data, X);
-  const ano = dataEnsaio ? Number(dataEnsaio.slice(0, 4)) : null;
+  const ano = Number(anoFixo) || (dataEnsaio ? Number(dataEnsaio.slice(0, 4)) : null);
   const contatos = [parseTel(r.c2, "Mãe"), parseTel(r.c3, "Pai"), parseTel(r.c1, "Formando"), parseTel(r.c4, "Telefone")].filter(Boolean);
   const vistos = new Set();
-  const cs = contatos.filter(c => !vistos.has(c.tel) && vistos.add(c.tel));
+  const cs = contatos
+    .filter(c => !vistos.has(c.tel) && vistos.add(c.tel))
+    .map(c => ((c.tipo === "Mãe" || c.tipo === "Pai") && !c.nome ? Object.assign({}, c, { nome: RESP_CADASTRO }) : c));
   const s = v => (v == null ? "" : String(v).trim());
+  // ID só com número (1, 2, 3…): vira o ID do app com a sigla do colégio (21CIEP384-01)
+  const cod = s(r.codigo);
+  const codigo =
+    /^\d{1,4}$/.test(cod) && siglaDe(s(r.escola)) ? fmtCodigo(ano, siglaDe(s(r.escola)), Number(cod)) : cod ? comAno(cod, ano) : "";
+  const obs = [s(r.obs), s(r.fotozoom) ? "FotoZoom: " + s(r.fotozoom) : ""].filter(Boolean).join(" · ");
   return {
     nome: s(r.nome),
     nomeBusca: norm(r.nome),
@@ -97,17 +115,19 @@ export function linhaParaDoc(r, X) {
     vendedor: s(r.vendedor),
     // ID da planilha: guarda como veio (identifica a linha ao importar de novo) e no formato com o ano (26CEPNCP-01)
     codigoOrig: s(r.codigo),
-    codigo: s(r.codigo) ? comAno(r.codigo, ano) : "",
-    codigoBusca: s(r.codigo) ? codigoBusca(comAno(r.codigo, ano)) : "",
+    codigo,
+    codigoBusca: codigo ? codigoBusca(codigo) : "",
     dataEnsaio,
     ano,
     contatos: cs,
+    // sem telefone de mãe ou pai: o responsável fica como "do cadastro" (não trava a fila)
+    responsavel: cs.some(c => c.tipo !== "Formando") ? "" : RESP_CADASTRO,
     telefones: cs.map(c => c.tel),
     email: s(r.email).toLowerCase(),
     pagamentoOrig: s(r.pagamento),
     fotosOrig: s(r.fotos),
     endereco: { rua: s(r.rua), numero: s(r.numero), complemento: s(r.complemento), bairro: s(r.bairro), cidade: s(r.cidade) },
-    obs: s(r.obs)
+    obs
   };
 }
 export function docId(d, i) {
