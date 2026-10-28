@@ -237,7 +237,7 @@ const nomeBonito = n =>
     .join(" ")
     .replace(/^(\S+)/, m => m.charAt(0).toUpperCase() + m.slice(1));
 // Faixas de conversão (cores do quadrinho)
-const faixa = v => (v >= 0.3 ? "boa" : v >= 0.2 ? "media" : "baixa");
+const faixa = v => (Math.round(v * 100) >= 30 ? "boa" : Math.round(v * 100) >= 20 ? "media" : "baixa"); // pela % mostrada
 function legendaConv() {
   const l = el("div", "hleg");
   [
