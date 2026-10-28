@@ -10,12 +10,14 @@ const loadXLSX = () => carregarLib("xlsx");
 export async function jaExistem(FS, col, ids) {
   const grupos = [];
   for (let i = 0; i < ids.length; i += 30) grupos.push(ids.slice(i, i + 30));
-  const achados = new Set();
+  const achados = new Map(); // id → etapa atual
   for (let i = 0; i < grupos.length; i += 5)
     await Promise.all(
       grupos
         .slice(i, i + 5)
-        .map(async g => (await FS.getDocs(FS.query(col, FS.where(FS.documentId(), "in", g)))).docs.forEach(d => achados.add(d.id)))
+        .map(async g =>
+          (await FS.getDocs(FS.query(col, FS.where(FS.documentId(), "in", g)))).docs.forEach(d => achados.set(d.id, d.data().etapa))
+        )
     );
   return achados;
 }
@@ -263,14 +265,19 @@ export function openImport(ctx, ui, aoTerminar) {
         let novos = 0,
           atual = 0,
           historico = 0,
-          semTel = 0;
+          semTel = 0,
+          voltou = 0;
         const escolas = Object.assign({}, meta.escolas || {}),
           anos = Object.assign({}, meta.anos || {});
         const ops = sel.map((d, i) => {
           const id = idDe[i];
           if (exist.has(id)) {
             atual++;
-            return [id, Object.assign({}, d, { atualizadoEm: agora }), true];
+            // estava sem telefone e a planilha agora traz o número: sai do "só Dashboard" e vai para a fila
+            const achou = exist.get(id) === "SEM TELEFONE" && !semTelefone(d);
+            if (achou) voltou++;
+            const extra = achou ? { etapa: faltando(d).length ? "INCOMPLETO" : "NA FILA", semTelefone: false } : {};
+            return [id, Object.assign({}, d, extra, { atualizadoEm: agora }), true];
           }
           novos++;
           if (d.escola) escolas[d.escola] = (escolas[d.escola] || 0) + 1;
@@ -340,7 +347,7 @@ export function openImport(ctx, ui, aoTerminar) {
         }
         await FS.setDoc(FS.doc(db, "config", "repasse_meta"), { escolas, anos, importadoEm: agora }, { merge: true });
         const nInc = ops.filter(([, d, m]) => !m && d.etapa === "INCOMPLETO").length;
-        prog.textContent = `Pronto! ${novos - nInc - historico - semTel} novos na fila${nInc ? `, ${nInc} na aba Incompletos` : ""}${semTel ? `, ${semTel} sem telefone (só para o Dashboard)` : ""}${historico ? `, ${historico} que já compraram (só histórico, para o Dashboard)` : ""}${fora ? `, ${fora} de turma desmarcada ficaram fora do app` : ""}${atual ? ` e ${atual} atualizados` : ""}.`;
+        prog.textContent = `Pronto! ${novos - nInc - historico - semTel} novos na fila${nInc ? `, ${nInc} na aba Incompletos` : ""}${semTel ? `, ${semTel} sem telefone (só para o Dashboard)` : ""}${historico ? `, ${historico} que já compraram (só histórico, para o Dashboard)` : ""}${fora ? `, ${fora} de turma desmarcada ficaram fora do app` : ""}${atual ? ` e ${atual} atualizados` : ""}${voltou ? ` (${voltou} que estavam sem telefone agora têm número e foram para a fila)` : ""}.`;
         U.toast("Planilha importada ✅");
         aoTerminar();
         const fechar = U.mkBtn("Fechar", "btn-primary", close);

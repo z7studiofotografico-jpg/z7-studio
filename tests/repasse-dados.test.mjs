@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { parseTel, linhaParaDoc, docId, faltando, slug } from "../js/repasse-dados.js";
+import { parseTel, linhaParaDoc, docId, faltando, slug, MAPA, hkey } from "../js/repasse-dados.js";
 
 test("telefone da planilha: tira o 55, guarda o nome entre parênteses e recusa número curto", () => {
   assert.deepEqual(parseTel("+55 (21) 98888-7777", "Mãe"), { tipo: "Mãe", nome: "", tel: "21988887777" });
@@ -149,4 +149,14 @@ test("planilha com colunas deslocadas (STATUS em CURSO), ano no nome do colégio
   assert.equal(d.endereco.rua, "AVENIDA FERNANDO TEIXEIRA");
   const e = linhaParaDoc({ escola: "X", curso: "-", status: "CAIDO", nome: "A", c1: "21967841572" }, null, 2021);
   assert.equal(e.statusOrig, "CAIDO");
+});
+
+test("colunas TEL MAE / TEL PAI / CELULAR MAE e RESPONSÁVEL das planilhas de 2023 a 2027", () => {
+  for (const h of ["TEL MAE", "TELEFONE MÃE", "CELULAR MAE", "CEL MAE"]) assert.equal(MAPA[hkey(h)], "c2", h);
+  for (const h of ["TEL PAI", "TELEFONE PAI", "CELULAR PAI", "CEL PAI"]) assert.equal(MAPA[hkey(h)], "c3", h);
+  assert.equal(MAPA[hkey("REPONSAVEL")], "respNome");
+  const d = linhaParaDoc({ nome: "Ana Lima", escola: "CIEP 1", c2: "21988887777", respNome: "MARIA LIMA" }, null, 2027);
+  assert.deepEqual(d.telefones, ["21988887777"]);
+  const so = linhaParaDoc({ nome: "Ana Lima", escola: "CIEP 1", c1: "21988887777", respNome: "MARIA LIMA" }, null, 2027);
+  assert.equal(so.responsavel, "Maria Lima");
 });
