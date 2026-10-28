@@ -57,7 +57,9 @@ export function secaoNesteCelular(C, box) {
       "hint",
       ehAndroid()
         ? "Diga em qual app cada número está neste celular. Assim, ao tocar em “Abrir no WhatsApp”, o app abre direto o WhatsApp do número em uso (nunca o errado)."
-        : "No iPhone o app não consegue escolher entre WhatsApp e WhatsApp Business: antes de enviar, confira o número no topo da conversa. Marque mesmo assim para lembrar qual app usar."
+        : /iPhone|iPad|iPod/i.test(navigator.userAgent || "")
+          ? "No iPhone o app não consegue escolher entre WhatsApp e WhatsApp Business: antes de enviar, confira o número no topo da conversa. Marque mesmo assim para lembrar qual app usar."
+          : "Neste computador o link abre o WhatsApp Web ou o app do computador, com o número que estiver conectado nele: confira antes de enviar. A escolha automática do app funciona no celular Android."
     )
   );
   nums.forEach(n => {
