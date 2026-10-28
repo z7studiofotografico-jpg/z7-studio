@@ -397,6 +397,38 @@ test("ID do aluno: quem cadastra aluno reserva o próximo número; o contador s�
 // As mesmas consultas que o app faz para quem é da equipe (se a regra recusar, a pessoa veria erro na tela)
 const ANO = new Date().getFullYear();
 const c = (db, n) => collection(db, n);
+test("formulário do site: sem login só cria lead novo do site, sem dono e com os campos certos", async () => {
+  const anon = env.unauthenticatedContext().firestore();
+  const lead = {
+    nome: "Érica Souza",
+    telefone: "(21) 98888-7777",
+    email: "erica@mail.com",
+    servico: "Formatura individual (externo)",
+    origem: "Site",
+    etapa: "NOVO LEAD",
+    followup: "2026-10-28",
+    notas: "Pelo site (Contato).",
+    resp: "",
+    respEmail: "",
+    nomeBusca: "ERICA SOUZA",
+    criadoEm: "2026-10-28T12:00:00.000Z",
+    atualizadoEm: "2026-10-28T12:00:00.000Z",
+    tentativas: 0,
+    valor: 0
+  };
+  await assertSucceeds(setDoc(doc(anon, "leads", "site1"), lead));
+  await assertFails(setDoc(doc(anon, "leads", "site2"), { ...lead, etapa: "FECHADO", valor: 500 }));
+  await assertFails(setDoc(doc(anon, "leads", "site3"), { ...lead, respEmail: ANA, resp: "Ana" }));
+  await assertFails(setDoc(doc(anon, "leads", "site4"), { ...lead, origem: "WhatsApp" }));
+  await assertFails(setDoc(doc(anon, "leads", "site5"), { ...lead, conferido: true }));
+  await assertFails(setDoc(doc(anon, "leads", "site6"), { ...lead, notas: "x".repeat(1600) }));
+  // sem login não lê, não muda e não apaga
+  await assertFails(getDoc(doc(anon, "leads", "site1")));
+  await assertFails(updateDoc(doc(anon, "leads", "site1"), { nome: "Outro" }));
+  await assertFails(deleteDoc(doc(anon, "leads", "site1")));
+  // a equipe do Funil vê o lead do site (livre) e pode assumir
+  await assertSucceeds(getDoc(doc(como(ANA), "leads", "site1")));
+});
 test("ID do ensaio: quem só tem o Funil dá o ID à venda fechada; depois a equipe não troca", async () => {
   const SO_FUNIL = "funil@equipe.com";
   await semRegra(async d => {

@@ -39,6 +39,18 @@ service cloud.firestore {
       return instId != '' && get(/databases/$(database)/documents/instituicoes/$(instId)).data.get('respEmail', '') == email();
     }
     function meuPedido() { return resource.data.get('pedidoEmail', email()) == email(); }
+    // Formulário do site (WordPress, sem login): só cria um lead novo, sem dono, com estes campos e tamanhos
+    function doSite() {
+      let d = request.resource.data;
+      return request.auth == null
+        && d.keys().hasOnly(['nome', 'telefone', 'email', 'servico', 'origem', 'etapa', 'followup', 'notas', 'resp', 'respEmail', 'nomeBusca', 'criadoEm', 'atualizadoEm', 'tentativas', 'valor'])
+        && d.origem == 'Site' && d.etapa == 'NOVO LEAD' && d.resp == '' && d.respEmail == '' && d.valor == 0 && d.tentativas == 0
+        && d.nome is string && d.nome.size() > 0 && d.nome.size() <= 120 && d.nomeBusca is string && d.nomeBusca.size() <= 120
+        && d.telefone is string && d.telefone.size() <= 30 && d.email is string && d.email.size() <= 120
+        && d.notas is string && d.notas.size() <= 1500 && d.servico is string && d.servico.size() <= 60
+        && d.followup is string && d.followup.size() <= 10 && d.criadoEm is string && d.criadoEm.size() <= 30
+        && d.atualizadoEm is string && d.atualizadoEm.size() <= 30;
+    }
 
     match /usuarios/{em} { allow read: if membro(); allow write: if admin(); }
     match /config/{id} { allow read: if membro(); allow write: if admin(); }
@@ -59,7 +71,8 @@ service cloud.firestore {
       // a equipe lê os leads livres (para assumir) e os seus; os dos outros, não
       allow read: if admin() || (pode('funil') && minhaOuLivre());
       // lead novo da equipe não nasce como venda fechada (senão entraria direto no total do Dashboard)
-      allow create: if admin() || (pode('funil') && request.resource.data.get('etapa', '') != 'FECHADO'
+      // (o formulário do site também cria: lead novo sem dono, origem "Site")
+      allow create: if doSite() || admin() || (pode('funil') && request.resource.data.get('etapa', '') != 'FECHADO'
         && request.resource.data.get('respEmail', '') in ['', email()]);
       // venda fechada pela equipe entra "a conferir": só o admin marca como conferida
       allow update: if admin() || (pode('funil') && minhaOuLivre() && respOk()

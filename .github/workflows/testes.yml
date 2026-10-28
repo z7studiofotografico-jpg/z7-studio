@@ -15,6 +15,8 @@ jobs:
           node-version: 20
       - name: Regras de negócio, cálculo e arquivos do app
         run: node --test tests/*.test.mjs
+      - name: Código do site (formulário do site → Funil)
+        run: php tests/site-funil.php
 
   estilo:
     runs-on: ubuntu-latest

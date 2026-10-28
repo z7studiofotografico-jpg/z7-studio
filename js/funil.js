@@ -98,7 +98,7 @@ export function fecharForm() {
 const STAGES = ["NOVO LEAD", "QUALIFICADO", "PROPOSTA ENVIADA", "FOLLOW-UP", "FECHADO", "PERDIDO"];
 const OPEN = ["NOVO LEAD", "QUALIFICADO", "PROPOSTA ENVIADA", "FOLLOW-UP"];
 const SERVS = ["Formatura individual (estúdio)", "Formatura individual (externo)", "Turma", "Corporativo", "Retrato", "Outro"];
-const ORIGS = ["Meta Ads", "Instagram", "WhatsApp", "Indicação", "Google", "Ex-cliente", "Instituição/Coordenação", "Outro"];
+const ORIGS = ["Meta Ads", "Instagram", "WhatsApp", "Site", "Indicação", "Google", "Ex-cliente", "Instituição/Coordenação", "Outro"];
 
 function status(l) {
   if (l.etapa === "FECHADO") return "won";
