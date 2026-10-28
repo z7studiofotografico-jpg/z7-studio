@@ -165,6 +165,7 @@ export function situacaoTxt(it, s) {
       (!ret && !it.enderecoConfirmado ? " · ⚠️ endereço não confirmado" : "")
     );
   }
+  if (it.historico) return `Já comprou${it.ano ? " em " + it.ano : ""} (histórico da planilha)`;
   if (it.etapa === "ENTREGUE") return "Entregue" + (it.entregueEm ? " em " + dia(it.entregueEm) : "");
   return it.etapa === "NA FILA" ? "Ainda na fila" : it.etapa === "INCOMPLETO" ? "Fora da fila até completar" : "Encerrado";
 }

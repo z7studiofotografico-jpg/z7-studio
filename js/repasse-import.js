@@ -153,7 +153,11 @@ export function openImport(ctx, ui, aoTerminar) {
         porStatus[k] = (porStatus[k] || 0) + 1;
       });
       out.append(
-        el("p", "hint", "Quais STATUS entram no Repasse? Deixe marcado só quem NÃO comprou (CAÍDO). Quem está como VENDIDO já tem o kit.")
+        el(
+          "p",
+          "hint",
+          "Quais STATUS entram na fila do Repasse? Deixe marcado só quem NÃO comprou. Os desmarcados que já compraram (VENDIDO) entram só como histórico, para o Dashboard (fora de qualquer fila)."
+        )
       );
       const box = el("div", "quick");
       const temCaido = Object.keys(porStatus).some(k => /CA[IÍ]D/i.test(norm(k)));
@@ -194,7 +198,9 @@ export function openImport(ctx, ui, aoTerminar) {
       ev.preventDefault();
       if (!rows.length) return;
       const okStatus = new Set([...out.querySelectorAll("input[type=checkbox]")].filter(c => c.checked).map(c => c.value));
-      const sel = rows.filter(r => okStatus.has(r.statusOrig || "(vazio)"));
+      // desmarcados que já compraram (VENDIDO…): entram como histórico (comprou naquele ano), fora das filas
+      const comprou = r => /VENDID/.test(norm(r.statusOrig));
+      const sel = rows.filter(r => okStatus.has(r.statusOrig || "(vazio)") || comprou(r));
       ok.disabled = true;
       inp.disabled = true;
       const prog = el("p", "hint", "Preparando…");
@@ -213,7 +219,8 @@ export function openImport(ctx, ui, aoTerminar) {
         const exist = await jaExistem(FS, col, idDe);
         const agora = new Date().toISOString();
         let novos = 0,
-          atual = 0;
+          atual = 0,
+          historico = 0;
         const escolas = Object.assign({}, meta.escolas || {}),
           anos = Object.assign({}, meta.anos || {});
         const ops = sel.map((d, i) => {
@@ -225,6 +232,25 @@ export function openImport(ctx, ui, aoTerminar) {
           novos++;
           if (d.escola) escolas[d.escola] = (escolas[d.escola] || 0) + 1;
           if (d.ano) anos[d.ano] = (anos[d.ano] || 0) + 1;
+          if (!okStatus.has(d.statusOrig || "(vazio)") && comprou(d)) {
+            historico++;
+            // histórico: comprou na época (sem data de pagamento no app, para não entrar nas vendas dos meses)
+            return [
+              id,
+              Object.assign({}, d, {
+                etapa: "ENTREGUE",
+                historico: true,
+                followup: null,
+                conferido: true,
+                valor: 0,
+                resp: "",
+                respEmail: "",
+                importadoEm: agora,
+                atualizadoEm: agora
+              }),
+              false
+            ];
+          }
           return [
             id,
             Object.assign({}, d, {
@@ -253,7 +279,7 @@ export function openImport(ctx, ui, aoTerminar) {
         }
         await FS.setDoc(FS.doc(db, "config", "repasse_meta"), { escolas, anos, importadoEm: agora }, { merge: true });
         const nInc = ops.filter(([, d, m]) => !m && d.etapa === "INCOMPLETO").length;
-        prog.textContent = `Pronto! ${novos - nInc} novos na fila${nInc ? `, ${nInc} na aba Incompletos` : ""}${atual ? ` e ${atual} atualizados` : ""}.`;
+        prog.textContent = `Pronto! ${novos - nInc - historico} novos na fila${nInc ? `, ${nInc} na aba Incompletos` : ""}${historico ? `, ${historico} que já compraram (só histórico, para o Dashboard)` : ""}${atual ? ` e ${atual} atualizados` : ""}.`;
         U.toast("Planilha importada ✅");
         aoTerminar();
         const fechar = U.mkBtn("Fechar", "btn-primary", close);

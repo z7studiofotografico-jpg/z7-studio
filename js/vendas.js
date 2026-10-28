@@ -8,6 +8,7 @@ import { brl, reais, taxa } from "./regras.js";
 import { el, title, carregarLib } from "./ui.js";
 import * as U from "./util.js";
 import { botaoRelatorio, copiaDaTela } from "./relatorio.js";
+import { prPorAno } from "./vendas-anos.js";
 let C,
   FS,
   db,
@@ -562,6 +563,8 @@ function areaPR(corpo, p, nomeP) {
         vend.has(k) ? moeda(comissaoLinhas(p.pessoas[k] || {}, ["pr"])) : "—"
       ])
   );
+  // histórico: conversão por ano das fotos (o que aconteceu em cada ano)
+  prPorAno(corpo, C, caixa, tabela);
 }
 
 function areaForm(corpo, p, nomeP) {

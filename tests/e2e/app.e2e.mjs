@@ -864,6 +864,14 @@ await cenario("Adriano (admin), com os dados já atualizados no servidor", async
       /Vendido no PR/.test(vt) && /Linha de Frente × Repasse/.test(vt) && /Equipe no PR/.test(vt) && /1 venda do PR a conferir/.test(vt),
       "Dashboard · PR separado (vendas, separados, conversão, equipe) e aviso de venda a conferir"
     );
+    await pg
+      .waitForFunction(() => !/Contando…/.test(document.querySelector("#vdCorpo").textContent), null, { timeout: 5000 })
+      .catch(() => {});
+    vt = await pg.textContent("#vdCorpo");
+    ok(
+      /PR por ano das fotos/.test(vt) && /Fotografados/.test(vt) && !/Não foi possível contar/.test(vt),
+      "Dashboard · PR por ano das fotos (fotografados × compraram)"
+    );
     await pg.locator(".vdareas").getByText("🎓 Formaturas").click();
     await calmo(pg);
     vt = await pg.textContent("#vdCorpo");
@@ -1037,8 +1045,18 @@ await cenario("Adriano (admin), com os dados já atualizados no servidor", async
         gabriel &&
         gabriel.ano === 2021 &&
         gabriel.codigo === "21EMAF-02" &&
-        !Object.values(s).some(x => x.nome === "CAMILLI VENDIDA" || x.nome === "NAO ENTRA NO PR"),
-      "2021 importado: ano, ID com a sigla, mãe 'do cadastro', e quem comprou ficou de fora"
+        !Object.values(s).some(x => x.nome === "NAO ENTRA NO PR"),
+      "2021 importado: ano, ID com a sigla, mãe 'do cadastro', e planilha de FORMATURA fora"
+    );
+    const camilli = Object.values(s).find(x => x.nome === "CAMILLI VENDIDA");
+    ok(
+      camilli &&
+        camilli.historico === true &&
+        camilli.etapa === "ENTREGUE" &&
+        !camilli.pagoEm &&
+        !camilli.followup &&
+        /1 que já compraram/.test(await pg.textContent("body")),
+      "quem já comprou entra só como histórico (fora das filas e das vendas do mês)"
     );
     await pg.locator(".sheet:visible").getByRole("button", { name: "Fechar" }).click();
     await calmo(pg);
