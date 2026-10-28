@@ -9,6 +9,7 @@ import { el, title, carregarLib } from "./ui.js";
 import * as U from "./util.js";
 import { botaoRelatorio, copiaDaTela } from "./relatorio.js";
 import { prPorAno } from "./vendas-anos.js";
+import { areaHistorico } from "./vendas-historico.js";
 let C,
   FS,
   db,
@@ -20,7 +21,8 @@ const AREAS = [
   ["geral", "Geral"],
   ["pr", "🖼️ PR"],
   ["form", "🎓 Formaturas"],
-  ["funil", "💬 Funil"]
+  ["funil", "💬 Funil"],
+  ["hist", "📈 Histórico"]
 ];
 const $ = id => document.getElementById(id);
 const MESES_C = ["jan", "fev", "mar", "abr", "mai", "jun", "jul", "ago", "set", "out", "nov", "dez"];
@@ -183,7 +185,16 @@ const nomeDe = k => {
 function desenhar() {
   hide();
   const corpo = $("vdCorpo");
-  if (!corpo || !resumo) return;
+  if (!corpo) return;
+  // o período (este mês, 12 meses…) não vale para o histórico por ano
+  const chipsP = document.querySelector("#viewVendas > .chips");
+  if (chipsP) chipsP.hidden = area === "hist";
+  // Histórico por ano: não depende do resumo dos meses
+  if (area === "hist") {
+    corpo.innerHTML = "";
+    return areaHistorico(corpo, { C, caixa, canvas, tabela, lista, registrar: ch => charts.push(ch), limpar: hide });
+  }
+  if (!resumo) return;
   corpo.innerHTML = "";
   const nomeP = PERIODOS.find(p => p[0] === periodo)[1];
   const p = somaPeriodo(resumo, mesesDoPeriodo());

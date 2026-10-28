@@ -164,7 +164,7 @@ export function importarFormandos(ctx, inst, lista) {
       prev.textContent = "Lendo…";
       try {
         const XLSX = await carregarLib("xlsx");
-        const wb = XLSX.read(await file.files[0].arrayBuffer(), { cellDates: true });
+        const wb = XLSX.read(await file.files[0].arrayBuffer(), { cellDates: true, codepage: 65001 });
         const rows = XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]], { defval: "" });
         const ja = new Set(lista.map(f => norm(f.nome)));
         const kits = kitsDe(C.P, inst);

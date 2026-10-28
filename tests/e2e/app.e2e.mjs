@@ -889,6 +889,46 @@ await cenario("Adriano (admin), com os dados já atualizados no servidor", async
       /PR por ano das fotos/.test(vt) && /Fotografados/.test(vt) && !/Não foi possível contar/.test(vt),
       "Dashboard · PR por ano das fotos (fotografados × compraram)"
     );
+    // Histórico por ano: importa a planilha PERCENTUAL e mostra tabelas e gráficos
+    await pg.locator(".vdareas").getByText("📈 Histórico").click();
+    await calmo(pg);
+    if (process.env.DEBUG) console.log("HIST:", (await pg.textContent("#vdCorpo")).slice(0, 300));
+    await pg.getByRole("button", { name: "📥 Importar planilhas PERCENTUAL" }).click();
+    await calmo(pg);
+    const cabP = "CÓDIGO;INSTITUIÇÃO;ALUNOS;VENDAS;% VENDA;DEVOLUÇÃO;% DEVOLUÇÃO;TICKET;DINHEIRO;CARTÃO;BOLETO;VALOR ALUNO;TOTAL VENDAS\n";
+    await pg.locator(".sheet:visible input[type=file]").setInputFiles([
+      {
+        name: "2021 - PERCENTUAL PR.csv",
+        mimeType: "text/csv",
+        buffer: Buffer.from(
+          cabP +
+            "1;CIEP 384 - GONÇALVES DIAS;24;14;0,58;0;0;327;799;2501;1280;190;4580\n2;COLEGIO ESTADUAL JOAO PAULO II (FORMATURA);58;15;0,26;;0;1020;1270;5300;8735;263;15305\n;TOTAL;82;29\n"
+        )
+      },
+      {
+        name: "2022 - PERCENTUAL PR.csv",
+        mimeType: "text/csv",
+        buffer: Buffer.from(cabP + "1;CIEP 384 - GONÇALVES DIAS - R. LAGOS;46;19;0,41;0;#REF!;403;1167;4147;2345;166;7659\n")
+      }
+    ]);
+    await pg.waitForFunction(() => /2022: 1 colégios/.test(document.body.textContent), null, { timeout: 8000 }).catch(() => {});
+    if (process.env.DEBUG) console.log("IMP:", await pg.locator(".sheet:visible").last().textContent());
+    await pg.locator(".sheet:visible button[type=submit]").click();
+    await pg
+      .waitForFunction(() => /Ano a ano/.test(document.getElementById("vdCorpo").textContent), null, { timeout: 8000 })
+      .catch(() => {});
+    s = await store();
+    vt = await pg.textContent("#vdCorpo");
+    ok(
+      s["resumos/historico"] &&
+        s["resumos/historico"].anos["2021"].colegios.length === 2 &&
+        s["resumos/historico"].anos["2022"].colegios[0].total === 765900 &&
+        /Ano a ano/.test(vt) &&
+        /O mesmo colégio em vários anos/.test(vt) &&
+        /CIEP 384/.test(vt) &&
+        (await pg.locator("#vdCorpo canvas").count()) >= 4,
+      "Dashboard · Histórico: importa as planilhas PERCENTUAL, guarda por ano e mostra tabelas e gráficos"
+    );
     await pg.locator(".vdareas").getByText("🎓 Formaturas").click();
     await calmo(pg);
     vt = await pg.textContent("#vdCorpo");

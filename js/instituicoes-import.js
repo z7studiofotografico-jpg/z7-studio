@@ -152,7 +152,7 @@ export function openImport(ctx, tipos, nomeTipo, items) {
       if (!file) return;
       try {
         X = await loadXLSX();
-        wb = X.read(await file.arrayBuffer(), { type: "array", cellDates: true });
+        wb = X.read(await file.arrayBuffer(), { type: "array", cellDates: true, codepage: 65001 });
         aba.innerHTML = "";
         wb.SheetNames.forEach(n => {
           const o = el("option", null, n);

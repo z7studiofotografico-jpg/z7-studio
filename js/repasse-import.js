@@ -85,7 +85,7 @@ export function openImport(ctx, ui, aoTerminar) {
             foraDoPR.push(f.name.replace(/\.(xlsx|xls|csv)$/i, ""));
             continue;
           }
-          const wb = X.read(await f.arrayBuffer(), { type: "array", cellDates: true });
+          const wb = X.read(await f.arrayBuffer(), { type: "array", cellDates: true, codepage: 65001 });
           const sh = wb.Sheets[wb.SheetNames[0]];
           const m = X.utils.sheet_to_json(sh, { header: 1, defval: "", raw: true });
           const hi = m.findIndex(r => r.some(c => hkey(c) === "FORMANDO"));
