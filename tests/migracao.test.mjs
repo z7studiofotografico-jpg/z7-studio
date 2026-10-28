@@ -243,7 +243,8 @@ test("v11: aluno do PR importado sem telefone sai dos Incompletos e só conta no
         { id: "b", etapa: "INCOMPLETO", importadoEm: "x", respEmail: "", contatos: [{ tel: "21999990000" }] },
         { id: "c", etapa: "INCOMPLETO", respEmail: "eq@z7.com", contatos: [] },
         { id: "d", etapa: "ENTREGUE", historico: true, importadoEm: "x", contatos: [] },
-        { id: "e", etapa: "SEM TELEFONE", semTelefone: true, contatos: [] }
+        { id: "e", etapa: "SEM TELEFONE", semTelefone: true, contatos: [] },
+        { id: "f", etapa: "INCOMPLETO", contatos: [] }
       ]
     },
     () => ""
@@ -251,6 +252,7 @@ test("v11: aluno do PR importado sem telefone sai dos Incompletos e só conta no
   const rep = Object.fromEntries(ops.filter(o => o.col === "repasse").map(o => [o.id, o.dados]));
   assert.deepEqual(rep.a, { etapa: "SEM TELEFONE", semTelefone: true, followup: null });
   assert.deepEqual(rep.d, { semTelefone: true });
+  assert.deepEqual(rep.f, { etapa: "SEM TELEFONE", semTelefone: true, followup: null });
   assert.equal(rep.b, undefined);
   assert.equal(rep.c, undefined);
   assert.equal(rep.e, undefined);

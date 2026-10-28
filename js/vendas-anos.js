@@ -4,6 +4,7 @@
 // Quem veio da planilha sem nenhum telefone (etapa "SEM TELEFONE") fica FORA das contas:
 // aparece só na coluna "Sem telefone" e no quadro por colégio, para a equipe ficar atenta a pegar o número.
 import { el } from "./ui.js";
+import { chaveColegio } from "./historico-dados.js";
 
 const pct = (a, b) => (b ? Math.round((a / b) * 100) + "%" : "—");
 export function prPorAno(corpo, C, caixa, tabela) {
@@ -82,12 +83,14 @@ async function semTelefonePorColegio(corpo, C, caixa, tabela) {
   s.forEach(d => {
     const x = d.data();
     const esc = String(x.escola || "(sem colégio)").trim();
+    const k = chaveColegio(esc) || esc; // "C.M CYRO MONTEIRO" e "CYRO MONTEIRO" são o mesmo colégio
     const a = Number(x.ano) || 0;
     anos.add(a);
-    const r = m.get(esc) || { esc, total: 0, anos: {} };
+    const r = m.get(k) || { esc, ano: a, total: 0, anos: {} };
+    if (a >= r.ano) Object.assign(r, { esc, ano: a }); // o nome mais recente
     r.total++;
     r.anos[a] = (r.anos[a] || 0) + 1;
-    m.set(esc, r);
+    m.set(k, r);
   });
   const ord = [...anos].sort((a, b) => b - a);
   const box = caixa(corpo, "Sem telefone por colégio", "Alunos que vieram da planilha sem nenhum número, por ano das fotos");

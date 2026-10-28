@@ -145,6 +145,16 @@ export function openImport(ctx, ui, aoTerminar) {
           `${rows.length} formandos encontrados: ${rows.length - incompletos.length} completos e ${incompletos.length} incompletos.`
         )
       );
+      // cada aluno grava o documento + até 4 telefones no índice; o plano gratuito do Firebase grava até 20 mil por dia
+      const gravacoes = rows.reduce((t, r) => t + 1 + Math.min(4, (r.telefones || []).length), 0);
+      if (gravacoes > 6000)
+        out.append(
+          el(
+            "p",
+            "wait",
+            `⚠️ Esta importação usa cerca de ${gravacoes.toLocaleString("pt-BR")} gravações. O Firebase grátis permite 20 mil por dia (para o app todo): importe no máximo 2 ou 3 anos por dia, senão o app para de salvar até as 4h da manhã.`
+          )
+        );
       if (incompletos.length) {
         const cont = {};
         incompletos.forEach(r =>

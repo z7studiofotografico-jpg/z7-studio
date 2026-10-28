@@ -119,8 +119,8 @@ export function planejar(cols, emailDe) {
   // v11: sem telefone (combinado com o Adriano em 28/10/2026)
   for (const x of cols.repasse || []) {
     if ((x.contatos || []).length || (x.telefones || []).length || x.semTelefone) continue;
-    const importado = !!x.importadoEm && !x.respEmail;
-    if (x.etapa === "INCOMPLETO" && importado)
+    // (só quem não está com ninguém da equipe: o aluno incluído à mão por alguém continua com essa pessoa)
+    if (x.etapa === "INCOMPLETO" && !x.respEmail)
       muda("PR sem telefone (só Dashboard)", "repasse", x.id, { etapa: "SEM TELEFONE", semTelefone: true, followup: null });
     else if (x.historico) muda("PR sem telefone (só Dashboard)", "repasse", x.id, { semTelefone: true });
   }
