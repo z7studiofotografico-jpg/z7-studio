@@ -242,6 +242,7 @@ export function openImport(ctx, tipos, nomeTipo, items) {
               visitas,
               tentativas: (s(r.obs).match(/TENTEI LIGAR/gi) || []).length,
               resp: "",
+              respEmail: "", // livre: a equipe vê e pode assumir (sem o campo, a carteira da equipe não acha)
               importadoEm: agora
             }),
             false
