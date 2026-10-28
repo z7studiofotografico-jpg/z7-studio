@@ -1048,6 +1048,14 @@ await cenario("Adriano (admin), com os dados já atualizados no servidor", async
         !Object.values(s).some(x => x.nome === "NAO ENTRA NO PR"),
       "2021 importado: ano, ID com a sigla, mãe 'do cadastro', e planilha de FORMATURA fora"
     );
+    const tamaraHist = await pg.evaluate(async () => {
+      const m = await import("./js/repasse-dados.js");
+      return m.historicoPlanilha([...window.__store.values()].find(x => x.nome === "TAMARA CORREA") || {});
+    });
+    ok(
+      /FotoZoom: 4821/.test(tamaraHist) && !/Status: -/.test(tamaraHist),
+      "cartão mostra o histórico da planilha (status, motivo, FotoZoom): " + tamaraHist
+    );
     const camilli = Object.values(s).find(x => x.nome === "CAMILLI VENDIDA");
     ok(
       camilli &&

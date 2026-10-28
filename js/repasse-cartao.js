@@ -2,7 +2,7 @@
 import { openMockup, textoEscolha } from "./mockup.js";
 import { el, title } from "./ui.js";
 import * as U from "./util.js";
-import { faltando, situacaoTxt, enderecoTxt } from "./repasse-dados.js";
+import { faltando, situacaoTxt, enderecoTxt, historicoPlanilha } from "./repasse-dados.js";
 import { avisoTel } from "./aluno-id.js";
 import { fmtTel } from "./numeros.js";
 import { whatsAtivo } from "./numeros-tela.js";
@@ -87,8 +87,10 @@ export function card(it) {
   e.append(fu);
   const end = enderecoTxt(it);
   if (end) e.append(el("p", "notes", "📍 " + end));
-  const nt = [it.notas, it.obs && it.obs !== "-" ? "Planilha: " + it.obs : ""].filter(Boolean).join("\n");
-  if (nt) e.append(el("p", "notes", nt));
+  if (it.notas) e.append(el("p", "notes", it.notas));
+  // o que veio da planilha (status, motivo/observação, vendedor, pagamento…): para saber o que aconteceu antes de conversar
+  const hp = historicoPlanilha(it);
+  if (hp) e.append(el("p", "notes", "📋 Histórico da planilha: " + hp));
   if (it.ultimo && it.ultimo.em)
     e.append(
       el(

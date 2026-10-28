@@ -39,6 +39,8 @@ export const MAPA = {
   TELEFONE3: "c3",
   TEL3: "c3",
   FOTOZOOM: "fotozoom",
+  MOTIVO: "motivo",
+  MOTIVOS: "motivo",
   CEL2MAE: "c2",
   CELULAR2MAE: "c2",
   CEL3PAI: "c3",
@@ -106,7 +108,14 @@ export function linhaParaDoc(r, X, anoFixo) {
   const cod = s(r.codigo);
   const codigo =
     /^\d{1,4}$/.test(cod) && siglaDe(s(r.escola)) ? fmtCodigo(ano, siglaDe(s(r.escola)), Number(cod)) : cod ? comAno(cod, ano) : "";
-  const obs = [s(r.obs), s(r.fotozoom) ? "FotoZoom: " + s(r.fotozoom) : ""].filter(Boolean).join(" · ");
+  const vazio = v => !s(v) || /^[-–.]+$/.test(s(v));
+  const obs = [
+    vazio(r.obs) ? "" : s(r.obs),
+    vazio(r.motivo) ? "" : "Motivo: " + s(r.motivo),
+    s(r.fotozoom) ? "FotoZoom: " + s(r.fotozoom) : ""
+  ]
+    .filter(Boolean)
+    .join(" · ");
   return {
     nome: s(r.nome),
     nomeBusca: norm(r.nome),
@@ -141,6 +150,20 @@ export function docId(d, i) {
   ].join("_");
 }
 
+// O que veio da planilha, numa linha, para quem vai conversar saber o que aconteceu (ex.: CAÍDO e o motivo)
+export function historicoPlanilha(it) {
+  const s = v => String(v == null ? "" : v).trim();
+  const ok = v => s(v) && !/^[-–.]+$/.test(s(v));
+  return [
+    ok(it.statusOrig) ? "Status: " + s(it.statusOrig) : "",
+    ok(it.obs) ? s(it.obs) : "",
+    ok(it.vendedor) ? "Vendedor: " + s(it.vendedor) : "",
+    ok(it.pagamentoOrig) ? "Pagamento: " + s(it.pagamentoOrig) : "",
+    ok(it.fotosOrig) ? "Fotos: " + s(it.fotosOrig) : ""
+  ]
+    .filter(Boolean)
+    .join(" · ");
+}
 // Texto da situação no cartão do PR (s = status do contato: "late", "today", "later" ou "none")
 export function situacaoTxt(it, s) {
   const ABERTAS = ["SEPARADO", "CONTATADO", "INTERESSADO"];

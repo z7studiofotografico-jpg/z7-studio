@@ -105,3 +105,24 @@ test("planilha antiga (2021): TELEFONE 1 aluno, 2 mãe, 3 pai; sem nome vira 'Re
   // sem ano escolhido, continua usando a DATA (planilhas do ano atual)
   assert.equal(linhaParaDoc(linha(["", "X", "", "", "", "1", "ANA", "10/3/2022", "21966472002"]), X).ano, 2022);
 });
+
+test("histórico da planilha no cartão: status (CAÍDO), observação/motivo, vendedor e pagamento; ignora '-'", async () => {
+  const { historicoPlanilha, linhaParaDoc } = await import("../js/repasse-dados.js");
+  const d = linhaParaDoc(
+    {
+      nome: "Ana",
+      escola: "X",
+      statusOrig: "",
+      status: "CAIDO",
+      vendedor: "ROBERTO",
+      obs: "mãe desempregada",
+      motivo: "sem dinheiro",
+      pagamento: "-",
+      c1: "21988887777"
+    },
+    null,
+    2021
+  );
+  assert.equal(historicoPlanilha(d), "Status: CAIDO · mãe desempregada · Motivo: sem dinheiro · Vendedor: ROBERTO");
+  assert.equal(historicoPlanilha({ statusOrig: "-", obs: "" }), "");
+});
