@@ -59,8 +59,7 @@ export async function reservarVarios(it, pares) {
   }
   const datas = pares.map(([, f]) => f.data);
   if (new Set(datas).size !== datas.length) throw erroAgenda("mesmodia");
-  // Feriado: o estúdio não trabalha
-  for (const d of datas) if (feriado(d)) throw erroAgenda("feriado", { ocupado: { data: d }, nomeFeriado: feriado(d) });
+  // Feriado não bloqueia (o formulário só avisa): dá para marcar colégio em feriado
   // Dia bloqueado por compromisso de dia inteiro (consulta médica, viagem…)
   // (se não der para conferir, o erro sobe e nada é reservado: a agenda nunca é liberada "no escuro")
   for (const d of datas) {
@@ -129,8 +128,6 @@ export async function liberar(it, kind) {
 }
 export function msgErroData(e) {
   if (e.code === "ocupado") return msgOcupado(e);
-  if (e.code === "feriado")
-    return `O dia ${U.fmtDate(e.ocupado.data)} é feriado (${e.nomeFeriado}) e o estúdio não trabalha. Escolha outra data.`;
   if (e.code === "bloqueado") {
     const x = e.bloqueio || {};
     return `O dia ${U.fmtDate(e.ocupado.data)} está bloqueado: ${x.particular ? "compromisso particular" : x.titulo || "compromisso"}${x.deQuem ? " (" + x.deQuem + ")" : ""}. Escolha outra data.`;
@@ -156,6 +153,15 @@ export function camposEvento(kind, f, instNome, dia) {
   hora.value = (f && f.hora) || "";
   const r1 = el("div", "row2");
   r1.append(field(kind === "formatura" ? "Dia da formatura" : "Dia das fotos", data), field("Horário", hora));
+  // feriado só avisa (pode marcar)
+  const avFer = el("p", "wait");
+  const verFer = () => {
+    const nf = data.value && feriado(data.value);
+    avFer.textContent = nf ? `🚫 ${U.fmtDate(data.value)} é feriado (${nf}). Pode marcar mesmo assim.` : "";
+    avFer.hidden = !nf;
+  };
+  data.addEventListener("input", verFer);
+  verFer();
   box.append(
     el("h3", null, K.ico + " " + (instNome ? nomeEvento(kind, instNome) : K.nome)),
     el(
@@ -164,7 +170,8 @@ export function camposEvento(kind, f, instNome, dia) {
       (C.aprovador ? "Você confirma direto." : "A data fica segurada e vai para a Luciana aprovar.") +
         " Cada dia só pode ter um compromisso."
     ),
-    r1
+    r1,
+    avFer
   );
   let onde = null,
     local = null,

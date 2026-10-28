@@ -43,7 +43,7 @@ const ADRIANO = "z7studiofotografico@gmail.com",
 const hoje = new Date(),
   iso = d => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
 import { feriado } from "../../js/feriados.js";
-// dia n a partir de hoje, pulando feriado (o app bloqueia feriado e o teste ficaria instável)
+// dia n a partir de hoje, pulando feriado (o app avisa em feriado e o teste ficaria instável)
 const dia = n => {
   const d = new Date(hoje);
   d.setDate(d.getDate() + n);
@@ -2071,6 +2071,50 @@ await cenario("Agenda: agendar colégio no dia tocado", async () => {
         `${quem}: o formulário do colégio já vem com o dia tocado (${tit.trim()} → ${v})`
       );
     }
+    ok(erros.length === 0, "sem erros no console" + (erros.length ? ": " + erros.slice(0, 3).join(" | ") : ""));
+  }
+  {
+    // feriado só avisa: dá para marcar ensaio e colégio
+    const fer = (() => {
+      const d = new Date();
+      for (let i = 1; i < 400; i++) {
+        d.setDate(d.getDate() + 1);
+        const x = iso(d);
+        if (feriado(x)) return x;
+      }
+      return "";
+    })();
+    const { pg, store, erros } = await abrir(ADRIANO, migrar(base));
+    await ir(pg, "#agenda");
+    await pg.getByRole("button", { name: "+ Marcar ensaio" }).click();
+    await calmo(pg);
+    let sh = pg.locator(".sheet").last();
+    await sh.getByLabel("Cliente").fill("Cliente Do Feriado");
+    await sh.getByLabel("Tipo de ensaio").selectOption("Retrato");
+    await sh.getByLabel("Dia").fill(fer);
+    await sh.getByLabel("Dia").dispatchEvent("change");
+    await sh.getByLabel("Horário").fill("10:00");
+    ok(/Feriado/.test(await sh.textContent()), "ensaio em feriado: mostra o aviso de feriado");
+    await sh.locator("button[type=submit]").click();
+    await calmo(pg);
+    const e = Object.values(await store()).find(x => x.cliente === "Cliente Do Feriado");
+    ok(e && e.data === fer, "ensaio em feriado (" + fer + ") é marcado");
+    await pg.getByRole("button", { name: "+ Agendar colégio" }).click();
+    await calmo(pg);
+    sh = pg.locator(".sheet").last();
+    await sh.getByLabel("Colégio").fill("Colegio Beta");
+    await sh.locator("button[type=submit]").click();
+    await calmo(pg);
+    sh = pg.locator(".sheet").last();
+    await sh.locator("input[type=date]").first().fill(fer);
+    await sh.locator("input[type=date]").first().dispatchEvent("input");
+    ok(/é feriado/.test(await sh.textContent()), "colégio em feriado: mostra o aviso");
+    await sh.getByLabel("Média de alunos (obrigatório)").fill("80");
+    await sh.getByLabel("Nome", { exact: true }).fill("Marta Diretora");
+    await sh.getByLabel("WhatsApp", { exact: true }).fill("21 98888-1111");
+    await sh.locator("button[type=submit]").click();
+    await calmo(pg);
+    ok(!!(await store())["agenda/" + fer], "colégio em feriado (" + fer + ") é agendado");
     ok(erros.length === 0, "sem erros no console" + (erros.length ? ": " + erros.slice(0, 3).join(" | ") : ""));
   }
 });

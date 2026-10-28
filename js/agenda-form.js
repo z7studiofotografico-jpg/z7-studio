@@ -138,11 +138,10 @@ export function openEnsaio(x, pre) {
         return;
       }
       const r = resumoDia(data.value, x && x.id);
-      diaBox.textContent = feriado(data.value)
-        ? `🚫 Feriado: ${feriado(data.value)}. O estúdio não trabalha.`
-        : r.length
-          ? "Nesse dia já tem:\n" + r.join("\n")
-          : "Dia livre ✅";
+      // feriado só avisa: pode marcar mesmo assim
+      diaBox.textContent =
+        (feriado(data.value) ? `🚫 Feriado: ${feriado(data.value)} (normalmente o estúdio fecha, mas pode marcar).\n` : "") +
+        (r.length ? "Nesse dia já tem:\n" + r.join("\n") : "Dia livre ✅");
       diaBox.hidden = false;
     };
     data.addEventListener("change", () => {
@@ -214,11 +213,6 @@ export function openEnsaio(x, pre) {
     p.addEventListener("submit", async ev => {
       ev.preventDefault();
       if (!nome.value.trim() || !tipo.value || !data.value || !hora.value) return;
-      if (feriado(data.value)) {
-        err.textContent = `${U.fmtDate(data.value)} é feriado (${feriado(data.value)}) e o estúdio não trabalha. Escolha outro dia.`;
-        err.hidden = false;
-        return;
-      }
       const { doDia, encavala, colegio, compBate } = conflitos(data.value, hora.value, dur.value, x && x.id);
       if (compBate.length && !p._okc) {
         p._okc = true;

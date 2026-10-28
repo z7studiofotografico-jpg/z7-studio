@@ -505,7 +505,8 @@ function renderMes(box, ent) {
     const lst = porDia[selDia] || [];
     if (!lst.length) card.append(el("p", "hint", selDia < hoje ? "Dia que já passou." : "Dia livre ✅"));
     lst.forEach(it => card.append(linha(it)));
-    if (selDia >= hoje && !feriado(selDia) && (marco() || C.pode("colegios"))) {
+    // feriado só avisa (aparece no dia), não bloqueia: dá para marcar qualquer coisa
+    if (selDia >= hoje && (marco() || C.pode("colegios"))) {
       const a = el("div", "actions");
       const dia = selDia;
       // colégio (dia de fotos ou formatura): quem tem Instituições; ensaio e compromisso: só o Adriano e a Luciana
