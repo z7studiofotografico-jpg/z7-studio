@@ -1,6 +1,7 @@
 // App Z7 Studio: login, perfil (quem é e o que pode ver), rotas entre as telas e o botão voltar.
 // Partes: inicio.js (números dos cartões), ajustes.js, notificacoes.js, vercomo.js.
 // (Saiu de dentro do index.html para ter lint e ficar fácil de achar.)
+import "./endereco.js"; // endereço antigo (github.io) → app.z7studio.com.br
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
 import {
   getAuth,
