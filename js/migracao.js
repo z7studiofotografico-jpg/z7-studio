@@ -4,7 +4,14 @@ import { pagamentosDe, proxVenc } from "./regras.js";
 import { norm } from "./ui.js";
 import { entradasFones } from "./pedidos.js";
 import { codigoBusca, comAno } from "./aluno-id.js";
-export const VERSAO_DADOS = 9;
+import { normTel, fmtTel, EMPRESA_PADRAO } from "./numeros.js";
+import { tipoIdEnsaio, precisaCodigo, anoDoFechamento, fmtCodigoEnsaio, maiorEnsaio } from "./ensaio-id.js";
+export const VERSAO_DADOS = 10;
+// v10: WhatsApp da empresa corrigido (combinado com o Adriano em 27/10/2026)
+// - (21) 97105-9512 é de um representante (vai no cadastro dele em Equipe): sai da Linha de Frente da empresa
+// - o Repasse é (21) 3743-0000 (estava (21) 3774-0000)
+const NUMERO_DE_REPRESENTANTE = "21971059512";
+const CORRIGE_NUMERO = { 2137740000: "2137430000" };
 
 // cols = { instituicoes, formandos, repasse, agenda, ensaios, leads }: listas de { id, ...dados }
 // emailDe(nome) → e-mail da pessoa com esse nome ("" se não achar)
@@ -108,6 +115,38 @@ export function planejar(cols, emailDe) {
     if (x.respEmail == null) patch.respEmail = emailDe(x.resp);
     if (Object.keys(patch).length) muda("funil", "leads", x.id, patch);
   }
+  // v10: WhatsApp da empresa (config/app)
+  const cfg = (cols.config || []).find(x => x.id === "app");
+  if (cfg) {
+    const patch = {};
+    for (const k of ["funilNumero", "lfNumero", "repNumero", "cobrancaNumero"]) {
+      const d = normTel(cfg[k]);
+      if (d === NUMERO_DE_REPRESENTANTE) patch[k] = "";
+      else if (CORRIGE_NUMERO[d]) patch[k] = fmtTel(CORRIGE_NUMERO[d]);
+      else if (!d && EMPRESA_PADRAO[k]) patch[k] = fmtTel(EMPRESA_PADRAO[k]);
+    }
+    if (Object.keys(patch).length) muda("WhatsApp da empresa", "config", "app", patch);
+  }
+  // v10: ID das vendas de ensaio já fechadas (26EST-00001), na ordem do fechamento, seguindo os contadores
+  const contadores = {};
+  (cols.ids || []).forEach(x => (contadores[x.id] = Number(x.ultimo) || 0));
+  const comId = cols.leads || [];
+  const semId = comId
+    .filter(precisaCodigo)
+    .sort(
+      (a, b) => String(a.fechadoEm || a.criadoEm || "").localeCompare(String(b.fechadoEm || b.criadoEm || "")) || (a.id < b.id ? -1 : 1)
+    );
+  const usados = new Set();
+  for (const x of semId) {
+    const ano = anoDoFechamento(x),
+      tipo = tipoIdEnsaio(x.servico),
+      k = `ensaio_${String(ano).slice(-2)}${tipo}`;
+    const n = Math.max(contadores[k] || 0, maiorEnsaio(ano, tipo, comId)) + 1;
+    contadores[k] = n;
+    usados.add(k);
+    muda("ID dos ensaios", "leads", x.id, { codigoEnsaio: fmtCodigoEnsaio(ano, tipo, n) });
+  }
+  usados.forEach(k => ops.push({ col: "ids", id: k, tipo: "s", dados: { ultimo: contadores[k] } }));
   return { ops, conta };
 }
 export { norm as normBusca };

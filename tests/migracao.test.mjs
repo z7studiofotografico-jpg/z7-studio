@@ -180,3 +180,57 @@ test("responsável antigo: acha pelo nome completo, pelo e-mail ou pelo primeiro
     [["r1", "pedro@x.com"]]
   );
 });
+
+test("v10: WhatsApp da empresa corrigido e ID das vendas de ensaio já fechadas", () => {
+  const { ops, conta } = planejar(
+    {
+      config: [{ id: "app", lfNumero: "(21) 97105-9512", repNumero: "(21) 3774-0000", funilNumero: "", cobrancaNumero: "21997597605" }],
+      ids: [{ id: "ensaio_26EST", ultimo: 3 }],
+      leads: [
+        {
+          id: "b",
+          nome: "B",
+          nomeBusca: "B",
+          respEmail: "",
+          etapa: "FECHADO",
+          servico: "Formatura individual (estúdio)",
+          fechadoEm: "2026-10-05"
+        },
+        {
+          id: "a",
+          nome: "A",
+          nomeBusca: "A",
+          respEmail: "",
+          etapa: "FECHADO",
+          servico: "Formatura individual (estúdio)",
+          fechadoEm: "2026-10-01"
+        },
+        { id: "c", nome: "C", nomeBusca: "C", respEmail: "", etapa: "FECHADO", servico: "Corporativo", fechadoEm: "2025-03-01" },
+        { id: "d", nome: "D", nomeBusca: "D", respEmail: "", etapa: "FECHADO", servico: "Turma", fechadoEm: "2026-03-01" },
+        {
+          id: "e",
+          nome: "E",
+          nomeBusca: "E",
+          respEmail: "",
+          etapa: "FECHADO",
+          servico: "Corporativo",
+          codigoEnsaio: "26COP-00001",
+          fechadoEm: "2026-03-01"
+        }
+      ]
+    },
+    () => ""
+  );
+  const cfg = ops.find(o => o.col === "config");
+  assert.deepEqual(cfg.dados, { lfNumero: "", repNumero: "(21) 3743-0000", funilNumero: "(21) 99881-7771" });
+  const cod = Object.fromEntries(ops.filter(o => o.col === "leads").map(o => [o.id, o.dados.codigoEnsaio]));
+  assert.deepEqual(cod, { a: "26EST-00004", b: "26EST-00005", c: "25COP-00001" });
+  assert.deepEqual(
+    ops.filter(o => o.col === "ids").map(o => [o.id, o.dados.ultimo]),
+    [
+      ["ensaio_25COP", 1],
+      ["ensaio_26EST", 5]
+    ]
+  );
+  assert.equal(conta["ID dos ensaios"], 3);
+});

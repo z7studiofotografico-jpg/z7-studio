@@ -358,8 +358,10 @@ function migrar(dados) {
   }
   return out;
 }
-async function abrir(email, dados) {
-  const ctx = await browser.newContext({ viewport: { width: 420, height: 900 }, serviceWorkers: "block" });
+async function abrir(email, dados, opc = {}) {
+  const ctx = await browser.newContext(
+    Object.assign({ viewport: { width: 420, height: 900 }, serviceWorkers: "block" }, opc.userAgent ? { userAgent: opc.userAgent } : {})
+  );
   abertos.push(ctx);
   const pg = await ctx.newPage();
   const erros = [];
@@ -1959,6 +1961,77 @@ await cenario("WhatsApp de trabalho (empresa x equipe, troca com autorização)"
     await pg.locator("#hNumeros").getByRole("button", { name: "Entendi" }).click();
     await calmo(pg);
     ok((await store())["numeros/" + PEDRO].visto === true && (await pg.locator("#hNumeros").isHidden()), "o aviso some depois de visto");
+  }
+});
+
+await cenario("ID do ensaio fechado e WhatsApp certo no celular", async () => {
+  const aa = String(new Date().getFullYear()).slice(-2);
+  {
+    // admin fecha a venda: ganha o ID na sequência e aparece no card e na busca
+    const { pg, store, erros } = await abrir(ADRIANO, migrar(base));
+    await ir(pg, "#funil");
+    await pg.locator("#list .card").filter({ hasText: "Erica Souza" }).getByRole("button", { name: "Fechou" }).click();
+    await pg.fill("#fValor", "450");
+    await pg.click("#btnSave");
+    await calmo(pg);
+    const s = await store();
+    ok(
+      s["leads/l1"].codigoEnsaio === aa + "EST-00001" && s["ids/ensaio_" + aa + "EST"].ultimo === 1,
+      "venda de ensaio no estúdio ganha o ID " + aa + "EST-00001 → " + s["leads/l1"].codigoEnsaio
+    );
+    ok(!s["leads/l3"].codigoEnsaio && !s["leads/l9"].codigoEnsaio, "venda sem tipo de ensaio (estúdio, externo, corporativo) não ganha ID");
+    await pg.fill("#q", aa + "est-00001");
+    await calmo(pg);
+    ok(
+      /Erica Souza/.test(await pg.textContent("#list")) && /🆔 \d\dEST-00001/.test(await pg.textContent("#list")),
+      "busca pelo ID acha o ensaio"
+    );
+    ok(erros.length === 0, "sem erros no console" + (erros.length ? ": " + erros.slice(0, 3).join(" | ") : ""));
+  }
+  {
+    // equipe fecha a venda dela: ID na sequência do tipo (corporativo), venda a conferir
+    const d = migrar(base);
+    d["ids/ensaio_" + aa + "COP"] = { ultimo: 7 };
+    d["leads/la"] = {
+      nome: "Empresa Da Ana",
+      telefone: "21955554444",
+      etapa: "FOLLOW-UP",
+      followup: dia(0),
+      servico: "Corporativo",
+      origem: "Google",
+      resp: "Ana Vendedora",
+      respEmail: ANA,
+      nomeBusca: "EMPRESA DA ANA",
+      atualizadoEm: new Date().toISOString()
+    };
+    const { pg, store, erros } = await abrir(ANA, d);
+    await ir(pg, "#funil");
+    await pg.locator("#list .card").filter({ hasText: "Empresa Da Ana" }).getByRole("button", { name: "Fechou" }).click();
+    await pg.fill("#fValor", "900");
+    await pg.click("#btnSave");
+    await calmo(pg);
+    const la = (await store())["leads/la"];
+    ok(la.codigoEnsaio === aa + "COP-00008" && la.conferido === false, "equipe: corporativo ganha " + aa + "COP-00008 e fica a conferir");
+    ok(erros.length === 0, "sem erros no console" + (erros.length ? ": " + erros.slice(0, 3).join(" | ") : ""));
+  }
+  {
+    // Android: marca em qual app está cada número; o "Abrir no WhatsApp" abre direto o app do número em uso
+    const { pg, erros } = await abrir(ADRIANO, migrar(base), {
+      userAgent: "Mozilla/5.0 (Linux; Android 14; SM-A546E) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/130.0 Mobile Safari/537.36"
+    });
+    await pg.click("#btnPrices");
+    await pg.selectOption('#pNesteCel select[aria-label="App do WhatsApp (21) 99881-7771"]', "business");
+    await pg.click("#pCancel");
+    await pg.evaluate(() => (window.__abrirLink = u => (window.__link = u)));
+    await ir(pg, "#funil");
+    await pg.locator("#list .card").filter({ hasText: "Erica Souza" }).getByRole("link", { name: "Abrir no WhatsApp" }).click();
+    await calmo(pg);
+    const link = await pg.evaluate(() => window.__link || "");
+    ok(
+      /^intent:\/\/send\/\?phone=5521988887777&text=/.test(link) && /package=com\.whatsapp\.w4b;/.test(link),
+      "Android: abre direto no WhatsApp Business do número do Funil"
+    );
+    ok(erros.length === 0, "sem erros no console" + (erros.length ? ": " + erros.slice(0, 3).join(" | ") : ""));
   }
 });
 

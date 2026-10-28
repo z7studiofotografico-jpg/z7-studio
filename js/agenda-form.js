@@ -55,6 +55,7 @@ export function openEnsaio(x, pre) {
     tel.placeholder = "(21) 9…";
     tel.value = x ? x.tel || "" : pre.tel || "";
     let leadId = x ? x.leadId || "" : pre.leadId || "";
+    let codigo = x ? x.codigo || "" : pre.codigo || ""; // ID do ensaio fechado no Funil (26EST-00001)
     const r1 = el("div", "row2");
     r1.append(field("Cliente", nome), field("WhatsApp", tel));
     p.append(r1, dl);
@@ -77,9 +78,11 @@ export function openEnsaio(x, pre) {
       const l = (leadsCache || []).find(l => l.nome.trim().toLowerCase() === nome.value.trim().toLowerCase());
       if (!l) {
         leadId = "";
+        codigo = "";
         return;
       }
       leadId = l.id;
+      codigo = l.codigoEnsaio || "";
       if (!tel.value && l.telefone) tel.value = l.telefone;
       const t = tipoDoLead(l.servico);
       if (t && !tipo.value) tipo.value = t;
@@ -262,6 +265,7 @@ export function openEnsaio(x, pre) {
         status,
         conflito: motivos.join(" · "),
         leadId,
+        codigo,
         sinalPago: sinC.checked,
         sinalValor: lerReais(sinV.value),
         valor: lerReais(tot.value),

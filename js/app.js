@@ -38,6 +38,7 @@ import { criarNotificacoes } from "./notificacoes.js";
 import { ligarAjustes } from "./ajustes.js";
 import { criarInicio } from "./inicio.js";
 import { painelNumeros } from "./numeros-tela.js";
+import { ligarWhatsCerto } from "./numeros-celular.js";
 import * as Equipe from "./equipe.js";
 import { definirExtras as feriadosExtras } from "./feriados.js";
 
@@ -309,6 +310,8 @@ const ctx = {
   }
 };
 ligarErros(ctx);
+// "Abrir no WhatsApp": abre no app (WhatsApp ou Business) do número em uso nesta tela
+ligarWhatsCerto(ctx);
 Funil.init(ctx);
 const { renderPushState, renderPushBanner, refreshPushToken } = criarNotificacoes({
   app,

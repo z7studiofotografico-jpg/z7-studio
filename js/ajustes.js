@@ -8,6 +8,7 @@ import { num, toast } from "./util.js";
 import { definirExtras as feriadosExtras, feriadosEntre } from "./feriados.js";
 import { EMPRESA_PADRAO, FRENTES, fmtTel, conferirNumeros, numerosDosOutros } from "./numeros.js";
 import { secaoMeusNumeros } from "./numeros-tela.js";
+import { secaoNesteCelular } from "./numeros-celular.js";
 const $ = id => document.getElementById(id);
 // ctx = o mesmo do app (P, isAdmin, db, handleErr); o = { sair(), renderPushState(), verComo() }
 export function ligarAjustes(ctx, o) {
@@ -89,6 +90,7 @@ export function ligarAjustes(ctx, o) {
     if (ctx.isAdmin) mostrarErros();
     $("pVerComo").hidden = !ctx.isAdmin;
     secaoMeusNumeros(ctx, $("pMeusNum"));
+    secaoNesteCelular(ctx, $("pNesteCel"));
     $("sheetPrices").hidden = false;
   };
   // Tabela de comissão: PR e Formatura × forma de pagamento

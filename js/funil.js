@@ -7,6 +7,7 @@ import * as U from "./util.js";
 import { botaoRelatorio, contar } from "./relatorio.js";
 import { contatoRel } from "./aluno-id.js";
 import { pintarSeletor } from "./numeros-tela.js";
+import { darCodigoEnsaio, precisaCodigo } from "./ensaio-id.js";
 let C,
   leads = [],
   filter = "ABERTOS",
@@ -255,6 +256,7 @@ function card(l) {
   const meta = document.createElement("div");
   meta.className = "meta";
   [
+    [l.codigoEnsaio ? "🆔 " + l.codigoEnsaio : "", "id"],
     [C.nomeDe(l) ? "👤 " + first(C.nomeDe(l)) : "", ""],
     [l.servico, "svc"],
     [l.origem, ""],
@@ -435,6 +437,7 @@ async function marcarEnsaio(l) {
       tel: l.telefone || "",
       servico: l.servico || "",
       leadId: l.id,
+      codigo: l.codigoEnsaio || "",
       valor: l.valor || "",
       sinalPago: l.etapa === "FECHADO"
     });
@@ -493,7 +496,8 @@ export function render() {
           ? C.ehMeu(l) && OPEN.includes(l.etapa)
           : l.etapa === filter
   );
-  if (q) arr = arr.filter(l => norm([l.nome, l.telefone, l.notas, l.servico, l.origem, l.resp].join(" ")).includes(norm(q)));
+  if (q)
+    arr = arr.filter(l => norm([l.codigoEnsaio, l.nome, l.telefone, l.notas, l.servico, l.origem, l.resp].join(" ")).includes(norm(q)));
   const rank = { late: 0, today: 1, later: 2, none: 3, won: 4 };
   arr.sort(
     (a, b) =>
@@ -518,6 +522,24 @@ export function render() {
     return;
   }
   emPartes(list, arr, card);
+  garantirIds();
+}
+// Venda fechada sem ID (ficou sem internet na hora): dá o ID assim que der (admin, ou quem é o responsável)
+const tentados = new Set();
+let dandoIds = false;
+async function garantirIds() {
+  if (dandoIds || C.verComo) return;
+  const falta = leads.filter(l => precisaCodigo(l) && !tentados.has(l.id) && (C.isAdmin || l.respEmail === C.email));
+  if (!falta.length) return;
+  dandoIds = true;
+  try {
+    for (const l of falta) {
+      tentados.add(l.id);
+      await darCodigoEnsaio(C.FS, db, l.id, leads);
+    }
+  } finally {
+    dandoIds = false;
+  }
 }
 
 // ---------- formulário de lead ----------
@@ -664,6 +686,8 @@ function ligar() {
       atualizadoEm: new Date().toISOString()
     };
     $("btnSave").disabled = true;
+    let idSalvo = "";
+    const antes = editing;
     try {
       if (editing) {
         if (etapa === "FECHADO") {
@@ -673,6 +697,7 @@ function ligar() {
           body.atendendo = null;
         }
         await updateDoc(doc(db, "leads", editing.id), body);
+        idSalvo = editing.id;
       } else {
         body.criadoEm = new Date().toISOString();
         body.tentativas = 0;
@@ -684,10 +709,13 @@ function ligar() {
           body.fechadoEm = todayStr();
           body.conferido = true;
         }
-        await addDoc(collection(db, "leads"), body);
+        idSalvo = (await addDoc(collection(db, "leads"), body)).id;
       }
-      toast(etapa === "FECHADO" ? "Venda registrada 🎉" : "Lead salvo");
       closeForm();
+      // venda fechada de ensaio ganha o ID (26EST-00001); sem internet, o app dá o ID depois
+      const cod =
+        etapa === "FECHADO" && precisaCodigo(Object.assign({}, antes, body)) ? await darCodigoEnsaio(C.FS, db, idSalvo, leads) : "";
+      toast(etapa === "FECHADO" ? "Venda registrada 🎉" + (cod ? " · ID " + cod : "") : "Lead salvo");
     } catch (err) {
       handleErr(err);
     } finally {
@@ -744,8 +772,9 @@ function relatorioFunil() {
       {
         titulo: "Vendas fechadas no mês",
         tabela: {
-          cols: ["Cliente", "Telefone", "Data", "Valor", "Responsável", "Situação"],
+          cols: ["ID", "Cliente", "Telefone", "Data", "Valor", "Responsável", "Situação"],
           linhas: fechados.map(l => [
+            l.codigoEnsaio || "—",
             l.nome,
             contatoRel(l.telefone, l.email),
             dataBR(l.fechadoEm),

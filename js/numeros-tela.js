@@ -257,6 +257,7 @@ export function seletorWhats(C, frente) {
 // Põe o seletor numa caixa da tela; só refaz quando as opções mudam (não fecha a lista no meio da escolha)
 export function pintarSeletor(box, C, frente) {
   if (!box) return;
+  box.dataset.frente = frente; // o "Abrir no WhatsApp" desta tela usa o número escolhido aqui
   const chave = [C.email, C.isAdmin, frente, ...opcoesWhats(C, frente)].join("|");
   if (box.dataset.chave === chave) return;
   box.dataset.chave = chave;

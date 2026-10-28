@@ -65,6 +65,8 @@ service cloud.firestore {
       allow update: if admin() || (pode('funil') && minhaOuLivre() && respOk()
         && !(resource.data.get('etapa', '') == 'FECHADO' && mudou(['valor', 'fechadoEm', 'etapa']))
         && (!mudou(['conferido']) || request.resource.data.conferido == false)
+        // o ID do ensaio (26EST-00001), depois de dado, a equipe não troca
+        && (resource.data.get('codigoEnsaio', '') == '' || !mudou(['codigoEnsaio']))
         && (request.resource.data.get('etapa', '') != 'FECHADO' || resource.data.get('etapa', '') == 'FECHADO'
           || request.resource.data.get('conferido', true) == false));
       allow delete: if admin();
@@ -158,10 +160,10 @@ service cloud.firestore {
         && request.resource.data.alunos.diff(resource.data.alunos).changedKeys().size() == 0);
       allow delete: if admin();
     }
-    // ID do aluno (26CEPNCP-01): último número usado de cada colégio em cada ano. Quem cadastra aluno reserva
-    // o próximo número (o contador só sobe), assim dois cadastros ao mesmo tempo nunca pegam o mesmo ID.
+    // ID do aluno (26CEPNCP-01) e do ensaio fechado no Funil (ensaio_26EST → 26EST-00001): último número usado.
+    // Quem cadastra reserva o próximo número (o contador só sobe), assim dois cadastros ao mesmo tempo nunca pegam o mesmo ID.
     match /ids/{prefixo} {
-      function cadastraAluno() { return pode('rep') || pode('lf') || pode('colegios') || pode('formaturas'); }
+      function cadastraAluno() { return pode('rep') || pode('lf') || pode('colegios') || pode('formaturas') || pode('funil'); }
       allow read: if admin() || cadastraAluno();
       allow create: if admin() || (cadastraAluno() && request.resource.data.keys().hasOnly(['ultimo'])
         && request.resource.data.ultimo is int && request.resource.data.ultimo > 0);

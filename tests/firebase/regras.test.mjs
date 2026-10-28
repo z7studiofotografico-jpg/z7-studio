@@ -397,6 +397,27 @@ test("ID do aluno: quem cadastra aluno reserva o próximo número; o contador s�
 // As mesmas consultas que o app faz para quem é da equipe (se a regra recusar, a pessoa veria erro na tela)
 const ANO = new Date().getFullYear();
 const c = (db, n) => collection(db, n);
+test("ID do ensaio: quem só tem o Funil dá o ID à venda fechada; depois a equipe não troca", async () => {
+  const SO_FUNIL = "funil@equipe.com";
+  await semRegra(async d => {
+    await setDoc(doc(d, "usuarios", SO_FUNIL), { nome: "Fê", papel: "equipe", ativo: true, modulos: ["funil"] });
+    await setDoc(doc(d, "leads", "e1"), {
+      nome: "Cliente",
+      etapa: "FECHADO",
+      valor: 500,
+      fechadoEm: "2026-10-01",
+      conferido: false,
+      respEmail: SO_FUNIL
+    });
+  });
+  const db = como(SO_FUNIL);
+  await assertSucceeds(getDoc(doc(db, "ids", "ensaio_26EST")));
+  await assertSucceeds(setDoc(doc(db, "ids", "ensaio_26EST"), { ultimo: 1 }));
+  await assertSucceeds(updateDoc(doc(db, "leads", "e1"), { codigoEnsaio: "26EST-00001" }));
+  await assertFails(updateDoc(doc(db, "leads", "e1"), { codigoEnsaio: "26EST-00009" }));
+  await assertFails(setDoc(doc(db, "ids", "ensaio_26EST"), { ultimo: 1 }));
+  await assertSucceeds(updateDoc(doc(como(ADRIANO), "leads", "e1"), { codigoEnsaio: "26EST-00002" }));
+});
 test("consultas da equipe 1: Funil (leads livres e os seus)", async () => {
   const db = como(ANA);
   await assertSucceeds(

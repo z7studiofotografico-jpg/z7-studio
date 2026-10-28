@@ -33,7 +33,15 @@ export function linhaEnsaio(x) {
   const r = el("div", "agrow");
   const t = el("div", "agtxt");
   t.append(el("b", null, `📷 ${x.hora ? x.hora + "–" + fimDe(x) : "Sem horário"} · ${title(x.cliente)}`));
-  t.append(el("span", null, [x.tipo, marco() ? (x.sinalPago ? "💰 sinal pago" : "⚠️ sem sinal") : "", x.obs].filter(Boolean).join(" · ")));
+  t.append(
+    el(
+      "span",
+      null,
+      [x.codigo ? "🆔 " + x.codigo : "", x.tipo, marco() ? (x.sinalPago ? "💰 sinal pago" : "⚠️ sem sinal") : "", x.obs]
+        .filter(Boolean)
+        .join(" · ")
+    )
+  );
   if (x.status === "analisar")
     t.append(el("span", "wait", "⏳ A Luciana vai analisar: " + (x.conflito || "o dia já tem outro compromisso")));
   if (!marco()) {

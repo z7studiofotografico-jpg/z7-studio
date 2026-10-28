@@ -16,7 +16,7 @@ initializeApp({ credential: cert(JSON.parse(process.env.FIREBASE_SERVICE_ACCOUNT
 const db = getFirestore();
 const ler = async nome => (await db.collection(nome).get()).docs.map(d => ({ id: d.id, ...d.data() }));
 
-const nomes = ["instituicoes", "formandos", "repasse", "agenda", "ensaios", "leads", "fones"];
+const nomes = ["instituicoes", "formandos", "repasse", "agenda", "ensaios", "leads", "fones", "config", "ids"];
 const cols = Object.fromEntries(await Promise.all(nomes.map(async n => [n, await ler(n)])));
 // responsável antigo (nome) → e-mail de quem está cadastrado na Equipe (ou dono no config.js)
 const { emailDe, comoAchou } = criarEmailDe(await ler("usuarios"), CFG.donos);
