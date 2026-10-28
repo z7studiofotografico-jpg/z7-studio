@@ -6,7 +6,8 @@ import { TIPOS, CARGOS, norm } from "./instituicoes-dados.js";
 import { C, FS, col, tipo, iniciar } from "./instituicoes-estado.js";
 // Agenda → "+ Agendar colégio": escolhe o colégio e o tipo (dia de fotos do PR ou formatura)
 // e abre o mesmo formulário do cartão da instituição (com aprovação da Luciana).
-export async function agendarColegio(ctx) {
+// dia (opcional, AAAA-MM-DD): veio do dia tocado na agenda e já entra preenchido na data
+export async function agendarColegio(ctx, dia) {
   if (!C) iniciar(ctx);
   let lista = [];
   try {
@@ -22,7 +23,8 @@ export async function agendarColegio(ctx) {
       el(
         "p",
         "hint",
-        "Para o dia de fotos no colégio (medir beca e fazer o ensaio do PR) ou para a formatura. A data fica segurada até a Luciana aprovar."
+        (dia ? `Dia ${U.fmtDate(dia)}/${dia.slice(0, 4)}. ` : "") +
+          "Para o dia de fotos no colégio (medir beca e fazer o ensaio do PR) ou para a formatura. A data fica segurada até a Luciana aprovar."
       )
     );
     const tipoEv = sel(
@@ -167,7 +169,7 @@ export async function agendarColegio(ctx) {
         }
       }
       close();
-      openEvento(it, tipoEv.value);
+      openEvento(it, tipoEv.value, dia);
     });
     setTimeout(() => nome.focus(), 30);
   });

@@ -144,12 +144,12 @@ function msgOcupado(e) {
   const o = e.ocupado || {};
   return `O dia ${U.fmtDate(o.data)}/${String(o.data || "").slice(0, 4)} já está ocupado: ${nomeEvento(o.kind, o.instNome)}${o.hora ? " às " + o.hora : ""} (${o.status === "confirmado" ? "confirmado" : "aguardando a Luciana"}). Escolha outra data.`;
 }
-export function camposEvento(kind, f, instNome) {
+export function camposEvento(kind, f, instNome, dia) {
   const K = KINDS[kind],
     box = el("div", "imp");
   const data = el("input");
   data.type = "date";
-  data.value = (f && f.status !== "recusado" && f.data) || "";
+  data.value = dia || (f && f.status !== "recusado" && f.data) || "";
   data.min = U.todayStr();
   const hora = el("input");
   hora.type = "time";
@@ -341,7 +341,8 @@ export function linhaEvento(it, kind) {
   return el("div", "fu " + (ev.status === "confirmado" ? "ok" : ev.status === "recusado" ? "late" : "today"), t);
 }
 
-export function openEvento(it, kind) {
+// dia (opcional): data já escolhida na agenda; entra no campo da data quando ele ainda está vazio
+export function openEvento(it, kind, dia) {
   const K = KINDS[kind],
     ev = it[K.campo],
     fot = it.diaFotos;
@@ -383,7 +384,7 @@ export function openEvento(it, kind) {
       p.append(dBox);
     }
     let avisado = false;
-    const box = camposEvento(kind, ev, it.nome);
+    const box = camposEvento(kind, ev, it.nome, dia);
     p.append(box);
     // Com quem foi combinado (recebe o WhatsApp e o e-mail) e a média de alunos (obrigatória)
     const resp = el("div", "imp");

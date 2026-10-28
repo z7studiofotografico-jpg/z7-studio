@@ -2035,6 +2035,46 @@ await cenario("ID do ensaio fechado e WhatsApp certo no celular", async () => {
   }
 });
 
+await cenario("Agenda: agendar colégio no dia tocado", async () => {
+  for (const [quem, pode] of [
+    [ADRIANO, true],
+    [PEDRO, true],
+    [ANA, false]
+  ]) {
+    const { pg, erros } = await abrir(quem, migrar(base));
+    await ir(pg, "#agenda");
+    // próximo mês: todos os dias são futuros; toca no primeiro dia livre que aceita agendar
+    await pg.locator(".calnav button").last().click();
+    await calmo(pg);
+    const dias = pg.locator(".cal button");
+    let achou = false;
+    for (let i = 0; i < (await dias.count()) && !achou; i++) {
+      await dias.nth(i).click();
+      await calmo(pg);
+      achou = (await pg.locator(".agdia").getByRole("button", { name: "+ Colégio neste dia" }).count()) > 0;
+      if (!achou && (await pg.locator(".agdia").count())) await dias.nth(i).click(); // fecha o dia
+    }
+    ok(achou === pode, `${quem}: botão "+ Colégio neste dia" ${pode ? "aparece" : "não aparece (sem Instituições)"}`);
+    if (pode) {
+      const tit = (await pg.locator(".agdia h3.name").first().textContent()) || "";
+      await pg.locator(".agdia").getByRole("button", { name: "+ Colégio neste dia" }).click();
+      await calmo(pg);
+      let sa = pg.locator(".sheet").last();
+      const dataTxt = ((await sa.textContent()).match(/Dia (\d\d)\/(\d\d)\/(\d{4})/) || []).slice(1);
+      await sa.getByLabel("Colégio").fill("Colegio Beta");
+      await sa.locator("button[type=submit]").click();
+      await calmo(pg);
+      sa = pg.locator(".sheet").last();
+      const v = await sa.locator("input[type=date]").last().inputValue();
+      ok(
+        dataTxt.length === 3 && v === `${dataTxt[2]}-${dataTxt[1]}-${dataTxt[0]}`,
+        `${quem}: o formulário do colégio já vem com o dia tocado (${tit.trim()} → ${v})`
+      );
+    }
+    ok(erros.length === 0, "sem erros no console" + (erros.length ? ": " + erros.slice(0, 3).join(" | ") : ""));
+  }
+});
+
 await cenario("Cadastro sem módulos", async () => {
   const { pg } = await abrir(NOVO, Object.assign({}, base, { "config/app": { versaoDados: 4 } }));
   ok((await visiveis(pg)).length === 0, "não vê nenhum card");

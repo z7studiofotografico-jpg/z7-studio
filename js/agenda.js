@@ -505,12 +505,16 @@ function renderMes(box, ent) {
     const lst = porDia[selDia] || [];
     if (!lst.length) card.append(el("p", "hint", selDia < hoje ? "Dia que já passou." : "Dia livre ✅"));
     lst.forEach(it => card.append(linha(it)));
-    if (marco() && selDia >= hoje && !feriado(selDia)) {
+    if (selDia >= hoje && !feriado(selDia) && (marco() || C.pode("colegios"))) {
       const a = el("div", "actions");
-      a.append(
-        U.mkBtn("+ Ensaio neste dia", "btn-sm btn-primary", () => openEnsaio(null, { data: selDia })),
-        U.mkBtn("+ Compromisso", "btn-sm", () => openComp(null, selDia))
-      );
+      const dia = selDia;
+      // colégio (dia de fotos ou formatura): quem tem Instituições; ensaio e compromisso: só o Adriano e a Luciana
+      if (C.pode("colegios")) a.append(U.mkBtn("+ Colégio neste dia", "btn-sm btn-verde", () => agendarColegio(C, dia)));
+      if (marco())
+        a.append(
+          U.mkBtn("+ Ensaio neste dia", "btn-sm btn-primary", () => openEnsaio(null, { data: dia })),
+          U.mkBtn("+ Compromisso", "btn-sm", () => openComp(null, dia))
+        );
       card.append(a);
     }
     box.append(card);
