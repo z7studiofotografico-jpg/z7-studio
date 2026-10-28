@@ -5,8 +5,15 @@ import { norm } from "./ui.js";
 import { entradasFones } from "./pedidos.js";
 import { codigoBusca, comAno } from "./aluno-id.js";
 import { normTel, fmtTel, EMPRESA_PADRAO } from "./numeros.js";
+import { segmentoPeloNome } from "./instituicao-cadastro.js";
 import { tipoIdEnsaio, precisaCodigo, anoDoFechamento, fmtCodigoEnsaio, maiorEnsaio } from "./ensaio-id.js";
-export const VERSAO_DADOS = 11;
+export const VERSAO_DADOS = 12;
+// v12 (combinado com o Adriano em 28/10/2026): os 42 colégios públicos que vieram das planilhas do Drive
+// - João Paulo II e CIEP 156 são do Adriano; os outros, do Roberto (com o aviso para completar o cadastro)
+// - tipo pelo nome: CIEP e C.E. = 3º ano (ensino médio); E.M. = 9º ano; Zenóbio da Costa e Waldemar Raythe são C.E.
+// - Mário Piragibe é aluguel de becas: aluno sem telefone lá não é falha (não conta em "Sem telefone")
+const DO_ADRIANO = /JOAO PAULO II|CIEP 156/;
+const NOME_CERTO = { "E.E. Zenóbio da Costa": "C.E. Zenóbio da Costa", "Waldemar Raythe": "C.E. Waldemar Raythe" };
 // v11: aluno do PR importado sem nenhum telefone sai dos Incompletos (etapa "SEM TELEFONE": só conta no Dashboard)
 // v10: WhatsApp da empresa corrigido (combinado com o Adriano em 27/10/2026)
 // - (21) 97105-9512 é de um representante (vai no cadastro dele em Equipe): sai da Linha de Frente da empresa
@@ -124,6 +131,27 @@ export function planejar(cols, emailDe) {
       muda("PR sem telefone (só Dashboard)", "repasse", x.id, { etapa: "SEM TELEFONE", semTelefone: true, followup: null });
     else if (x.historico) muda("PR sem telefone (só Dashboard)", "repasse", x.id, { semTelefone: true });
   }
+  // v12: colégios das planilhas do Drive (importados com a observação "Já trabalhamos…")
+  for (const x of cols.instituicoes || []) {
+    const v0 = (x.visitas || [])[0];
+    if (x.tipo !== "publico" || !x.importadoEm || !(v0 && /^Já trabalhamos/.test(v0.obs || ""))) continue;
+    const patch = {};
+    const nome = NOME_CERTO[x.nome] || x.nome;
+    if (nome !== x.nome) Object.assign(patch, { nome, nomeBusca: norm(nome) });
+    const seg = segmentoPeloNome(nome);
+    if (seg && !Object.values(x.segmentos || {}).some(Boolean))
+      patch.segmentos = { pre: false, ano5: false, ano9: seg === "ano9", medio: seg === "medio" };
+    const adriano = DO_ADRIANO.test(norm(nome));
+    const resp = adriano ? "Adriano" : "Roberto";
+    const respEmail = emailDe(resp);
+    if (x.resp !== resp) patch.resp = resp;
+    if ((x.respEmail || "") !== respEmail && (respEmail || !x.respEmail)) patch.respEmail = respEmail;
+    if (!adriano && x.cadastroPendente === undefined) patch.cadastroPendente = true;
+    if (Object.keys(patch).length) muda("colégios das planilhas (Roberto e Adriano)", "instituicoes", x.id, patch);
+  }
+  for (const x of cols.repasse || [])
+    if (x.etapa === "SEM TELEFONE" && /PIRAGIBE/.test(norm(x.escola)) && !x.semTelOk)
+      muda("Mário Piragibe (becas): sem telefone não conta", "repasse", x.id, { semTelOk: true });
   // v10: WhatsApp da empresa (config/app)
   const cfg = (cols.config || []).find(x => x.id === "app");
   if (cfg) {

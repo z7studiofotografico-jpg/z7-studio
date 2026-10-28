@@ -257,3 +257,48 @@ test("v11: aluno do PR importado sem telefone sai dos Incompletos e só conta no
   assert.equal(rep.c, undefined);
   assert.equal(rep.e, undefined);
 });
+
+test("v12: colégios das planilhas: João Paulo II e CIEP 156 do Adriano, o resto do Roberto com cadastro pendente", () => {
+  const v = [{ obs: "Já trabalhamos (PR) nos anos 2022.", origem: "planilha" }];
+  const base = {
+    tipo: "publico",
+    importadoEm: "x",
+    visitas: v,
+    resp: "",
+    respEmail: "",
+    segmentos: { pre: false, ano5: false, ano9: false, medio: false }
+  };
+  const emailDe = n => ({ Adriano: "adriano@z7.com", Roberto: "roberto@z7.com" })[n] || "";
+  const { ops } = planejar(
+    {
+      instituicoes: [
+        Object.assign({ id: "jp", nome: "C.E. João Paulo II" }, base),
+        Object.assign({ id: "c225", nome: "CIEP 225 Mário Quintana" }, base),
+        Object.assign({ id: "w", nome: "Waldemar Raythe" }, base),
+        Object.assign({ id: "cm", nome: "E.M. Cyro Monteiro" }, base),
+        { id: "outro", tipo: "publico", nome: "C.E. Alfa", resp: "Ana", respEmail: "ana@z7.com" }
+      ],
+      repasse: [
+        { id: "p1", etapa: "SEM TELEFONE", escola: "E. M. MARIO PIRAGIBE", contatos: [], semTelefone: true },
+        { id: "p2", etapa: "SEM TELEFONE", escola: "CIEP 225", contatos: [], semTelefone: true }
+      ]
+    },
+    emailDe
+  );
+  const de = Object.fromEntries(ops.map(o => [o.col + "/" + o.id, o.dados]));
+  assert.equal(de["instituicoes/jp"].respEmail, "adriano@z7.com");
+  assert.equal(de["instituicoes/jp"].cadastroPendente, undefined);
+  assert.equal(de["instituicoes/jp"].segmentos.medio, true);
+  assert.equal(de["instituicoes/c225"].respEmail, "roberto@z7.com");
+  assert.equal(de["instituicoes/c225"].cadastroPendente, true);
+  assert.equal(de["instituicoes/w"].nome, "C.E. Waldemar Raythe");
+  assert.equal(de["instituicoes/cm"].segmentos.ano9, true);
+  assert.equal(de["instituicoes/outro"], undefined);
+  assert.deepEqual(de["repasse/p1"], { semTelOk: true });
+  assert.equal(de["repasse/p2"], undefined);
+  // Roberto ainda não cadastrado: fica com o nome (livre) e pega o e-mail quando rodar de novo
+  const { ops: ops2 } = planejar({ instituicoes: [Object.assign({ id: "c", nome: "CIEP 1" }, base)] }, () => "");
+  assert.equal(ops2[0].dados.resp, "Roberto");
+  assert.equal(ops2[0].dados.respEmail, undefined);
+  assert.equal(ops2[0].dados.cadastroPendente, true);
+});

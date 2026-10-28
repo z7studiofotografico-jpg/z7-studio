@@ -10,6 +10,7 @@ import { contatoRel } from "./aluno-id.js";
 import { TIPOS, CARTOES, ETAPAS, ABERTAS, SEGMENTOS, cartaoDoTipo, norm, status, pendFotos } from "./instituicoes-dados.js";
 import { C, FS, tipo, items, mudarTipo, mudarItems, iniciar, lockInfo, mensagem, save, claim } from "./instituicoes-estado.js";
 import { openForm, openVisita } from "./instituicoes-form.js";
+import { cadastroFalta, cadastroPendente } from "./instituicao-cadastro.js";
 export { TIPOS, CARTOES, CARGOS, cartaoDoTipo } from "./instituicoes-dados.js";
 export { agendarColegio } from "./instituicoes-agendar.js";
 // (o Agendamento importa estas daqui; continuam disponíveis)
@@ -86,7 +87,7 @@ export function hide() {
 
 function filtra(i, k) {
   if (k === "hoje") return ["late", "today"].includes(status(i)) || pendFotos(i);
-  if (k === "pend") return pendFotos(i);
+  if (k === "pend") return pendFotos(i) || (cadastroPendente(i) && (C.isAdmin || C.ehMeu(i)));
   if (k === "meus") return C.ehMeu(i) && (ABERTAS.includes(i.etapa) || pendFotos(i));
   if (k === "todos") return true;
   return i.etapa === k;
@@ -120,7 +121,34 @@ function renderChips() {
     }
   );
 }
+// Aviso no alto da tela: colégios da planilha com o cadastro para completar (o do representante; o admin vê todos)
+function avisoCadastro() {
+  let a = $("iCadAviso");
+  const meus = items.filter(i => cadastroPendente(i) && (C.isAdmin || C.ehMeu(i)));
+  if (!meus.length) return a && a.remove();
+  if (!a) {
+    a = el("div", "notice");
+    a.id = "iCadAviso";
+    $("iChips").before(a);
+  }
+  a.innerHTML = "";
+  const quem = C.isAdmin ? [...new Set(meus.map(i => U.first(i.resp || "") || "sem responsável"))].join(", ") : "";
+  a.append(
+    el(
+      "span",
+      null,
+      `📋 ${meus.length} colégio${meus.length > 1 ? "s" : ""} com o cadastro para completar (contato com telefone, nº de alunos e endereço)` +
+        (C.isAdmin ? ` · ${quem}` : ". Atualize até completar todos: o Adriano recebe o resumo às 19h.")
+    ),
+    U.mkBtn("Ver", "btn-sm", () => {
+      tab = "pend";
+      renderChips();
+      renderList();
+    })
+  );
+}
 function renderList() {
+  avisoCadastro();
   const list = $("iList");
   if (!list) return;
   list.innerHTML = "";
@@ -194,6 +222,7 @@ function card(it) {
     const l = linhaEvento(it, k);
     if (l) e.append(l);
   });
+  if (cadastroPendente(it)) e.append(el("p", "wait", "📋 Falta no cadastro: " + cadastroFalta(it).join(", ")));
   if (pendFotos(it)) {
     const pd = el("div", "lock other");
     pd.append(

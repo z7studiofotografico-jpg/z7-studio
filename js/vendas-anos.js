@@ -29,13 +29,15 @@ export function prPorAno(corpo, C, caixa, tabela) {
       const linhas = await Promise.all(
         anos.map(async a => {
           const ano = FS.where("ano", "==", a);
-          const [todos, compraram, fila, semTel] = await Promise.all([
+          const [todos, compraram, fila, semTelTodos, semTelOk] = await Promise.all([
             conta(ano),
             conta(ano, FS.where("etapa", "in", ["PAGO", "ENTREGUE"])),
             conta(ano, FS.where("etapa", "==", "NA FILA")),
-            conta(ano, FS.where("etapa", "==", "SEM TELEFONE"))
+            conta(ano, FS.where("etapa", "==", "SEM TELEFONE")),
+            // colégio de aluguel de becas (ex.: Mário Piragibe): sem telefone lá não é falha
+            conta(ano, FS.where("semTelOk", "==", true))
           ]);
-          return { a, total: todos - semTel, compraram, fila, semTel, todos };
+          return { a, total: todos - semTelTodos, compraram, fila, semTel: semTelTodos - semTelOk, todos: todos - semTelOk };
         })
       );
       espera.remove();
@@ -80,14 +82,21 @@ async function semTelefonePorColegio(corpo, C, caixa, tabela) {
   const s = await FS.getDocs(FS.query(FS.collection(db, "repasse"), FS.where("etapa", "==", "SEM TELEFONE"), FS.limit(3000)));
   const m = new Map(),
     anos = new Set();
+  // o nome como está no cadastro de Instituições (ex.: "C.E. João Paulo II"), quando o colégio está cadastrado
+  const nomes = {};
+  (await FS.getDocs(FS.query(FS.collection(db, "instituicoes"), FS.limit(1000)))).forEach(d => {
+    const k = chaveColegio(d.data().nome || "");
+    if (k) nomes[k] = d.data().nome;
+  });
   s.forEach(d => {
     const x = d.data();
+    if (x.semTelOk) return;
     const esc = String(x.escola || "(sem colégio)").trim();
     const k = chaveColegio(esc) || esc; // "C.M CYRO MONTEIRO" e "CYRO MONTEIRO" são o mesmo colégio
     const a = Number(x.ano) || 0;
     anos.add(a);
-    const r = m.get(k) || { esc, ano: a, total: 0, anos: {} };
-    if (a >= r.ano) Object.assign(r, { esc, ano: a }); // o nome mais recente
+    const r = m.get(k) || { esc: nomes[k] || esc, ano: a, total: 0, anos: {} };
+    if (a >= r.ano) Object.assign(r, { esc: nomes[k] || esc, ano: a }); // o nome do cadastro ou o mais recente
     r.total++;
     r.anos[a] = (r.anos[a] || 0) + 1;
     m.set(k, r);

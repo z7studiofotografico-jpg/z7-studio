@@ -2,6 +2,7 @@
 import * as FS from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
 import { collection, query, where, getCountFromServer } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
 import { avisoErro } from "./ui.js";
+import { cadastroPendente } from "./instituicao-cadastro.js";
 import { todayStr, addDays, first } from "./util.js";
 const $ = id => document.getElementById(id);
 // ctx = o mesmo do app (me, isAdmin, pode, email, aprovador, P, carteira); Funil = módulo do funil (contagem dos leads)
@@ -178,6 +179,8 @@ export function criarInicio(ctx, Funil) {
         ])
       : FS.getDocs(ctx.carteira("instituicoes")).then(s => {
           const docs = s.docs;
+          // colégios da planilha que esta pessoa precisa completar (aviso na tela inicial)
+          instCount.cad = docs.filter(d => cadastroPendente(d.data()) && d.data().respEmail === ctx.email).length;
           const f = fn => ({ docs: docs.filter(d => fn(d.data())) });
           return [f(x => x.followup && x.followup <= hj), f(x => x.formatura && ["pendente", "confirmado"].includes(x.formatura.status))];
         })
@@ -205,6 +208,19 @@ export function criarInicio(ctx, Funil) {
   }
   function paintInst() {
     const por = instCount.por || {};
+    // aviso para o representante: colégios com o cadastro para completar
+    let av = document.getElementById("hCadastro");
+    if (instCount.cad && !av) {
+      av = document.createElement("a");
+      av.id = "hCadastro";
+      av.className = "notice";
+      av.href = "#inst-publico";
+      document.querySelector("#viewHome .tiles").before(av);
+    }
+    if (av) {
+      av.hidden = !instCount.cad;
+      av.textContent = `📋 Você tem ${instCount.cad} colégio${instCount.cad > 1 ? "s" : ""} com o cadastro para completar (contato, nº de alunos e endereço). Toque aqui e atualize até completar todos.`;
+    }
     document.querySelectorAll(".tile[data-inst]").forEach(t => {
       const n = t.dataset.inst === "superior" ? (por.faculdade || 0) + (por.profissionalizante || 0) : por[t.dataset.inst] || 0;
       t.querySelector(".tile-n").textContent = n ? `${n} para hoje` : "Nada pendente hoje ✓";

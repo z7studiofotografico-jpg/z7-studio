@@ -1,0 +1,26 @@
+name: Pendências da equipe às 19h
+
+on:
+  schedule:
+    # 22:00 UTC = 19h em Brasília. Segunda a sábado.
+    - cron: "0 22 * * 1-6"
+  workflow_dispatch:
+
+jobs:
+  pendencias:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - name: Instalar
+        working-directory: scripts
+        run: npm install --no-audit --no-fund
+      - name: Enviar pendências ao administrador
+        working-directory: scripts
+        run: node pendencias.mjs
+        env:
+          FIREBASE_SERVICE_ACCOUNT: ${{ secrets.FIREBASE_SERVICE_ACCOUNT }}
+          APP_URL: ${{ vars.APP_URL }}

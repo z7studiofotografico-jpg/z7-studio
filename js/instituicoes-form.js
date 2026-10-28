@@ -5,6 +5,7 @@ import * as U from "./util.js";
 import { siglaDe } from "./aluno-id.js";
 import { TIPOS, CARTOES, CARGOS, FOTOGRAFO, RESULTADOS, PASSOS, SEGMENTOS, semSeries, norm, anoQueVem } from "./instituicoes-dados.js";
 import { C, FS, db, col, tipo, items } from "./instituicoes-estado.js";
+import { cadastroFalta, cadastroPendente } from "./instituicao-cadastro.js";
 // Atalhos de data do próximo passo
 function quandoBtns(target) {
   const q = el("div", "quick");
@@ -29,6 +30,8 @@ export function openForm(it) {
   sheet(it ? "Editar instituição" : "Nova instituição · " + cartao.nome, (p, close) => {
     const nome = inp(it ? title(it.nome) : "", "Nome da instituição");
     nome.required = true;
+    if (cadastroPendente(it))
+      p.append(el("p", "wait", "📋 Complete o cadastro deste colégio. Falta: " + cadastroFalta(it).join(", ") + "."));
     p.append(field("Nome", nome));
     // O tipo vem do cartão que foi aberto; no cartão de faculdade e curso profissionalizante, escolhe qual dos dois
     const tipoSel =
@@ -228,6 +231,12 @@ export function openForm(it) {
         notas: nota.value.trim(),
         atualizadoEm: new Date().toISOString()
       };
+      // colégio da planilha: completou contato, alunos e endereço → sai da lista de pendências (o Adriano vê às 19h)
+      let completou = false;
+      if (it && it.cadastroPendente && !cadastroFalta(Object.assign({}, it, body)).length) {
+        Object.assign(body, { cadastroPendente: false, cadastroOkEm: new Date().toISOString(), cadastroOkPor: C.me || "" });
+        completou = true;
+      }
       try {
         if (it) await FS.updateDoc(FS.doc(db, "instituicoes", it.id), body);
         else
@@ -243,7 +252,7 @@ export function openForm(it) {
               criadoEm: new Date().toISOString()
             })
           );
-        U.toast("Salvo");
+        U.toast(completou ? "Cadastro completo ✅ Obrigado!" : "Salvo");
         close();
       } catch (e) {
         C.handleErr(e);
