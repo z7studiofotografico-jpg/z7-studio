@@ -234,3 +234,24 @@ test("v10: WhatsApp da empresa corrigido e ID das vendas de ensaio já fechadas"
   );
   assert.equal(conta["ID dos ensaios"], 3);
 });
+
+test("v11: aluno do PR importado sem telefone sai dos Incompletos e só conta no Dashboard", () => {
+  const { ops } = planejar(
+    {
+      repasse: [
+        { id: "a", etapa: "INCOMPLETO", importadoEm: "x", respEmail: "", contatos: [] },
+        { id: "b", etapa: "INCOMPLETO", importadoEm: "x", respEmail: "", contatos: [{ tel: "21999990000" }] },
+        { id: "c", etapa: "INCOMPLETO", respEmail: "eq@z7.com", contatos: [] },
+        { id: "d", etapa: "ENTREGUE", historico: true, importadoEm: "x", contatos: [] },
+        { id: "e", etapa: "SEM TELEFONE", semTelefone: true, contatos: [] }
+      ]
+    },
+    () => ""
+  );
+  const rep = Object.fromEntries(ops.filter(o => o.col === "repasse").map(o => [o.id, o.dados]));
+  assert.deepEqual(rep.a, { etapa: "SEM TELEFONE", semTelefone: true, followup: null });
+  assert.deepEqual(rep.d, { semTelefone: true });
+  assert.equal(rep.b, undefined);
+  assert.equal(rep.c, undefined);
+  assert.equal(rep.e, undefined);
+});

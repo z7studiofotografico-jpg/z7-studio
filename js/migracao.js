@@ -6,7 +6,8 @@ import { entradasFones } from "./pedidos.js";
 import { codigoBusca, comAno } from "./aluno-id.js";
 import { normTel, fmtTel, EMPRESA_PADRAO } from "./numeros.js";
 import { tipoIdEnsaio, precisaCodigo, anoDoFechamento, fmtCodigoEnsaio, maiorEnsaio } from "./ensaio-id.js";
-export const VERSAO_DADOS = 10;
+export const VERSAO_DADOS = 11;
+// v11: aluno do PR importado sem nenhum telefone sai dos Incompletos (etapa "SEM TELEFONE": só conta no Dashboard)
 // v10: WhatsApp da empresa corrigido (combinado com o Adriano em 27/10/2026)
 // - (21) 97105-9512 é de um representante (vai no cadastro dele em Equipe): sai da Linha de Frente da empresa
 // - o Repasse é (21) 3743-0000 (estava (21) 3774-0000)
@@ -114,6 +115,14 @@ export function planejar(cols, emailDe) {
     if (x.nome && x.nomeBusca !== norm(x.nome)) patch.nomeBusca = norm(x.nome);
     if (x.respEmail == null) patch.respEmail = emailDe(x.resp);
     if (Object.keys(patch).length) muda("funil", "leads", x.id, patch);
+  }
+  // v11: sem telefone (combinado com o Adriano em 28/10/2026)
+  for (const x of cols.repasse || []) {
+    if ((x.contatos || []).length || (x.telefones || []).length || x.semTelefone) continue;
+    const importado = !!x.importadoEm && !x.respEmail;
+    if (x.etapa === "INCOMPLETO" && importado)
+      muda("PR sem telefone (só Dashboard)", "repasse", x.id, { etapa: "SEM TELEFONE", semTelefone: true, followup: null });
+    else if (x.historico) muda("PR sem telefone (só Dashboard)", "repasse", x.id, { semTelefone: true });
   }
   // v10: WhatsApp da empresa (config/app)
   const cfg = (cols.config || []).find(x => x.id === "app");

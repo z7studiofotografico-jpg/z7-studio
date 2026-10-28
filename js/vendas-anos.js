@@ -22,16 +22,35 @@ export function prPorAno(corpo, C, caixa, tabela) {
       const linhas = await Promise.all(
         anos.map(async a => {
           const ano = FS.where("ano", "==", a);
-          const [total, compraram, fila] = await Promise.all([
+          const [total, compraram, fila, semTel] = await Promise.all([
             conta(ano),
             conta(ano, FS.where("etapa", "in", ["PAGO", "ENTREGUE"])),
-            conta(ano, FS.where("etapa", "==", "NA FILA"))
+            conta(ano, FS.where("etapa", "==", "NA FILA")),
+            conta(ano, FS.where("semTelefone", "==", true))
           ]);
-          return [String(a), total, compraram, pct(compraram, total), fila];
+          return { a, total, compraram, fila, semTel };
         })
       );
       espera.remove();
-      tabela(box, ["Ano das fotos", "Fotografados", "Compraram", "Conversão", "Na fila do Repasse"], linhas, "Nenhum ano importado ainda.");
+      const soma = k => linhas.reduce((t, x) => t + x[k], 0);
+      const linha = (rot, x) => [rot, x.total, x.compraram, pct(x.compraram, x.total), x.fila, `${x.semTel} (${pct(x.semTel, x.total)})`];
+      const todas = linhas.map(x => linha(String(x.a), x));
+      if (linhas.length > 1)
+        todas.push(linha("Geral", { total: soma("total"), compraram: soma("compraram"), fila: soma("fila"), semTel: soma("semTel") }));
+      tabela(
+        box,
+        ["Ano das fotos", "Fotografados", "Compraram", "Conversão", "Na fila do Repasse", "Sem telefone"],
+        todas,
+        "Nenhum ano importado ainda."
+      );
+      if (linhas.length)
+        box.append(
+          el(
+            "p",
+            "hint",
+            "Sem telefone = alunos que vieram da planilha sem nenhum número: não entram na fila nem nos Incompletos, só contam aqui."
+          )
+        );
     } catch (e) {
       console.warn("[Z7] PR por ano", e);
       espera.textContent = "Não foi possível contar agora.";

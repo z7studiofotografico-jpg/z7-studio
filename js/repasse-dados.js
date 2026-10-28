@@ -8,6 +8,8 @@ export const norm = U.chave,
   slug = U.slug;
 
 // O que não pode faltar para entrar na fila: colégio, ano, aluno, nome de um responsável e 1 telefone.
+// Sem nenhum telefone na planilha: não dá para trabalhar no PR; entra só como número para o Dashboard
+export const semTelefone = d => !(d.contatos || []).length && !(d.telefones || []).length;
 export function faltando(d) {
   const f = [];
   if (!String(d.escola || "").trim()) f.push("colégio");
@@ -190,6 +192,7 @@ export function situacaoTxt(it, s) {
     );
   }
   if (it.historico) return `Já comprou${it.ano ? " em " + it.ano : ""} (histórico da planilha)`;
+  if (it.etapa === "SEM TELEFONE") return "Sem telefone na planilha (só conta no Dashboard)";
   if (it.etapa === "ENTREGUE") return "Entregue" + (it.entregueEm ? " em " + dia(it.entregueEm) : "");
   return it.etapa === "NA FILA" ? "Ainda na fila" : it.etapa === "INCOMPLETO" ? "Fora da fila até completar" : "Encerrado";
 }

@@ -1,7 +1,7 @@
 // PR: dados do formando (completar ou corrigir) e "+ Aluno" (incluir à mão, sem planilha)
 import { el, title } from "./ui.js";
 import * as U from "./util.js";
-import { norm, faltando, docId } from "./repasse-dados.js";
+import { norm, faltando, docId, semTelefone } from "./repasse-dados.js";
 import { codigoBusca, comAno, avisoTel } from "./aluno-id.js";
 import { procurarRepetido, pedirAluno, indexarFones, gerarCodigoPR } from "./pedidos.js";
 import { C, FS, db, tab, seg, meta, ANO, segDe, save, tela } from "./repasse-estado.js";
@@ -238,7 +238,10 @@ export function openDados(it) {
         }
         return criar(patch, falta);
       }
-      if (it.etapa === "INCOMPLETO" || it.etapa === "NA FILA") {
+      if (it.etapa === "SEM TELEFONE" && !semTelefone(patch)) {
+        // achou o telefone: sai do "só Dashboard" e vai para a fila (ou Incompletos, se ainda faltar algo)
+        Object.assign(patch, { etapa: falta.length ? "INCOMPLETO" : "NA FILA", semTelefone: false });
+      } else if (it.etapa === "INCOMPLETO" || it.etapa === "NA FILA") {
         // aluno de alguém da equipe: completo, volta para a lista dessa pessoa; sem dono, vai para a fila
         const dono = it.etapa === "INCOMPLETO" && it.respEmail;
         patch.etapa = falta.length ? "INCOMPLETO" : dono ? "SEPARADO" : "NA FILA";

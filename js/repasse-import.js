@@ -1,6 +1,6 @@
 // PR: importar a planilha de formandos (só admin). Os dados puros ficam em repasse-dados.js.
 import { el, carregarLib } from "./ui.js";
-import { MAPA, hkey, linhaParaDoc, docId, faltando, norm } from "./repasse-dados.js";
+import { MAPA, hkey, linhaParaDoc, docId, faltando, norm, semTelefone } from "./repasse-dados.js";
 import * as U from "./util.js";
 import { indexarFones } from "./pedidos.js";
 let C, FS, db;
@@ -254,7 +254,8 @@ export function openImport(ctx, ui, aoTerminar) {
         const agora = new Date().toISOString();
         let novos = 0,
           atual = 0,
-          historico = 0;
+          historico = 0,
+          semTel = 0;
         const escolas = Object.assign({}, meta.escolas || {}),
           anos = Object.assign({}, meta.anos || {});
         const ops = sel.map((d, i) => {
@@ -274,9 +275,27 @@ export function openImport(ctx, ui, aoTerminar) {
               Object.assign({}, d, {
                 etapa: "ENTREGUE",
                 historico: true,
+                semTelefone: semTelefone(d),
                 followup: null,
                 conferido: true,
                 valor: 0,
+                resp: "",
+                respEmail: "",
+                importadoEm: agora,
+                atualizadoEm: agora
+              }),
+              false
+            ];
+          }
+          if (semTelefone(d)) {
+            semTel++;
+            // sem telefone: fora das filas e dos Incompletos; só conta no Dashboard (PR por ano das fotos)
+            return [
+              id,
+              Object.assign({}, d, {
+                etapa: "SEM TELEFONE",
+                semTelefone: true,
+                followup: null,
                 resp: "",
                 respEmail: "",
                 importadoEm: agora,
@@ -313,7 +332,7 @@ export function openImport(ctx, ui, aoTerminar) {
         }
         await FS.setDoc(FS.doc(db, "config", "repasse_meta"), { escolas, anos, importadoEm: agora }, { merge: true });
         const nInc = ops.filter(([, d, m]) => !m && d.etapa === "INCOMPLETO").length;
-        prog.textContent = `Pronto! ${novos - nInc - historico} novos na fila${nInc ? `, ${nInc} na aba Incompletos` : ""}${historico ? `, ${historico} que já compraram (só histórico, para o Dashboard)` : ""}${fora ? `, ${fora} de turma desmarcada ficaram fora do app` : ""}${atual ? ` e ${atual} atualizados` : ""}.`;
+        prog.textContent = `Pronto! ${novos - nInc - historico - semTel} novos na fila${nInc ? `, ${nInc} na aba Incompletos` : ""}${semTel ? `, ${semTel} sem telefone (só para o Dashboard)` : ""}${historico ? `, ${historico} que já compraram (só histórico, para o Dashboard)` : ""}${fora ? `, ${fora} de turma desmarcada ficaram fora do app` : ""}${atual ? ` e ${atual} atualizados` : ""}.`;
         U.toast("Planilha importada ✅");
         aoTerminar();
         const fechar = U.mkBtn("Fechar", "btn-primary", close);

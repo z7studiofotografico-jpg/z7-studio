@@ -886,7 +886,7 @@ await cenario("Adriano (admin), com os dados já atualizados no servidor", async
       .catch(() => {});
     vt = await pg.textContent("#vdCorpo");
     ok(
-      /PR por ano das fotos/.test(vt) && /Fotografados/.test(vt) && !/Não foi possível contar/.test(vt),
+      /PR por ano das fotos/.test(vt) && /Fotografados/.test(vt) && /Sem telefone/.test(vt) && !/Não foi possível contar/.test(vt),
       "Dashboard · PR por ano das fotos (fotografados × compraram)"
     );
     // Histórico por ano: importa a planilha PERCENTUAL e mostra tabelas e gráficos
@@ -1032,8 +1032,8 @@ await cenario("Adriano (admin), com os dados já atualizados no servidor", async
     const joana = Object.values(s).find(x => x.nome === "Joana Planilha"),
       semTel = Object.values(s).find(x => x.nome === "Sem Telefone");
     ok(
-      joana && joana.etapa === "NA FILA" && joana.ano === 2025 && semTel && semTel.etapa === "INCOMPLETO",
-      "importar PR: fila e incompletos gravados"
+      joana && joana.etapa === "NA FILA" && joana.ano === 2025 && semTel && semTel.etapa === "SEM TELEFONE" && semTel.semTelefone === true,
+      "importar PR: fila gravada e sem telefone fora das filas (só Dashboard)"
     );
     await pg.locator(".sheet:visible").getByRole("button", { name: "Fechar" }).click();
     await calmo(pg);
