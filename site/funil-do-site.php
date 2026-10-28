@@ -38,7 +38,7 @@ if (!function_exists('z7_lead_do_formulario')) {
 		$nome  = $corta($pega('/nome|name/i'), 120);
 		$tel   = $corta($pega('/tel|fone|phone|whats|celular|contato/i'), 30);
 		$email = $corta(strtolower($pega('/mail/i')), 120);
-		$msg   = $pega('/mensag|message|texto|assunto|duvida|obs|coment/i');
+		$msg   = $pega('/mensag|message|^text|assunto|duvida|obs|coment/i'); // (no formulário de contato do site: "text")
 		$serv0 = $pega('/servi|ensaio|tipo|interesse/i');
 		if ($nome === '' && $tel === '' && $email === '') return null; // formulário sem contato: não cria lead
 

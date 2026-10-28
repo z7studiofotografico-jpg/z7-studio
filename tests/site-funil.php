@@ -18,6 +18,9 @@ $ok($c['servico'] === 'Corporativo', 'formulário corporativo vira Corporativo')
 $ok(z7_lead_do_formulario(['_wpcf7' => '1', 'aceite' => '1'], '', '2026-10-28', 'x') === null, 'formulário sem contato não cria lead');
 $f = z7_campos_firestore($l);
 $ok($f['fields']['valor'] === ['integerValue' => '0'] && $f['fields']['nome'] === ['stringValue' => 'Érica Souza'], 'formato da API do Firebase');
+// formulário de contato do site hoje: name-p, mail, text
+$k = z7_lead_do_formulario(['_wpcf7' => '5', 'name-p' => 'Rita Lima', 'mail' => 'rita@x.com', 'text' => 'Quero um ensaio corporativo'], 'Contato', '2026-10-28', 'x');
+$ok($k['nome'] === 'Rita Lima' && $k['email'] === 'rita@x.com' && strpos($k['notas'], 'Mensagem: Quero um ensaio corporativo') !== false && $k['servico'] === 'Corporativo', 'formulário de contato do site (name-p, mail, text)');
 $ok(count($l) === 15, 'só os 15 campos que as regras aceitam');
 echo $falhas ? "$falhas falha(s)\n" : "Tudo certo\n";
 exit($falhas ? 1 : 0);
