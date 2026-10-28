@@ -1000,6 +1000,11 @@ await cenario("Adriano (admin), com os dados já atualizados no servidor", async
         )
       },
       {
+        name: "01 - FORMATURA - 2021-12-13 - C.E. JOÃO PAULO II.csv",
+        mimeType: "text/csv",
+        buffer: Buffer.from(cab + ";C.E. JOAO PAULO II;3º ANO;-;-;1;NAO ENTRA NO PR;;21911112222;;;\n")
+      },
+      {
         name: "05 - PR - E.M ALEXANDRE FARAH (ANCHIETA).csv",
         mimeType: "text/csv",
         buffer: Buffer.from(cab + ";E.M. ALEXANDRE FARAH;9 ANO;-;ROBERTO;EMAF - 02;GABRIEL ANTIGO;;21990021393;;;\n")
@@ -1007,7 +1012,10 @@ await cenario("Adriano (admin), com os dados já atualizados no servidor", async
     ]);
     await pg.waitForFunction(() => /3 formandos encontrados/.test(document.body.textContent), null, { timeout: 8000 }).catch(() => {});
     const imp = pg.locator(".sheet:visible").last();
-    ok(/2 arquivos/.test(await imp.textContent()), "importar PR: lê vários arquivos de uma vez");
+    ok(
+      /3 arquivos/.test(await imp.textContent()) && /fora do PR por ser de formatura/.test(await imp.textContent()),
+      "importar PR: lê vários arquivos de uma vez e deixa de fora os de FORMATURA"
+    );
     await imp.getByLabel("Ano das fotos (de todos os alunos destes arquivos)").fill("2021");
     await calmo(pg);
     ok(
@@ -1025,11 +1033,11 @@ await cenario("Adriano (admin), com os dados já atualizados no servidor", async
         tamara.ano === 2021 &&
         tamara.etapa === "NA FILA" &&
         tamara.codigo === "21CIEP384-07" &&
-        tamara.contatos.some(c => c.tipo === "Mãe" && c.nome === "Responsável pelo aluno de cadastro") &&
+        tamara.contatos.some(c => c.tipo === "Mãe" && c.nome === "Responsável do aluno Tamara Correa (cadastrado)") &&
         gabriel &&
         gabriel.ano === 2021 &&
         gabriel.codigo === "21EMAF-02" &&
-        !Object.values(s).some(x => x.nome === "CAMILLI VENDIDA"),
+        !Object.values(s).some(x => x.nome === "CAMILLI VENDIDA" || x.nome === "NAO ENTRA NO PR"),
       "2021 importado: ano, ID com a sigla, mãe 'do cadastro', e quem comprou ficou de fora"
     );
     await pg.locator(".sheet:visible").getByRole("button", { name: "Fechar" }).click();

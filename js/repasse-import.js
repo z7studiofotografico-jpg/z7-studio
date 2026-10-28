@@ -71,7 +71,13 @@ export function openImport(ctx, ui, aoTerminar) {
       out.append(el("p", "hint", "Lendo as planilhas…"));
       try {
         X = await loadXLSX();
+        const foraDoPR = [];
         for (const f of fs) {
+          // planilha com FORMATURA no nome é de colégio de formatura (vai em Formaturas, não no PR)
+          if (/FORMATURA/i.test(norm(f.name))) {
+            foraDoPR.push(f.name.replace(/\.(xlsx|xls|csv)$/i, ""));
+            continue;
+          }
           const wb = X.read(await f.arrayBuffer(), { type: "array", cellDates: true });
           const sh = wb.Sheets[wb.SheetNames[0]];
           const m = X.utils.sheet_to_json(sh, { header: 1, defval: "", raw: true });
@@ -90,6 +96,8 @@ export function openImport(ctx, ui, aoTerminar) {
           }
           porArquivo.push(`${f.name.replace(/\.(xlsx|xls|csv)$/i, "")}: ${n}`);
         }
+        if (foraDoPR.length) porArquivo.push(`fora do PR por ser de formatura: ${foraDoPR.join(", ")}`);
+        if (!brutos.length) throw new Error("Nenhuma planilha de PR (as de FORMATURA vão em Formaturas).");
         // ano sugerido: o que estiver no nome dos arquivos (ex.: "2021"); senão o mais comum nas datas
         const doNome = fs.map(f => (f.name.match(/\b(20[12]\d)\b/) || [])[1]).find(Boolean);
         if (!anoIn.value) {

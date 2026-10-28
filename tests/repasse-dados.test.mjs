@@ -37,8 +37,8 @@ test("situação e endereço do cartão do PR", async () => {
   assert.equal(enderecoTxt({ etapa: "PAGO", entregaTipo: "Retirada no estúdio", endereco: end }), "");
 });
 
-test("planilha antiga (2021): TELEFONE 1 aluno, 2 mãe, 3 pai; sem nome vira 'Responsável pelo aluno de cadastro'; ano escolhido na importação", async () => {
-  const { linhaParaDoc, faltando, RESP_CADASTRO, MAPA, hkey } = await import("../js/repasse-dados.js");
+test("planilha antiga (2021): TELEFONE 1 aluno, 2 mãe, 3 pai; sem nome vira 'Responsável do aluno Fulano (cadastrado)'; ano escolhido na importação", async () => {
+  const { linhaParaDoc, faltando, ehRespCadastro, MAPA, hkey } = await import("../js/repasse-dados.js");
   const cab = [
     "FOTOZOOM",
     "ESCOLA / FAC.",
@@ -82,8 +82,8 @@ test("planilha antiga (2021): TELEFONE 1 aluno, 2 mãe, 3 pai; sem nome vira 'Re
   assert.deepEqual(
     a.contatos.map(c => [c.tipo, c.nome, c.tel]),
     [
-      ["Mãe", RESP_CADASTRO, "22999266331"],
-      ["Pai", RESP_CADASTRO, "22999831848"],
+      ["Mãe", "Responsável do aluno Tamara Correa (cadastrado)", "22999266331"],
+      ["Pai", "Responsável do aluno Tamara Correa (cadastrado)", "22999831848"],
       ["Formando", "", "22999638860"]
     ]
   );
@@ -99,7 +99,8 @@ test("planilha antiga (2021): TELEFONE 1 aluno, 2 mãe, 3 pai; sem nome vira 'Re
   assert.equal(b.ano, 2021);
   assert.equal(b.codigo, "21EMAF-21");
   // só o telefone do aluno: entra na fila com o responsável "do cadastro"
-  assert.equal(b.responsavel, RESP_CADASTRO);
+  assert.equal(b.responsavel, "Responsável do aluno Rianny Victoria (cadastrado)");
+  assert.ok(ehRespCadastro(b.responsavel) && !ehRespCadastro("Marta"));
   assert.deepEqual(faltando(b), []);
   // sem ano escolhido, continua usando a DATA (planilhas do ano atual)
   assert.equal(linhaParaDoc(linha(["", "X", "", "", "", "1", "ANA", "10/3/2022", "21966472002"]), X).ano, 2022);

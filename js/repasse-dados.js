@@ -88,8 +88,10 @@ export function parseData(v, X) {
   }
   return "";
 }
-// Nome usado quando a planilha não traz o nome da mãe nem do pai (o contato existe, só não tem nome)
-export const RESP_CADASTRO = "Responsável pelo aluno de cadastro";
+// Nome usado quando a planilha não traz o nome da mãe nem do pai (o contato existe, só não tem nome):
+// "Responsável do aluno Tamara Correa (cadastrado)"
+export const respCadastro = nome => `Responsável do aluno ${title(String(nome || "").trim())} (cadastrado)`;
+export const ehRespCadastro = n => /^Responsável do aluno .*\(cadastrado\)$/.test(String(n || ""));
 // anoFixo: o ano das fotos escolhido na importação (nas planilhas antigas a DATA é a da venda, não a do ensaio)
 export function linhaParaDoc(r, X, anoFixo) {
   const dataEnsaio = parseData(r.data, X);
@@ -98,7 +100,7 @@ export function linhaParaDoc(r, X, anoFixo) {
   const vistos = new Set();
   const cs = contatos
     .filter(c => !vistos.has(c.tel) && vistos.add(c.tel))
-    .map(c => ((c.tipo === "Mãe" || c.tipo === "Pai") && !c.nome ? Object.assign({}, c, { nome: RESP_CADASTRO }) : c));
+    .map(c => ((c.tipo === "Mãe" || c.tipo === "Pai") && !c.nome ? Object.assign({}, c, { nome: respCadastro(r.nome) }) : c));
   const s = v => (v == null ? "" : String(v).trim());
   // ID só com número (1, 2, 3…): vira o ID do app com a sigla do colégio (21CIEP384-01)
   const cod = s(r.codigo);
@@ -121,7 +123,7 @@ export function linhaParaDoc(r, X, anoFixo) {
     ano,
     contatos: cs,
     // sem telefone de mãe ou pai: o responsável fica como "do cadastro" (não trava a fila)
-    responsavel: cs.some(c => c.tipo !== "Formando") ? "" : RESP_CADASTRO,
+    responsavel: cs.some(c => c.tipo !== "Formando") ? "" : respCadastro(r.nome),
     telefones: cs.map(c => c.tel),
     email: s(r.email).toLowerCase(),
     pagamentoOrig: s(r.pagamento),
