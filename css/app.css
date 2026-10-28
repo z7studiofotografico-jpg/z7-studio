@@ -282,3 +282,12 @@ details.tamtipo{border:1px solid var(--line,#ddd);border-radius:10px;padding:6px
 .hq-baixa{background:var(--late-soft);color:var(--late)}
 .hq-vazio{background:var(--bg);color:var(--muted)}
 .hleg-i .hq-boa{background:var(--ok)}.hleg-i .hq-media{background:var(--warn)}.hleg-i .hq-baixa{background:var(--late)}.hleg-i .hq-vazio{background:var(--line)}
+.hcol-num{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:4px}
+.hcol-num .hq{padding:6px 4px}
+.hcol-num .hq-vazio{color:var(--fg)}
+.hcol-num .hq-vazio small{color:var(--muted)}
+.hcol-tend.pr{background:#dbe6fd;color:#1d4ed8}
+.hcol-tend.form{background:var(--bg);color:var(--fg);border:1px solid var(--line)}
+.hcol-obs{margin:8px 0 0;font-size:.8rem;color:var(--muted)}
+@media (max-width:480px){.hcol-num{grid-template-columns:repeat(2,minmax(0,1fr))}}
+@media (prefers-color-scheme:dark){.hcol-tend.pr{background:#1e2a4a;color:#9db8ff}}

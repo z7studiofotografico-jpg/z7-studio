@@ -210,23 +210,8 @@ function desenhar(corpo, D, hs) {
     sufixo: "%"
   });
   const b7 = caixa(corpo, `${anoSel} · colégios`, "do que mais converteu ao que menos converteu");
-  tabela(
-    b7,
-    ["Colégio", "Tipo", "Alunos", "Vendas", "Conversão", "Ticket", "R$ por aluno", "Total", "Obs."],
-    ord.map(c => [
-      c.nome + (c.turma ? ` (turma ${c.turma})` : ""),
-      c.tipo === "pr" ? "PR" : "Formatura",
-      c.alunos,
-      c.vendas,
-      pc(c.vendas / c.alunos),
-      c.vendas ? moeda(Math.round(c.total / c.vendas)) : "—",
-      moeda(Math.round(c.total / c.alunos)),
-      moeda(c.total),
-      [c.devolucoes ? c.devolucoes + " devolução(ões)" : "", c.beca ? "beca " + moeda(c.beca) : "", c.obs || ""]
-        .filter(Boolean)
-        .join(" · ") || "—"
-    ])
-  );
+  b7.append(legendaConv(true));
+  ord.forEach(c => b7.append(cartaoDoAno(c)));
 }
 
 // "C.E SANTO ANTONIO (N.IGUAÇU)" → "C.E Santo Antonio (N.Iguaçu)": siglas (C.E, CIEP, GET, II) ficam em maiúsculas
@@ -238,18 +223,20 @@ const nomeBonito = n =>
     .replace(/^(\S+)/, m => m.charAt(0).toUpperCase() + m.slice(1));
 // Faixas de conversão (cores do quadrinho)
 const faixa = v => (Math.round(v * 100) >= 30 ? "boa" : Math.round(v * 100) >= 20 ? "media" : "baixa"); // pela % mostrada
-function legendaConv() {
+function legendaConv(semVazio) {
   const l = el("div", "hleg");
   [
     ["boa", "30% ou mais"],
     ["media", "20% a 29%"],
     ["baixa", "abaixo de 20%"],
     ["vazio", "não fotografamos"]
-  ].forEach(([k, t]) => {
-    const i = el("span", "hleg-i");
-    i.append(el("i", "hq-" + k), document.createTextNode(t));
-    l.append(i);
-  });
+  ]
+    .filter(([k]) => !(semVazio && k === "vazio"))
+    .forEach(([k, t]) => {
+      const i = el("span", "hleg-i");
+      i.append(el("i", "hq-" + k), document.createTextNode(t));
+      l.append(i);
+    });
   return l;
 }
 function cartaoColegio(x, anos) {
@@ -280,6 +267,47 @@ function cartaoColegio(x, anos) {
   });
   c.append(g);
   return c;
+}
+
+// Um colégio no ano: conversão em destaque (com a cor da faixa) e os números ao lado
+function cartaoDoAno(c) {
+  const k = el("div", "hcol");
+  const topo = el("div", "hcol-topo");
+  topo.append(el("b", null, nomeBonito(c.nome)));
+  topo.append(
+    el(
+      "span",
+      "hcol-tend " + (c.tipo === "pr" ? "pr" : "form"),
+      c.tipo === "pr" ? "PR" : "Formatura" + (c.turma ? " · turma " + c.turma : "")
+    )
+  );
+  k.append(topo);
+  const g = el("div", "hcol-num");
+  const q = (cls, rot, val, sub) => {
+    const d = el("div", "hq " + cls);
+    d.append(el("small", null, rot), el("strong", null, val));
+    if (sub) d.append(el("small", null, sub));
+    g.append(d);
+  };
+  const conv = c.vendas / c.alunos;
+  q("hq-" + faixa(conv), "Conversão", pc(conv), `${c.vendas} de ${c.alunos}`);
+  q("hq-vazio", "Total", moeda(c.total));
+  q("hq-vazio", "Ticket", c.vendas ? moeda(Math.round(c.total / c.vendas)) : "—");
+  q("hq-vazio", "Por aluno", moeda(Math.round(c.total / c.alunos)));
+  k.append(g);
+  const obs = [
+    c.devolucoes ? `↩️ ${c.devolucoes} devolução${c.devolucoes > 1 ? "ões" : ""}` : "",
+    c.beca ? "👘 beca " + moeda(c.beca) : "",
+    c.obs
+      ? "📝 " +
+        c.obs
+          .replace(/^([\d.,]+)\s+DEVENDO/i, "R$ $1 devendo")
+          .toLowerCase()
+          .replace(/^r\$/, "R$")
+      : ""
+  ].filter(Boolean);
+  if (obs.length) k.append(el("p", "hcol-obs", obs.join("  ·  ")));
+  return k;
 }
 
 // Um gráfico do Chart.js (ou nada, se a biblioteca não carregou: as tabelas já mostram os números)

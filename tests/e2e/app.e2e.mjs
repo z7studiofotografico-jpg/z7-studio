@@ -927,6 +927,7 @@ await cenario("Adriano (admin), com os dados já atualizados no servidor", async
         /O mesmo colégio em vários anos/.test(vt) &&
         /CIEP 384/.test(vt) &&
         (await pg.locator("#vdCorpo .hcol .hq").count()) >= 2 &&
+        (await pg.locator("#vdCorpo .hcol-num").count()) >= 1 &&
         (await pg.locator("#vdCorpo canvas").count()) >= 4,
       "Dashboard · Histórico: importa as planilhas PERCENTUAL, guarda por ano e mostra tabelas e gráficos"
     );
