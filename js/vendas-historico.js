@@ -34,6 +34,7 @@ export async function areaHistorico(corpo, D) {
     console.warn("[Z7] histórico", e);
     return;
   }
+  if (!corpo.isConnected) return; // trocou de aba enquanto carregava
   espera.remove();
   if (!hs.length) {
     corpo.append(
@@ -271,22 +272,28 @@ function importar(D, aoTerminar) {
       try {
         const X = await carregarLib("xlsx");
         for (const f of inp.files) {
-          const wb = X.read(await f.arrayBuffer(), { type: "array", cellDates: true, codepage: 65001 });
-          const ano = anoDaPlanilha(f.name, wb.SheetNames);
-          if (!ano) {
-            out.append(el("p", "err", `${f.name}: não achei o ano no nome do arquivo (ex.: “2023 - PERCENTUAL PR.xlsx”).`));
-            continue;
+          try {
+            const wb = X.read(await f.arrayBuffer(), { type: "array", cellDates: true, codepage: 65001 });
+            const ano = anoDaPlanilha(f.name, wb.SheetNames);
+            if (!ano) {
+              out.append(el("p", "err", `${f.name}: não achei o ano no nome do arquivo (ex.: “2023 - PERCENTUAL PR.xlsx”).`));
+              continue;
+            }
+            if (lidos.some(x => x.ano === ano))
+              out.append(el("p", "err", `${f.name}: o ano ${ano} veio em mais de uma planilha; fica a última.`));
+            const h = lerPercentual(X.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]], { header: 1, defval: "", raw: true }), ano);
+            const r = resumoDoAno(h).geral;
+            lidos = lidos.filter(x => x.ano !== ano).concat(h);
+            out.append(
+              el(
+                "p",
+                null,
+                `${ano}: ${h.colegios.length} colégios · ${r.alunos} alunos · ${r.vendas} vendas (${pc(r.conversao)}) · ${moeda(r.total)}`
+              )
+            );
+          } catch (e) {
+            out.append(el("p", "err", `${f.name}: não consegui ler (${e.message || e}).`));
           }
-          const h = lerPercentual(X.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]], { header: 1, defval: "", raw: true }), ano);
-          const r = resumoDoAno(h).geral;
-          lidos.push(h);
-          out.append(
-            el(
-              "p",
-              null,
-              `${ano}: ${h.colegios.length} colégios · ${r.alunos} alunos · ${r.vendas} vendas (${pc(r.conversao)}) · ${moeda(r.total)}`
-            )
-          );
         }
         ok.disabled = !lidos.length;
       } catch (e) {

@@ -28,6 +28,7 @@ export function numero(v) {
     .trim();
   if (!t || t.startsWith("#")) return 0;
   if (/,\d{1,2}$/.test(t)) t = t.replace(/\./g, "").replace(",", ".");
+  else if (/^-?\d{1,3}(\.\d{3})+$/.test(t)) t = t.replace(/\./g, ""); // "1.234" = mil duzentos e trinta e quatro
   const n = Number(t.replace(/[^\d.-]/g, ""));
   return isFinite(n) ? n : 0;
 }

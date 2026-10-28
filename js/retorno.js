@@ -21,7 +21,7 @@ export function linhasRetorno(it) {
       el(
         "p",
         hoje ? "wait" : "notes",
-        `${hoje ? "⏰ Retornar hoje" : "🔁 Retornar em " + dataBR(r.data)}${r.motivo ? ": " + r.motivo : ""}` +
+        `${hoje ? (r.data < U.todayStr() ? "⏰ Retornar (pedido para " + dataBR(r.data) + ")" : "⏰ Retornar hoje") : "🔁 Retornar em " + dataBR(r.data)}${r.motivo ? ": " + r.motivo : ""}` +
           (r.por ? ` (pediu a ${U.first(r.por)} em ${dataBR(String(r.em || "").slice(0, 10))})` : "")
       )
     );
@@ -75,10 +75,12 @@ export function abrirRetorno(C, it, salvar) {
       ["1 mês", 30]
     ].forEach(([t, n]) => atalhos.append(U.mkBtn(t, "btn-sm", () => (data.value = U.addDays(n)))));
     p.append(atalhos, botoes(close, "Salvar"));
+    let salvando = false; // toque duplo no Salvar não grava o motivo duas vezes
     p.addEventListener("submit", async ev => {
       ev.preventDefault();
       const texto = motivo.value.trim();
-      if (!texto || !data.value) return;
+      if (!texto || !data.value || salvando) return;
+      salvando = true;
       const agora = new Date().toISOString();
       const ret = { data: data.value, motivo: texto, por: C.me || "", porEmail: C.email || "", em: agora };
       const patch = {
@@ -90,6 +92,7 @@ export function abrirRetorno(C, it, salvar) {
         Object.assign(it, patch);
         close();
       } catch (e) {
+        salvando = false;
         C.handleErr(e);
       }
     });

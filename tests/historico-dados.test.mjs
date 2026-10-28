@@ -15,6 +15,8 @@ test("histórico: números da planilha (pt-BR, erros de fórmula, vazio)", () =>
   assert.equal(numero(1234.5), 1234.5);
   assert.equal(numero("1.669,75"), 1669.75);
   assert.equal(numero("407,36"), 407.36);
+  assert.equal(numero("1.234"), 1234);
+  assert.equal(numero("1.5"), 1.5);
   assert.equal(numero("#DIV/0!"), 0);
   assert.equal(numero("#REF!"), 0);
   assert.equal(numero(""), 0);
