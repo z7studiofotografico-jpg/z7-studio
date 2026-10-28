@@ -1,3 +1,4 @@
+import "./endereco.js"; // endereço antigo (github.io) → app.z7studio.com.br
 import { campoReais } from "./regras.js";
 import { chave } from "./util.js";
 // Peças de tela usadas por todos os módulos (antes cada arquivo tinha a sua cópia).

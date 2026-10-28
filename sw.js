@@ -140,7 +140,8 @@ self.addEventListener("fetch", e => {
       let espera;
       const tempo = new Promise(r => (espera = setTimeout(() => r(guardado), ESPERA_MS)));
       const rede = daRede.then(
-        res => (res.ok ? res : guardado), // erro do servidor: fica com a cópia boa
+        // erro do servidor: fica com a cópia boa; endereço que mudou (redirecionamento): segue para o novo
+        res => (res.ok || res.type === "opaqueredirect" ? res : guardado),
         () => guardado
       );
       const res = await Promise.race([rede, tempo]);
