@@ -47,6 +47,13 @@ export function openImport(ctx, ui, aoTerminar) {
     inp.accept = ".xlsx,.xls,.csv";
     inp.multiple = true;
     p.append(field("Arquivos", inp));
+    // planilhas de FORMATURA: por padrão ficam fora (o colégio é de formatura); marcando, entram para a
+    // Linha de Frente do ano delas (ex.: 2027 só aparece para a Linha de Frente em 2027)
+    const comForm = el("input");
+    comForm.type = "checkbox";
+    const lForm = el("label", "chk");
+    lForm.append(comForm, document.createTextNode(" Incluir as planilhas de FORMATURA (Linha de Frente do ano das fotos)"));
+    p.append(lForm);
     // Ano das fotos: vale para todos os alunos destes arquivos (nas planilhas antigas a DATA é a da venda)
     const anoIn = el("input");
     anoIn.type = "number";
@@ -81,7 +88,7 @@ export function openImport(ctx, ui, aoTerminar) {
         const foraDoPR = [];
         for (const f of fs) {
           // planilha com FORMATURA no nome é de colégio de formatura (vai em Formaturas, não no PR)
-          if (/FORMATURA/i.test(norm(f.name))) {
+          if (/FORMATURA/i.test(norm(f.name)) && !comForm.checked) {
             foraDoPR.push(f.name.replace(/\.(xlsx|xls|csv)$/i, ""));
             continue;
           }
@@ -123,6 +130,7 @@ export function openImport(ctx, ui, aoTerminar) {
       }
     };
     anoIn.oninput = () => brutos.length && montar();
+    comForm.onchange = () => inp.files.length && inp.onchange();
     function montar() {
       rows = brutos.map(o => linhaParaDoc(o, X, anoIn.value));
       out.innerHTML = "";
