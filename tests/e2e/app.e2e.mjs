@@ -576,6 +576,22 @@ await cenario("Adriano (admin), com os dados já atualizados no servidor", async
     // Formaturas: registrar parcela (transação)
     await ir(pg, "#formaturas");
     ok(/Lucas Silva/.test(await pg.textContent("#fmCorpo")), "cobranças mostram o formando atrasado");
+    // pediu para pagar outro dia: motivo + data ficam no formando (e no histórico de motivos)
+    await pg.locator("#fmCorpo .card").filter({ hasText: "Lucas" }).getByRole("button", { name: "📅 Pediu contato depois" }).click();
+    await calmo(pg);
+    const shRet = pg.locator(".sheet").last();
+    await shRet.getByLabel("Motivo").fill("Sem dinheiro agora, recebe dia 10");
+    await shRet.getByRole("button", { name: "15 dias" }).click();
+    await shRet.locator("button[type=submit]").click();
+    await calmo(pg);
+    s = await store();
+    ok(
+      s["formandos/f1"].retorno &&
+        s["formandos/f1"].retorno.motivo === "Sem dinheiro agora, recebe dia 10" &&
+        s["formandos/f1"].retorno.data === dia(15) &&
+        s["formandos/f1"].motivos.length === 1,
+      "Formaturas: 'Pediu contato depois' guarda motivo e data (histórico de motivos)"
+    );
     await pg.locator("#fmCorpo .card").filter({ hasText: "Lucas" }).getByText("✅ Parcela paga").click();
     await calmo(pg);
     s = await store();
@@ -583,6 +599,7 @@ await cenario("Adriano (admin), com os dados já atualizados no servidor", async
       s["formandos/f1"].pagamentos.length === 2 && s["formandos/f1"].pagas === 2 && s["formandos/f1"].pagamentos[1].valor === 85,
       "parcela registrada com valor e data"
     );
+
     // Turma: novo formando com 400 em 3x
     await pg.locator("#fmChips").getByText("Turmas").click();
     await calmo(pg);
@@ -1016,19 +1033,25 @@ await cenario("Adriano (admin), com os dados já atualizados no servidor", async
         name: "05 - PR - E.M ALEXANDRE FARAH (ANCHIETA).csv",
         mimeType: "text/csv",
         buffer: Buffer.from(cab + ";E.M. ALEXANDRE FARAH;9 ANO;-;ROBERTO;EMAF - 02;GABRIEL ANTIGO;;21990021393;;;\n")
+      },
+      {
+        name: "07 - PR - E.E NUTA BARTLET JAMES (NILOPOLIS).csv",
+        mimeType: "text/csv",
+        buffer: Buffer.from(cab + ";E.E NUTA BARTLET JAMES;9 ANO;-;ROBERTO;1;BLOQUEADO NUTA;;21977776666;;;\n")
       }
     ]);
-    await pg.waitForFunction(() => /3 formandos encontrados/.test(document.body.textContent), null, { timeout: 8000 }).catch(() => {});
+    await pg.waitForFunction(() => /4 formandos encontrados/.test(document.body.textContent), null, { timeout: 8000 }).catch(() => {});
     const imp = pg.locator(".sheet:visible").last();
     ok(
-      /3 arquivos/.test(await imp.textContent()) && /fora do PR por ser de formatura/.test(await imp.textContent()),
+      /4 arquivos/.test(await imp.textContent()) && /fora do PR por ser de formatura/.test(await imp.textContent()),
       "importar PR: lê vários arquivos de uma vez e deixa de fora os de FORMATURA"
     );
     await imp.getByLabel("Ano das fotos (de todos os alunos destes arquivos)").fill("2021");
+    await imp.locator("label.chk", { hasText: "NUTA BARTLET JAMES · 9 ANO" }).locator("input").uncheck();
     await calmo(pg);
     ok(
       !(await imp.locator("label.chk", { hasText: "VENDIDO" }).locator("input").isChecked()) &&
-        /3 completos e 0 incompletos/.test(await imp.textContent()),
+        /4 completos e 0 incompletos/.test(await imp.textContent()),
       "quem já comprou (VENDIDO) vem desmarcado; sem nome da mãe/pai não trava (responsável do cadastro)"
     );
     await imp.locator("button[type=submit]").click();
@@ -1053,9 +1076,11 @@ await cenario("Adriano (admin), com os dados já atualizados no servidor", async
       return m.historicoPlanilha([...window.__store.values()].find(x => x.nome === "TAMARA CORREA") || {});
     });
     ok(
-      /FotoZoom: 4821/.test(tamaraHist) && !/Status: -/.test(tamaraHist),
-      "cartão mostra o histórico da planilha (status, motivo, FotoZoom): " + tamaraHist
+      !/FotoZoom|4821/.test(tamaraHist) && !/Status: -/.test(tamaraHist),
+      "histórico da planilha sem o código do FotoZoom e sem '-': " + tamaraHist
     );
+    const nuta = Object.values(s).find(x => x.nome === "BLOQUEADO NUTA");
+    ok(!nuta && /1 de turma desmarcada ficaram fora do app/.test(await pg.textContent("body")), "turma desmarcada fica fora do app");
     const camilli = Object.values(s).find(x => x.nome === "CAMILLI VENDIDA");
     ok(
       camilli &&

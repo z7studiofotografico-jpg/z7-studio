@@ -51,6 +51,7 @@ export const MAPA = {
   PAGAMENTO: "pagamento",
   FOTOS: "fotos",
   RUA: "rua",
+  ENDERECO: "rua",
   N: "numero",
   NO: "numero",
   NUMERO: "numero",
@@ -104,18 +105,18 @@ export function linhaParaDoc(r, X, anoFixo) {
     .filter(c => !vistos.has(c.tel) && vistos.add(c.tel))
     .map(c => ((c.tipo === "Mãe" || c.tipo === "Pai") && !c.nome ? Object.assign({}, c, { nome: respCadastro(r.nome) }) : c));
   const s = v => (v == null ? "" : String(v).trim());
+  // linha com as colunas deslocadas (STATUS na coluna CURSO e o vendedor em STATUS): põe cada uma no lugar
+  const ehStatus = v => /VENDID|CA[IÍ]D|CANCEL|BRINDE|^-$/i.test(s(v));
+  if (!ehStatus(r.status) && ehStatus(r.curso) && s(r.curso) !== "-") r = Object.assign({}, r, { status: r.curso, curso: "" });
+  // o ano no fim do nome do colégio ("C. E PRESIDENTE DUTRA 2021") não faz parte do nome
+  r = Object.assign({}, r, { escola: s(r.escola).replace(/\s+20\d\d$/, ""), curso: s(r.curso) === "-" ? "" : r.curso });
   // ID só com número (1, 2, 3…): vira o ID do app com a sigla do colégio (21CIEP384-01)
   const cod = s(r.codigo);
   const codigo =
     /^\d{1,4}$/.test(cod) && siglaDe(s(r.escola)) ? fmtCodigo(ano, siglaDe(s(r.escola)), Number(cod)) : cod ? comAno(cod, ano) : "";
   const vazio = v => !s(v) || /^[-–.]+$/.test(s(v));
-  const obs = [
-    vazio(r.obs) ? "" : s(r.obs),
-    vazio(r.motivo) ? "" : "Motivo: " + s(r.motivo),
-    s(r.fotozoom) ? "FotoZoom: " + s(r.fotozoom) : ""
-  ]
-    .filter(Boolean)
-    .join(" · ");
+  // (o código do FotoZoom não entra: a venda pelo FotoZoom é outro caminho)
+  const obs = [vazio(r.obs) ? "" : s(r.obs), vazio(r.motivo) ? "" : "Motivo: " + s(r.motivo)].filter(Boolean).join(" · ");
   return {
     nome: s(r.nome),
     nomeBusca: norm(r.nome),
@@ -132,7 +133,7 @@ export function linhaParaDoc(r, X, anoFixo) {
     ano,
     contatos: cs,
     // sem telefone de mãe ou pai: o responsável fica como "do cadastro" (não trava a fila)
-    responsavel: cs.some(c => c.tipo !== "Formando") ? "" : respCadastro(r.nome),
+    responsavel: cs.some(c => c.tipo !== "Formando" && c.nome) ? "" : respCadastro(r.nome),
     telefones: cs.map(c => c.tel),
     email: s(r.email).toLowerCase(),
     pagamentoOrig: s(r.pagamento),

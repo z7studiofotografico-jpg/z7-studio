@@ -20,6 +20,12 @@ export async function jaExistem(FS, col, ids) {
   return achados;
 }
 
+// turma = colégio · série (ex.: "E.E NUTA BARTLET JAMES · 9 ANO")
+const turmaDe = r =>
+  [r.escola, r.curso]
+    .map(x => String(x || "").trim())
+    .filter(Boolean)
+    .join(" · ") || "(sem colégio)";
 // ui = { sheet, field, actions, meta } (janelinhas do PR e escolas/anos já importados); aoTerminar() recarrega escolas e números
 export function openImport(ctx, ui, aoTerminar) {
   C = ctx;
@@ -56,6 +62,7 @@ export function openImport(ctx, ui, aoTerminar) {
     const ok = acts.querySelector("button[type=submit]");
     ok.disabled = true;
     p.append(acts);
+    const bloqueadas = new Set();
     let rows = [],
       brutos = [],
       X = null,
@@ -160,20 +167,42 @@ export function openImport(ctx, ui, aoTerminar) {
         )
       );
       const box = el("div", "quick");
-      const temCaido = Object.keys(porStatus).some(k => /CA[IÍ]D/i.test(norm(k)));
       Object.entries(porStatus)
         .sort((a, b) => b[1] - a[1])
         .forEach(([k, n]) => {
           const l = el("label", "chk");
           const c = el("input");
           c.type = "checkbox";
-          // quem já comprou (VENDIDO, VENDIDO SITE…) vem desmarcado
-          c.checked = temCaido ? /CAID/.test(norm(k)) : !/VENDID/.test(norm(k));
+          // quem já comprou (VENDIDO, VENDIDO SITE, BRINDE…) vem desmarcado; CAÍDO, cancelado e vazio entram na fila
+          c.checked = !/VENDID|BRINDE/.test(norm(k));
           c.value = k;
           l.append(c, document.createTextNode(` ${k} (${n})`));
           box.append(l);
         });
       out.append(box);
+      // turmas (colégio · série): desmarcada = não entrar em contato (ex.: turma que pediu para não ser procurada)
+      const porTurma = {};
+      rows.forEach(r => {
+        const k = turmaDe(r);
+        porTurma[k] = (porTurma[k] || 0) + 1;
+      });
+      out.append(
+        el("p", "hint", "Turmas que entram. Desmarque a turma que NÃO pode ser procurada de novo: os alunos dela ficam fora do app.")
+      );
+      const boxT = el("div", "quick turmas-imp");
+      Object.entries(porTurma)
+        .sort((a, b) => a[0].localeCompare(b[0], "pt-BR"))
+        .forEach(([k, n]) => {
+          const l = el("label", "chk");
+          const c = el("input");
+          c.type = "checkbox";
+          c.checked = !bloqueadas.has(k);
+          c.dataset.turma = k;
+          c.onchange = () => (c.checked ? bloqueadas.delete(k) : bloqueadas.add(k));
+          l.append(c, document.createTextNode(` ${k} (${n})`));
+          boxT.append(l);
+        });
+      out.append(boxT);
       const porAno = {};
       rows.forEach(r => {
         const k = r.ano || "sem data";
@@ -197,10 +226,15 @@ export function openImport(ctx, ui, aoTerminar) {
     p.addEventListener("submit", async ev => {
       ev.preventDefault();
       if (!rows.length) return;
-      const okStatus = new Set([...out.querySelectorAll("input[type=checkbox]")].filter(c => c.checked).map(c => c.value));
+      const okStatus = new Set(
+        [...out.querySelectorAll("input[type=checkbox]:not([data-turma])")].filter(c => c.checked).map(c => c.value)
+      );
       // desmarcados que já compraram (VENDIDO…): entram como histórico (comprou naquele ano), fora das filas
-      const comprou = r => /VENDID/.test(norm(r.statusOrig));
-      const sel = rows.filter(r => okStatus.has(r.statusOrig || "(vazio)") || comprou(r));
+      const comprou = r => /VENDID|BRINDE/.test(norm(r.statusOrig));
+      // turma desmarcada não entra no app (alunos que não podem ser procurados de novo)
+      const naTurma = rows.filter(r => !bloqueadas.has(turmaDe(r)));
+      const fora = rows.length - naTurma.length;
+      const sel = naTurma.filter(r => okStatus.has(r.statusOrig || "(vazio)") || comprou(r));
       ok.disabled = true;
       inp.disabled = true;
       const prog = el("p", "hint", "Preparando…");
@@ -279,7 +313,7 @@ export function openImport(ctx, ui, aoTerminar) {
         }
         await FS.setDoc(FS.doc(db, "config", "repasse_meta"), { escolas, anos, importadoEm: agora }, { merge: true });
         const nInc = ops.filter(([, d, m]) => !m && d.etapa === "INCOMPLETO").length;
-        prog.textContent = `Pronto! ${novos - nInc - historico} novos na fila${nInc ? `, ${nInc} na aba Incompletos` : ""}${historico ? `, ${historico} que já compraram (só histórico, para o Dashboard)` : ""}${atual ? ` e ${atual} atualizados` : ""}.`;
+        prog.textContent = `Pronto! ${novos - nInc - historico} novos na fila${nInc ? `, ${nInc} na aba Incompletos` : ""}${historico ? `, ${historico} que já compraram (só histórico, para o Dashboard)` : ""}${fora ? `, ${fora} de turma desmarcada ficaram fora do app` : ""}${atual ? ` e ${atual} atualizados` : ""}.`;
         U.toast("Planilha importada ✅");
         aoTerminar();
         const fechar = U.mkBtn("Fechar", "btn-primary", close);

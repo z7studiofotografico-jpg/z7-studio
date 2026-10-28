@@ -5,7 +5,8 @@
 //  - 📋 Kits e preços: tabela do contrato (antecipado) e preço depois das fotos
 //  - Turmas: colégios fechados, com acesso à lista de formandos
 // Quem não é administrador vê só as turmas dos colégios que fechou.
-import { openTurma, cobrarWa, registrarPagamento, atrasado, oferecerKit, abrirPrevia } from "./turma.js";
+import { openTurma, cobrarWa, registrarPagamento, atrasado, oferecerKit, abrirPrevia, retornoFormando } from "./turma.js";
+import { linhasRetorno } from "./retorno.js";
 import { kitsPadrao, candidatosPosFoto, ehRepasse, anoDaTurma } from "./contrato.js";
 import {
   ativo,
@@ -366,6 +367,7 @@ function renderCobrancas(corpo, cob) {
       .filter(Boolean)
       .forEach((t, i) => meta.append(el("span", "tag" + (i === 1 ? " svc" : ""), t)));
     e.append(meta);
+    linhasRetorno(f).forEach(x => e.append(x));
     const pg = pagasDe(f),
       emAtraso = esperadas(f, U.todayStr()) - pg;
     e.append(
@@ -379,6 +381,7 @@ function renderCobrancas(corpo, cob) {
     const act = el("div", "actions");
     if (C.isAdmin) act.append(U.mkBtn("✅ Parcela paga", "btn-ok", () => registrarPagamento(C, f).catch(er => C.handleErr(er))));
     if (f.tel) act.append(U.mkBtn("💬 Cobrar", at ? "btn-primary" : "", () => cobrarWa(C, f)));
+    act.append(U.mkBtn("📅 Pediu contato depois", "", () => retornoFormando(C, f)));
     const inst = insts.find(i => i.id === f.instId);
     if (inst) act.append(U.mkBtn("Ver turma", "", () => abrirTurma(inst)));
     e.append(act);

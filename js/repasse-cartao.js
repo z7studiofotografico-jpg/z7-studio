@@ -6,6 +6,7 @@ import { faltando, situacaoTxt, enderecoTxt, historicoPlanilha } from "./repasse
 import { avisoTel } from "./aluno-id.js";
 import { fmtTel } from "./numeros.js";
 import { whatsAtivo } from "./numeros-tela.js";
+import { linhasRetorno, abrirRetorno } from "./retorno.js";
 import {
   C,
   tab,
@@ -85,6 +86,8 @@ export function card(it) {
   const fu = el("div", "fu " + (s === "late" ? "late" : s === "today" ? "today" : it.followup ? "" : "none"));
   fu.textContent = situacaoTxt(it, s);
   e.append(fu);
+  // pediu contato depois (motivo e data) e o histórico de motivos
+  linhasRetorno(it).forEach(x => e.append(x));
   const end = enderecoTxt(it);
   if (end) e.append(el("p", "notes", "📍 " + end));
   if (it.notas) e.append(el("p", "notes", it.notas));
@@ -309,7 +312,28 @@ function acoesDoCartao(it, li, e) {
         save(it, { etapa: "ENTREGUE", entregueEm: U.todayStr(), followup: U.addDays(2) }, "Entrega registrada 🎉")
       )
     );
-  if (["NÃO QUER", "SEM CONTATO"].includes(it.etapa))
+  // pediu para falar outro dia (ex.: não consegue pagar agora): motivo + data; nesse dia volta para a lista
+  if ((ABERTAS.includes(it.etapa) || ["NÃO QUER", "SEM CONTATO"].includes(it.etapa)) && !it.naoContatar)
+    act.append(
+      U.mkBtn("📅 Pediu contato depois", "", () =>
+        abrirRetorno(C, it, patch =>
+          save(
+            it,
+            Object.assign(
+              patch,
+              {
+                followup: patch.retorno.data,
+                atendendo: null,
+                etapa: ABERTAS.includes(it.etapa) ? it.etapa : "CONTATADO"
+              },
+              !it.resp && !it.respEmail && C.me ? assumir(it) : {}
+            ),
+            "Anotado: volta para a lista em " + U.fmtDate(patch.retorno.data)
+          )
+        )
+      )
+    );
+  if (["NÃO QUER", "SEM CONTATO"].includes(it.etapa) && !it.naoContatar)
     act.append(
       U.mkBtn("Reabrir", "", () =>
         save(it, { etapa: "SEPARADO", followup: U.todayStr(), tentativas: 0, tentInteresse: 0, ...assumir(it) }, "Contato reaberto")

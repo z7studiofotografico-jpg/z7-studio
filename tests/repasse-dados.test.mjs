@@ -89,7 +89,7 @@ test("planilha antiga (2021): TELEFONE 1 aluno, 2 mãe, 3 pai; sem nome vira 'Re
   );
   assert.deepEqual(faltando(a), []);
   assert.equal(a.codigo, "21CIEP384-07");
-  assert.match(a.obs, /FotoZoom: 4821/);
+  assert.doesNotMatch(a.obs, /FotoZoom|4821/); // o código do FotoZoom não entra
   // DATA de venda em outro ano não muda o ano das fotos escolhido
   const b = linhaParaDoc(
     linha(["", "E.M. ALEXANDRE FARAH", "9 ANO", "VENDIDO", "ROBERTO", "EMAF - 21", "RIANNY VICTORIA", "10/3/2022", "21966472002"]),
@@ -125,4 +125,28 @@ test("histórico da planilha no cartão: status (CAÍDO), observação/motivo, v
   );
   assert.equal(historicoPlanilha(d), "Status: CAIDO · mãe desempregada · Motivo: sem dinheiro · Vendedor: ROBERTO");
   assert.equal(historicoPlanilha({ statusOrig: "-", obs: "" }), "");
+});
+
+test("planilha com colunas deslocadas (STATUS em CURSO), ano no nome do colégio e ENDEREÇO", async () => {
+  const { linhaParaDoc } = await import("../js/repasse-dados.js");
+  const d = linhaParaDoc(
+    {
+      escola: "C. E PRESIDENTE DUTRA 2021",
+      curso: "VENDIDO",
+      status: "ROBERTO",
+      vendedor: "ROBERTO",
+      codigo: "CEPD - 04",
+      nome: "BRUNA",
+      c1: "21967841572",
+      rua: "AVENIDA FERNANDO TEIXEIRA"
+    },
+    null,
+    2021
+  );
+  assert.equal(d.statusOrig, "VENDIDO");
+  assert.equal(d.curso, "");
+  assert.equal(d.escola, "C. E PRESIDENTE DUTRA");
+  assert.equal(d.endereco.rua, "AVENIDA FERNANDO TEIXEIRA");
+  const e = linhaParaDoc({ escola: "X", curso: "-", status: "CAIDO", nome: "A", c1: "21967841572" }, null, 2021);
+  assert.equal(e.statusOrig, "CAIDO");
 });

@@ -2,6 +2,7 @@
 // Coleção "formandos": { instId, instNome, nome, tel, serie, contrato, kit, valor, parcelas, primeiroVenc, formaPag,
 //   pagamentos: [{ data, valor, por }], pagas (= quantidade de pagamentos), proxVenc, status, resp, respEmail, vendidoEm }
 // Regras de parcela e dinheiro: js/regras.js. Só o administrador registra pagamento e muda valores.
+import { linhasRetorno, abrirRetorno } from "./retorno.js";
 import {
   brl,
   dividir,
@@ -81,6 +82,14 @@ export async function registrarPagamento(ctx, f) {
 // Desfaz o último pagamento (lançado por engano)
 
 // Mensagem de cobrança no WhatsApp (usada aqui e no card Formaturas)
+// Formaturas: "Pediu contato depois" no formando (motivo + data). Usado aqui e nas cobranças.
+export function retornoFormando(ctx, f) {
+  abrirRetorno(ctx, f, patch =>
+    ctx.FS.updateDoc(ctx.FS.doc(ctx.db, "formandos", f.id), Object.assign(patch, { atualizadoEm: new Date().toISOString() })).then(() =>
+      U.toast("Anotado: falar de novo em " + U.fmtDate(patch.retorno.data))
+    )
+  );
+}
 export function cobrarWa(ctx, f) {
   usar(ctx);
   const prox = pagasDe(f) + 1,
@@ -452,10 +461,13 @@ function card(T, f, candSet) {
     );
   if (saiu && f.devolucao) e.append(el("div", "fu", `↩️ Devolução: ${brl(f.devolucao.valor)} (${f.devolucao.regra})`));
   if (f.obs) e.append(el("p", "notes", f.obs));
+  linhasRetorno(f).forEach(x => e.append(x));
   const act = el("div", "actions");
   if (C.isAdmin && comprou && !q0)
     act.append(U.mkBtn("✅ Parcela paga", "btn-ok", () => registrarPagamento(C, f).catch(er => C.handleErr(er))));
   if (comprou && !q0 && f.tel) act.append(U.mkBtn("💬 Cobrar", at ? "btn-primary" : "", () => cobrarWa(C, f)));
+  // pediu para pagar/falar outro dia: motivo + data (fica no histórico do formando)
+  if ((comprou && !q0) || sem) act.append(U.mkBtn("📅 Pediu contato depois", "", () => retornoFormando(C, f)));
   if (C.isAdmin && q0 && !f.entregueEm)
     act.append(
       U.mkBtn("📦 Marcar entregue", "btn-verde", () =>
