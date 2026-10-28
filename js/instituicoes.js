@@ -224,7 +224,9 @@ function card(it) {
     if (ult.apresentou && ult.apresentou.length)
       linhas.push("Apresentou: " + ult.apresentou.map(p => `${p.nome} ${U.money(p.preco)}`).join(", "));
     if (ult.obs) linhas.push(ult.obs);
-    e.append(el("p", "notes", "Última visita: " + linhas.join("\n")));
+    // sem data (veio da planilha): mostra só a observação
+    if (!ult.data && !ult.por) linhas.shift();
+    e.append(el("p", "notes", (ult.data || ult.por ? "Última visita: " : "📝 ") + linhas.join("\n")));
     if ((it.visitas || []).length > 1) {
       const d = el("details", "hist");
       d.append(el("summary", null, `Ver as ${it.visitas.length} visitas`));

@@ -9,10 +9,15 @@ export function el(tag, cls, text) {
   return e;
 }
 export function title(s) {
-  return String(s || "")
-    .toLowerCase()
-    .replace(/(^|[\s(-])(\p{L})/gu, (m, a, b) => a + b.toUpperCase())
-    .replace(/\b(Da|De|Do|Das|Dos|E)\b/g, w => w.toLowerCase());
+  return (
+    String(s || "")
+      .toLowerCase()
+      .replace(/(^|[\s(-])(\p{L})/gu, (m, a, b) => a + b.toUpperCase())
+      .replace(/\b(Da|De|Do|Das|Dos|E)\b/g, w => w.toLowerCase())
+      // siglas de colégio ficam em maiúsculas: C.E., E.M., CIEP, GET, João Paulo II
+      .replace(/(^|\s)((?:\p{L}\.){1,3}\p{L}?\.?)(?=\s|$)/gu, (m, a, b) => a + b.toUpperCase())
+      .replace(/\b(Ciep|Get|Ii|Iii|Iv)\b/g, w => w.toUpperCase())
+  );
 }
 // comparar e buscar nomes: a mesma função de util.js (antes havia duas, uma minúscula e outra maiúscula)
 export const norm = chave;
