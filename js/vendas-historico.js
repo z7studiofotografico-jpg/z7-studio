@@ -1,7 +1,7 @@
 // Dashboard → 📈 Histórico (só admin): os resumos de cada ano (planilhas "PERCENTUAL PR"), com gráficos.
 // Fica guardado em resumos/historico = { anos: { "2021": { ano, colegios: [...], atualizadoEm } }, importadoEm, importadoPor }
 // (resumos: só o admin lê e grava). As contas estão em historico-dados.js.
-import { el, sheet, field, botoes, carregarLib } from "./ui.js";
+import { el, sheet, field, botoes, carregarLib, title } from "./ui.js";
 import * as U from "./util.js";
 import { brl, reais } from "./regras.js";
 import { lerPercentual, anoDaPlanilha, resumoDoAno, colegiosNosAnos, destaques } from "./historico-dados.js";
@@ -143,18 +143,19 @@ function desenhar(corpo, D, hs) {
     },
     sufixo: "%"
   });
-  // 5) o mesmo colégio em vários anos (PR)
+  // 5) o mesmo colégio em vários anos (PR): um cartão por colégio, um quadrinho colorido por ano
   const rep = colegiosNosAnos(hs);
   if (rep.length) {
-    const b5 = caixa(corpo, "O mesmo colégio em vários anos (PR)", "vendas / alunos e conversão em cada ano");
-    tabela(
-      b5,
-      ["Colégio", ...anos],
-      rep.map(x => [
-        x.nome,
-        ...anos.map(a => (x.anos[a] ? `${x.anos[a].vendas}/${x.anos[a].alunos} · ${pc(x.anos[a].vendas / (x.anos[a].alunos || 1))}` : "—"))
-      ])
+    const b5 = caixa(
+      corpo,
+      "O mesmo colégio em vários anos (PR)",
+      "Cada quadrinho é um ano: a % de alunos que comprou e quantos compraram de quantos foram fotografados."
     );
+    b5.append(legendaConv());
+    rep
+      .map(x => ({ x, ult: Math.max(...Object.keys(x.anos).map(Number)) }))
+      .sort((a, b) => b.ult - a.ult || a.x.nome.localeCompare(b.x.nome, "pt-BR"))
+      .forEach(({ x }) => b5.append(cartaoColegio(x, anos)));
   }
   // 6) um ano em detalhe
   if (!anoSel || !hs.some(h => h.ano === anoSel)) anoSel = ult.ano;
@@ -226,6 +227,59 @@ function desenhar(corpo, D, hs) {
         .join(" · ") || "—"
     ])
   );
+}
+
+// "C.E SANTO ANTONIO (N.IGUAÇU)" → "C.E Santo Antonio (N.Iguaçu)": siglas (C.E, CIEP, GET, II) ficam em maiúsculas
+const nomeBonito = n =>
+  String(n || "")
+    .split(" ")
+    .map(w => (/^(CIEP|GET|[IVX]+|[A-Z]\.[A-Z.]*|[A-Z]\.?)$/.test(w) ? w : title(w)))
+    .join(" ")
+    .replace(/^(\S+)/, m => m.charAt(0).toUpperCase() + m.slice(1));
+// Faixas de conversão (cores do quadrinho)
+const faixa = v => (v >= 0.3 ? "boa" : v >= 0.2 ? "media" : "baixa");
+function legendaConv() {
+  const l = el("div", "hleg");
+  [
+    ["boa", "30% ou mais"],
+    ["media", "20% a 29%"],
+    ["baixa", "abaixo de 20%"],
+    ["vazio", "não fotografamos"]
+  ].forEach(([k, t]) => {
+    const i = el("span", "hleg-i");
+    i.append(el("i", "hq-" + k), document.createTextNode(t));
+    l.append(i);
+  });
+  return l;
+}
+function cartaoColegio(x, anos) {
+  const c = el("div", "hcol");
+  const feitos = anos.filter(a => x.anos[a]);
+  const conv = a => x.anos[a].vendas / (x.anos[a].alunos || 1);
+  const topo = el("div", "hcol-topo");
+  topo.append(el("b", null, nomeBonito(x.nome)));
+  if (feitos.length > 1) {
+    const [a0, a1] = [feitos[0], feitos[feitos.length - 1]];
+    const d = Math.round((conv(a1) - conv(a0)) * 100);
+    const t = d >= 3 ? ["sobe", `↗ subiu ${d} pontos`] : d <= -3 ? ["desce", `↘ caiu ${-d} pontos`] : ["igual", "→ estável"];
+    const tag = el("span", "hcol-tend " + t[0], t[1]);
+    tag.title = `de ${a0} (${pc(conv(a0))}) a ${a1} (${pc(conv(a1))})`;
+    topo.append(tag);
+  }
+  c.append(topo);
+  const g = el("div", "hcol-anos");
+  g.style.gridTemplateColumns = `repeat(${anos.length}, minmax(0, 1fr))`;
+  anos.forEach(a => {
+    const v = x.anos[a];
+    const q = el("div", "hq hq-" + (v ? faixa(conv(a)) : "vazio"));
+    q.append(el("small", null, a));
+    q.append(el("strong", null, v ? pc(conv(a)) : "—"));
+    q.append(el("small", null, v ? `${v.vendas} de ${v.alunos}` : ""));
+    if (v) q.title = `${a}: ${v.vendas} compraram de ${v.alunos} alunos · ${moeda(v.total)}`;
+    g.append(q);
+  });
+  c.append(g);
+  return c;
 }
 
 // Um gráfico do Chart.js (ou nada, se a biblioteca não carregou: as tabelas já mostram os números)

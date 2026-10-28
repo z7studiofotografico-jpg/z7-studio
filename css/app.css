@@ -261,3 +261,24 @@ details.tamtipo{border:1px solid var(--line,#ddd);border-radius:10px;padding:6px
   .rel-folha{border:0;border-radius:0;padding:0;max-width:none}
   .rel-secao{overflow:visible}
 }
+
+/* Dashboard → Histórico: o mesmo colégio em vários anos */
+.hleg{display:flex;flex-wrap:wrap;gap:6px 14px;margin:6px 0 12px;font-size:.8rem;color:var(--muted)}
+.hleg-i{display:inline-flex;align-items:center;gap:6px}
+.hleg-i i{width:12px;height:12px;border-radius:3px;display:inline-block}
+.hcol{border:1px solid var(--line);border-radius:12px;padding:10px 12px;margin-top:10px;background:var(--surface)}
+.hcol-topo{display:flex;justify-content:space-between;align-items:center;gap:8px;margin-bottom:8px}
+.hcol-topo b{font-size:.92rem;line-height:1.25}
+.hcol-tend{flex:none;font-size:.75rem;font-weight:600;padding:2px 8px;border-radius:999px;white-space:nowrap}
+.hcol-tend.sobe{background:var(--ok-soft);color:var(--ok)}
+.hcol-tend.desce{background:var(--late-soft);color:var(--late)}
+.hcol-tend.igual{background:var(--bg);color:var(--muted)}
+.hcol-anos{display:grid;gap:4px}
+.hq{border-radius:8px;padding:5px 2px;text-align:center;display:flex;flex-direction:column;line-height:1.15;min-width:0}
+.hq small{font-size:.68rem;opacity:.85;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.hq strong{font-size:.95rem}
+.hq-boa{background:var(--ok-soft);color:var(--ok)}
+.hq-media{background:var(--warn-soft);color:var(--warn)}
+.hq-baixa{background:var(--late-soft);color:var(--late)}
+.hq-vazio{background:var(--bg);color:var(--muted)}
+.hleg-i .hq-boa{background:var(--ok)}.hleg-i .hq-media{background:var(--warn)}.hleg-i .hq-baixa{background:var(--late)}.hleg-i .hq-vazio{background:var(--line)}

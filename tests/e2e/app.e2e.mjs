@@ -926,9 +926,15 @@ await cenario("Adriano (admin), com os dados já atualizados no servidor", async
         /Ano a ano/.test(vt) &&
         /O mesmo colégio em vários anos/.test(vt) &&
         /CIEP 384/.test(vt) &&
+        (await pg.locator("#vdCorpo .hcol .hq").count()) >= 2 &&
         (await pg.locator("#vdCorpo canvas").count()) >= 4,
       "Dashboard · Histórico: importa as planilhas PERCENTUAL, guarda por ano e mostra tabelas e gráficos"
     );
+    if (process.env.FOTOS)
+      await pg
+        .locator(".hcol")
+        .first()
+        .screenshot({ path: process.env.FOTOS + "/dash-hist.png" });
     await pg.locator(".vdareas").getByText("🎓 Formaturas").click();
     await calmo(pg);
     vt = await pg.textContent("#vdCorpo");
