@@ -173,8 +173,8 @@ export function openImport(ctx, ui, aoTerminar) {
           const l = el("label", "chk");
           const c = el("input");
           c.type = "checkbox";
-          // quem já comprou (VENDIDO, VENDIDO SITE, BRINDE…) vem desmarcado; CAÍDO, cancelado e vazio entram na fila
-          c.checked = !/VENDID|BRINDE|ENTREGUE/.test(norm(k));
+          // quem já comprou (VENDIDO, VENDA ANTECIPADA, BRINDE, ENTREGUE, IMPRESSO…) vem desmarcado; CAÍDO, cancelado e vazio entram na fila
+          c.checked = !/VENDID|VENDA|BRINDE|ENTREGUE|IMPRESSO/.test(norm(k));
           c.value = k;
           l.append(c, document.createTextNode(` ${k} (${n})`));
           box.append(l);
@@ -230,7 +230,7 @@ export function openImport(ctx, ui, aoTerminar) {
         [...out.querySelectorAll("input[type=checkbox]:not([data-turma])")].filter(c => c.checked).map(c => c.value)
       );
       // desmarcados que já compraram (VENDIDO…): entram como histórico (comprou naquele ano), fora das filas
-      const comprou = r => /VENDID|BRINDE|ENTREGUE/.test(norm(r.statusOrig));
+      const comprou = r => /VENDID|VENDA|BRINDE|ENTREGUE|IMPRESSO/.test(norm(r.statusOrig));
       // turma desmarcada não entra no app (alunos que não podem ser procurados de novo)
       const naTurma = rows.filter(r => !bloqueadas.has(turmaDe(r)));
       const fora = rows.length - naTurma.length;
