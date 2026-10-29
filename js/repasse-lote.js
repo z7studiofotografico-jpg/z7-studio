@@ -2,6 +2,8 @@
 import { el, title, avisoErro } from "./ui.js";
 import * as U from "./util.js";
 import { pintarSeletor } from "./numeros-tela.js";
+import { chaveColegio } from "./historico-dados.js";
+import { gruposEscolas, escolhaDe } from "./escolas-pr.js";
 import { C, FS, db, col, tab, seg, meta, mudarMeta, ANO, ANO_MIN, ABERTAS, baseLF, soMinha, noSeg, $, tela } from "./repasse-estado.js";
 
 export async function refreshStats() {
@@ -105,8 +107,9 @@ export async function separarLote() {
   const ja = Number($("rLoteBtn").dataset.n || 0),
     av = avisoSeg();
   let falta = POR_VEZ;
-  const esc = $("rLoteEscola").value;
-  const anos = seg === "lf" ? [ANO()] : anosRepasse(); // Repasse: do ano mais recente para o mais antigo
+  const esc = escolaEscolhida($("rLoteEscola").value);
+  // Repasse: do ano mais recente para o mais antigo; com escola escolhida, só o ano dela
+  const anos = esc && esc.ano ? [esc.ano] : seg === "lf" ? [ANO()] : anosRepasse();
   $("rLoteBtn").disabled = true;
   try {
     // candidatos: um pouco mais que o necessário, porque outra pessoa pode pegar alguns ao mesmo tempo
@@ -114,7 +117,7 @@ export async function separarLote() {
     for (const a of anos) {
       if (cand.length >= falta * 2) break;
       const filtros = [FS.where("etapa", "==", "NA FILA"), FS.where("ano", "==", a)];
-      if (esc) filtros.push(FS.where("escola", "==", esc));
+      if (esc) filtros.push(esc.nomes.length > 1 ? FS.where("escola", "in", esc.nomes) : FS.where("escola", "==", esc.nomes[0]));
       const s0 = await FS.getDocs(FS.query(col, ...filtros, FS.orderBy(FS.documentId()), FS.limit(falta * 2 - cand.length)));
       s0.docs.forEach(d => cand.push(d.ref));
     }
@@ -161,24 +164,62 @@ export async function separarLote() {
     $("rLoteBtn").disabled = false;
   }
 }
+// nome de cada colégio no cadastro de Instituições (chave → nome), para a lista mostrar "C.E. João Cardoso"
+let cadastroNomes = null;
+async function nomesDoCadastro() {
+  if (cadastroNomes) return cadastroNomes;
+  cadastroNomes = {};
+  try {
+    if (C.pode("colegios") || C.isAdmin)
+      (await FS.getDocs(C.carteira("instituicoes", FS.limit(1000)))).forEach(d => {
+        const k = chaveColegio(d.data().nome || "");
+        if (k) cadastroNomes[k] = d.data().nome;
+      });
+  } catch (_) {}
+  return cadastroNomes;
+}
+// As listas de escola (lote e busca): uma linha por colégio e ano ("2026 - C.E. João Cardoso").
+// Linha de Frente: só o ano atual; Repasse: os anos anteriores.
+export let gruposPR = [];
+export function pintarEscolas() {
+  const temAno = Object.keys(meta.escolasAno || {}).length;
+  gruposPR = temAno ? gruposEscolas(meta, cadastroNomes || {}, a => (seg === "lf" ? a >= ANO() : a < ANO())) : [];
+  ["rLoteEscola", "rEscola"].forEach(id => {
+    const sel = $(id);
+    if (!sel) return;
+    const cur = sel.value;
+    const first0 = sel.options[0];
+    sel.innerHTML = "";
+    sel.append(first0);
+    if (temAno)
+      gruposPR.forEach(g => {
+        const o = el("option", null, `${g.rotulo} (${g.n})`);
+        o.value = g.valor;
+        sel.append(o);
+      });
+    // (antes da atualização de dados: só o nome, sem o ano)
+    else
+      Object.keys(meta.escolas || {})
+        .sort((a, b) => a.localeCompare(b, "pt-BR"))
+        .forEach(n => {
+          const o = el("option", null, `${title(n)} (${meta.escolas[n]})`);
+          o.value = n;
+          sel.append(o);
+        });
+    sel.value = [...sel.options].some(o => o.value === cur) ? cur : "";
+  });
+}
+// o valor escolhido numa das listas → { ano, nomes } (ou só o nome, nas listas antigas)
+export function escolaEscolhida(valor) {
+  if (!valor) return null;
+  return escolhaDe(valor, gruposPR) || { ano: null, nomes: [valor], rotulo: title(valor) };
+}
 export async function loadMeta() {
   try {
     const s = await FS.getDoc(FS.doc(db, "config", "repasse_meta"));
     mudarMeta(s.exists() ? Object.assign({ escolas: {}, anos: {} }, s.data()) : { escolas: {}, anos: {} });
-    const names = Object.keys(meta.escolas || {}).sort((a, b) => a.localeCompare(b, "pt-BR"));
-    ["rLoteEscola", "rEscola"].forEach(id => {
-      const sel = $(id);
-      const cur = sel.value;
-      const first0 = sel.options[0];
-      sel.innerHTML = "";
-      sel.append(first0);
-      names.forEach(n => {
-        const o = el("option", null, `${title(n)} (${meta.escolas[n]})`);
-        o.value = n;
-        sel.append(o);
-      });
-      sel.value = cur;
-    });
+    await nomesDoCadastro();
+    pintarEscolas();
     const imp = $("rImport");
     if (imp) imp.hidden = !C.isAdmin;
   } catch (e) {

@@ -2277,6 +2277,79 @@ await cenario("Cadastro sem módulos", async () => {
   const { pg } = await abrir(NOVO, Object.assign({}, base, { "config/app": { versaoDados: 4 } }));
   ok((await visiveis(pg)).length === 0, "não vê nenhum card");
 });
+await cenario("PR por colégio e ano · passar para a equipe", async () => {
+  const Y = new Date().getFullYear();
+  const aluno = (nome, escola, ano) => ({
+    nome,
+    nomeBusca: nome.toUpperCase(),
+    escola,
+    ano,
+    etapa: "NA FILA",
+    resp: "",
+    respEmail: "",
+    contatos: [{ tipo: "Mãe", nome: "Mãe", tel: "21999990000" }],
+    telefones: ["21999990000"]
+  });
+  const d = Object.assign({}, base, {
+    "config/repasse_meta": {
+      escolas: { "C.E C.E JOÃO CARDOSO": 1, "e.e.joao Cardoso": 1, "C. E. JOAO CARDOSO": 1 },
+      anos: { [Y - 1]: 2, [Y - 2]: 1 },
+      escolasAno: { ["C.E C.E JOÃO CARDOSO|" + (Y - 1)]: 1, ["e.e.joao Cardoso|" + (Y - 1)]: 1, ["C. E. JOAO CARDOSO|" + (Y - 2)]: 1 }
+    },
+    "repasse/jc1": aluno("Aluno Um", "C.E C.E JOÃO CARDOSO", Y - 1),
+    "repasse/jc2": aluno("Aluno Dois", "e.e.joao Cardoso", Y - 1),
+    "repasse/jc3": aluno("Aluno Tres", "C. E. JOAO CARDOSO", Y - 2),
+    "instituicoes/jc": {
+      nome: "C.E. João Cardoso",
+      nomeBusca: "C.E. JOAO CARDOSO",
+      tipo: "publico",
+      etapa: "VISITADO",
+      resp: "",
+      respEmail: "",
+      visitas: [],
+      contatos: []
+    }
+  });
+  const { pg, erros, store } = await abrir(ADRIANO, d);
+  await ir(pg, "#pr");
+  const segRep = pg.locator("section:not([hidden]) .seg", { hasText: "Repasse" });
+  if (await segRep.count()) await segRep.first().click();
+  await calmo(pg);
+  const ops = await pg.$$eval("#rLoteEscola option", os => os.map(o => o.textContent));
+  if (process.env.DEBUG) console.log("DBG", ops, erros, await pg.evaluate(() => document.body.dataset.tela));
+  ok(
+    ops.includes(`${Y - 1} - C.E. João Cardoso (2)`) && ops.includes(`${Y - 2} - C.E. João Cardoso (1)`),
+    "lista de escolas com o ano e o nome do cadastro: " + ops.slice(1).join(" | ")
+  );
+  await ir(pg, "#inst-publico");
+  await pg.locator("#iChips .chip", { hasText: "Todas" }).click();
+  await pg.locator("article", { hasText: "C.E. João Cardoso" }).getByRole("button", { name: "📤 Passar o PR para a equipe" }).click();
+  await pg.waitForFunction(
+    () => /vão para a pessoa escolhida/.test(document.querySelector(".sheet:last-of-type")?.textContent || ""),
+    null,
+    { timeout: 6000 }
+  );
+  await pg.locator(".sheet:visible button[type=submit]").click();
+  let s = await store();
+  ok(
+    s["repasse/jc1"].etapa === "SEPARADO" &&
+      s["repasse/jc1"].respEmail === ANA &&
+      s["repasse/jc2"].respEmail === ANA &&
+      s["repasse/jc3"].etapa === "NA FILA",
+    "colégio: passa os alunos do ano escolhido para a pessoa (os outros anos ficam na fila)"
+  );
+  await ir(pg, "#pr");
+  await pg.locator("section:not([hidden]) .chip", { hasText: "Buscar" }).first().click();
+  await calmo(pg);
+  await pg.selectOption("#rEscola", { label: `${Y - 2} - C.E. João Cardoso (1)` });
+  await calmo(pg);
+  await pg.locator("article", { hasText: "Aluno Tres" }).getByRole("button", { name: "📤 Passar para a equipe" }).click();
+  await pg.locator(".sheet:visible select").selectOption(PEDRO);
+  await pg.locator(".sheet:visible button[type=submit]").click();
+  s = await store();
+  ok(s["repasse/jc3"].etapa === "SEPARADO" && s["repasse/jc3"].respEmail === PEDRO, "aluno: passa um aluno específico para a pessoa");
+  ok(!erros.length, "sem erros" + (erros.length ? ": " + erros.join(" | ") : ""));
+});
 await cenario("Convite: criar a senha dentro do app", async () => {
   const ctx = await browser.newContext({ viewport: { width: 420, height: 900 }, serviceWorkers: "block" });
   abertos.push(ctx);

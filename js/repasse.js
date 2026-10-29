@@ -41,7 +41,7 @@ import {
 import { card } from "./repasse-cartao.js";
 import { sheet, field, actions } from "./repasse-janelas.js";
 import { openDados } from "./repasse-form.js";
-import { refreshStats, refreshLote, separarLote, loadMeta } from "./repasse-lote.js";
+import { refreshStats, refreshLote, separarLote, loadMeta, pintarEscolas, escolaEscolhida } from "./repasse-lote.js";
 export { ETAPAS } from "./repasse-estado.js";
 let unsubList = null,
   mounted = false;
@@ -184,6 +184,7 @@ function renderSegs() {
           localStorage.setItem("z7seg", k);
         } catch (_) {}
         renderSegs();
+        pintarEscolas();
         refreshStats();
         refreshLote();
         openTab(tab);
@@ -273,7 +274,9 @@ const ordemBusca = porEscola => (porEscola ? (a, b) => (a.ano || 0) - (b.ano || 
 async function buscar() {
   if (tab !== "buscar") return;
   const txt = $("rQ").value.trim(),
-    esc = $("rEscola").value;
+    esc = $("rEscola").value,
+    escE = escolaEscolhida(esc); // { ano, nomes } do colégio escolhido (uma linha por colégio e ano)
+  const daEscola = it => !escE || ((!escE.ano || it.ano === escE.ano) && escE.nomes.includes(it.escola));
   if (!C.pode("rep")) {
     // Só Linha de Frente: carrega os ensaios do ano (uma vez a cada 10 min) e filtra aqui.
     if (!txt && !esc) {
@@ -293,7 +296,7 @@ async function buscar() {
         cacheLF.docs
           .filter(
             it =>
-              (!esc || it.escola === esc) &&
+              daEscola(it) &&
               (!txt ||
                 (cods.length && cods.includes(codigoBusca(it.codigo))) ||
                 (dg.length >= 8 ? (it.telefones || []).some(t => t.includes(dg.slice(-8))) : (it.nomeBusca || "").includes(n)))
@@ -327,7 +330,13 @@ async function buscar() {
   else if (txt.length >= 2) {
     const n = norm(txt);
     q = FS.query(col, FS.orderBy("nomeBusca"), FS.startAt(n), FS.endAt(n + ""), FS.limit(30));
-  } else if (esc) q = FS.query(col, FS.where("escola", "==", esc), FS.limit(500));
+  } else if (escE)
+    q = FS.query(
+      col,
+      escE.nomes.length > 1 ? FS.where("escola", "in", escE.nomes) : FS.where("escola", "==", escE.nomes[0]),
+      ...(escE.ano ? [FS.where("ano", "==", escE.ano)] : []),
+      FS.limit(500)
+    );
   if (!q) {
     mudarItems([]);
     renderList(false, "Digite pelo menos 2 letras do nome, um telefone, ou escolha uma escola.");
@@ -434,7 +443,7 @@ function relatorioPR() {
     subtitulo:
       "Aba " +
       (NOMES_ABA[tab] || tab) +
-      (tab === "buscar" && esc ? " · " + title(esc) : "") +
+      (tab === "buscar" && esc ? " · " + escolaEscolhida(esc).rotulo : "") +
       (C.isAdmin ? "" : " · os contatos que você vê"),
     secoes: [
       {

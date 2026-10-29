@@ -11,6 +11,7 @@ import { TIPOS, CARTOES, ETAPAS, ABERTAS, SEGMENTOS, cartaoDoTipo, norm, status,
 import { C, FS, tipo, items, mudarTipo, mudarItems, iniciar, lockInfo, mensagem, save, claim } from "./instituicoes-estado.js";
 import { openForm, openVisita } from "./instituicoes-form.js";
 import { cadastroFalta, cadastroPendente } from "./instituicao-cadastro.js";
+import { passarColegio } from "./passar-pr.js";
 export { TIPOS, CARTOES, CARGOS, cartaoDoTipo } from "./instituicoes-dados.js";
 export { agendarColegio } from "./instituicoes-agendar.js";
 // (o Agendamento importa estas daqui; continuam disponíveis)
@@ -317,6 +318,8 @@ function card(it) {
   }
   const act = el("div", "actions");
   act.append(U.mkBtn("📝 Registrar visita / contato", "btn-primary", () => openVisita(it)));
+  // admin: passar o PR deste colégio (de um ano) para alguém da equipe
+  if (C.isAdmin && C.pode("pr")) act.append(U.mkBtn("📤 Passar o PR para a equipe", "", () => passarColegio(C, it)));
   if (it.etapa !== "FECHADO")
     act.append(U.mkBtn("Remarcar +7d", "", () => save(it, { followup: U.addDays(7) }, "Retorno em " + U.fmtDate(U.addDays(7)))));
   if (!li && it.etapa !== "FECHADO") act.append(U.mkBtn("✋ Estou atendendo", "", () => claim(it)));

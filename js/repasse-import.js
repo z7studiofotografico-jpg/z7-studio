@@ -278,7 +278,8 @@ export function openImport(ctx, ui, aoTerminar) {
           semTel = 0,
           voltou = 0;
         const escolas = Object.assign({}, meta.escolas || {}),
-          anos = Object.assign({}, meta.anos || {});
+          anos = Object.assign({}, meta.anos || {}),
+          escolasAno = Object.assign({}, meta.escolasAno || {});
         const ops = sel.map((d, i) => {
           const id = idDe[i];
           if (exist.has(id)) {
@@ -292,6 +293,7 @@ export function openImport(ctx, ui, aoTerminar) {
           novos++;
           if (d.escola) escolas[d.escola] = (escolas[d.escola] || 0) + 1;
           if (d.ano) anos[d.ano] = (anos[d.ano] || 0) + 1;
+          if (d.escola && d.ano) escolasAno[d.escola + "|" + d.ano] = (escolasAno[d.escola + "|" + d.ano] || 0) + 1;
           if (!okStatus.has(d.statusOrig || "(vazio)") && comprou(d)) {
             historico++;
             // histórico: comprou na época (sem data de pagamento no app, para não entrar nas vendas dos meses)
@@ -355,7 +357,7 @@ export function openImport(ctx, ui, aoTerminar) {
           await b.commit();
           prog.textContent = `Importando… ${Math.min(i + 80, ops.length)} de ${ops.length}`;
         }
-        await FS.setDoc(FS.doc(db, "config", "repasse_meta"), { escolas, anos, importadoEm: agora }, { merge: true });
+        await FS.setDoc(FS.doc(db, "config", "repasse_meta"), { escolas, anos, escolasAno, importadoEm: agora }, { merge: true });
         const nInc = ops.filter(([, d, m]) => !m && d.etapa === "INCOMPLETO").length;
         prog.textContent = `Pronto! ${novos - nInc - historico - semTel} novos na fila${nInc ? `, ${nInc} na aba Incompletos` : ""}${semTel ? `, ${semTel} sem telefone (só para o Dashboard)` : ""}${historico ? `, ${historico} que já compraram (só histórico, para o Dashboard)` : ""}${fora ? `, ${fora} de turma desmarcada ficaram fora do app` : ""}${atual ? ` e ${atual} atualizados` : ""}${voltou ? ` (${voltou} que estavam sem telefone agora têm número e foram para a fila)` : ""}.`;
         U.toast("Planilha importada ✅");

@@ -26,6 +26,7 @@ import {
 import { passo } from "./repasse-mensagens.js";
 import { openPago, openEntrega, openNotas } from "./repasse-janelas.js";
 import { openDados } from "./repasse-form.js";
+import { passarAluno } from "./passar-pr.js";
 
 // aviso dos telefones que com certeza estão errados (DDD que não existe, celular sem o 9...)
 function telAvisos(it) {
@@ -265,6 +266,9 @@ function acoesDoCartao(it, li, e) {
         openDados(it)
       )
     );
+  // admin: passar este aluno para alguém da equipe
+  if (C.isAdmin && !["PAGO", "ENTREGUE", "SEM TELEFONE"].includes(it.etapa))
+    act.append(U.mkBtn("📤 Passar para a equipe", "", () => passarAluno(C, it, (patch, msg) => save(it, patch, msg))));
   if (it.etapa === "NA FILA")
     act.append(
       U.mkBtn("Separar para mim", "btn-primary", () =>

@@ -6,6 +6,7 @@ import { entradasFones } from "./pedidos.js";
 import { codigoBusca, comAno } from "./aluno-id.js";
 import { normTel, fmtTel, EMPRESA_PADRAO } from "./numeros.js";
 import { segmentoPeloNome } from "./instituicao-cadastro.js";
+import { contarEscolasAno } from "./escolas-pr.js";
 import { tipoIdEnsaio, precisaCodigo, anoDoFechamento, fmtCodigoEnsaio, maiorEnsaio } from "./ensaio-id.js";
 export const VERSAO_DADOS = 12;
 // v12 (combinado com o Adriano em 28/10/2026): os 42 colégios públicos que vieram das planilhas do Drive
@@ -152,6 +153,20 @@ export function planejar(cols, emailDe) {
   for (const x of cols.repasse || [])
     if (x.etapa === "SEM TELEFONE" && /PIRAGIBE/.test(norm(x.escola)) && !x.semTelOk)
       muda("Mário Piragibe (becas): sem telefone não conta", "repasse", x.id, { semTelOk: true });
+  // v12: lista de escolas do PR por ano ("2026 - C.E. João Cardoso"), contada de novo a partir dos alunos
+  if ((cols.repasse || []).length) {
+    const atual = (cols.config || []).find(x => x.id === "repasse_meta") || {};
+    const escolasAno = contarEscolasAno(cols.repasse);
+    const escolas = {},
+      anos = {};
+    cols.repasse.forEach(a => {
+      if (a.escola) escolas[a.escola] = (escolas[a.escola] || 0) + 1;
+      if (a.ano) anos[a.ano] = (anos[a.ano] || 0) + 1;
+    });
+    const igual = (x, y) => JSON.stringify(Object.entries(x || {}).sort()) === JSON.stringify(Object.entries(y || {}).sort());
+    if (!igual(atual.escolasAno, escolasAno) || !igual(atual.escolas, escolas) || !igual(atual.anos, anos))
+      muda("lista de escolas do PR por ano", "config", "repasse_meta", { escolasAno, escolas, anos }, atual.id ? "u" : "s");
+  }
   // v10: WhatsApp da empresa (config/app)
   const cfg = (cols.config || []).find(x => x.id === "app");
   if (cfg) {

@@ -17,6 +17,8 @@ const SHELL = [
   "./js/instituicao-cadastro.js",
   "./js/pendencias-equipe.js",
   "./js/criar-senha.js",
+  "./js/escolas-pr.js",
+  "./js/passar-pr.js",
   "./js/regras.js",
   "./js/calc.js",
   "./js/feriados.js",
