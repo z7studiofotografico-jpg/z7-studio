@@ -59,7 +59,9 @@ for (const d of enviar) {
   const e = d.data();
   try {
     if (e.tipo === "convite") {
-      const em = String((e.para || [])[0] || "").trim().toLowerCase();
+      const em = String((e.para || [])[0] || "")
+        .trim()
+        .toLowerCase();
       const cad = await db.collection("usuarios").doc(em).get();
       if (!em || !cad.exists || cad.data().ativo === false) {
         await d.ref.update({ status: "descartado", motivo: "pessoa fora da equipe", descartadoEm: new Date().toISOString() });
