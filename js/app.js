@@ -10,6 +10,8 @@ import {
   signInWithEmailAndPassword,
   createUserWithEmailAndPassword,
   sendPasswordResetEmail,
+  verifyPasswordResetCode,
+  confirmPasswordReset,
   signOut,
   setPersistence,
   indexedDBLocalPersistence,
@@ -38,6 +40,7 @@ import { lerVerComo, faixaVerComo, escolherVerComo } from "./vercomo.js";
 import { criarNotificacoes } from "./notificacoes.js";
 import { ligarAjustes } from "./ajustes.js";
 import { criarInicio } from "./inicio.js";
+import { telaCriarSenha } from "./criar-senha.js";
 import { painelNumeros } from "./numeros-tela.js";
 import { ligarWhatsCerto } from "./numeros-celular.js";
 import * as Equipe from "./equipe.js";
@@ -641,6 +644,10 @@ function startData() {
 // ---------- dados antigos ----------
 // A atualização de dados antigos roda no GitHub (scripts/migrar.mjs), não no celular de quem abre o app.
 
+// convite / "esqueci a senha": criar a senha aqui mesmo, no app
+telaCriarSenha({ auth, verifyPasswordResetCode, confirmPasswordReset, signInWithEmailAndPassword, signOut }).catch(e =>
+  console.warn("[Z7] criar senha", e)
+);
 onAuthStateChanged(auth, u => {
   user = u;
   $("viewLogin").hidden = !!u;

@@ -20,6 +20,15 @@ export async function createUserWithEmailAndPassword(_a, em) {
   return { user: { email: em } };
 }
 export async function sendPasswordResetEmail() {}
+// convite: o teste define window.__RESET = { "codigo": "email" }
+export async function verifyPasswordResetCode(_a, c) {
+  const em = (window.__RESET || {})[c];
+  if (!em) throw Object.assign(new Error("expirado"), { code: "auth/expired-action-code" });
+  return em;
+}
+export async function confirmPasswordReset(_a, c) {
+  if (!(window.__RESET || {})[c]) throw Object.assign(new Error("expirado"), { code: "auth/expired-action-code" });
+}
 export async function signOut(a) {
   if (a && a.principal === false) return;
   window.__EMAIL = "";

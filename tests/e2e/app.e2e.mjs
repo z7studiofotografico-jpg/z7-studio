@@ -2277,6 +2277,42 @@ await cenario("Cadastro sem módulos", async () => {
   const { pg } = await abrir(NOVO, Object.assign({}, base, { "config/app": { versaoDados: 4 } }));
   ok((await visiveis(pg)).length === 0, "não vê nenhum card");
 });
+await cenario("Convite: criar a senha dentro do app", async () => {
+  const ctx = await browser.newContext({ viewport: { width: 420, height: 900 }, serviceWorkers: "block" });
+  abertos.push(ctx);
+  await ctx.route(/gstatic\.com\/firebasejs\/10\.12\.2\/(firebase-\w+)\.js/, (rt, rq) =>
+    rt.fulfill({ path: AQUI + "fake/" + rq.url().match(/(firebase-\w+)\.js/)[1] + ".js", contentType: "text/javascript" })
+  );
+  const pg = await ctx.newPage();
+  const erros = [];
+  pg.on("pageerror", e => erros.push(e.message));
+  await pg.addInitScript(
+    ([d]) => {
+      window.__EMAIL = "";
+      window.__RESET = { abc: "novo@equipe.com" };
+      window.__store = new Map(Object.entries(d));
+    },
+    [Object.assign({}, base, { "usuarios/novo@equipe.com": { nome: "Novo Teste", papel: "equipe", ativo: true, modulos: ["colegios"] } })]
+  );
+  const raiz = URLAPP.replace(/[#?].*$/, "");
+  await pg.goto(raiz + "?mode=resetPassword&oobCode=abc");
+  await pg.waitForSelector("#formSenha #sSenha:not([hidden])", { state: "attached", timeout: 8000 });
+  ok(/Crie a sua senha para entrar no app com novo@equipe\.com/.test(await pg.textContent("#formSenha")), "mostra o e-mail do convite");
+  await pg.fill("#sSenha", "segredo1");
+  await pg.fill("#sSenha2", "segredo1");
+  await pg.click("#sBtn");
+  await pg.waitForSelector("#viewHome:not([hidden])", { timeout: 8000 }).catch(() => {});
+  ok(
+    !(await pg.$("#formSenha")) && !/oobCode/.test(pg.url()) && (await pg.isVisible("#viewHome")),
+    "cria a senha, entra no app e limpa o endereço"
+  );
+  await pg.goto(raiz + "?mode=resetPassword&oobCode=velho");
+  await pg.waitForFunction(() => /já foi usado ou venceu/.test((document.getElementById("formSenha") || {}).textContent || ""), null, {
+    timeout: 8000
+  });
+  ok(true, "link vencido: avisa e oferece voltar ao login");
+  ok(!erros.length, "sem erros na página do convite" + (erros.length ? ": " + erros.join(" | ") : ""));
+});
 await browser.close();
 srv.close();
 console.log(falhas ? `\n${falhas} falha(s)` : "\nTudo certo ✅");
