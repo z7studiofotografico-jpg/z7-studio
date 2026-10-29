@@ -1,9 +1,12 @@
-// Envia os e-mails da fila "emails" (datas confirmadas para os colégios) pelo Gmail do estúdio.
+// Envia os e-mails da fila "emails" pelo Gmail do estúdio: datas confirmadas para os colégios e convites da
+// equipe (tipo "convite": link para criar a senha direto no app, porque o Firebase não deixa mudar o modelo dele).
 // Roda no GitHub Actions a cada 15 minutos. Precisa dos segredos:
 //   FIREBASE_SERVICE_ACCOUNT, GMAIL_USER (ex.: z7studiofotografico@gmail.com) e GMAIL_APP_PASSWORD (senha de app do Google).
 import { initializeApp, cert } from "firebase-admin/app";
 import { ESTUDIO, assuntoDatas } from "../js/mensagens.js";
 import { getFirestore } from "firebase-admin/firestore";
+import { getAuth } from "firebase-admin/auth";
+import { conviteEmail } from "./convite.mjs";
 import nodemailer from "nodemailer";
 
 const { FIREBASE_SERVICE_ACCOUNT, GMAIL_USER, GMAIL_APP_PASSWORD } = process.env;
@@ -55,6 +58,21 @@ let ok = 0;
 for (const d of enviar) {
   const e = d.data();
   try {
+    if (e.tipo === "convite") {
+      const em = String((e.para || [])[0] || "").trim().toLowerCase();
+      const cad = await db.collection("usuarios").doc(em).get();
+      if (!em || !cad.exists || cad.data().ativo === false) {
+        await d.ref.update({ status: "descartado", motivo: "pessoa fora da equipe", descartadoEm: new Date().toISOString() });
+        console.log(`Convite descartado: ${em}`);
+        continue;
+      }
+      const link = await getAuth().generatePasswordResetLink(em);
+      const c = conviteEmail(cad.data().nome || "", link);
+      await mail.sendMail({ from: `"${ESTUDIO.curto}" <${GMAIL_USER}>`, to: em, replyTo: GMAIL_USER, ...c });
+      await d.ref.update({ status: "enviado", enviadoEm: new Date().toISOString() });
+      ok++;
+      continue;
+    }
     await mail.sendMail({
       from: `"${ESTUDIO.nome}" <${GMAIL_USER}>`,
       to: (e.para || []).join(", "),

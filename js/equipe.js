@@ -4,7 +4,7 @@ import { fmtTel, numerosDe, numerosEmpresa, conferirNumeros, numerosDosOutros } 
 let D,
   numCampo = null;
 const $ = id => document.getElementById(id);
-// D = { db, auth, updateDoc, doc, setDoc, sendPasswordResetEmail, createUserWithEmailAndPassword, signOut, cadastroAuth,
+// D = { db, auth, updateDoc, doc, setDoc, convidar, createUserWithEmailAndPassword, signOut, cadastroAuth,
 //       mkBtn, toast, handleErr, first, isDono, MODULOS, usuarios(), user(), isAdmin(), ctx }
 export function init(deps) {
   D = deps;
@@ -64,8 +64,8 @@ export function render() {
       acts.appendChild(
         D.mkBtn("Reenviar convite", "", async () => {
           try {
-            await D.sendPasswordResetEmail(D.auth, em);
-            D.toast("Convite enviado para " + em);
+            await D.convidar(em);
+            D.toast("Convite na fila: " + em + " recebe o e-mail em até 15 minutos.");
           } catch (_) {
             D.toast("Não foi possível enviar o e-mail.");
           }
@@ -259,14 +259,14 @@ function ligar() {
       }
       await D.setDoc(D.doc(D.db, "usuarios", em), dados);
       // 3) manda o e-mail para a pessoa criar a própria senha
-      await D.sendPasswordResetEmail(D.auth, em);
+      await D.convidar(em);
       $("uNome").value = "";
       $("uEmail").value = "";
       $("uPapel").value = "equipe";
       numCampo.box.remove();
       numCampo = null;
       paintModsForm();
-      D.toast("Pronto! " + D.first(nome) + " vai receber um e-mail para criar a senha.");
+      D.toast("Pronto! " + D.first(nome) + " vai receber um e-mail para criar a senha (em até 15 minutos).");
     } catch (ex) {
       err.textContent =
         ex.code === "permission-denied"

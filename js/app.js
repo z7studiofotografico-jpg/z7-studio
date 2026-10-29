@@ -21,6 +21,7 @@ import {
   initializeFirestore,
   persistentLocalCache,
   persistentMultipleTabManager,
+  addDoc,
   collection,
   doc,
   onSnapshot,
@@ -540,6 +541,18 @@ async function enviarSenha(a, em) {
     await sendPasswordResetEmail(a, em);
   }
 }
+// Convite da equipe: o Firebase não deixa trocar o modelo do e-mail neste projeto, então o convite entra na
+// fila "emails" e o GitHub (scripts/emails.mjs) manda pelo Gmail do estúdio, em português, com o link direto
+// para criar a senha no app (app.z7studio.com.br). Chega em até 15 minutos.
+async function convidar(em) {
+  await addDoc(collection(db, "emails"), {
+    tipo: "convite",
+    para: [em],
+    status: "pendente",
+    criadoEm: new Date().toISOString(),
+    por: (auth.currentUser && auth.currentUser.email) || ""
+  });
+}
 $("lReset").onclick = async () => {
   const em = $("lEmail").value.trim();
   if (!em) {
@@ -564,7 +577,7 @@ Equipe.init({
   updateDoc,
   doc,
   setDoc,
-  sendPasswordResetEmail: enviarSenha,
+  convidar,
   createUserWithEmailAndPassword,
   signOut,
   cadastroAuth,
