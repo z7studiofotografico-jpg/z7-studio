@@ -16,6 +16,16 @@ const limpo = n =>
     .trim()
     .slice(0, 120) || "aluno";
 
+// "2022-03-30 - C.E. YONNE MARIA SIQUEIRA - entregue" → { nome: "C.E. YONNE MARIA SIQUEIRA", ano: "2022" }
+export function nomeDoColegio(pasta) {
+  const s = String(pasta || "");
+  const ano = (s.match(/^(20\d\d)-\d\d-\d\d/) || [])[1] || "";
+  const nome = s
+    .replace(/^20\d\d-\d\d-\d\d\s*-?\s*/, "")
+    .replace(/\s*-\s*(entregue|pronto|pronta|ok)\s*$/i, "")
+    .trim();
+  return { nome: nome || s, ano };
+}
 // Todas as pastas que têm fotos (cada uma é um aluno): [{ nome, caminho, arquivos: [FileHandle] }]
 export async function pastasComFotos(dir, caminho = []) {
   const out = [],
@@ -92,7 +102,8 @@ export function abrirPreviasLote(C) {
         if (!alunos.length) return (info.textContent = "Não achei fotos nessa pasta (nem nas pastas de dentro).");
         info.textContent = `${alunos.length} aluno${alunos.length > 1 ? "s" : ""} com fotos em “${origem.name}”. Agora escolha onde salvar as prévias.`;
         destino = await window.showDirectoryPicker({ id: "z7-previas", mode: "readwrite" });
-        const pasta = await destino.getDirectoryHandle(limpo("Prévias - " + origem.name), { create: true });
+        const col = nomeDoColegio(origem.name);
+        const pasta = await destino.getDirectoryHandle(limpo(`Prévias - ${col.ano ? col.ano + " - " : ""}${col.nome}`), { create: true });
         await prep();
         const nomes = nomesDeSaida(alunos);
         cancelar = false;
@@ -114,7 +125,13 @@ export function abrirPreviasLote(C) {
             }
           }
           if (!fotos.length) continue;
-          const st = { nome: a.nome, escola: origem.name, fotos };
+          // no cabeçalho: o nome do aluno sem o código da pasta ("CEYMS 01 - FABIOLA" → "FABIOLA"), e o código ao lado do colégio
+          const cod = (a.nome.match(/^([A-Z0-9]+\s*\d+)\s*-\s*/i) || [])[1] || "";
+          const st = {
+            nome: a.nome.replace(/^[A-Z0-9]+\s*\d+\s*-\s*/i, "") || a.nome,
+            escola: [cod, col.nome, col.ano].filter(Boolean).join(" · "),
+            fotos
+          };
           const paginas = Math.ceil(fotos.length / POR_PAGINA);
           for (let pg = 0; pg < paginas; pg++) {
             const cv = document.createElement("canvas");

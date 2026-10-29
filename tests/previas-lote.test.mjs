@@ -28,3 +28,9 @@ test("prévias em lote: cada pasta com fotos é um aluno; nomes de saída sem re
   );
   assert.deepEqual(nomesDeSaida(alunos), ["01 - MARIA SILVA", "02 - ANA", "3002 - 01 - MARIA SILVA"]);
 });
+test("nome do colégio a partir da pasta do servidor", async () => {
+  const { nomeDoColegio } = await import("../js/previas-lote.js");
+  assert.deepEqual(nomeDoColegio("2022-03-30 - C.E. YONNE MARIA SIQUEIRA - entregue"), { nome: "C.E. YONNE MARIA SIQUEIRA", ano: "2022" });
+  assert.deepEqual(nomeDoColegio("2022-09-21 - SANTO ANTONIO - pronto"), { nome: "SANTO ANTONIO", ano: "2022" });
+  assert.deepEqual(nomeDoColegio("C.E. TESTE 2026"), { nome: "C.E. TESTE 2026", ano: "" });
+});
