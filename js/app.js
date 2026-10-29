@@ -543,7 +543,7 @@ async function enviarSenha(a, em) {
 }
 // Convite da equipe: o Firebase não deixa trocar o modelo do e-mail neste projeto, então o convite entra na
 // fila "emails" e o GitHub (scripts/emails.mjs) manda pelo Gmail do estúdio, em português, com o link direto
-// para criar a senha no app (app.z7studio.com.br). Chega em até 15 minutos.
+// para criar a senha no app (app.z7studio.com.br). Sai na próxima rodada da fila (o GitHub roda a cada poucas horas).
 async function convidar(em) {
   await addDoc(collection(db, "emails"), {
     tipo: "convite",

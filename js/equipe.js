@@ -65,7 +65,7 @@ export function render() {
         D.mkBtn("Reenviar convite", "", async () => {
           try {
             await D.convidar(em);
-            D.toast("Convite na fila: " + em + " recebe o e-mail em até 15 minutos.");
+            D.toast("Convite na fila: " + em + " recebe o e-mail na próxima rodada da fila (pode levar algumas horas).");
           } catch (_) {
             D.toast("Não foi possível enviar o e-mail.");
           }
@@ -266,7 +266,7 @@ function ligar() {
       numCampo.box.remove();
       numCampo = null;
       paintModsForm();
-      D.toast("Pronto! " + D.first(nome) + " vai receber um e-mail para criar a senha (em até 15 minutos).");
+      D.toast("Pronto! " + D.first(nome) + " vai receber um e-mail para criar a senha (pode levar algumas horas).");
     } catch (ex) {
       err.textContent =
         ex.code === "permission-denied"
