@@ -527,6 +527,16 @@ $("formLogin").addEventListener("submit", async e => {
     $("lBtn").disabled = false;
   }
 });
+// E-mail para criar ou trocar a senha: depois de salvar a senha, o botão "Continuar" do Firebase volta para o app.
+// (se o endereço do app não estiver na lista de domínios autorizados do Firebase, manda sem o botão)
+async function enviarSenha(a, em) {
+  try {
+    await sendPasswordResetEmail(a, em, { url: "https://app.z7studio.com.br/" });
+  } catch (e) {
+    if (!/continue-uri|unauthorized-domain/.test((e && e.code) || "")) throw e;
+    await sendPasswordResetEmail(a, em);
+  }
+}
 $("lReset").onclick = async () => {
   const em = $("lEmail").value.trim();
   if (!em) {
@@ -535,7 +545,7 @@ $("lReset").onclick = async () => {
     return;
   }
   try {
-    await sendPasswordResetEmail(auth, em);
+    await enviarSenha(auth, em);
     $("lErr").textContent = "Enviamos um link para criar uma nova senha no seu e-mail.";
     $("lErr").hidden = false;
   } catch (_) {
@@ -551,7 +561,7 @@ Equipe.init({
   updateDoc,
   doc,
   setDoc,
-  sendPasswordResetEmail,
+  sendPasswordResetEmail: enviarSenha,
   createUserWithEmailAndPassword,
   signOut,
   cadastroAuth,
