@@ -27,6 +27,7 @@ import { passo } from "./repasse-mensagens.js";
 import { openPago, openEntrega, openNotas } from "./repasse-janelas.js";
 import { openDados } from "./repasse-form.js";
 import { passarAluno } from "./passar-pr.js";
+import { abrirFotosDoAluno } from "./fotos-aluno.js";
 
 // aviso dos telefones que com certeza estão errados (DDD que não existe, celular sem o 9...)
 function telAvisos(it) {
@@ -165,6 +166,8 @@ function desenharProximo(box, it, escolhido, blocked, li) {
       }
     })
   );
+  // fotos do aluno direto do Google Drive (quando a pasta das prévias está ligada em Ajustes)
+  if (C.P.drivePrevias) row.append(U.mkBtn("🖼️ Fotos do aluno", "", () => abrirFotosDoAluno(C, it, precoTxt(it))));
   if (ns.mockup || it.etapa === "INTERESSADO")
     row.append(
       U.mkBtn("🖼️ Prévia", "", () => openMockup({ nome: title(it.nome), escola: title(it.escola), preco: precoTxt(it), toast: U.toast }))

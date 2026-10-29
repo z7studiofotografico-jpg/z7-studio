@@ -265,7 +265,8 @@ async function desenharEscolha(cv, st) {
 export const textoEscolha = F =>
   `Aqui estão as fotos do ensaio${F ? " de " + F : ""}! 📸 Escolhe qual vai no quadro e quais vão nos 2 porta-retratos. É só responder com os números, por exemplo: Quadro 2, porta-retratos 1 e 4 😊`;
 
-export function openMockup({ nome = "", escola = "", preco = "", modo = "kit", toast = null } = {}) {
+// fotos: já entram na prévia (as escolhidas pela família, vindas do Drive), na ordem quadro, porta-retratos
+export function openMockup({ nome = "", escola = "", preco = "", modo = "kit", toast = null, fotos = [] } = {}) {
   const st = { fotos: [], slots: [0, 1, 2], nome, escola: escola || "", preco: /\[/.test(preco) ? "" : preco, modo };
   const sh = el("div", "sheet");
   const p = el("div", "panel mock");
@@ -510,6 +511,7 @@ export function openMockup({ nome = "", escola = "", preco = "", modo = "kit", t
   if (!navigator.canShare) bShare.textContent = "Baixar para o WhatsApp";
   paintSlots();
   setModo(modo);
+  if (fotos.length) addFiles(fotos.map(b => (b instanceof File ? b : new File([b], "foto.jpg", { type: b.type || "image/jpeg" }))));
 }
 
 function fieldOf(lbl, inp) {

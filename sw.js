@@ -20,6 +20,8 @@ const SHELL = [
   "./js/escolas-pr.js",
   "./js/passar-pr.js",
   "./js/previas-lote.js",
+  "./js/drive-fotos.js",
+  "./js/fotos-aluno.js",
   "./js/regras.js",
   "./js/calc.js",
   "./js/feriados.js",

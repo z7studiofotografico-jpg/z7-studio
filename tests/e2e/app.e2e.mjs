@@ -2424,6 +2424,75 @@ await cenario("Prévias de um colégio (lote, no computador)", async () => {
   );
   ok(!erros.length, "sem erros" + (erros.length ? ": " + erros.join(" | ") : ""));
 });
+await cenario("Fotos do aluno direto do Google Drive", async () => {
+  const Y = new Date().getFullYear();
+  const F = "application/vnd.google-apps.folder";
+  const arvore = {
+    RAIZ123456789: [{ id: "col1", name: `Prévias - ${Y} - C.E. YONNE MARIA SIQUEIRA`, mimeType: F }],
+    col1: [
+      { id: "folha1", name: "CEYMS 02 - DOMINGOS JOSE.jpg", mimeType: "image/jpeg" },
+      { id: "pasta1", name: "CEYMS 02 - DOMINGOS JOSE", mimeType: F }
+    ],
+    pasta1: [1, 2, 3, 4].map(n => ({ id: "foto" + n, name: `CEYMS 02 - DOMINGOS JOSE - foto 0${n}.jpg`, mimeType: "image/jpeg" }))
+  };
+  const d = Object.assign({}, base, {
+    "config/app": Object.assign({}, base["config/app"] || {}, {
+      drivePrevias: "https://drive.google.com/drive/folders/RAIZ123456789?usp=sharing"
+    }),
+    "repasse/dj": {
+      nome: "DOMINGOS JOSE",
+      nomeBusca: "DOMINGOS JOSE",
+      escola: "C.E YONNE MARIA SIQUEIRA DE ANDRADE",
+      ano: Y,
+      codigoOrig: "02",
+      etapa: "SEPARADO",
+      resp: "Adriano Vinicius",
+      respEmail: ADRIANO,
+      separadoEm: dia(0),
+      separadoSeg: "lf",
+      followup: dia(0),
+      contatos: [{ tipo: "Mãe", nome: "Mãe", tel: "21999990000" }],
+      telefones: ["21999990000"]
+    }
+  });
+  const { pg, erros, ctx } = await abrir(ADRIANO, d);
+  const urls = [];
+  await ctx.route(/googleapis\.com\/drive\/v3\/files/, rt => {
+    const u = decodeURIComponent(rt.request().url());
+    urls.push(u);
+    if (/alt=media/.test(u))
+      return rt.fulfill({
+        path: AQUI + "../../icons/icon-192.png",
+        contentType: "image/png",
+        headers: { "access-control-allow-origin": "*" }
+      });
+    const pai = (u.match(/'([^']+)' in parents/) || [])[1];
+    return rt.fulfill({
+      contentType: "application/json",
+      headers: { "access-control-allow-origin": "*" },
+      body: JSON.stringify({ files: arvore[pai] || [] })
+    });
+  });
+  await ir(pg, "#pr");
+  await pg.locator("article", { hasText: "DOMINGOS JOSE" }).first().getByRole("button", { name: "🖼️ Fotos do aluno" }).click();
+  await pg.waitForFunction(() => document.querySelectorAll(".fotos-grade .foto-item img").length === 4, null, { timeout: 8000 });
+  ok(
+    (await pg.locator(".sheet:visible").getByRole("button", { name: "📤 Enviar a folha numerada" }).count()) === 1,
+    "acha a folha e as 4 fotos do aluno no Drive"
+  );
+  await pg.locator(".fotos-grade .foto-item").nth(2).click();
+  await pg.locator(".fotos-grade .foto-item").nth(0).click();
+  const tags = await pg.$$eval(".fotos-grade .tag", ts => ts.map(t => t.textContent));
+  ok(tags[2] === "Quadro" && tags[0] === "Porta-retratos 1", "toque na ordem: quadro e porta-retratos");
+  await pg.getByRole("button", { name: "🖼️ Montar o quadro com estas fotos" }).click();
+  await pg.waitForFunction(() => document.querySelectorAll(".mock .thumb").length === 2, null, { timeout: 8000 });
+  ok(true, "abre a prévia do kit já com as fotos escolhidas");
+  ok(
+    urls.every(u => /key=/.test(u)),
+    "lê o Drive com a chave do app"
+  );
+  ok(!erros.length, "sem erros" + (erros.length ? ": " + erros.join(" | ") : ""));
+});
 await cenario("Convite: criar a senha dentro do app", async () => {
   const ctx = await browser.newContext({ viewport: { width: 420, height: 900 }, serviceWorkers: "block" });
   abertos.push(ctx);

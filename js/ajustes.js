@@ -45,7 +45,9 @@ export function ligarAjustes(ctx, o) {
     ["pLinkFinal", "linkCartaoFinal", "texto"],
     ["pLinkLF", "linkCartaoLF", "texto"],
     ["pAval", "linkAvaliacao", "texto"],
-    ["pFeriados", "feriadosExtras", "texto"]
+    ["pFeriados", "feriadosExtras", "texto"],
+    ["pDrive", "drivePrevias", "texto"],
+    ["pDriveChave", "driveChave", "texto"]
   ];
   // Ajustes (só admin): os últimos erros do app registrados pelos aparelhos (defeitos, não falta de internet)
   async function mostrarErros() {
