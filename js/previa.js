@@ -87,6 +87,17 @@ export function desenharFolha(cv, st, pagina) {
     ctx.fillRect(x, y, cw, ch);
     ctx.restore();
     cover(ctx, f, x + 5, y + 5, cw - 10, ch - 10, 0.35);
+    // número da foto (a família escolhe pelo número: "quadro 3, porta-retratos 1 e 5")
+    const n = String(pagina * POR_PAGINA + i + 1);
+    ctx.fillStyle = "rgba(28,27,29,.85)";
+    ctx.beginPath();
+    ctx.arc(x + 26, y + 26, 18, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.fillStyle = "#fff";
+    ctx.font = "700 20px 'Source Sans 3', sans-serif";
+    ctx.textAlign = "center";
+    ctx.textBaseline = "middle";
+    ctx.fillText(n, x + 26, y + 27);
   });
   marca(ctx, 0, 150, W, H - 150 - 70);
   rodape(ctx, W, H, "Prévia com marca d'água · o kit é entregue com todas as fotos, tratadas e sem marca");

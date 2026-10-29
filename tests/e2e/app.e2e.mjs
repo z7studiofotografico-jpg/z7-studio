@@ -2379,26 +2379,25 @@ await cenario("Prévias de um colégio (lote, no computador)", async () => {
       pasta("02 - JOAO", [await arq("1.jpg", "#33c")])
     ]);
     window.__gravados = {};
-    const destino = {
-      name: "Prévias",
+    const dirFalso = caminho => ({
+      name: caminho.split("/").pop(),
       async getDirectoryHandle(n) {
+        return dirFalso(caminho ? caminho + "/" + n : n);
+      },
+      async getFileHandle(f) {
         return {
-          name: n,
-          async getFileHandle(f) {
+          async createWritable() {
             return {
-              async createWritable() {
-                return {
-                  async write(b) {
-                    window.__gravados[n + "/" + f] = b.size;
-                  },
-                  async close() {}
-                };
-              }
+              async write(b) {
+                window.__gravados[caminho + "/" + f] = b.size;
+              },
+              async close() {}
             };
           }
         };
       }
-    };
+    });
+    const destino = dirFalso("");
     const fila = [origem, destino];
     window.showDirectoryPicker = async () => fila.shift();
   });
@@ -2410,10 +2409,18 @@ await cenario("Prévias de um colégio (lote, no computador)", async () => {
   });
   const g = await pg.evaluate(() => window.__gravados);
   const nomes = Object.keys(g).sort();
+  const P = "Prévias - C.E. TESTE 2026/";
   ok(
-    nomes.join("|") === "Prévias - C.E. TESTE 2026/01 - MARIA.jpg|Prévias - C.E. TESTE 2026/02 - JOAO.jpg" &&
-      Object.values(g).every(t => t > 10000 && t < 600000),
-    "uma prévia leve por aluno, na pasta escolhida: " + JSON.stringify(g)
+    [
+      P + "01 - MARIA.jpg",
+      P + "02 - JOAO.jpg",
+      P + "01 - MARIA/01 - MARIA - foto 01.jpg",
+      P + "01 - MARIA/01 - MARIA - foto 02.jpg",
+      P + "02 - JOAO/02 - JOAO - foto 01.jpg"
+    ].every(n => nomes.includes(n)) &&
+      nomes.length === 5 &&
+      Object.values(g).every(t => t > 3000 && t < 600000),
+    "uma folha por aluno e as fotos separadas numeradas: " + nomes.join(" | ")
   );
   ok(!erros.length, "sem erros" + (erros.length ? ": " + erros.join(" | ") : ""));
 });

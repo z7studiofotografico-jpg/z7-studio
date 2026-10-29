@@ -3,7 +3,7 @@
 // Nada sobe para a internet: depois é só arrastar a pasta de prévias para o Google Drive e compartilhar como Leitor.
 // Precisa do Chrome ou Edge no computador (acesso a pastas). As fotos originais nunca são alteradas.
 import { el, sheet } from "./ui.js";
-import { prep } from "./mockup.js";
+import { prep, marca } from "./mockup.js";
 import { reduzir, desenharFolha } from "./previa.js";
 
 const FOTO = /\.(jpe?g|png|webp)$/i,
@@ -74,6 +74,15 @@ export function abrirPreviasLote(C) {
       p.append(el("p", "wait", "Abra o app no Chrome ou no Edge do computador para usar esta função."));
       return;
     }
+    const separadas = el("input");
+    separadas.type = "checkbox";
+    separadas.checked = true;
+    const lSep = el("label", "chk");
+    lSep.append(
+      separadas,
+      document.createTextNode(" Também salvar as fotos separadas, numeradas (para montar o quadro e os porta-retratos)")
+    );
+    p.append(lSep);
     const info = el("p", null, "");
     const barra = el("progress");
     barra.max = 1;
@@ -133,6 +142,20 @@ export function abrirPreviasLote(C) {
             fotos
           };
           const paginas = Math.ceil(fotos.length / POR_PAGINA);
+          // as fotos separadas (pequenas, com marca e número): o representante monta o quadro e os porta-retratos
+          // no app ("🖼️ Prévia e fotos") com as que a família escolher
+          if (separadas.checked) {
+            const sub = await pasta.getDirectoryHandle(nomes[i], { create: true });
+            for (const [k, f] of fotos.entries()) {
+              const c = document.createElement("canvas");
+              c.width = f.width;
+              c.height = f.height;
+              const x = c.getContext("2d");
+              x.drawImage(f, 0, 0);
+              marca(x, 0, 0, c.width, c.height);
+              await gravar(sub, `${nomes[i]} - foto ${String(k + 1).padStart(2, "0")}.jpg`, await jpg(c));
+            }
+          }
           for (let pg = 0; pg < paginas; pg++) {
             const cv = document.createElement("canvas");
             desenharFolha(cv, st, pg);
