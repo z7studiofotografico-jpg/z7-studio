@@ -72,6 +72,11 @@ function mount() {
   const hb = el("div", "quick");
   hb.append(U.mkBtn("+ Aluno", "btn-primary", () => openDados(null)));
   hb.append(U.mkBtn("🖼️ Prévia e fotos", "", () => openMockup({ preco: precoTxt(), toast: U.toast })));
+  // admin, no computador: prévias leves com marca d'água de um colégio inteiro (para o representante)
+  if (C.isAdmin)
+    hb.append(
+      U.mkBtn("🗂️ Prévias de um colégio", "", () => import("./previas-lote.js").then(m => m.abrirPreviasLote(C)).catch(e => C.handleErr(e)))
+    );
   hb.append(botaoRelatorio(relatorioPR, () => C.me));
   const imp = U.mkBtn("Importar planilha", "", () =>
     openImport(

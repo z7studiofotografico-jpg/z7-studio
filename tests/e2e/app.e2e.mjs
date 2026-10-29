@@ -2350,6 +2350,73 @@ await cenario("PR por colégio e ano · passar para a equipe", async () => {
   ok(s["repasse/jc3"].etapa === "SEPARADO" && s["repasse/jc3"].respEmail === PEDRO, "aluno: passa um aluno específico para a pessoa");
   ok(!erros.length, "sem erros" + (erros.length ? ": " + erros.join(" | ") : ""));
 });
+await cenario("Prévias de um colégio (lote, no computador)", async () => {
+  const { pg, erros } = await abrir(ADRIANO, base);
+  await pg.evaluate(async () => {
+    // fotos de verdade (geradas aqui) e pastas falsas no formato do Chrome (showDirectoryPicker)
+    const foto = async cor => {
+      const c = document.createElement("canvas");
+      c.width = 1200;
+      c.height = 1600;
+      const x = c.getContext("2d");
+      x.fillStyle = cor;
+      x.fillRect(0, 0, 1200, 1600);
+      return new File([await new Promise(r => c.toBlob(r, "image/jpeg"))], "f.jpg", { type: "image/jpeg" });
+    };
+    const arq = async (name, cor) => {
+      const f = await foto(cor);
+      return { kind: "file", name, getFile: async () => f };
+    };
+    const pasta = (name, itens) => ({
+      kind: "directory",
+      name,
+      async *values() {
+        yield* itens;
+      }
+    });
+    const origem = pasta("C.E. TESTE 2026", [
+      pasta("01 - MARIA", [await arq("1.jpg", "#c33"), await arq("2.jpg", "#3c3")]),
+      pasta("02 - JOAO", [await arq("1.jpg", "#33c")])
+    ]);
+    window.__gravados = {};
+    const destino = {
+      name: "Prévias",
+      async getDirectoryHandle(n) {
+        return {
+          name: n,
+          async getFileHandle(f) {
+            return {
+              async createWritable() {
+                return {
+                  async write(b) {
+                    window.__gravados[n + "/" + f] = b.size;
+                  },
+                  async close() {}
+                };
+              }
+            };
+          }
+        };
+      }
+    };
+    const fila = [origem, destino];
+    window.showDirectoryPicker = async () => fila.shift();
+  });
+  await ir(pg, "#pr");
+  await pg.getByRole("button", { name: "🗂️ Prévias de um colégio" }).click();
+  await pg.locator(".sheet:visible").getByRole("button", { name: "Escolher a pasta do colégio" }).click();
+  await pg.waitForFunction(() => /Pronto!/.test(document.querySelector(".sheet:last-of-type")?.textContent || ""), null, {
+    timeout: 15000
+  });
+  const g = await pg.evaluate(() => window.__gravados);
+  const nomes = Object.keys(g).sort();
+  ok(
+    nomes.join("|") === "Prévias - C.E. TESTE 2026/01 - MARIA.jpg|Prévias - C.E. TESTE 2026/02 - JOAO.jpg" &&
+      Object.values(g).every(t => t > 10000 && t < 600000),
+    "uma prévia leve por aluno, na pasta escolhida: " + JSON.stringify(g)
+  );
+  ok(!erros.length, "sem erros" + (erros.length ? ": " + erros.join(" | ") : ""));
+});
 await cenario("Convite: criar a senha dentro do app", async () => {
   const ctx = await browser.newContext({ viewport: { width: 420, height: 900 }, serviceWorkers: "block" });
   abertos.push(ctx);

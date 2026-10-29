@@ -15,7 +15,7 @@ const FUNDO = "#f3f0ec",
   CINZA = "#6b6670";
 
 // Lê a foto e já reduz (um celular não aguenta 70 fotos de 12 MP abertas ao mesmo tempo)
-async function reduzir(file) {
+export async function reduzir(file) {
   const url = URL.createObjectURL(file);
   try {
     const img = await new Promise((res, rej) => {
