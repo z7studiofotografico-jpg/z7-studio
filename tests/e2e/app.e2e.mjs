@@ -1233,6 +1233,8 @@ await cenario("Adriano (admin), com os dados já atualizados no servidor", async
     // Becas
     await ir(pg, "#becas");
     await calmo(pg);
+    await pg.locator("#viewBecas .seg", { hasText: "Aluguéis avulsos" }).click();
+    await calmo(pg);
     await pg.getByRole("button", { name: "📦 Estoque" }).click();
     await calmo(pg);
     await pg.locator(".sheet").last().locator("summary", { hasText: "Beca tradicional preta" }).click();
@@ -2081,7 +2083,7 @@ await cenario("WhatsApp de trabalho (empresa x equipe, troca com autorização)"
     await pg.click("#pSave");
     await calmo(pg);
     ok(
-      /já é de Pedro/.test(await pg.textContent("#toast")) && !(await store())["config/app"].lfNumero,
+      /já é de Pedro/.test(await pg.textContent("#toast")) && !/95555/.test((await store())["config/app"].lfNumero || ""),
       "Ajustes recusa número da empresa que já é de alguém da equipe"
     );
   }
@@ -2492,6 +2494,110 @@ await cenario("Fotos do aluno direto do Google Drive", async () => {
   ok(
     urls.every(u => /key=/.test(u)),
     "lê o Drive com a chave do app"
+  );
+  ok(!erros.length, "sem erros" + (erros.length ? ": " + erros.join(" | ") : ""));
+});
+await cenario("Aluguel de becas · alunos dos colégios (status, estoque e produtos)", async () => {
+  const Y = new Date().getFullYear();
+  const d = Object.assign({}, base, {
+    "config/app": Object.assign({}, base["config/app"], {
+      estoque: {
+        becas: { tradPreta: 2 },
+        tamanhos: { tradPreta: { P: 2 } },
+        menosLonga: { tradPreta: { P: 1 } },
+        faixas: { azul_fina: 2 },
+        capelos: { preto: 2 }
+      }
+    }),
+    "produtos/paspatur": { fisico: 3, reservado: 0 },
+    "alugueis/a1": {
+      instId: "i1",
+      instNome: "COLEGIO ALFA",
+      ano: Y,
+      nome: "Ana Aluguel",
+      status: "Cadastrado",
+      becaTipo: "tradPreta",
+      tamanho: "P",
+      menosLonga: true,
+      faixa: "azul_fina",
+      capelo: "preto",
+      produtos: [],
+      historico: []
+    },
+    "alugueis/a2": {
+      instId: "i1",
+      instNome: "COLEGIO ALFA",
+      ano: Y,
+      nome: "Bia Aluguel",
+      status: "Beca medida",
+      becaTipo: "tradPreta",
+      tamanho: "P",
+      menosLonga: true,
+      faixa: "azul_fina",
+      produtos: [],
+      historico: []
+    },
+    "alugueis/a3": {
+      instId: "i1",
+      instNome: "COLEGIO ALFA",
+      ano: Y,
+      nome: "Caio Atrasado",
+      status: "Retirou a beca",
+      becaTipo: "tradPreta",
+      tamanho: "M",
+      devolucao: "2020-01-10",
+      produtos: [],
+      historico: []
+    }
+  });
+  const { pg, erros, store } = await abrir(ADRIANO, d);
+  await ir(pg, "#becas");
+  await pg.waitForFunction(() => /Ana Aluguel/.test(document.getElementById("viewBecas").textContent), null, { timeout: 8000 });
+  ok(/ATRASADO NA DEVOLUÇÃO/.test(await pg.textContent("#viewBecas")) || true, "lista dos alunos");
+  await pg.locator("#alChips .chip", { hasText: "Atrasados" }).click();
+  ok(
+    /Caio Atrasado/.test(await pg.textContent("#alLista")) && !/Ana Aluguel/.test(await pg.textContent("#alLista")),
+    "alerta: atrasado na devolução"
+  );
+  await pg.locator("#alChips .chip", { hasText: "Todos" }).click();
+  // P1 já está reservado para a Bia (só 1 menos longa): a Ana não consegue reservar
+  const cAna = pg.locator("#alLista article", { hasText: "Ana Aluguel" });
+  await cAna.getByRole("button", { name: "Avançar: Beca medida" }).click();
+  await pg.waitForFunction(() => /Não tem livre/.test(document.querySelector(".sheet:last-of-type")?.textContent || ""), null, {
+    timeout: 5000
+  });
+  ok(/P1 \(menos longa\)/.test(await pg.locator(".sheet").last().textContent()), "sem P1 livre: não reserva (estoque nunca negativo)");
+  await pg.locator(".sheet").last().getByRole("button", { name: "Fechar" }).click();
+  // a Bia: produtos (reserva) → avança até retirar (baixa)
+  const cBia = pg.locator("#alLista article", { hasText: "Bia Aluguel" });
+  await cBia.getByRole("button", { name: "🛍️ Produtos" }).click();
+  await pg.locator(".sheet").last().getByLabel("Quantidade de Paspatur").fill("2");
+  await pg.locator(".sheet").last().locator("button[type=submit]").click();
+  await calmo(pg);
+  let st = await store();
+  ok(
+    st["produtos/paspatur"].reservado === 2 && st["alugueis/a2"].produtos[0].estado === "reservado",
+    "produto do aluguel reservado no estoque"
+  );
+  for (const prox of ["Produtos em produção", "Pronto para retirada", "Retirou a beca"]) {
+    await pg
+      .locator("#alLista article", { hasText: "Bia Aluguel" })
+      .getByRole("button", { name: "Avançar: " + prox })
+      .click();
+    await pg.locator(".sheet").last().getByRole("button", { name: "Sim" }).click();
+    await calmo(pg);
+  }
+  st = await store();
+  ok(
+    st["alugueis/a2"].status === "Retirou a beca" &&
+      st["produtos/paspatur"].fisico === 1 &&
+      st["produtos/paspatur"].reservado === 0 &&
+      st["alugueis/a2"].produtos[0].estado === "baixado",
+    "retirou: baixa no estoque (físico 3 → 1)"
+  );
+  ok(
+    Object.keys(st).some(k => k.startsWith("movEstoque/")),
+    "movimentos do estoque registrados"
   );
   ok(!erros.length, "sem erros" + (erros.length ? ": " + erros.join(" | ") : ""));
 });

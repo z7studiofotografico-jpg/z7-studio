@@ -70,6 +70,18 @@ const parcAtrasadas = (await db.collection("formandos").where("proxVenc", ">", "
 const becasAbertas = (await db.collection("becas").where("status", "in", ["reservado", "retirado"]).get()).docs.map(d => d.data());
 const becasAtr = becasAbertas.filter(b => b.status === "retirado" && b.devolucao && b.devolucao < hoje).length;
 const becasRet = becasAbertas.filter(b => b.status === "reservado" && b.retirada === amanha).length;
+// Para o Adriano (Regra 10): pedidos de exclusão da equipe, alunos de aluguel atrasados na devolução e
+// colégios que "Não fecharam" com o retorno chegando (7 dias antes)
+const exclPend = (await db.collection("exclusoes").where("status", "==", "pendente").get()).size;
+const alugAtr = (await db.collection("alugueis").where("status", "==", "Retirou a beca").get()).docs.filter(d => {
+  const x = d.data();
+  return x.devolucao && x.devolucao < hoje && !x.excluido;
+}).length;
+const em7 = somaDias(hoje, 7);
+const naoFechouVolta = (await db.collection("instituicoes").where("etapa", "==", "NÃO FECHOU").get()).docs.filter(d => {
+  const r = (d.data().naoFechou || {}).retorno;
+  return r && r > hoje && r <= em7;
+}).length;
 // Datas aprovadas que quem agendou ainda não avisou o colégio pelo WhatsApp
 const paraAvisar = {};
 (await db.collection("agenda").where("status", "==", "confirmado").get()).docs
@@ -126,7 +138,10 @@ for (const t of tokensSnap.docs) {
       aval = souAdmin ? avaliacoes : 0,
       parc = souAdmin ? parcAtrasadas : 0,
       ped = souAdmin ? pedidosPR : 0,
-      num = souAdmin ? pedNumeros : 0;
+      num = souAdmin ? pedNumeros : 0,
+      exc = souAdmin ? exclPend : 0,
+      alA = souAdmin ? alugAtr : 0,
+      nfv = souAdmin ? naoFechouVolta : 0;
     const bec = souAdmin || (mods && mods.includes("becas")) ? becasAtr + becasRet : 0;
     const avisar = paraAvisar[String(t.get("email") || "").toLowerCase()] || 0;
     const minhasOfertas = ofertas.filter(o => souAdmin || o.respEmail === String(t.get("email") || "").toLowerCase());
@@ -144,10 +159,29 @@ for (const t of tokensSnap.docs) {
       !avisar &&
       !ofe &&
       !ped &&
-      !num
+      !num &&
+      !exc &&
+      !alA &&
+      !nfv
     )
       continue;
-    const total = meus.length + meusRep.length + meusInst.length + aprova + lembrar + ent + aval + parc + bec + avisar + ofe + ped + num;
+    const total =
+      meus.length +
+      meusRep.length +
+      meusInst.length +
+      aprova +
+      lembrar +
+      ent +
+      aval +
+      parc +
+      bec +
+      avisar +
+      ofe +
+      ped +
+      num +
+      exc +
+      alA +
+      nfv;
     const atrasados =
       meus.filter(l => l.followup < hoje).length +
       meusRep.filter(r => r.followup < hoje).length +
@@ -167,6 +201,9 @@ for (const t of tokensSnap.docs) {
         `📩 ${ped} pedido${ped > 1 ? "s" : ""} de aluno repetido no PR` +
           (trocaramColegio ? ` (🏫 ${trocaramColegio} trocou de colégio)` : "")
       );
+    if (exc) partes.push(`🗑️ ${exc} pedido${exc > 1 ? "s" : ""} de exclusão da equipe para aprovar`);
+    if (alA) partes.push(`👘 ${alA} aluno${alA > 1 ? "s" : ""} atrasado${alA > 1 ? "s" : ""} na devolução da beca`);
+    if (nfv) partes.push(`❌ ${nfv} colégio${nfv > 1 ? "s" : ""} que não fechou: retorno nesta semana`);
     if (num) partes.push(`📱 ${num} pedido${num > 1 ? "s" : ""} de troca de WhatsApp de trabalho para autorizar`);
     if (lembrar) partes.push(`Lembrar ${lembrar} cliente${lembrar > 1 ? "s" : ""} do ensaio de amanhã`);
     if (ent) partes.push(`⚠️ ${ent} entrega${ent > 1 ? "s" : ""} de fotos atrasada${ent > 1 ? "s" : ""}`);

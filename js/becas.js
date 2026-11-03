@@ -8,6 +8,8 @@ import { lerReais, centavos, reais, brl } from "./regras.js";
 import * as U from "./util.js";
 import { botaoRelatorio } from "./relatorio.js";
 import { contatoRel } from "./aluno-id.js";
+import { BECAS, TAMANHOS, FAIXAS, CAPELOS, nomeFaixa, nomeCapelo, abrirEstoqueBecas, somarUso, usoDosAlunos } from "./becas-estoque.js";
+export { BECAS, TAMANHOS, FAIXAS, CAPELOS };
 let C,
   FS,
   db,
@@ -21,7 +23,7 @@ const ITENS = [
   ["capelo", "Capelo"],
   ["jabor", "Jabor"]
 ]; // só para aluguéis antigos
-export const CAPELOS = [["capelo", "Capelo"]];
+// Tipos de beca, tamanhos, faixas (cor + espessura) e capelos: em becas-estoque.js (o mesmo para avulsos e alunos)
 // Tamanhos por tipo de beca: { tipo: { tamanho: n } } (ignora o formato antigo, que não separava o tipo)
 const porTipo = o => Object.fromEntries(Object.entries(o || {}).filter(([, v]) => v && typeof v === "object"));
 const textoTam = t =>
@@ -33,26 +35,6 @@ const textoTam = t =>
           .join(", ")}`
     )
     .join("; ");
-// Tamanhos de beca que o estúdio tem
-export const TAMANHOS = ["PPP", "PP", "P", "M", "G", "GG", "XG", "XXG", "EXG"].map(t => [t, t]);
-// Tipos de beca e cores de faixa: cada um tem o seu estoque (definido no botão "📦 Estoque")
-export const BECAS = [
-  ["pelerineAzul", "Beca pelerine azul"],
-  ["infAzul", "Beca infantil azul"],
-  ["infPreta", "Beca infantil preta"],
-  ["tradPreta", "Beca tradicional preta"],
-  ["americana", "Beca americana"]
-];
-export const FAIXAS = [
-  ["azul", "Azul"],
-  ["branca", "Branca"],
-  ["amarela", "Amarela"],
-  ["lilas", "Lilás"],
-  ["verde", "Verde"],
-  ["laranja", "Laranja"],
-  ["rosa", "Rosa"],
-  ["vermelha", "Vermelha"]
-];
 const estoque = () => C.P.estoque || {};
 const somaObj = o => Object.values(o || {}).reduce((a, v) => a + n0(v), 0);
 const totBecas = x => (x.becasQtd ? somaObj(x.becasQtd) : n0(x.qtd));
@@ -71,9 +53,49 @@ export function hide() {
   unsubs = [];
 }
 
+let parte = "alunos"; // "alunos" (dos colégios, Etapa 3) ou "avulsos" (aluguéis para outros eventos)
 export function show() {
   const v = $("viewBecas");
   v.innerHTML = "";
+  hide();
+  // as duas partes do card: alunos dos colégios e aluguéis avulsos
+  const segs = el("div", "segs");
+  [
+    ["alunos", "🎓 Alunos dos colégios", "ligados à instituição, ano e série"],
+    ["avulsos", "👘 Aluguéis avulsos", "outros eventos, por quantidade"]
+  ].forEach(([k, t, sub]) => {
+    const b = el("button", "seg");
+    b.type = "button";
+    b.setAttribute("role", "tab");
+    b.setAttribute("aria-selected", String(parte === k));
+    b.append(el("b", null, t), el("small", null, sub));
+    b.onclick = () => {
+      if (parte === k) return;
+      parte = k;
+      show();
+    };
+    segs.append(b);
+  });
+  v.append(segs);
+  // alunos com beca reservada ou fora: entram na conta do estoque dos avulsos também
+  unsubs.push(
+    FS.onSnapshot(
+      FS.query(
+        FS.collection(db, "alugueis"),
+        FS.where("status", "in", ["Beca medida", "Produtos em produção", "Pronto para retirada", "Retirou a beca"]),
+        FS.limit(2000)
+      ),
+      s => {
+        alunosAtivos = s.docs.map(d => d.data());
+        if (parte === "avulsos") render();
+      },
+      e => avisoErro(e, "contar as becas dos alunos")
+    )
+  );
+  if (parte === "alunos") {
+    import("./aluguel-alunos.js").then(m => m.mostrarAlunos(C, v, { abrirEstoque: openEstoque, unsubs })).catch(e => C.handleErr(e));
+    return;
+  }
   const head = el("div", "vhead");
   head.append(el("h2", null, "Aluguel de becas"));
   const hb = el("div", "agact");
@@ -95,7 +117,6 @@ export function show() {
   corpo.id = "bcLista";
   corpo.append(el("div", "empty", "Carregando…"));
   v.append(corpo);
-  hide();
   lista = [];
   let a = [],
     b = [];
@@ -136,8 +157,9 @@ export function show() {
 }
 
 // Quantas becas estão comprometidas entre duas datas (para conferir o estoque)
+let alunosAtivos = []; // alunos de aluguel com beca reservada ou fora (carregados ao abrir a tela)
 function emUso(de, ate, ignora) {
-  const out = { becas: {}, faixas: {}, capelos: {}, tamanhos: {} };
+  const out = somarUso({ becas: {}, faixas: {}, capelos: {}, tamanhos: {} }, usoDosAlunos(alunosAtivos));
   lista
     .filter(x => x.id !== ignora && ativo(x) && x.retirada && x.devolucao && x.retirada <= ate && x.devolucao >= de)
     .forEach(x => {
@@ -260,8 +282,12 @@ function card(x) {
     x.tipoEvento === "nosso" ? "Nosso evento" : "Outro evento",
     x.evento,
     ...BECAS.filter(([k]) => n0((x.becasQtd || {})[k])).map(([k, t]) => `${t.replace("Beca ", "")}: ${x.becasQtd[k]}`),
-    ...FAIXAS.filter(([k]) => n0((x.faixasQtd || {})[k])).map(([k, t]) => `Faixa ${t.toLowerCase()}: ${x.faixasQtd[k]}`),
-    n0((x.capelosQtd || {}).capelo) ? `Capelo: ${x.capelosQtd.capelo}` : "",
+    ...Object.keys(x.faixasQtd || {})
+      .filter(k => n0(x.faixasQtd[k]))
+      .map(k => `Faixa ${nomeFaixa(k).toLowerCase()}: ${x.faixasQtd[k]}`),
+    ...Object.keys(x.capelosQtd || {})
+      .filter(k => n0(x.capelosQtd[k]))
+      .map(k => `${nomeCapelo(k)}: ${x.capelosQtd[k]}`),
     x.capelosQtd
       ? ""
       : ITENS.filter(([kk]) => x.itens && x.itens[kk])
@@ -341,7 +367,15 @@ function devolver(x) {
       el(
         "p",
         "hint",
-        `${totBecas(x)} beca${totBecas(x) !== 1 ? "s" : ""} · ${[...BECAS.filter(([k]) => n0((x.becasQtd || {})[k])).map(([k, t]) => `${x.becasQtd[k]} ${t.toLowerCase()}`), ...FAIXAS.filter(([k]) => n0((x.faixasQtd || {})[k])).map(([k, t]) => `${x.faixasQtd[k]} faixa ${t.toLowerCase()}`), ...(n0((x.capelosQtd || {}).capelo) ? [`${x.capelosQtd.capelo} capelo${x.capelosQtd.capelo > 1 ? "s" : ""}`] : [])].join(", ")}`
+        `${totBecas(x)} beca${totBecas(x) !== 1 ? "s" : ""} · ${[
+          ...BECAS.filter(([k]) => n0((x.becasQtd || {})[k])).map(([k, t]) => `${x.becasQtd[k]} ${t.toLowerCase()}`),
+          ...Object.keys(x.faixasQtd || {})
+            .filter(k => n0(x.faixasQtd[k]))
+            .map(k => `${x.faixasQtd[k]} faixa ${nomeFaixa(k).toLowerCase()}`),
+          ...Object.keys(x.capelosQtd || {})
+            .filter(k => n0(x.capelosQtd[k]))
+            .map(k => `${x.capelosQtd[k]} ${nomeCapelo(k).toLowerCase()}`)
+        ].join(", ")}`
       )
     );
     const tudoL = el("label", "chk");
@@ -374,100 +408,10 @@ function devolver(x) {
   });
 }
 
-// Estoque por tipo de beca e cor de faixa (salvo em Ajustes / config). Mostra o que está fora agora.
+// Estoque: becas, tamanhos (com "menos longa"), faixas e capelos; mostra o que está em uso agora (avulsos + alunos)
 function openEstoque() {
-  sheet("📦 Estoque de becas, faixas, capelos e tamanhos", (p, close) => {
-    const E = estoque(),
-      hoje = U.todayStr(),
-      u = emUso(hoje, hoje);
-    p.append(
-      el(
-        "p",
-        "hint",
-        C.isAdmin
-          ? "Quantas peças vocês têm de cada tipo. O app usa isso para avisar quando faltar num período."
-          : "Só administradores mudam o estoque."
-      )
-    );
-    const tab = (titulo, tipos, atual, fora) => {
-      const f = el("div", "field");
-      f.append(el("label", null, titulo));
-      const g = gradeQtd(tipos, atual, {
-        max: 5,
-        disabled: !C.isAdmin,
-        rotulo: (k, t) => "Estoque " + t,
-        texto: (k, t) => t + (n0(fora[k]) ? ` · ${n0(fora[k])} fora hoje` : "")
-      });
-      f.append(g.box);
-      p.append(f);
-      return g.ins;
-    };
-    const iB = tab("Becas (o jabor vai junto)", BECAS, E.becas, u.becas),
-      iF = tab("Faixas", FAIXAS, E.faixas, u.faixas),
-      iC = tab("Capelos", CAPELOS, E.capelos, u.capelos);
-    // Tamanhos de cada tipo de beca
-    const ET = porTipo(E.tamanhos),
-      UT = u.tamanhos;
-    {
-      const f = el("div", "field");
-      f.append(el("label", null, "Tamanhos de cada beca (PPP a EXG)"));
-      p.append(f);
-    }
-    const iT = BECAS.map(([tp, nm]) => {
-      const d = el("details", "tamtipo"),
-        sm = el("summary");
-      d.append(sm);
-      const g = gradeQtd(TAMANHOS, ET[tp], {
-        disabled: !C.isAdmin,
-        rotulo: z => `Estoque ${nm} ${z}`,
-        texto: z => z + (n0((UT[tp] || {})[z]) ? ` · ${n0(UT[tp][z])} fora` : "")
-      });
-      d.append(g.box);
-      const ins = g.ins;
-      const total = iB.find(([k]) => k === tp)[1];
-      const resumo = () => {
-        const t = ins.reduce((a, [, q]) => a + n0(q.value), 0),
-          b = n0(total.value);
-        sm.textContent = `${nm}: ${t ? `${t} de ${b} com tamanho${t === b ? " ✅" : t > b ? " ⚠️ passou do total" : ""}` : "sem tamanhos"}`;
-      };
-      [...ins.map(([, q]) => q), total].forEach(q => q.addEventListener("input", resumo));
-      resumo();
-      p.append(d);
-      return [tp, ins];
-    });
-    p.append(
-      el(
-        "p",
-        "hint",
-        "Beca americana: deixe 0 até chegar. O app avisa se alguém tentar alugar. Tamanhos: abra cada beca e coloque quantas tem de cada tamanho; beca sem tamanhos preenchidos não é conferida por tamanho."
-      )
-    );
-    p.append(botoes(close, "Salvar estoque"));
-    if (!C.isAdmin) p.querySelector("button[type=submit]").hidden = true;
-    p.addEventListener("submit", async ev => {
-      ev.preventDefault();
-      if (!C.isAdmin) return;
-      const novo = {
-        becas: Object.fromEntries(iB.map(([k, q]) => [k, n0(q.value)])),
-        faixas: Object.fromEntries(iF.map(([k, q]) => [k, n0(q.value)])),
-        capelos: Object.fromEntries(iC.map(([k, q]) => [k, n0(q.value)])),
-        tamanhos: Object.fromEntries(
-          iT
-            .map(([tp, ins]) => [tp, Object.fromEntries(ins.map(([z, q]) => [z, n0(q.value)]).filter(([, v]) => v))])
-            .filter(([, o]) => Object.keys(o).length)
-        )
-      };
-      try {
-        await FS.setDoc(FS.doc(db, "config", "app"), { estoque: novo }, { merge: true });
-        C.P.estoque = novo;
-        close();
-        U.toast("Estoque salvo");
-        render();
-      } catch (e) {
-        C.handleErr(e);
-      }
-    });
-  });
+  const hoje = U.todayStr();
+  abrirEstoqueBecas(C, emUso(hoje, "9999-12-31"), render);
 }
 
 export function form(x, pre) {
@@ -638,7 +582,7 @@ export function form(x, pre) {
           livre = tem - n0(u.faixas[k]);
         if (pede > livre)
           out.push(
-            `Faixa ${FAIXAS.find(b => b[0] === k)[1].toLowerCase()}: pediu ${pede}, livres ${Math.max(0, livre)}${tem ? "" : " (sem estoque cadastrado)"}`
+            `Faixa ${nomeFaixa(k).toLowerCase()}: pediu ${pede}, livres ${Math.max(0, livre)}${tem ? "" : " (sem estoque cadastrado)"}`
           );
       });
       qC.forEach(([k, q]) => {
@@ -646,7 +590,8 @@ export function form(x, pre) {
         if (!pede) return;
         const tem = n0((E.capelos || {})[k]),
           livre = tem - n0(u.capelos[k]);
-        if (pede > livre) out.push(`Capelo: pediu ${pede}, livres ${Math.max(0, livre)}${tem ? "" : " (sem estoque cadastrado)"}`);
+        if (pede > livre)
+          out.push(`${nomeCapelo(k)}: pediu ${pede}, livres ${Math.max(0, livre)}${tem ? "" : " (sem estoque cadastrado)"}`);
       });
       // tamanho só é conferido se o estoque de tamanhos foi preenchido
       const ET = porTipo(E.tamanhos);

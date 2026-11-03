@@ -12,12 +12,21 @@ import { avisoTel } from "./aluno-id.js";
 
 export const MAX_NUMEROS = 3;
 // Números da empresa que já vêm preenchidos em Ajustes (o admin pode trocar)
-export const EMPRESA_PADRAO = { funilNumero: "21998817771", cobrancaNumero: "21997597605" };
+// Números de cada função (combinado em 03/11/2026): Funil/Meta Ads (21) 99881-7771; Cobrança e Venda Antecipada
+// (21) 99759-7605; Formatura e PR (Repasse PR, Repasse Formatura e Linha de Frente) (21) 3743-0000
+export const EMPRESA_PADRAO = {
+  funilNumero: "21998817771",
+  cobrancaNumero: "21997597605",
+  lfNumero: "2137430000",
+  repNumero: "2137430000",
+  formNumero: "2137430000"
+};
 export const FRENTES = {
   funil: { chave: "funilNumero", nome: "Funil de vendas" },
   lf: { chave: "lfNumero", nome: "PR · Linha de Frente" },
   rep: { chave: "repNumero", nome: "PR · Repasse" },
-  cobranca: { chave: "cobrancaNumero", nome: "Cobrança das formaturas" }
+  cobranca: { chave: "cobrancaNumero", nome: "Cobrança e Venda Antecipada" },
+  form: { chave: "formNumero", nome: "Formatura · Linha de Frente e Repasse" }
 };
 
 // Só os dígitos, com DDD e sem o 55 (sem DDD, é do Rio: 21)

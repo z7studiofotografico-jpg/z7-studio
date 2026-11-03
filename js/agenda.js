@@ -158,17 +158,29 @@ export function show() {
         e => avisoErro(e, "ler os compromissos particulares")
       )
     );
+  // Alunos de aluguel dos colégios (Etapa 3): retirada e devolução juntas por colégio e dia, ligadas ao status
+  if (C.pode("becas"))
+    unsubs.push(
+      FS.onSnapshot(
+        FS.query(FS.collection(db, "alugueis"), FS.where("devolucao", ">=", hoje), FS.orderBy("devolucao"), FS.limit(1500)),
+        snap => {
+          becasAlunos = agruparAlunos(snap.docs.map(d => d.data()));
+          mudar({ becas: [...becasAvulsas, ...becasAlunos] });
+          render();
+        },
+        e => avisoErro(e, "carregar os alunos de aluguel")
+      )
+    );
   // Aluguel de becas: retirada e devolução (só informam, não bloqueiam o dia)
   if (C.pode("becas"))
     unsubs.push(
       FS.onSnapshot(
         FS.query(FS.collection(db, "becas"), FS.where("devolucao", ">=", hoje), FS.orderBy("devolucao"), FS.limit(400)),
         snap => {
-          mudar({
-            becas: snap.docs
-              .map(d => Object.assign({ id: d.id }, d.data()))
-              .filter(x => x.status !== "cancelado" && x.status !== "devolvido")
-          });
+          becasAvulsas = snap.docs
+            .map(d => Object.assign({ id: d.id }, d.data()))
+            .filter(x => x.status !== "cancelado" && x.status !== "devolvido");
+          mudar({ becas: [...becasAvulsas, ...becasAlunos] });
           render();
         },
         e => avisoErro(e, "carregar as becas")
@@ -421,6 +433,32 @@ function linhaFeriado(f) {
   t.append(el("b", null, "🚫 Feriado: " + f.nome), el("span", null, "Estúdio fechado"));
   r.append(t, el("span", "tag late", "Fechado"));
   return r;
+}
+let becasAvulsas = [],
+  becasAlunos = [];
+// um item por colégio e dia: "C.E. Alfa (12 alunos)"; some da retirada quando todos já retiraram
+function agruparAlunos(lst) {
+  const g = {};
+  lst
+    .filter(a => !a.excluido && a.status !== "Devolvida")
+    .forEach(a => {
+      const k = (a.instId || a.instNome) + "|" + (a.retirada || "") + "|" + (a.devolucao || "");
+      const x = (g[k] = g[k] || {
+        id: "al_" + k,
+        cliente: a.instNome || "Colégio",
+        qtd: 0,
+        retirada: "",
+        devolucao: a.devolucao,
+        evento: "alunos do colégio",
+        aRetirar: 0
+      });
+      x.qtd++;
+      if (a.status !== "Retirou a beca") {
+        x.aRetirar++;
+        x.retirada = a.retirada || "";
+      }
+    });
+  return Object.values(g);
 }
 // Tipos de evento: ícone + nome + cor (a mesma na legenda, no calendário e na lista do dia)
 export const TIPOS_EVENTO = {

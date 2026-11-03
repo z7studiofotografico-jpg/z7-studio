@@ -170,3 +170,48 @@ export function perguntarSeEnviou(aoConfirmar, texto = "Você enviou a mensagem?
     setTimeout(() => document.hasFocus() && perguntar(), 4000);
   }, 600);
 }
+
+// Pede um texto obrigatório (ex.: o motivo do estorno ou do "Caído"). Devolve o texto ou null (cancelou).
+export function pedirTexto(titulo, rotulo, { placeholder = "", ok = "Salvar" } = {}) {
+  return new Promise(res => {
+    let fim = false;
+    const acaba = v => {
+      if (fim) return;
+      fim = true;
+      res(v);
+    };
+    sheet(
+      titulo,
+      (p, close) => {
+        const t = el("textarea");
+        t.rows = 3;
+        t.maxLength = 500;
+        t.required = true;
+        t.placeholder = placeholder;
+        const f = el("div", "field");
+        const l = el("label", null, rotulo);
+        f.append(l, t);
+        const a = el("div", "panel-actions");
+        const bN = el("button", "btn", "Cancelar");
+        bN.type = "button";
+        bN.onclick = () => {
+          acaba(null);
+          close();
+        };
+        const bS = el("button", "btn btn-primary", ok);
+        bS.type = "submit";
+        a.append(el("span"), bN, bS);
+        a.firstChild.style.flex = "1";
+        p.append(f, a);
+        p.addEventListener("submit", ev => {
+          ev.preventDefault();
+          if (!t.value.trim()) return;
+          acaba(t.value.trim());
+          close();
+        });
+        setTimeout(() => t.focus(), 30);
+      },
+      { onClose: () => acaba(null) }
+    );
+  });
+}
