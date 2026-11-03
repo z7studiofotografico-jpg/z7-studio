@@ -106,6 +106,11 @@ export function ligarAjustes(ctx, o) {
     if (ctx.isAdmin) mostrarErros();
     $("pVerComo").hidden = !ctx.isAdmin;
     $("pBackup").hidden = !ctx.isAdmin;
+    // link e chave do Drive: a equipe nem vê os campos (só o Adriano)
+    ["pDrive", "pDriveChave", "pDriveCliente"].forEach(id => {
+      const f = $(id).closest(".field");
+      if (f) f.hidden = !ctx.isAdmin;
+    });
     $("pAjuda").hidden = !ctx.isAdmin;
     $("pLimpar").hidden = !ctx.isAdmin;
     secaoMeusNumeros(ctx, $("pMeusNum"));
