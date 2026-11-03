@@ -54,7 +54,8 @@ const limpo = n =>
     .replace(/[\\/:*?"<>|]+/g, " ")
     .replace(/\s+/g, " ")
     .trim()
-    .slice(0, 120) || "aluno";
+    .slice(0, 120)
+    .replace(/[.\s]+$/, "") || "aluno"; // (o Windows não aceita nome terminando em ponto ou espaço)
 
 // "2022-03-30 - C.E. YONNE MARIA SIQUEIRA - entregue" → { nome: "C.E. YONNE MARIA SIQUEIRA", ano: "2022" }
 export function nomeDoColegio(pasta) {
@@ -94,11 +95,29 @@ export function nomesDeSaida(alunos) {
   });
 }
 const jpg = cv => new Promise(res => cv.toBlob(res, "image/jpeg", 0.72));
-async function gravar(pasta, nome, blob) {
+async function gravar1(pasta, nome, blob) {
   const f = await pasta.getFileHandle(nome, { create: true });
   const w = await f.createWritable();
   await w.write(blob);
   await w.close();
+}
+// pasta do Google Drive no computador ou na rede às vezes "some" por um instante: tenta de novo antes de desistir
+const espera = ms => new Promise(r => setTimeout(r, ms));
+async function gravar(pasta, nome, blob) {
+  try {
+    await gravar1(pasta, nome, blob);
+  } catch (e) {
+    await espera(800);
+    await gravar1(pasta, nome, blob);
+  }
+}
+async function lerFoto(h) {
+  try {
+    return await reduzir(await h.getFile());
+  } catch (e) {
+    await espera(500);
+    return reduzir(await h.getFile());
+  }
 }
 
 // o = { col: "repasse" | "paspatur" | "formaturaAlunos" } (a lista onde procurar quem já comprou)
@@ -198,18 +217,17 @@ export function abrirPreviasLote(C, o = {}) {
         barra.max = alunos.length;
         let feitos = 0,
           puladas = 0;
-        for (const [i, a] of alunos.entries()) {
-          if (cancelar) break;
-          info.textContent = `Aluno ${i + 1} de ${alunos.length}: ${a.nome} (${a.arquivos.length} fotos)…`;
+        const falharam = [];
+        const fazer = async (a, i) => {
           const fotos = [];
           for (const h of a.arquivos.slice(0, MAX_FOTOS)) {
             try {
-              fotos.push(await reduzir(await h.getFile()));
+              fotos.push(await lerFoto(h));
             } catch (_) {
               puladas++;
             }
           }
-          if (!fotos.length) continue;
+          if (!fotos.length) throw new Error("nenhuma foto abriu");
           // no cabeçalho: o nome do aluno sem o código da pasta ("CEYMS 01 - FABIOLA" → "FABIOLA"), e o código ao lado do colégio
           const cod = (a.nome.match(/^([A-Z0-9]+\s*\d+)\s*-\s*/i) || [])[1] || "";
           const st = {
@@ -237,9 +255,39 @@ export function abrirPreviasLote(C, o = {}) {
             desenharFolha(cv, st, pg);
             await gravar(pasta, nomes[i] + (paginas > 1 ? ` - pagina ${pg + 1}` : "") + ".jpg", await jpg(cv));
           }
-          feitos++;
+        };
+        // um aluno com problema (arquivo que sumiu, pasta do Drive ainda baixando) não para os outros
+        for (const [i, a] of alunos.entries()) {
+          if (cancelar) break;
+          info.textContent = `Aluno ${i + 1} de ${alunos.length}: ${a.nome} (${a.arquivos.length} fotos)…`;
+          try {
+            await fazer(a, i);
+            feitos++;
+          } catch (e) {
+            console.warn("[Z7] prévia de", a.nome, e);
+            falharam.push([a, i]);
+          }
           barra.value = i + 1;
         }
+        // os que falharam: mais uma tentativa no fim
+        if (falharam.length && !cancelar) {
+          const de = falharam.splice(0);
+          for (const [a, i] of de) {
+            info.textContent = `Tentando de novo: ${a.nome}…`;
+            try {
+              await fazer(a, i);
+              feitos++;
+            } catch (_) {
+              falharam.push([a, i]);
+            }
+          }
+        }
+        resumoFora += falharam.length
+          ? ` ⚠️ ${falharam.length} aluno${falharam.length > 1 ? "s" : ""} não deu certo (arquivo não encontrado ou pasta ainda baixando do Drive): ${falharam
+              .map(([a]) => a.nome)
+              .slice(0, 15)
+              .join(", ")}. Confira se as fotos estão no computador e gere de novo só esse colégio.`
+          : "";
         info.textContent =
           (cancelar ? `Parado. ` : "Pronto! ") +
           `${feitos} prévia${feitos === 1 ? "" : "s"} salva${feitos === 1 ? "" : "s"} em “${pasta.name}”.` +

@@ -2425,7 +2425,17 @@ await cenario("Prévias de um colégio (lote, no computador)", async () => {
     });
     const origem = pasta("C.E. TESTE 2026", [
       pasta("01 - MARIA", [await arq("1.jpg", "#c33"), await arq("2.jpg", "#3c3")]),
-      pasta("02 - JOAO", [await arq("1.jpg", "#33c")])
+      pasta("02 - JOAO", [await arq("1.jpg", "#33c")]),
+      // arquivo que "some" (pasta do Drive ainda baixando): não pode parar os outros
+      pasta("03 - PEDRO", [
+        {
+          kind: "file",
+          name: "1.jpg",
+          getFile: async () => {
+            throw new DOMException("A requested file or directory could not be found", "NotFoundError");
+          }
+        }
+      ])
     ]);
     window.__gravados = {};
     const dirFalso = caminho => ({
@@ -2465,7 +2475,9 @@ await cenario("Prévias de um colégio (lote, no computador)", async () => {
       Object.values(g).every(t => t > 3000 && t < 600000),
     "só quem vai ser trabalhado (quem já comprou fica de fora): folha e fotos separadas numeradas: " + nomes.join(" | ")
   );
-  ok(/1 de 2 ficaram de fora/.test(await pg.locator(".sheet:last-of-type").textContent()), "avisa quantos ficaram de fora");
+  const fim = await pg.locator(".sheet:last-of-type").textContent();
+  ok(/1 de 3 ficaram de fora/.test(fim), "avisa quantos ficaram de fora");
+  ok(/1 aluno não deu certo.*03 - PEDRO/.test(fim), "arquivo que não abre: avisa qual aluno e continua os outros");
   ok(!erros.length, "sem erros" + (erros.length ? ": " + erros.join(" | ") : ""));
 });
 await cenario("Fotos do aluno direto do Google Drive", async () => {
