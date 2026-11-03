@@ -274,10 +274,26 @@ export function formFormando(ctx, T, f, preset) {
       const agora = new Date().toISOString();
       try {
         if (f && !adm && !preset.venda) {
-          await FS.updateDoc(
-            FS.doc(db, "formandos", f.id),
-            comAlteracao(f, { tel: tel.value.trim(), obs: obs.value.trim(), atualizadoEm: agora }, C.me)
-          );
+          const novoTel = tel.value.trim(),
+            novaObs = obs.value.trim();
+          await FS.updateDoc(FS.doc(db, "formandos", f.id), comAlteracao(f, { tel: novoTel, obs: novaObs, atualizadoEm: agora }, C.me));
+          const campos = [
+            novoTel !== (f.tel || "") ? `WhatsApp: ${f.tel || "—"} → ${novoTel || "—"}` : "",
+            novaObs !== (f.obs || "") ? "observação" : ""
+          ].filter(Boolean);
+          if (campos.length)
+            FS.addDoc(FS.collection(db, "edicoes"), {
+              col: "formandos",
+              alunoId: f.id,
+              aluno: f.nome || "",
+              escola: f.instNome || "",
+              ano: null,
+              campos,
+              por: C.me || "",
+              porEmail: C.email || "",
+              em: agora,
+              visto: false
+            }).catch(e => console.warn("[Z7] aviso de edição", e));
           fechar();
           U.toast("Salvo");
           return;

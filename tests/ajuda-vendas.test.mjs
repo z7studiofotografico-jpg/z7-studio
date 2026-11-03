@@ -83,3 +83,10 @@ test("Perguntar ao Claude: a dúvida vai junto, sem telefone nem e-mail, e o lin
   assert.match(u, /^https:\/\/claude\.ai\/new\?q=/);
   assert.equal(decodeURIComponent(u.split("?q=")[1]), t);
 });
+
+test("Prévia: sugere a foto em pé para o quadro e as outras para os porta-retratos", async () => {
+  const { sugerirSlots } = await import("../js/mockup.js");
+  const f = (w, h) => ({ width: w, height: h });
+  assert.deepEqual(sugerirSlots([f(1600, 1000), f(1000, 1600), f(1200, 1200)]), [1, 0, 2]);
+  assert.deepEqual(sugerirSlots([f(1000, 1500)]), [0, 0, 0]);
+});

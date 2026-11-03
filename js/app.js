@@ -441,7 +441,12 @@ async function route() {
       telaFalhou($("viewInstTipo"), "viewInstTipo", e);
     }
   }
-  if (key === "home") renderHome();
+  if (key === "home") {
+    renderHome();
+    // Adriano: aviso no Início quando a equipe editou dados de aluno (qual aluno e quem editou)
+    if (isAdmin) import("./edicoes.js").then(m => m.faixaEdicoes(ctx, $("hEdicoes"))).catch(() => {});
+    else $("hEdicoes").hidden = true;
+  }
   if (key === "pr" || key === "repasse") {
     try {
       if (!repasseMod) {

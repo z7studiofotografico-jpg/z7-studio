@@ -2685,6 +2685,14 @@ await cenario("Formaturas · abas Linha de Frente / Repasse / Venda Antecipada, 
     return [...v.querySelectorAll(".vhead button")].every(b => b.getBoundingClientRect().right <= r.right + 1);
   });
   ok(larg, "botões do topo da Formatura dentro da margem da página (celular)");
+  if (process.env.FOTO2) {
+    await pg.getByRole("button", { name: "🖼️ Prévia e fotos" }).click();
+    await calmo(pg);
+    await pg.waitForTimeout(800);
+    await pg.locator(".sheet canvas").last().screenshot({ path: process.env.FOTO2 });
+    await pg.keyboard.press("Escape");
+    await pg.evaluate(() => document.querySelectorAll(".sheet").forEach(x => (x.id ? (x.hidden = true) : x.remove())));
+  }
   await pg.setViewportSize({ width: 1280, height: 800 });
   await calmo(pg);
   const largPC = await pg.evaluate(() => {
@@ -2905,7 +2913,7 @@ await cenario("Equipe edita os dados do aluno e o Adriano vê quem editou", asyn
     st["repasse/ed1"].telefones[0] === "21977776666" &&
       av &&
       av[1].porEmail === ANA &&
-      av[1].campos.includes("contatos") &&
+      av[1].campos.some(c => c.startsWith("contatos") && c.includes("21977776666")) &&
       /Bianca|BIANCA/.test(av[1].aluno),
     "equipe edita o contato e fica o aviso: qual aluno, o que mudou e quem editou"
   );

@@ -53,6 +53,7 @@
     <section id="viewHome" class="view" hidden>
       <h1 class="hello" id="hello">Bom dia!</h1>
       <section class="pedidos" id="hNumeros" hidden></section>
+      <p class="notice" id="hEdicoes" hidden></p>
       <div class="tiles">
         <a class="tile" href="#agenda" data-mod="agenda">
           <span class="tile-ico" aria-hidden="true">📅</span>
@@ -303,8 +304,8 @@
       <div class="field"><label for="pForKitFinal">Repasse · última oferta (R$)</label><input id="pForKitFinal" inputmode="decimal"></div>
     </div>
     <div class="row2">
-      <div class="field"><label for="pDrive">Pasta das prévias no Google Drive (link)</label><input id="pDrive" maxlength="300" placeholder="https://drive.google.com/drive/folders/…"></div>
-      <div class="field"><label for="pDriveChave">Chave do Google para ler o Drive (opcional)</label><input id="pDriveChave" maxlength="80" placeholder="em branco: usa a chave do app"></div>
+      <div class="field"><label for="pDrive">Pasta das prévias no Google Drive (link)</label><input id="pDrive" type="password" autocomplete="off" maxlength="300" placeholder="https://drive.google.com/drive/folders/…"></div>
+      <div class="field"><label for="pDriveChave">Chave do Google para ler o Drive (opcional)</label><input id="pDriveChave" type="password" autocomplete="off" maxlength="80" placeholder="em branco: usa a chave do app"></div>
     </div>
     <div class="field"><label for="pDriveCliente">Pasta fechada: ID do cliente Google (OAuth). Preenchido = cada pessoa entra com a conta Google dela</label><input id="pDriveCliente" maxlength="120" placeholder="ex.: 1234-abc.apps.googleusercontent.com"></div>
     <div class="row2">

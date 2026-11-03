@@ -73,6 +73,80 @@ function marca(ctx, x, y, w, h) {
   }
   ctx.restore();
 }
+// Sem foto ainda: uma foto de exemplo desenhada (formando de beca e capelo num fundo de estúdio), em vez do quadro branco
+export function exemplo(ctx, x, y, w, h) {
+  ctx.save();
+  ctx.beginPath();
+  ctx.rect(x, y, w, h);
+  ctx.clip();
+  const bg = ctx.createRadialGradient(x + w / 2, y + h * 0.35, 10, x + w / 2, y + h * 0.45, Math.max(w, h));
+  bg.addColorStop(0, "#d8c7b2");
+  bg.addColorStop(0.55, "#9c8670");
+  bg.addColorStop(1, "#4b3d31");
+  ctx.fillStyle = bg;
+  ctx.fillRect(x, y, w, h);
+  const cx = x + w / 2,
+    u = Math.min(w, h * 0.75);
+  // beca (ombros e corpo)
+  const beca = ctx.createLinearGradient(cx - u * 0.5, 0, cx + u * 0.5, 0);
+  beca.addColorStop(0, "#14182b");
+  beca.addColorStop(0.5, "#252b47");
+  beca.addColorStop(1, "#14182b");
+  ctx.fillStyle = beca;
+  ctx.beginPath();
+  ctx.moveTo(cx - u * 0.46, y + h);
+  ctx.quadraticCurveTo(cx - u * 0.44, y + h * 0.66, cx - u * 0.12, y + h * 0.6);
+  ctx.lineTo(cx + u * 0.12, y + h * 0.6);
+  ctx.quadraticCurveTo(cx + u * 0.44, y + h * 0.66, cx + u * 0.46, y + h);
+  ctx.closePath();
+  ctx.fill();
+  // faixa
+  ctx.fillStyle = "#b3202a";
+  ctx.beginPath();
+  ctx.moveTo(cx - u * 0.12, y + h * 0.6);
+  ctx.lineTo(cx - u * 0.04, y + h);
+  ctx.lineTo(cx - u * 0.12, y + h);
+  ctx.lineTo(cx - u * 0.2, y + h * 0.63);
+  ctx.closePath();
+  ctx.fill();
+  // pescoço e rosto
+  ctx.fillStyle = "#c69c7d";
+  ctx.fillRect(cx - u * 0.06, y + h * 0.5, u * 0.12, h * 0.11);
+  ctx.beginPath();
+  ctx.ellipse(cx, y + h * 0.43, u * 0.13, u * 0.16, 0, 0, Math.PI * 2);
+  ctx.fill();
+  // capelo
+  ctx.fillStyle = "#111";
+  ctx.beginPath();
+  ctx.moveTo(cx, y + h * 0.27);
+  ctx.lineTo(cx + u * 0.26, y + h * 0.31);
+  ctx.lineTo(cx, y + h * 0.35);
+  ctx.lineTo(cx - u * 0.26, y + h * 0.31);
+  ctx.closePath();
+  ctx.fill();
+  ctx.fillRect(cx - u * 0.13, y + h * 0.32, u * 0.26, h * 0.05);
+  ctx.strokeStyle = "#d4a017";
+  ctx.lineWidth = Math.max(2, u * 0.012);
+  ctx.beginPath();
+  ctx.moveTo(cx, y + h * 0.31);
+  ctx.lineTo(cx + u * 0.2, y + h * 0.33);
+  ctx.lineTo(cx + u * 0.2, y + h * 0.42);
+  ctx.stroke();
+  // aviso discreto
+  ctx.fillStyle = "rgba(255,255,255,.85)";
+  ctx.font = `600 ${Math.max(14, Math.round(u * 0.07))}px 'Source Sans 3', sans-serif`;
+  ctx.textAlign = "center";
+  ctx.textBaseline = "alphabetic";
+  ctx.fillText("foto de exemplo", cx, y + h * 0.12);
+  ctx.restore();
+}
+// Sugestão automática: no quadro, a foto mais "em pé" (retrato); nos porta-retratos, as próximas, sem repetir
+export function sugerirSlots(fotos) {
+  const idx = fotos.map((f, i) => [i, f.height / Math.max(1, f.width)]);
+  const quadro = idx.length ? idx.slice().sort((a, b) => b[1] - a[1] || a[0] - b[0])[0][0] : 0;
+  const resto = idx.map(([i]) => i).filter(i => i !== quadro);
+  return [quadro, resto[0] ?? quadro, resto[1] ?? resto[0] ?? quadro];
+}
 function moldura(ctx, x, y, w, h, b, img, opts = {}) {
   ctx.save();
   ctx.shadowColor = "rgba(0,0,0,.45)";
@@ -95,16 +169,7 @@ function moldura(ctx, x, y, w, h, b, img, opts = {}) {
     iw = w - 2 * b,
     ih = h - 2 * b;
   if (img) cover(ctx, img, ix, iy, iw, ih);
-  else {
-    ctx.fillStyle = "#d9d4cd";
-    ctx.fillRect(ix, iy, iw, ih);
-    ctx.fillStyle = "#8a847d";
-    ctx.font = "600 26px 'Source Sans 3', sans-serif";
-    ctx.textAlign = "center";
-    ctx.textBaseline = "middle";
-    ctx.fillText("foto", ix + iw / 2, iy + ih / 2);
-    ctx.textBaseline = "alphabetic";
-  }
+  else exemplo(ctx, ix, iy, iw, ih);
   if (img && opts.marca !== false) marca(ctx, ix, iy, iw, ih);
   ctx.strokeStyle = "rgba(0,0,0,.6)";
   ctx.lineWidth = 3;
@@ -338,6 +403,7 @@ export function openMockup({ nome = "", escola = "", preco = "", modo = "kit", t
     s.id = "mkSlot" + i;
     s.onchange = () => {
       st.slots[i] = Number(s.value);
+      st.escolheu = true;
       redraw();
     };
     const f = el("div", "field");
@@ -456,6 +522,8 @@ export function openMockup({ nome = "", escola = "", preco = "", modo = "kit", t
       prog.append(`${falhas.length} foto${falhas.length > 1 ? "s" : ""} não abriu (use JPG ou PNG). `, de);
       avisoErro(new Error("foto"), `abrir ${falhas.length} foto${falhas.length > 1 ? "s" : ""} (use JPG ou PNG)`, toast);
     }
+    // sugestão de qual foto vai no quadro e nos porta-retratos (até a pessoa escolher outra)
+    if (!st.escolheu && st.fotos.length) st.slots = sugerirSlots(st.fotos);
     paintThumbs();
     paintSlots();
     redraw();

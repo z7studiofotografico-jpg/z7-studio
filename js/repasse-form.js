@@ -282,7 +282,10 @@ export function camposMudados(it, patch) {
   if (norm(patch.escola) !== norm(it.escola)) out.push(`colégio: ${title(it.escola || "")} → ${title(patch.escola || "")}`);
   if ((Number(patch.ano) || null) !== (Number(it.ano) || null)) out.push(`ano: ${it.ano || "—"} → ${patch.ano || "—"}`);
   if ("codigo" in patch && patch.codigo !== (it.codigo || "")) out.push(`ID: ${it.codigo || "—"} → ${patch.codigo || "—"}`);
-  if (ctt(patch.contatos) !== ctt(it.contatos)) out.push("contatos");
+  if (ctt(patch.contatos) !== ctt(it.contatos)) {
+    const tx = cs => (cs || []).map(c => `${c.tipo === "Formando" ? "Aluno" : c.tipo} ${c.tel}`).join(", ") || "—";
+    out.push(`contatos: ${tx(it.contatos)} → ${tx(patch.contatos)}`);
+  }
   return out;
 }
 function avisarEdicao(it, patch) {

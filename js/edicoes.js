@@ -4,7 +4,7 @@
 import { el, sheet, title } from "./ui.js";
 import * as U from "./util.js";
 
-const NOMES = { repasse: "PR", paspatur: "Paspatur", formaturaAlunos: "Formatura" };
+const NOMES = { repasse: "PR", paspatur: "Paspatur", formaturaAlunos: "Formatura", formandos: "Venda Antecipada" };
 export const textoEdicao = x =>
   `${title(x.aluno || "")} (${NOMES[x.col] || x.col}${x.escola ? " · " + title(x.escola) : ""}${x.ano ? " · " + x.ano : ""}) — editado por ${
     x.por || x.porEmail || "?"
