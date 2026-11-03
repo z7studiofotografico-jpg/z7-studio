@@ -3,6 +3,7 @@
 // Nada sobe para a internet: depois é só arrastar a pasta de prévias para o Google Drive e compartilhar como Leitor.
 // Precisa do Chrome ou Edge no computador (acesso a pastas). As fotos originais nunca são alteradas.
 import { el, sheet } from "./ui.js";
+import * as U from "./util.js";
 import { prep, marca } from "./mockup.js";
 import { reduzir, desenharFolha } from "./previa.js";
 import { acharAluno } from "./drive-fotos.js";
@@ -171,7 +172,46 @@ export function abrirPreviasLote(C, o = {}) {
     fechar.onclick = close;
     const acoes = el("div", "panel-actions");
     acoes.append(fechar, parar, ir);
-    p.append(info, barra, acoes);
+    const errosBox = el("div", "notes");
+    errosBox.hidden = true;
+    p.append(info, barra, errosBox, acoes);
+    // Só os que deram erro: a lista (para conferir no servidor) e gerar de novo apenas esses alunos
+    function mostrarErros(lista, fazer, destinoNome) {
+      errosBox.textContent = "";
+      errosBox.hidden = !lista.length;
+      if (!lista.length) return;
+      errosBox.append(
+        el("b", null, `⚠️ ${lista.length} aluno${lista.length > 1 ? "s" : ""} com erro (foto que não abriu no servidor):`),
+        ...lista.map(([a]) => el("div", null, "• " + (a.caminho.length ? a.caminho : [a.nome]).join(" / "))),
+        el("p", "hint", "As outras prévias já estão salvas. Confira essas pastas no servidor e gere de novo só elas:")
+      );
+      const de = U.mkBtn("🔁 Gerar de novo só esses", "btn-primary", async () => {
+        de.disabled = true;
+        const ainda = [];
+        let ok = 0;
+        for (const [a, i] of lista) {
+          info.textContent = `Gerando de novo: ${a.nome}…`;
+          try {
+            await fazer(a, i);
+            ok++;
+          } catch (_) {
+            ainda.push([a, i]);
+          }
+        }
+        info.textContent =
+          `${ok} prévia${ok === 1 ? "" : "s"} refeita${ok === 1 ? "" : "s"} em “${destinoNome}”.` +
+          (ainda.length ? "" : " Tudo certo agora ✅");
+        de.disabled = false;
+        mostrarErros(ainda, fazer, destinoNome);
+      });
+      const cp = U.mkBtn("📋 Copiar a lista", "", () =>
+        navigator.clipboard
+          .writeText(lista.map(([a]) => (a.caminho.length ? a.caminho : [a.nome]).join(" / ")).join("\n"))
+          .then(() => U.toast("Lista copiada"))
+          .catch(() => U.toast("Não consegui copiar"))
+      );
+      errosBox.append(de, cp);
+    }
     let cancelar = false;
     parar.onclick = () => (cancelar = true);
     ir.onclick = async () => {
@@ -215,19 +255,23 @@ export function abrirPreviasLote(C, o = {}) {
         parar.hidden = false;
         barra.hidden = false;
         barra.max = alunos.length;
-        let feitos = 0,
-          puladas = 0;
+        let feitos = 0;
         const falharam = [];
         const fazer = async (a, i) => {
           const fotos = [];
+          let faltou = 0;
           for (const h of a.arquivos.slice(0, MAX_FOTOS)) {
             try {
               fotos.push(await lerFoto(h));
             } catch (_) {
-              puladas++;
+              faltou++;
             }
           }
           if (!fotos.length) throw new Error("nenhuma foto abriu");
+          // saiu com foto faltando: conta como erro (gera de novo depois, completo)
+          if (faltou) {
+            throw Object.assign(new Error("foto faltando"), { parcial: true });
+          }
           // no cabeçalho: o nome do aluno sem o código da pasta ("CEYMS 01 - FABIOLA" → "FABIOLA"), e o código ao lado do colégio
           const cod = (a.nome.match(/^([A-Z0-9]+\s*\d+)\s*-\s*/i) || [])[1] || "";
           const st = {
@@ -282,17 +326,12 @@ export function abrirPreviasLote(C, o = {}) {
             }
           }
         }
-        resumoFora += falharam.length
-          ? ` ⚠️ ${falharam.length} aluno${falharam.length > 1 ? "s" : ""} não deu certo (arquivo não encontrado ou pasta ainda baixando do Drive): ${falharam
-              .map(([a]) => a.nome)
-              .slice(0, 15)
-              .join(", ")}. Confira se as fotos estão no computador e gere de novo só esse colégio.`
-          : "";
+        if (falharam.length) mostrarErros(falharam, fazer, pasta.name);
         info.textContent =
           (cancelar ? `Parado. ` : "Pronto! ") +
           `${feitos} prévia${feitos === 1 ? "" : "s"} salva${feitos === 1 ? "" : "s"} em “${pasta.name}”.` +
           resumoFora +
-          (puladas ? ` ${puladas} foto${puladas > 1 ? "s" : ""} não abriu (arquivo com problema) e ficou de fora.` : "") +
+          (falharam.length ? ` ⚠️ ${falharam.length} com erro (lista abaixo).` : "") +
           " Agora arraste essa pasta para o Google Drive.";
       } catch (e) {
         if (e && e.name === "AbortError") info.textContent = "Nenhuma pasta escolhida.";

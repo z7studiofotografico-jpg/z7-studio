@@ -2432,12 +2432,14 @@ await cenario("Prévias de um colégio (lote, no computador)", async () => {
           kind: "file",
           name: "1.jpg",
           getFile: async () => {
-            throw new DOMException("A requested file or directory could not be found", "NotFoundError");
+            if (window.__falha) throw new DOMException("A requested file or directory could not be found", "NotFoundError");
+            return foto("#999");
           }
         }
       ])
     ]);
     window.__gravados = {};
+    window.__falha = true;
     const dirFalso = caminho => ({
       name: caminho.split("/").pop(),
       async getDirectoryHandle(n) {
@@ -2477,7 +2479,15 @@ await cenario("Prévias de um colégio (lote, no computador)", async () => {
   );
   const fim = await pg.locator(".sheet:last-of-type").textContent();
   ok(/1 de 3 ficaram de fora/.test(fim), "avisa quantos ficaram de fora");
-  ok(/1 aluno não deu certo.*03 - PEDRO/.test(fim), "arquivo que não abre: avisa qual aluno e continua os outros");
+  ok(/1 aluno com erro/.test(fim) && /03 - PEDRO/.test(fim), "arquivo que não abre: lista qual aluno deu erro e continua os outros");
+  // o servidor voltou: gera de novo só quem deu erro
+  await pg.evaluate(() => (window.__falha = false));
+  await pg.getByRole("button", { name: "🔁 Gerar de novo só esses" }).click();
+  await pg.waitForFunction(() => /Tudo certo agora/.test(document.querySelector(".sheet:last-of-type")?.textContent || ""), null, {
+    timeout: 15000
+  });
+  const g2 = Object.keys(await pg.evaluate(() => window.__gravados));
+  ok(g2.includes(P + "03 - PEDRO.jpg") && g2.length === 4, "gera de novo só o que deu erro: " + g2.join(" | "));
   ok(!erros.length, "sem erros" + (erros.length ? ": " + erros.join(" | ") : ""));
 });
 await cenario("Fotos do aluno direto do Google Drive", async () => {
