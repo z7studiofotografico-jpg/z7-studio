@@ -1,4 +1,5 @@
 // PR: importar a planilha de alunos (só admin). Os dados puros ficam em repasse-dados.js.
+import { colNome, metaNome } from "./repasse-estado.js";
 import { el, carregarLib } from "./ui.js";
 import { MAPA, hkey, linhaParaDoc, docId, faltando, norm, semTelefone } from "./repasse-dados.js";
 import * as U from "./util.js";
@@ -34,7 +35,7 @@ export function openImport(ctx, ui, aoTerminar) {
   FS = ctx.FS;
   db = ctx.db;
   const { sheet, field, actions, meta } = ui,
-    col = FS.collection(db, "repasse");
+    col = FS.collection(db, colNome());
   if (!C.isAdmin) return;
   sheet("Importar planilha", (p, close) => {
     p.append(
@@ -49,13 +50,6 @@ export function openImport(ctx, ui, aoTerminar) {
     inp.accept = ".xlsx,.xls,.csv";
     inp.multiple = true;
     p.append(field("Arquivos", inp));
-    // planilhas de FORMATURA: por padrão ficam fora (o colégio é de formatura); marcando, entram para a
-    // Linha de Frente do ano delas (ex.: 2027 só aparece para a Linha de Frente em 2027)
-    const comForm = el("input");
-    comForm.type = "checkbox";
-    const lForm = el("label", "chk");
-    lForm.append(comForm, document.createTextNode(" Incluir as planilhas de FORMATURA (Linha de Frente do ano das fotos)"));
-    p.append(lForm);
     // Ano das fotos: vale para todos os alunos destes arquivos (nas planilhas antigas a DATA é a da venda)
     const anoIn = el("input");
     anoIn.type = "number";
@@ -90,7 +84,7 @@ export function openImport(ctx, ui, aoTerminar) {
         const foraDoPR = [];
         for (const f of fs) {
           // planilha com FORMATURA no nome é de colégio de formatura (vai em Formaturas, não no PR)
-          if (/FORMATURA/i.test(norm(f.name)) && !comForm.checked) {
+          if (/FORMATURA/i.test(norm(f.name))) {
             foraDoPR.push(f.name.replace(/\.(xlsx|xls|csv)$/i, ""));
             continue;
           }
@@ -132,7 +126,6 @@ export function openImport(ctx, ui, aoTerminar) {
       }
     };
     anoIn.oninput = () => brutos.length && montar();
-    comForm.onchange = () => inp.files.length && inp.onchange();
     function montar() {
       rows = brutos.map(o => linhaParaDoc(o, X, anoIn.value));
       out.innerHTML = "";
@@ -350,14 +343,14 @@ export function openImport(ctx, ui, aoTerminar) {
         for (let i = 0; i < ops.length; i += 80) {
           const b = FS.writeBatch(db);
           ops.slice(i, i + 80).forEach(([id, data, merge]) => {
-            if (merge) b.set(FS.doc(db, "repasse", id), data, { merge: true });
-            else b.set(FS.doc(db, "repasse", id), data);
-            indexarFones(FS, db, b, id, data);
+            if (merge) b.set(FS.doc(db, colNome(), id), data, { merge: true });
+            else b.set(FS.doc(db, colNome(), id), data);
+            if (colNome() === "repasse") indexarFones(FS, db, b, id, data);
           });
           await b.commit();
           prog.textContent = `Importando… ${Math.min(i + 80, ops.length)} de ${ops.length}`;
         }
-        await FS.setDoc(FS.doc(db, "config", "repasse_meta"), { escolas, anos, escolasAno, importadoEm: agora }, { merge: true });
+        await FS.setDoc(FS.doc(db, "config", metaNome()), { escolas, anos, escolasAno, importadoEm: agora }, { merge: true });
         const nInc = ops.filter(([, d, m]) => !m && d.etapa === "INCOMPLETO").length;
         prog.textContent = `Pronto! ${novos - nInc - historico - semTel} novos na fila${nInc ? `, ${nInc} na aba Incompletos` : ""}${semTel ? `, ${semTel} sem telefone (só para o Dashboard)` : ""}${historico ? `, ${historico} que já compraram (só histórico, para o Dashboard)` : ""}${fora ? `, ${fora} de turma desmarcada ficaram fora do app` : ""}${atual ? ` e ${atual} atualizados` : ""}${voltou ? ` (${voltou} que estavam sem telefone agora têm número e foram para a fila)` : ""}.`;
         U.toast("Planilha importada ✅");

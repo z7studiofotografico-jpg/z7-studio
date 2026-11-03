@@ -36,6 +36,8 @@ import {
   noSeg,
   status,
   precoTxt,
+  tipoPR,
+  mudarTipoPR,
   $
 } from "./repasse-estado.js";
 import { card } from "./repasse-cartao.js";
@@ -68,7 +70,7 @@ function mount() {
   const v = $("viewRepasse");
   v.innerHTML = "";
   const head = el("div", "vhead");
-  head.append(el("h2", null, "PR"));
+  head.append(el("h2", null, tipoPR === "paspatur" ? "PR · Paspatur" : "PR"));
   const hb = el("div", "quick");
   hb.append(U.mkBtn("+ Aluno", "btn-primary", () => openDados(null)));
   hb.append(U.mkBtn("🖼️ Prévia e fotos", "", () => openMockup({ preco: precoTxt(), toast: U.toast })));
@@ -98,6 +100,10 @@ function mount() {
   head.append(hb);
   v.append(head);
 
+  // abas PR e Paspatur (Etapa 4): o mesmo fluxo, listas e preços separados
+  const tipos = el("div", "chips tipos-pr");
+  tipos.id = "rTipos";
+  v.append(tipos);
   const segs = el("div", "segs");
   segs.id = "rSegs";
   segs.setAttribute("role", "tablist");
@@ -168,7 +174,32 @@ function mount() {
   } catch (_) {}
 }
 
+function renderTipos() {
+  const c = $("rTipos");
+  if (!c) return;
+  c.innerHTML = "";
+  [
+    ["pr", "🖼️ PR"],
+    ["paspatur", "🎞️ Paspatur"]
+  ].forEach(([k, t]) => {
+    const b = el("button", "chip", t);
+    b.type = "button";
+    b.setAttribute("aria-pressed", String(tipoPR === k));
+    b.onclick = () => {
+      if (tipoPR === k) return;
+      mudarTipoPR(k);
+      const h = document.querySelector("#viewRepasse .vhead h2");
+      if (h) h.textContent = k === "paspatur" ? "PR · Paspatur" : "PR";
+      renderTipos();
+      loadMeta().then(refreshStats);
+      refreshLote();
+      openTab(tab);
+    };
+    c.append(b);
+  });
+}
 function renderSegs() {
+  renderTipos();
   const c = $("rSegs");
   c.innerHTML = "";
   [
@@ -359,7 +390,8 @@ async function buscar() {
 
 // Os contatos que a aba mostra (a lista e o relatório usam a mesma regra)
 function naTela() {
-  let arr = tab === "buscar" ? items.slice() : items.filter(noSeg);
+  // pedido de exclusão: a equipe não vê mais; o admin vê com a pendência na frente
+  let arr = (tab === "buscar" ? items.slice() : items.filter(noSeg)).filter(it => C.isAdmin || !(it.excluido && it.excluido.em));
   if (tab === "hoje") {
     const t0 = U.todayStr();
     arr = arr.filter(it => (ABERTAS.includes(it.etapa) || it.etapa === "ENTREGUE") && it.followup && it.followup <= t0);

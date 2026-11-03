@@ -49,6 +49,15 @@ export function ligarAjustes(ctx, o) {
     ["pDrive", "drivePrevias", "texto"],
     ["pDriveChave", "driveChave", "texto"]
   ];
+  // Preços do Paspatur (Etapa 4): config/app → paspatur = { lfPix, lfCartao, kitPreco, kitPromo, kitCartao, kitFinal }
+  const PASPATUR = [
+    ["pPasLfPix", "lfPix"],
+    ["pPasLfCartao", "lfCartao"],
+    ["pPasKit", "kitPreco"],
+    ["pPasKitPromo", "kitPromo"],
+    ["pPasKitCartao", "kitCartao"],
+    ["pPasKitFinal", "kitFinal"]
+  ];
   // Ajustes (só admin): os últimos erros do app registrados pelos aparelhos (defeitos, não falta de internet)
   async function mostrarErros() {
     try {
@@ -76,6 +85,7 @@ export function ligarAjustes(ctx, o) {
       $(id).disabled = !ctx.isAdmin;
     });
     $("pEquipes").value = String(ctx.P.equipesDia || 1);
+    PASPATUR.forEach(([id, k]) => ($(id).value = (ctx.P.paspatur || {})[k] || ""));
     feriadosExtras(ctx.P.feriadosExtras);
     listarFeriados();
     montarComissao();
@@ -180,7 +190,11 @@ export function ligarAjustes(ctx, o) {
     e.preventDefault();
     if (!ctx.isAdmin) return;
     const body = Object.fromEntries(AJUSTES.map(([id, k, t, padrao]) => [k, lerAjuste[t]($(id).value) || padrao || lerAjuste[t]("")]));
-    Object.assign(body, { equipesDia: Number($("pEquipes").value) || 1, comissao: lerComissao() });
+    Object.assign(body, {
+      equipesDia: Number($("pEquipes").value) || 1,
+      comissao: lerComissao(),
+      paspatur: Object.fromEntries(PASPATUR.map(([id, k]) => [k, lerAjuste.reais($(id).value)]))
+    });
     // WhatsApp da empresa: número válido e que não seja o de trabalho de alguém da equipe (cada um com o seu)
     const outros = numerosDosOutros(ctx.usuarios, ctx.email, true);
     for (const f of Object.values(FRENTES)) {

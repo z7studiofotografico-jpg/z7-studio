@@ -211,6 +211,22 @@ service cloud.firestore {
       // apagar de verdade: só o admin (a equipe pede a exclusão, Regra 4)
       allow delete: if admin();
     }
+    // PR · Paspatur (Etapa 4): as mesmas regras do PR, numa lista separada
+    match /paspatur/{id} {
+      // (resource == null: aluno que ainda não existe; o "+ Aluno" confere antes de criar)
+      allow read: if pode('rep') || (pode('lf') && (resource == null || anoAtual(resource.data)));
+      allow update: if admin() || ((pode('rep') || (pode('lf') && anoAtual(resource.data) && anoAtual(request.resource.data)))
+        && respOk() && exclusaoOk()
+        // a venda entra "a conferir": só o admin marca como conferida (a comissão só conta depois)
+        && (!mudou(['conferido']) || request.resource.data.conferido == false)
+        && !(resource.data.etapa in ['PAGO', 'ENTREGUE'] && mudou(['valor', 'formaPag', 'pagoEm', 'resp', 'respEmail'])));
+      // a equipe inclui aluno à mão (sem planilha): entra na fila ou separado para si, nunca como venda
+      allow create: if admin() || ((pode('rep') || (pode('lf') && anoAtual(request.resource.data)))
+        && request.resource.data.get('etapa', '') in ['NA FILA', 'INCOMPLETO', 'SEPARADO']
+        && request.resource.data.get('respEmail', '') in ['', email()]);
+      // apagar de verdade: só o admin (a equipe pede a exclusão, Regra 4)
+      allow delete: if admin();
+    }
     // Aluguel de becas · alunos dos colégios (Etapa 3): a equipe cadastra e muda o status; valor e contrato só o admin
     match /alugueis/{id} {
       allow read, create: if pode('becas');

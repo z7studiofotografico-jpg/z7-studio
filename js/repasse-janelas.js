@@ -100,7 +100,8 @@ export function openPago(it) {
           },
           p._entrega()
         ),
-        C.isAdmin ? "Venda registrada 🎉" : "Venda registrada 🎉 · aguardando conferência"
+        C.isAdmin ? "Venda registrada 🎉" : "Venda registrada 🎉 · aguardando conferência",
+        { semConfirmar: true }
       );
     });
   });

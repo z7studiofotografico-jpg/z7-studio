@@ -15,8 +15,29 @@ function loadImg(src) {
     i.src = src;
   });
 }
-function fileToImg(f) {
-  return loadImg(URL.createObjectURL(f));
+// Foto do celular (12 MP ou mais) → reduzida para no máximo 1600 px, e o arquivo é liberado da memória.
+// (antes a foto ficava inteira na memória e o endereço nunca era liberado: com várias fotos o celular travava)
+const LADO_MAX = 1600;
+async function fileToImg(f) {
+  const url = URL.createObjectURL(f);
+  try {
+    const img = await loadImg(url);
+    const r = Math.min(1, LADO_MAX / Math.max(img.width, img.height));
+    if (r === 1) {
+      const c0 = document.createElement("canvas");
+      c0.width = img.width;
+      c0.height = img.height;
+      c0.getContext("2d").drawImage(img, 0, 0);
+      return c0;
+    }
+    const c = document.createElement("canvas");
+    c.width = Math.round(img.width * r);
+    c.height = Math.round(img.height * r);
+    c.getContext("2d").drawImage(img, 0, 0, c.width, c.height);
+    return c;
+  } finally {
+    URL.revokeObjectURL(url);
+  }
 }
 
 function cover(ctx, img, x, y, w, h, fy = 0.38) {
@@ -197,7 +218,7 @@ async function desenharEscolha(cv, st) {
   await prep();
   const ctx = cv.getContext("2d");
   const n = Math.max(1, st.fotos.length),
-    cols = n <= 4 ? 2 : 3,
+    cols = n <= 4 ? 2 : n <= 9 ? 3 : 4,
     rows = Math.ceil(n / cols);
   cv.width = W;
   cv.height = H;
@@ -266,7 +287,8 @@ export const textoEscolha = F =>
   `Aqui estão as fotos do ensaio${F ? " de " + F : ""}! 📸 Escolhe qual vai no quadro e quais vão nos 2 porta-retratos. É só responder com os números, por exemplo: Quadro 2, porta-retratos 1 e 4 😊`;
 
 // fotos: já entram na prévia (as escolhidas pela família, vindas do Drive), na ordem quadro, porta-retratos
-export function openMockup({ nome = "", escola = "", preco = "", modo = "kit", toast = null, fotos = [] } = {}) {
+// maxFotos: PR até 15 fotos por aluno (Formatura usa o envio próprio, com até ~70)
+export function openMockup({ nome = "", escola = "", preco = "", modo = "kit", toast = null, fotos = [], maxFotos = 15 } = {}) {
   const st = { fotos: [], slots: [0, 1, 2], nome, escola: escola || "", preco: /\[/.test(preco) ? "" : preco, modo };
   const sh = el("div", "sheet");
   const p = el("div", "panel mock");
@@ -290,8 +312,10 @@ export function openMockup({ nome = "", escola = "", preco = "", modo = "kit", t
   });
   p.append(modos);
   const drop = el("label", "drop");
-  drop.innerHTML =
-    "<b>Arraste as fotos do ensaio aqui (até 8)</b><span>ou toque para escolher. No PC também dá para colar (Ctrl+V). Toque numa miniatura para tirar a foto.</span>";
+  drop.append(
+    el("b", null, `Arraste as fotos do ensaio aqui (até ${maxFotos})`),
+    el("span", null, "ou toque para escolher. No PC também dá para colar (Ctrl+V). Toque numa miniatura para tirar a foto.")
+  );
   const inp = el("input");
   inp.type = "file";
   inp.accept = "image/*";
@@ -396,7 +420,10 @@ export function openMockup({ nome = "", escola = "", preco = "", modo = "kit", t
     });
   }
   async function addFiles(files) {
-    const imgs = [...files].filter(f => f.type.startsWith("image/")).slice(0, 8 - st.fotos.length);
+    const todas = [...files].filter(f => f.type.startsWith("image/") || /\.(jpe?g|png|webp|heic)$/i.test(f.name));
+    const imgs = todas.slice(0, Math.max(0, maxFotos - st.fotos.length));
+    // passou do limite: avisa (antes as fotos a mais sumiam sem aviso)
+    if (todas.length > imgs.length && toast) toast(`No máximo ${maxFotos} fotos por aluno: ${todas.length - imgs.length} ficaram de fora.`);
     let falhou = 0;
     for (const f of imgs) {
       try {

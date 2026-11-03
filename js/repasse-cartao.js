@@ -1,4 +1,5 @@
 // PR: o cartão de cada contato (para quem mandar, a mensagem pronta, os botões de cada etapa)
+import { excluir, faixaExclusao } from "./confirmar.js";
 import { openMockup, textoEscolha } from "./mockup.js";
 import { el, title } from "./ui.js";
 import * as U from "./util.js";
@@ -8,6 +9,7 @@ import { fmtTel } from "./numeros.js";
 import { whatsAtivo } from "./numeros-tela.js";
 import { linhasRetorno, abrirRetorno } from "./retorno.js";
 import {
+  colNome,
   C,
   tab,
   seg,
@@ -41,8 +43,17 @@ const tipoTxt = t => (t === "Formando" ? "Aluno" : t || "");
 export function card(it) {
   const s = status(it);
   const e = el("article", "card " + (["late", "today", "won"].includes(s) ? s : ""));
+  const fx = faixaExclusao(C, colNome(), it);
+  if (fx) e.append(fx);
   const top = el("div", "card-top");
-  top.append(el("h3", "name", title(it.nome) || "Sem nome"), el("span", "stage", it.etapa));
+  // botão vermelho de excluir (Regra 6): o admin exclui; a equipe pede ao Adriano
+  const bx = el("button", "btn-excluir", "🗑️");
+  bx.type = "button";
+  bx.title = "Excluir aluno";
+  bx.setAttribute("aria-label", "Excluir aluno");
+  bx.onclick = () =>
+    excluir(C, { col: colNome(), id: it.id, rotulo: `${title(it.nome) || "Aluno"} (${title(it.escola || "")} ${it.ano || ""})` });
+  top.append(el("h3", "name", title(it.nome) || "Sem nome"), el("span", "stage", it.etapa), bx);
   e.append(top);
 
   const meta = el("div", "meta");
@@ -273,7 +284,9 @@ function acoesDoCartao(it, li, e) {
     );
   // admin: passar este aluno para alguém da equipe
   if (C.isAdmin && !["PAGO", "ENTREGUE", "SEM TELEFONE"].includes(it.etapa))
-    act.append(U.mkBtn("📤 Passar para a equipe", "", () => passarAluno(C, it, (patch, msg) => save(it, patch, msg))));
+    act.append(
+      U.mkBtn("📤 Passar para a equipe", "", () => passarAluno(C, it, (patch, msg) => save(it, patch, msg, { semConfirmar: true })))
+    );
   if (it.etapa === "NA FILA")
     act.append(
       U.mkBtn("Separar para mim", "btn-primary", () =>

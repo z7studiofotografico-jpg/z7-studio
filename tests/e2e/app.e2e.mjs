@@ -1515,19 +1515,15 @@ await cenario("Pedro (vendedor: Linha de Frente, Agendamento, Instituições)", 
     await calmo(pg);
     ok((await pg.textContent("#viewRepasse")).length > 50, "PR (Linha de Frente) abre");
     ok(!/Outra Da Ana/i.test(await pg.textContent("#rList")), "Para hoje da equipe: só os contatos dela (o da Ana não aparece)");
-    // lote do dia: não trava, avisa depois de 25
-    for (let i = 0; i < 3; i++) {
-      await pg.locator("#rLoteBtn").click();
-      await calmo(pg);
-    }
+    // lote do dia: a pessoa diz quantos quer separar (sem número fixo por dia)
+    await pg.locator("#rLoteBtn").click();
+    await pg.locator(".sheet:visible input[type=number]").fill("30");
+    await pg.locator(".sheet:visible button[type=submit]").click();
+    await calmo(pg);
     const sepS = await store();
     const sep = Object.values(sepS).filter(x => x.separadoEm && x.respEmail === PEDRO).length;
-    ok(sep === 30, "separou 30 contatos sem travar no limite: " + sep);
-    ok(
-      (await pg.locator("#rLoteAviso").isVisible()) &&
-        /já separou 30 contatos hoje \(o combinado é até 25\)/.test(await pg.textContent("#rLoteAviso")),
-      "mostra o aviso depois de 25 na Linha de Frente"
-    );
+    ok(sep === 30, "“Deseja separar quantos alunos?” 30 → separou 30: " + sep);
+    ok(!/o ideal é até|combinado é até/.test(await pg.textContent("#rLote")), "sem número fixo de contatos por dia");
     ok(await pg.locator("#rLoteBtn").isEnabled(), "botão continua liberado");
     // "+ Aluno" no PR, sem planilha: entra separado para quem incluiu
     let fa = await incluirAluno(pg, { nome: "Paulo Manual", colegio: "Colegio Alfa", tel: "21933332222", contato: "Marta" });

@@ -12,15 +12,39 @@ export const mudarItems = v => (items = v);
 export const mudarMeta = v => (meta = v);
 // Ligações com a tela principal (repasse.js preenche): quem grava avisa a lista para redesenhar
 export const tela = { renderList() {}, openTab() {} };
+// PR tem duas abas (Etapa 4): "pr" (coleção repasse) e "paspatur" (coleção paspatur): o mesmo fluxo, cada uma com a
+// sua lista, contagem e tabela de preços (Ajustes → paspatur = { kitPreco, kitPromo, … }; o que estiver em branco
+// usa o preço do PR). O C daqui devolve os preços da aba aberta.
+export let tipoPR = "pr";
+export const colNome = () => (tipoPR === "paspatur" ? "paspatur" : "repasse");
+export const metaNome = () => (tipoPR === "paspatur" ? "paspatur_meta" : "repasse_meta");
+let ctx0 = null;
+export function mudarTipoPR(v) {
+  tipoPR = v === "paspatur" ? "paspatur" : "pr";
+  col = FS.collection(db, colNome());
+  try {
+    localStorage.setItem("z7tipoPR", tipoPR);
+  } catch (_) {}
+}
 export function iniciar(ctx) {
-  C = ctx;
+  ctx0 = ctx;
+  C = Object.create(ctx, {
+    P: {
+      get: () => (tipoPR === "paspatur" ? Object.assign({}, ctx0.P, limpo(ctx0.P.paspatur)) : ctx0.P)
+    }
+  });
   FS = ctx.FS;
   db = ctx.db;
-  col = FS.collection(db, "repasse");
+  try {
+    tipoPR = localStorage.getItem("z7tipoPR") === "paspatur" ? "paspatur" : "pr";
+  } catch (_) {}
+  col = FS.collection(db, colNome());
   try {
     seg = localStorage.getItem("z7seg") || "lf";
   } catch (_) {}
 }
+// preços do Paspatur: só os preenchidos substituem os do PR
+const limpo = o => Object.fromEntries(Object.entries(o || {}).filter(([, v]) => v !== "" && v != null && v !== 0));
 // Assumir o contato: quem não é admin só assume o que está sem responsável (ou já é seu)
 export const assumir = it => (!C.isAdmin && it.respEmail && it.respEmail !== C.email ? {} : { resp: C.me, respEmail: C.email || "" });
 export const ANO = () => new Date().getFullYear();
@@ -109,10 +133,15 @@ export function contatoPadrao(it) {
 }
 
 // ---------- gravação ----------
-export async function save(it, patch, msg) {
+// Mudança de etapa pede "Mudar de X para Y?" (Regra 5); janelas que já são um formulário passam semConfirmar
+export async function save(it, patch, msg, o = {}) {
+  if (patch.etapa && patch.etapa !== it.etapa && !o.semConfirmar) {
+    const { confirmarStatus } = await import("./confirmar.js");
+    if (!(await confirmarStatus(it.etapa || "—", patch.etapa))) return false;
+  }
   try {
     patch.atualizadoEm = new Date().toISOString();
-    await FS.updateDoc(FS.doc(db, "repasse", it.id), patch);
+    await FS.updateDoc(FS.doc(db, colNome(), it.id), patch);
     Object.assign(it, patch);
     if (tab === "buscar") tela.renderList();
     U.toast(msg || "Salvo");

@@ -4,7 +4,7 @@ import * as U from "./util.js";
 import { norm, faltando, docId, semTelefone } from "./repasse-dados.js";
 import { codigoBusca, comAno, avisoTel } from "./aluno-id.js";
 import { procurarRepetido, pedirAluno, indexarFones, gerarCodigoPR } from "./pedidos.js";
-import { C, FS, db, tab, seg, meta, ANO, segDe, save, tela } from "./repasse-estado.js";
+import { C, FS, db, tab, seg, meta, ANO, segDe, save, tela, colNome } from "./repasse-estado.js";
 import { sheet, field, actions } from "./repasse-janelas.js";
 import { refreshStats, refreshLote } from "./repasse-lote.js";
 // ID do aluno novo (26CEPNCP-01): ver gerarCodigoPR em pedidos.js
@@ -171,17 +171,18 @@ export function openDados(it) {
         U.toast(aviso);
       };
       try {
-        const achado = await procurarRepetido(C, docNovo);
+        // (Paspatur tem a sua lista: a procura de repetido é só no PR)
+        const achado = colNome() === "repasse" ? await procurarRepetido(C, docNovo) : null;
         if (achado) return await repetido(achado);
         if (!docNovo.codigo) docNovo.codigo = await gerarCodigo(docNovo).catch(e => (console.warn("[Z7] ID do aluno", e), ""));
         docNovo.codigoBusca = docNovo.codigo ? codigoBusca(docNovo.codigo) : "";
         // cria só se ainda não existe (transação): nunca sobrescreve um aluno que já está no PR
-        const ref = FS.doc(db, "repasse", docId(docNovo, Date.now()));
+        const ref = FS.doc(db, colNome(), docId(docNovo, Date.now()));
         const existente = await FS.runTransaction(db, async tx => {
           const s0 = await tx.get(ref);
           if (s0.exists()) return Object.assign({ id: ref.id }, s0.data());
           tx.set(ref, docNovo);
-          indexarFones(FS, db, tx, ref.id, docNovo); // telefones no índice: acha a família depois, em outro ano ou colégio
+          if (colNome() === "repasse") indexarFones(FS, db, tx, ref.id, docNovo); // telefones no índice: acha a família depois, em outro ano ou colégio
           return null;
         });
         if (existente) return await repetido(existente);
@@ -251,7 +252,7 @@ export function openDados(it) {
       close();
       // telefone novo entra no índice (para achar a família depois); se falhar, não atrapalha o salvar
       const novosTels = patch.telefones.filter(t => !(it.telefones || []).includes(t));
-      if (novosTels.length) {
+      if (novosTels.length && colNome() === "repasse") {
         const b = FS.writeBatch(db);
         indexarFones(FS, db, b, it.id, Object.assign({}, it, patch, { telefones: novosTels, contatos: [] }));
         b.commit().catch(e => console.warn("[Z7] índice de telefones", e));

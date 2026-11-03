@@ -1,10 +1,28 @@
 // PR: números do topo, lote do dia (separar contatos da fila) e a lista de escolas
-import { el, title, avisoErro } from "./ui.js";
+import { el, title, avisoErro, sheet as sheetQ, botoes as botoesQ } from "./ui.js";
 import * as U from "./util.js";
 import { pintarSeletor } from "./numeros-tela.js";
 import { chaveColegio } from "./historico-dados.js";
 import { gruposEscolas, escolhaDe } from "./escolas-pr.js";
-import { C, FS, db, col, tab, seg, meta, mudarMeta, ANO, ANO_MIN, ABERTAS, baseLF, soMinha, noSeg, $, tela } from "./repasse-estado.js";
+import {
+  C,
+  FS,
+  db,
+  col,
+  tab,
+  seg,
+  meta,
+  mudarMeta,
+  ANO,
+  ANO_MIN,
+  ABERTAS,
+  baseLF,
+  soMinha,
+  noSeg,
+  $,
+  tela,
+  metaNome
+} from "./repasse-estado.js";
 
 export async function refreshStats() {
   const today = U.todayStr(),
@@ -69,11 +87,9 @@ export function anosRepasse() {
   for (let a = Y - 1; a >= de; a--) out.push(a);
   return out;
 }
-// Não há limite: o app só avisa quando a pessoa passa do número de Ajustes (padrão: Linha de Frente 25, Repasse 20 por dia)
-const avisoSeg = () => (seg === "lf" ? C.P.lfAvisoDia || 25 : C.P.avisoDia || 20);
-const POR_VEZ = 10; // quantos contatos cada toque separa
+// Quantos separar: a pessoa decide a cada vez ("Deseja separar quantos alunos?"); sem número fixo por dia
+const MAX_POR_VEZ = 100;
 export async function refreshLote() {
-  const av = avisoSeg();
   // qual WhatsApp usar: o da empresa (admin) ou os da própria pessoa (equipe); aparece mesmo sem internet para contar
   pintarSeletor($("rLoteNum"), C, seg);
   try {
@@ -87,26 +103,56 @@ export async function refreshLote() {
       )
     );
     const n = c.data().count;
-    $("rLoteTxt").textContent = n
-      ? ` ${n} separado${n > 1 ? "s" : ""} hoje.`
-      : ` Separe os contatos novos de hoje (o ideal é até ${av} por dia).`;
-    const alerta = $("rLoteAviso");
-    alerta.hidden = n < av;
-    alerta.textContent = `⚠️ Você já separou ${n} contatos hoje (o combinado é até ${av}). Mandar muitas mensagens novas no mesmo dia pode fazer o WhatsApp bloquear o número. Pode continuar, mas vá com calma.`;
-    $("rLote").classList.toggle("lote-aviso", n >= av);
+    $("rLoteTxt").textContent = n ? ` ${n} separado${n > 1 ? "s" : ""} hoje.` : " Separe os alunos que você vai trabalhar hoje.";
+    $("rLoteAviso").hidden = true;
+    $("rLote").classList.remove("lote-aviso");
     $("rLoteBtn").disabled = false;
-    $("rLoteBtn").textContent = n ? `Separar mais ${POR_VEZ}` : `Separar ${POR_VEZ} contatos`;
+    $("rLoteBtn").textContent = n ? "Separar mais alunos" : "Separar alunos";
     $("rLoteBtn").dataset.n = n;
   } catch (e) {
     console.warn(e);
     $("rLoteTxt").textContent = " Não foi possível contar agora.";
   }
 }
+// "Deseja separar quantos alunos?": a pessoa digita o número (o app nunca separa sozinho)
+export function perguntarQuantos() {
+  return new Promise(res => {
+    let fim = false;
+    const acaba = v => {
+      if (!fim) {
+        fim = true;
+        res(v);
+      }
+    };
+    sheetQ(
+      "Deseja separar quantos alunos?",
+      (p, close) => {
+        const q = el("input");
+        q.type = "number";
+        q.min = "1";
+        q.max = String(MAX_POR_VEZ);
+        q.required = true;
+        q.value = "10";
+        q.setAttribute("aria-label", "Quantos alunos separar");
+        p.append(q, el("p", "hint", "Nunca vem o mesmo aluno duas vezes, nem aluno caído."), botoesQ(close, "Separar"));
+        p.addEventListener("submit", ev => {
+          ev.preventDefault();
+          const n = Math.min(MAX_POR_VEZ, Math.max(1, parseInt(q.value, 10) || 0));
+          acaba(n);
+          close();
+        });
+        setTimeout(() => q.select(), 30);
+      },
+      { onClose: () => acaba(0) }
+    );
+  });
+}
 export async function separarLote() {
   if (!C.me) return;
-  const ja = Number($("rLoteBtn").dataset.n || 0),
-    av = avisoSeg();
-  let falta = POR_VEZ;
+  const quantos = await perguntarQuantos();
+  if (!quantos) return;
+  const ja = Number($("rLoteBtn").dataset.n || 0);
+  let falta = quantos;
   const esc = escolaEscolhida($("rLoteEscola").value);
   // Repasse: do ano mais recente para o mais antigo; com escola escolhida, só o ano dela
   const anos = esc && esc.ano ? [esc.ano] : seg === "lf" ? [ANO()] : anosRepasse();
@@ -131,7 +177,7 @@ export async function separarLote() {
     const pegos = await FS.runTransaction(db, async tx => {
       const lidos = [];
       for (const r of cand) lidos.push(await tx.get(r));
-      const livres = lidos.filter(d => d.exists() && d.data().etapa === "NA FILA").slice(0, falta);
+      const livres = lidos.filter(d => d.exists() && d.data().etapa === "NA FILA" && !d.data().excluido).slice(0, falta);
       livres.forEach(d =>
         tx.update(d.ref, {
           etapa: "SEPARADO",
@@ -152,8 +198,8 @@ export async function separarLote() {
     }
     const total = ja + pegos.length;
     U.toast(
-      `${pegos.length} contato${pegos.length > 1 ? "s" : ""} separado${pegos.length > 1 ? "s" : ""} para você hoje` +
-        (total >= av ? ` · ⚠️ já são ${total} hoje (combinado: até ${av})` : "")
+      `${pegos.length} aluno${pegos.length > 1 ? "s" : ""} separado${pegos.length > 1 ? "s" : ""} para você · ${total} hoje` +
+        (pegos.length < quantos ? ` (a fila só tinha ${pegos.length})` : "")
     );
     refreshLote();
     refreshStats();
@@ -216,7 +262,7 @@ export function escolaEscolhida(valor) {
 }
 export async function loadMeta() {
   try {
-    const s = await FS.getDoc(FS.doc(db, "config", "repasse_meta"));
+    const s = await FS.getDoc(FS.doc(db, "config", metaNome()));
     mudarMeta(s.exists() ? Object.assign({ escolas: {}, anos: {} }, s.data()) : { escolas: {}, anos: {} });
     await nomesDoCadastro();
     pintarEscolas();

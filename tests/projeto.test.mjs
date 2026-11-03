@@ -100,7 +100,7 @@ test("os arquivos do app não dependem um do outro em círculo", () => {
 // (Atribuir direto numa variável importada nem funciona: o lint barra com no-import-assign.)
 test("só o dono muda o estado compartilhado de cada tela", () => {
   const DONOS = {
-    "repasse-estado.js": { "repasse.js": ["mudarTab", "mudarSeg", "mudarItems"], "repasse-lote.js": ["mudarMeta"] },
+    "repasse-estado.js": { "repasse.js": ["mudarTab", "mudarSeg", "mudarItems", "mudarTipoPR"], "repasse-lote.js": ["mudarMeta"] },
     "agenda-estado.js": { "agenda.js": ["mudar"] },
     "instituicoes-estado.js": { "instituicoes.js": ["mudarTipo", "mudarItems"] }
   };
