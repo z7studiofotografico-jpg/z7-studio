@@ -194,8 +194,9 @@ function mount() {
   const lote = el("div", "lote");
   lote.id = "rLote";
   lote.innerHTML = `<div><b>Seu lote de hoje</b><span id="rLoteTxt">…</span><small class="lnum" id="rLoteNum" hidden></small><p class="wait" id="rLoteAviso" hidden></p></div>
-    <div class="quick"><select id="rLoteEscola" aria-label="Escola do lote"><option value="">Turmas mais recentes primeiro</option></select>
-    <button class="btn btn-primary btn-sm" id="rLoteBtn" type="button">Separar contatos</button></div>`;
+    <div class="lote-esc"><div class="quick"><select id="rLoteEscola" aria-label="Escola do lote"><option value="">Turmas mais recentes primeiro</option></select>
+    <button class="btn btn-primary btn-sm" id="rLoteBtn" type="button">Separar contatos</button></div>
+    <input id="rLoteBusca" type="search" placeholder="🔎 Procurar colégio (ex.: yonne)" aria-label="Procurar colégio na lista"></div>`;
   v.append(lote);
 
   // pedidos de aluno repetido (admin decide; a equipe vê a resposta)
@@ -223,6 +224,7 @@ function mount() {
   v.append(list);
 
   $("rLoteBtn").onclick = separarLote;
+  $("rLoteBusca").oninput = () => pintarEscolas();
   let tq;
   $("rQ").addEventListener("input", () => {
     clearTimeout(tq);

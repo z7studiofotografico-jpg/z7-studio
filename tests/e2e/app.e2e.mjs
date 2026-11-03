@@ -2350,6 +2350,18 @@ await cenario("PR por colégio e ano · passar para a equipe", async () => {
     ops.includes(`${Y - 1} - C.E. João Cardoso (2)`) && ops.includes(`${Y - 2} - C.E. João Cardoso (1)`),
     "lista de escolas com o ano e o nome do cadastro: " + ops.slice(1).join(" | ")
   );
+  await pg.fill("#rLoteBusca", "cardos");
+  const ops2 = await pg.$$eval("#rLoteEscola option", os => os.map(o => o.textContent));
+  ok(
+    ops2.length === 3 && ops2.slice(1).every(o => /Cardoso/.test(o)) && (await pg.inputValue("#rLoteEscola")) !== "",
+    "procurar colégio: escreve parte do nome e a lista mostra só ele, com os anos (já escolhido): " + ops2.join(" | ")
+  );
+  await pg.fill("#rLoteBusca", "zzz");
+  ok(
+    /Nenhum colégio/.test((await pg.$$eval("#rLoteEscola option", os => os.map(o => o.textContent))).join()),
+    "procurar colégio: avisa quando não acha"
+  );
+  await pg.fill("#rLoteBusca", "");
   await ir(pg, "#inst-publico");
   await pg.locator("#iChips .chip", { hasText: "Todas" }).click();
   await pg.locator("article", { hasText: "C.E. João Cardoso" }).getByRole("button", { name: "📤 Passar o PR para a equipe" }).click();
@@ -2667,6 +2679,22 @@ await cenario("Formaturas · abas Linha de Frente / Repasse / Venda Antecipada, 
     "preço da Formatura em branco: avisa (não usa o preço do PR)"
   );
   ok(await pg.getByRole("button", { name: "🖼️ Prévia e fotos" }).isVisible(), "Formatura tem o botão de prévia e fotos");
+  const larg = await pg.evaluate(() => {
+    const v = document.querySelector("#viewFormaturas");
+    const r = v.getBoundingClientRect();
+    return [...v.querySelectorAll(".vhead button")].every(b => b.getBoundingClientRect().right <= r.right + 1);
+  });
+  ok(larg, "botões do topo da Formatura dentro da margem da página (celular)");
+  await pg.setViewportSize({ width: 1280, height: 800 });
+  await calmo(pg);
+  const largPC = await pg.evaluate(() => {
+    const v = document.querySelector("#viewFormaturas .vhead");
+    const r = document.querySelector("#viewFormaturas .segs3").getBoundingClientRect();
+    return [...v.querySelectorAll("button")].every(b => b.getBoundingClientRect().right <= r.right + 1);
+  });
+  if (process.env.FOTO) await pg.screenshot({ path: process.env.FOTO });
+  ok(largPC, "botões do topo da Formatura alinhados com as abas (computador)");
+  await pg.setViewportSize({ width: 420, height: 900 });
   await pg.locator("#viewFormaturas .chip", { hasText: "Caídos" }).first().click();
   await calmo(pg);
   ok(/Caio Caido/.test(await pg.textContent("#viewFormaturas")), "aba Caídos mostra o aluno caído");

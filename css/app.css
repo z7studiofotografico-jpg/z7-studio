@@ -172,7 +172,7 @@ details.guide summary{cursor:pointer;font-family:var(--f-display);font-weight:70
 .agtxt{display:flex;flex-direction:column;gap:2px;min-width:0;font-size:.92rem}
 .agtxt span{color:var(--muted);font-size:.86rem}
 .agtxt .wait{color:var(--warn)}
-.agact{display:flex;gap:6px;flex-wrap:wrap;justify-content:flex-end;flex:none}
+.agact{display:flex;gap:6px;flex-wrap:wrap;justify-content:flex-end;flex:1 1 auto;min-width:0}
 .phone{font-variant-numeric:tabular-nums;font-size:.9rem}
 .fu{font-size:.88rem;font-weight:600;font-variant-numeric:tabular-nums}
 .fu.late{color:var(--late)} .fu.today{color:var(--warn)} .fu.none{color:var(--muted);font-weight:400}
@@ -347,3 +347,6 @@ details.tamtipo{border:1px solid var(--line,#ddd);border-radius:10px;padding:6px
 .h2-acoes{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
 .h2-acoes .h2-dir{margin-left:auto;display:flex;gap:6px;font-family:inherit;text-transform:none;letter-spacing:0}
 .ajv-extra{border-left:3px solid var(--line);padding-left:8px;display:grid;gap:6px}
+.lote-esc{display:flex;flex-direction:column;gap:6px;align-items:stretch}
+.lote-esc input[type=search]{width:100%;padding:8px 10px;border:1px solid var(--line);border-radius:10px;background:var(--surface);color:var(--fg);font:inherit}
+#viewFormaturas .vhead .agact,#viewProdutos .vhead .agact{justify-content:flex-start;flex-basis:100%}

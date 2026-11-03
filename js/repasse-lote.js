@@ -232,6 +232,18 @@ async function nomesDoCadastro() {
 // As listas de escola (lote e busca): uma linha por colégio e ano ("2026 - C.E. João Cardoso").
 // Linha de Frente: só o ano atual; Repasse: os anos anteriores.
 export let gruposPR = [];
+// "Procurar colégio": escreve parte do nome (ex.: "yonne") e a lista mostra só os colégios que batem, com os anos
+const norm = t =>
+  String(t || "")
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLowerCase()
+    .replace(/[.\-]/g, " ");
+export const bateBusca = (rotulo, busca) => {
+  const ps = norm(busca).split(/\s+/).filter(Boolean);
+  const r = norm(rotulo);
+  return ps.every(p => r.includes(p));
+};
 export function pintarEscolas() {
   const temAno = Object.keys(meta.escolasAno || {}).length;
   gruposPR = temAno ? gruposEscolas(meta, cadastroNomes || {}, a => ehFormatura() || (seg === "lf" ? a >= ANO() : a < ANO())) : [];
@@ -242,12 +254,15 @@ export function pintarEscolas() {
     const first0 = sel.options[0];
     sel.innerHTML = "";
     sel.append(first0);
+    const busca = id === "rLoteEscola" && $("rLoteBusca") ? $("rLoteBusca").value.trim() : "";
     if (temAno)
-      gruposPR.forEach(g => {
-        const o = el("option", null, `${g.rotulo} (${g.n})`);
-        o.value = g.valor;
-        sel.append(o);
-      });
+      gruposPR
+        .filter(g => !busca || bateBusca(g.rotulo, busca))
+        .forEach(g => {
+          const o = el("option", null, `${g.rotulo} (${g.n})`);
+          o.value = g.valor;
+          sel.append(o);
+        });
     // (antes da atualização de dados: só o nome, sem o ano)
     else
       Object.keys(meta.escolas || {})
@@ -258,6 +273,9 @@ export function pintarEscolas() {
           sel.append(o);
         });
     sel.value = [...sel.options].some(o => o.value === cur) ? cur : "";
+    // procurou e achou: já escolhe o primeiro colégio (o mais recente)
+    if (busca && !sel.value && sel.options.length > 1) sel.value = sel.options[1].value;
+    if (busca) sel.options[0].textContent = sel.options.length > 1 ? "Turmas mais recentes primeiro" : "Nenhum colégio com esse nome";
   });
 }
 // o valor escolhido numa das listas → { ano, nomes } (ou só o nome, nas listas antigas)
