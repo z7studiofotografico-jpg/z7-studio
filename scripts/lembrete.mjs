@@ -82,6 +82,16 @@ const naoFechouVolta = (await db.collection("instituicoes").where("etapa", "==",
   const r = (d.data().naoFechou || {}).retorno;
   return r && r > hoje && r <= em7;
 }).length;
+// Formaturas: de 1º de fevereiro em diante, toda segunda-feira, avisa o Adriano dos alunos de turmas anteriores
+// que ainda estão na Linha de Frente (a virada para o Repasse é feita à mão, colégio por colégio)
+const anoHoje = Number(hoje.slice(0, 4));
+const ehSegunda = new Date(hoje + "T12:00:00").getDay() === 1;
+const viradaPend =
+  ehSegunda && Number(hoje.slice(5, 7)) >= 2
+    ? (await db.collection("formaturaAlunos").where("seg", "==", "lf").select("ano").get()).docs.filter(
+        d => Number(d.get("ano")) && Number(d.get("ano")) < anoHoje
+      ).length
+    : 0; // (só igualdade na consulta: não precisa de índice novo no Firebase)
 // Datas aprovadas que quem agendou ainda não avisou o colégio pelo WhatsApp
 const paraAvisar = {};
 (await db.collection("agenda").where("status", "==", "confirmado").get()).docs
@@ -141,7 +151,8 @@ for (const t of tokensSnap.docs) {
       num = souAdmin ? pedNumeros : 0,
       exc = souAdmin ? exclPend : 0,
       alA = souAdmin ? alugAtr : 0,
-      nfv = souAdmin ? naoFechouVolta : 0;
+      nfv = souAdmin ? naoFechouVolta : 0,
+      vir = souAdmin ? viradaPend : 0;
     const bec = souAdmin || (mods && mods.includes("becas")) ? becasAtr + becasRet : 0;
     const avisar = paraAvisar[String(t.get("email") || "").toLowerCase()] || 0;
     const minhasOfertas = ofertas.filter(o => souAdmin || o.respEmail === String(t.get("email") || "").toLowerCase());
@@ -157,6 +168,7 @@ for (const t of tokensSnap.docs) {
       !parc &&
       !bec &&
       !avisar &&
+      !vir &&
       !ofe &&
       !ped &&
       !num &&
@@ -203,6 +215,7 @@ for (const t of tokensSnap.docs) {
       );
     if (exc) partes.push(`🗑️ ${exc} pedido${exc > 1 ? "s" : ""} de exclusão da equipe para aprovar`);
     if (alA) partes.push(`👘 ${alA} aluno${alA > 1 ? "s" : ""} atrasado${alA > 1 ? "s" : ""} na devolução da beca`);
+    if (vir) partes.push(`🔁 Formatura: ${vir} aluno${vir > 1 ? "s" : ""} de turmas anteriores ainda na Linha de Frente (fazer a virada)`);
     if (nfv) partes.push(`❌ ${nfv} colégio${nfv > 1 ? "s" : ""} que não fechou: retorno nesta semana`);
     if (num) partes.push(`📱 ${num} pedido${num > 1 ? "s" : ""} de troca de WhatsApp de trabalho para autorizar`);
     if (lembrar) partes.push(`Lembrar ${lembrar} cliente${lembrar > 1 ? "s" : ""} do ensaio de amanhã`);

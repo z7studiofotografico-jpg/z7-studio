@@ -2,7 +2,8 @@
 import { title } from "./ui.js";
 import { ESTUDIO } from "./mensagens.js";
 import * as U from "./util.js";
-import { C, segDe, eu, ofertaTxt, entregaTxt, sextaTxt } from "./repasse-estado.js";
+import { C, segDe, eu, ofertaTxt, entregaTxt, sextaTxt, ehFormatura } from "./repasse-estado.js";
+import { passoFormatura } from "./formatura-mensagens.js";
 import { ehRespCadastro } from "./repasse-dados.js";
 
 export function passo(it, c) {
@@ -11,6 +12,8 @@ export function passo(it, c) {
   const cn = c && c.nome && !ehRespCadastro(c.nome) ? U.first(title(c.nome)) : "";
   const oi = cn ? `Olá, ${cn}!` : "Olá!";
   const souEu = `Aqui é ${eu()}, do ${ESTUDIO.nome} 📸`;
+  // Formatura: mensagens próprias (editáveis em Formaturas → ✏️ Mensagens)
+  if (ehFormatura()) return passoFormatura(it, c, { cn, eu: eu(), oferta: ofertaTxt(it), P: C.P, pix: C.P.pixCobranca || "21998817771" });
   const quem = c && c.tipo === "Formando" ? "o seu ensaio de formatura" : `o ensaio de formatura de ${F}`;
   const onde = segDe(it) === "lf" ? title(it.escola) + ", este ano" : [title(it.escola), it.ano].filter(Boolean).join(", ");
   const t = it.tentativas || 0;

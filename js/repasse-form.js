@@ -4,7 +4,7 @@ import * as U from "./util.js";
 import { norm, faltando, docId, semTelefone } from "./repasse-dados.js";
 import { codigoBusca, comAno, avisoTel } from "./aluno-id.js";
 import { procurarRepetido, pedirAluno, indexarFones, gerarCodigoPR } from "./pedidos.js";
-import { C, FS, db, tab, seg, meta, ANO, segDe, save, tela, colNome } from "./repasse-estado.js";
+import { C, FS, db, tab, seg, meta, ANO, segDe, save, tela, colNome, ehFormatura } from "./repasse-estado.js";
 import { sheet, field, actions } from "./repasse-janelas.js";
 import { refreshStats, refreshLote } from "./repasse-lote.js";
 // ID do aluno novo (26CEPNCP-01): ver gerarCodigoPR em pedidos.js
@@ -145,7 +145,9 @@ export function openDados(it) {
         tentInteresse: 0,
         resp: daEquipe ? C.me || "" : "",
         respEmail: daEquipe ? C.email || "" : "",
-        ...(meu ? { separadoEm: hoje, separadoSeg: d.ano >= ANO() ? "lf" : "rep" } : {}),
+        ...(meu ? { separadoEm: hoje, separadoSeg: ehFormatura() ? seg : d.ano >= ANO() ? "lf" : "rep" } : {}),
+        // Formatura: a frente vem da aba aberta (Linha de Frente ou Repasse), não do ano
+        ...(ehFormatura() ? { seg } : {}),
         manual: true,
         incluidoPor: C.email || "",
         importadoEm: agora,

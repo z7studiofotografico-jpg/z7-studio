@@ -1,5 +1,5 @@
 // PR: importar a planilha de alunos (só admin). Os dados puros ficam em repasse-dados.js.
-import { colNome, metaNome } from "./repasse-estado.js";
+import { colNome, metaNome, ehFormatura } from "./repasse-estado.js";
 import { el, carregarLib } from "./ui.js";
 import { MAPA, hkey, linhaParaDoc, docId, faltando, norm, semTelefone } from "./repasse-dados.js";
 import * as U from "./util.js";
@@ -84,7 +84,7 @@ export function openImport(ctx, ui, aoTerminar) {
         const foraDoPR = [];
         for (const f of fs) {
           // planilha com FORMATURA no nome é de colégio de formatura (vai em Formaturas, não no PR)
-          if (/FORMATURA/i.test(norm(f.name))) {
+          if (!ehFormatura() && /FORMATURA/i.test(norm(f.name))) {
             foraDoPR.push(f.name.replace(/\.(xlsx|xls|csv)$/i, ""));
             continue;
           }
@@ -107,7 +107,8 @@ export function openImport(ctx, ui, aoTerminar) {
           porArquivo.push(`${f.name.replace(/\.(xlsx|xls|csv)$/i, "")}: ${n}`);
         }
         if (foraDoPR.length) porArquivo.push(`fora do PR por ser de formatura: ${foraDoPR.join(", ")}`);
-        if (!brutos.length) throw new Error("Nenhuma planilha de PR (as de FORMATURA vão em Formaturas).");
+        if (!brutos.length)
+          throw new Error(ehFormatura() ? "Nenhum aluno na planilha." : "Nenhuma planilha de PR (as de FORMATURA vão em Formaturas).");
         // ano sugerido: o que estiver no nome dos arquivos (ex.: "2021"); senão o mais comum nas datas
         const doNome = fs.map(f => (f.name.match(/\b(20[12]\d)\b/) || [])[1]).find(Boolean);
         if (!anoIn.value) {
@@ -324,6 +325,22 @@ export function openImport(ctx, ui, aoTerminar) {
               false
             ];
           }
+          // Formatura: a turma do ano começa na Linha de Frente; turma de ano anterior já entra no Repasse.
+          // "CAIDO" na planilha = aluno que caiu da formatura: vai para a aba Caídos (o Adriano pode resgatar)
+          if (ehFormatura() && /CAIDO/.test(norm(d.statusOrig)))
+            return [
+              id,
+              Object.assign({}, d, {
+                etapa: "CAÍDO",
+                caido: { motivo: "Veio da planilha como CAIDO", em: agora.slice(0, 10), por: C.me || "" },
+                followup: null,
+                resp: "",
+                respEmail: "",
+                importadoEm: agora,
+                atualizadoEm: agora
+              }),
+              false
+            ];
           return [
             id,
             Object.assign({}, d, {
@@ -339,6 +356,12 @@ export function openImport(ctx, ui, aoTerminar) {
             false
           ];
         });
+        if (ehFormatura()) {
+          const anoAtual = new Date().getFullYear();
+          ops.forEach(o => {
+            if (!o[2]) o[1].seg = Number(o[1].ano) && Number(o[1].ano) < anoAtual ? "rep" : "lf";
+          });
+        }
         // de 80 em 80 alunos: cada aluno grava 1 documento + até 4 telefones no índice (o lote do Firestore vai até 500)
         for (let i = 0; i < ops.length; i += 80) {
           const b = FS.writeBatch(db);

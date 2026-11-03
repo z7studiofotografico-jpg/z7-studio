@@ -215,3 +215,46 @@ export function pedirTexto(titulo, rotulo, { placeholder = "", ok = "Salvar" } =
     );
   });
 }
+
+// Pede uma data (padrão: hoje). Devolve "AAAA-MM-DD" ou null (cancelou). Ex.: "Paga por Pix" com a data do Pix.
+export function pedirData(titulo, rotulo, { padrao = "", ok = "Salvar", max = "" } = {}) {
+  return new Promise(res => {
+    let fim = false;
+    const acaba = v => {
+      if (fim) return;
+      fim = true;
+      res(v);
+    };
+    sheet(
+      titulo,
+      (p, close) => {
+        const t = el("input");
+        t.type = "date";
+        t.required = true;
+        t.value = padrao;
+        if (max) t.max = max;
+        const f = el("div", "field");
+        f.append(el("label", null, rotulo), t);
+        const a = el("div", "panel-actions");
+        const bN = el("button", "btn", "Cancelar");
+        bN.type = "button";
+        bN.onclick = () => {
+          acaba(null);
+          close();
+        };
+        const bS = el("button", "btn btn-primary", ok);
+        bS.type = "submit";
+        a.append(el("span"), bN, bS);
+        a.firstChild.style.flex = "1";
+        p.append(f, a);
+        p.addEventListener("submit", ev => {
+          ev.preventDefault();
+          if (!/^\d{4}-\d{2}-\d{2}$/.test(t.value)) return;
+          acaba(t.value);
+          close();
+        });
+      },
+      { onClose: () => acaba(null) }
+    );
+  });
+}

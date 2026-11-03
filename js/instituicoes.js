@@ -27,6 +27,12 @@ const $ = id => document.getElementById(id);
 export function init(ctx) {
   iniciar(ctx);
 }
+// "+ Instituição" de outro card (ex.: Formaturas): o mesmo cadastro, no mesmo padrão
+export function novaInstituicao(ctx, tipoCartao = "publico") {
+  iniciar(ctx);
+  mudarTipo(cartaoDoTipo(tipoCartao));
+  openForm(null);
+}
 
 export function show(t) {
   t = cartaoDoTipo(t);

@@ -3,6 +3,7 @@
 //   pagamentos: [{ data, valor, por }], pagas (= quantidade de pagamentos), proxVenc, status, resp, respEmail, vendidoEm }
 // Regras de parcela e dinheiro: js/regras.js. Só o administrador registra pagamento e muda valores.
 import { linhasRetorno, abrirRetorno } from "./retorno.js";
+import { pedirData } from "./confirmar.js";
 import {
   brl,
   dividir,
@@ -56,8 +57,10 @@ function usar(ctx) {
 }
 
 // Registra a próxima parcela paga numa transação (duas pessoas ao mesmo tempo não se atropelam)
-export async function registrarPagamento(ctx, f) {
+// o = { forma: "Pix", data: "AAAA-MM-DD" } ("Paga por Pix": o boleto daquela parcela não vale mais)
+export async function registrarPagamento(ctx, f, o = {}) {
   usar(ctx);
+  const dataPag = o.data || hoje();
   const ref = FS.doc(db, "formandos", f.id);
   const r = await FS.runTransaction(db, async tx => {
     const s = await tx.get(ref);
@@ -66,19 +69,28 @@ export async function registrarPagamento(ctx, f) {
     if (quitado(atual)) return { ja: true, n: pagasDe(atual) };
     const lst = pagamentosDe(atual).slice(),
       n = lst.length + 1;
-    lst.push({ data: hoje(), valor: valorParcela(atual, n), por: C.email || "" });
+    lst.push(Object.assign({ data: dataPag, valor: valorParcela(atual, n), por: C.email || "" }, o.forma ? { forma: o.forma } : {}));
     const novo = Object.assign({}, atual, { pagamentos: lst });
     tx.update(ref, {
       pagamentos: lst,
       pagas: lst.length,
       proxVenc: proxVenc(novo),
-      ultimoPag: hoje(),
+      ultimoPag: dataPag,
       atualizadoEm: new Date().toISOString()
     });
     return { n };
   });
-  U.toast(r.ja ? "Esse aluno já está quitado" : `Parcela ${r.n} de ${U.first(title(f.nome))} registrada`);
+  U.toast(
+    r.ja ? "Esse aluno já está quitado" : `Parcela ${r.n} de ${U.first(title(f.nome))} registrada` + (o.forma ? ` (${o.forma})` : "")
+  );
 }
+// Venda Antecipada: a parcela do boleto foi paga por Pix (com a data do Pix)
+export async function pagaPorPix(ctx, f) {
+  const d = await pedirData("Paga por Pix", "Data do Pix", { padrao: hoje(), max: hoje(), ok: "Registrar" });
+  if (d) await registrarPagamento(ctx, f, { forma: "Pix", data: d });
+}
+// chave Pix da empresa nas cobranças (a dos Ajustes ou a padrão)
+export const CHAVE_PIX = "21998817771";
 // Desfaz o último pagamento (lançado por engano)
 
 // Mensagem de cobrança no WhatsApp (usada aqui e no card Formaturas)
@@ -96,7 +108,9 @@ export function cobrarWa(ctx, f) {
     venc = vencDa(f, prox),
     col = ehKit01(f);
   const item = col ? "da adesão da formatura (Kit 01)" : `do ${f.kit || "kit da formatura"}`;
-  const pagar = f.formaPag === "Boleto" ? "\nO pagamento é pelo boleto." : C.P.pix ? `\nChave Pix: ${C.P.pix}` : "";
+  const chave = C.P.pix || CHAVE_PIX;
+  const pagar =
+    f.formaPag === "Boleto" ? `\nO pagamento é pelo boleto. Se preferir, pague por Pix: chave ${chave}` : `\nChave Pix: ${chave}`;
   const msg = msgCobranca({
     nome: title(f.nome),
     parcela: `${prox}/${nParcelas(f)}`,
@@ -166,6 +180,11 @@ export function openTurma(ctx, inst, kits, aoFechar, opcoes) {
       bar.append(U.mkBtn("+ Aluno", "btn-primary", () => abrirFormando(T)));
       bar.append(U.mkBtn("🖨️ Lista da turma", "", () => abrirRelatorio(relatorioTurma(T), C.me)));
       if (C.isAdmin) bar.append(U.mkBtn("Importar planilha", "", () => importarFormandos(C, T.inst, T.lista)));
+      bar.append(
+        U.mkBtn("📄 Ficha do contrato", "", () =>
+          import("./contrato-ficha.js").then(m => m.abrirFicha(C, T.inst)).catch(e => C.handleErr(e))
+        )
+      );
       if (C.isAdmin)
         bar.append(
           U.mkBtn("📅 Contrato da turma", "", () => contratoTurma(C, T.inst, () => desenhar(T))),
@@ -459,7 +478,10 @@ function card(T, f, candSet) {
   linhasRetorno(f).forEach(x => e.append(x));
   const act = el("div", "actions");
   if (C.isAdmin && comprou && !q0)
-    act.append(U.mkBtn("✅ Parcela paga", "btn-ok", () => registrarPagamento(C, f).catch(er => C.handleErr(er))));
+    act.append(
+      U.mkBtn("✅ Parcela paga", "btn-ok", () => registrarPagamento(C, f).catch(er => C.handleErr(er))),
+      U.mkBtn("💠 Paga por Pix", "", () => pagaPorPix(C, f).catch(er => C.handleErr(er)))
+    );
   if (comprou && !q0 && f.tel) act.append(U.mkBtn("💬 Cobrar", at ? "btn-primary" : "", () => cobrarWa(C, f)));
   // pediu para pagar/falar outro dia: motivo + data (fica no histórico do formando)
   if ((comprou && !q0) || sem) act.append(U.mkBtn("📅 Pediu contato depois", "", () => retornoFormando(C, f)));

@@ -15,22 +15,32 @@ export const tela = { renderList() {}, openTab() {} };
 // PR tem duas abas (Etapa 4): "pr" (coleção repasse) e "paspatur" (coleção paspatur): o mesmo fluxo, cada uma com a
 // sua lista, contagem e tabela de preços (Ajustes → paspatur = { kitPreco, kitPromo, … }; o que estiver em branco
 // usa o preço do PR). O C daqui devolve os preços da aba aberta.
+// O mesmo motor também trabalha a Linha de Frente e o Repasse da FORMATURA (Etapa 5): tipo "formatura", coleção
+// formaturaAlunos (separada do PR). Lá a frente não vem do ano: vem do campo "seg" ("lf" até o Adriano virar o
+// colégio para Repasse, à mão).
 export let tipoPR = "pr";
-export const colNome = () => (tipoPR === "paspatur" ? "paspatur" : "repasse");
-export const metaNome = () => (tipoPR === "paspatur" ? "paspatur_meta" : "repasse_meta");
+export const ehFormatura = () => tipoPR === "formatura";
+export const colNome = () => (tipoPR === "paspatur" ? "paspatur" : tipoPR === "formatura" ? "formaturaAlunos" : "repasse");
+export const metaNome = () => (tipoPR === "paspatur" ? "paspatur_meta" : tipoPR === "formatura" ? "formatura_meta" : "repasse_meta");
 let ctx0 = null;
 export function mudarTipoPR(v) {
-  tipoPR = v === "paspatur" ? "paspatur" : "pr";
+  tipoPR = v === "paspatur" || v === "formatura" ? v : "pr";
   col = FS.collection(db, colNome());
-  try {
-    localStorage.setItem("z7tipoPR", tipoPR);
-  } catch (_) {}
+  if (tipoPR !== "formatura")
+    try {
+      localStorage.setItem("z7tipoPR", tipoPR);
+    } catch (_) {}
 }
 export function iniciar(ctx) {
   ctx0 = ctx;
   C = Object.create(ctx, {
     P: {
-      get: () => (tipoPR === "paspatur" ? Object.assign({}, ctx0.P, limpo(ctx0.P.paspatur)) : ctx0.P)
+      get: () =>
+        tipoPR === "paspatur"
+          ? Object.assign({}, ctx0.P, limpo(ctx0.P.paspatur))
+          : tipoPR === "formatura"
+            ? Object.assign({}, ctx0.P, limpo(ctx0.P.formatura))
+            : ctx0.P
     }
   });
   FS = ctx.FS;
@@ -51,22 +61,36 @@ export const ANO = () => new Date().getFullYear();
 export const ANO_MIN = 2015;
 // Em qual frente o formando está. Sem ano (incompleto) aparece nas duas.
 export function segDe(it) {
+  if (ehFormatura()) return it.seg === "rep" ? "rep" : "lf";
   return !it.ano ? null : it.ano >= ANO() ? "lf" : "rep";
 }
 export function noSeg(it) {
   const s0 = segDe(it);
   return !s0 || s0 === seg;
 }
-export const segNome = s0 => (s0 === "lf" ? "Linha de Frente " + ANO() : "Repasse");
+export const segNome = s0 => (s0 === "lf" ? "Linha de Frente" + (ehFormatura() ? "" : " " + ANO()) : "Repasse");
 // Quem só tem a Linha de Frente só pode ler ensaios do ano atual (as regras do Firebase também exigem isso),
 // então as buscas da Linha de Frente sempre filtram pelo ano.
-export const segsPermitidas = () => ["lf", "rep"].filter(k => C.pode(k));
-export const baseLF = () => [FS.where("ano", "==", ANO())];
+export const segsPermitidas = () => (ehFormatura() ? (C.pode("formaturas") ? ["lf", "rep"] : []) : ["lf", "rep"].filter(k => C.pode(k)));
+export const baseLF = () => (ehFormatura() ? [FS.where("seg", "==", "lf")] : [FS.where("ano", "==", ANO())]);
+// filtro da frente aberta (Formatura): Linha de Frente ou Repasse
+export const baseSeg = () => (ehFormatura() ? [FS.where("seg", "==", seg)] : []);
 // A equipe trabalha só a própria carteira (o admin vê tudo): filtro das abas e dos números
 export const soMinha = () => (C.isAdmin ? [] : [FS.where("respEmail", "==", C.email || "")]);
 export const $ = id => document.getElementById(id);
 
-export const ETAPAS = ["INCOMPLETO", "NA FILA", "SEPARADO", "CONTATADO", "INTERESSADO", "PAGO", "ENTREGUE", "NÃO QUER", "SEM CONTATO"];
+export const ETAPAS = [
+  "INCOMPLETO",
+  "NA FILA",
+  "SEPARADO",
+  "CONTATADO",
+  "INTERESSADO",
+  "PAGO",
+  "ENTREGUE",
+  "NÃO QUER",
+  "SEM CONTATO",
+  "CAÍDO"
+];
 export const ABERTAS = ["SEPARADO", "CONTATADO", "INTERESSADO"];
 
 // ---------- utilidades ----------

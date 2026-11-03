@@ -17,6 +17,8 @@ import {
   ANO_MIN,
   ABERTAS,
   baseLF,
+  baseSeg,
+  ehFormatura,
   soMinha,
   noSeg,
   $,
@@ -65,9 +67,11 @@ export async function refreshStats() {
       )
     );
     // Fila: conta por ano (só filtros de igualdade, não precisa de índice extra no Firebase)
-    const anos = seg === "lf" ? [Y] : anosRepasse();
+    const anos = ehFormatura() ? [null] : seg === "lf" ? [Y] : anosRepasse();
     const cs = await Promise.all(
-      anos.map(a => FS.getCountFromServer(FS.query(col, FS.where("etapa", "==", "NA FILA"), FS.where("ano", "==", a))))
+      anos.map(a =>
+        FS.getCountFromServer(FS.query(col, FS.where("etapa", "==", "NA FILA"), ...(a ? [FS.where("ano", "==", a)] : baseSeg())))
+      )
     );
     set(
       "rsFila",
@@ -155,14 +159,15 @@ export async function separarLote() {
   let falta = quantos;
   const esc = escolaEscolhida($("rLoteEscola").value);
   // Repasse: do ano mais recente para o mais antigo; com escola escolhida, só o ano dela
-  const anos = esc && esc.ano ? [esc.ano] : seg === "lf" ? [ANO()] : anosRepasse();
+  const anos = ehFormatura() ? [esc && esc.ano ? esc.ano : null] : esc && esc.ano ? [esc.ano] : seg === "lf" ? [ANO()] : anosRepasse();
   $("rLoteBtn").disabled = true;
   try {
     // candidatos: um pouco mais que o necessário, porque outra pessoa pode pegar alguns ao mesmo tempo
     const cand = [];
     for (const a of anos) {
       if (cand.length >= falta * 2) break;
-      const filtros = [FS.where("etapa", "==", "NA FILA"), FS.where("ano", "==", a)];
+      // (Formatura: a frente vem do campo seg; aluno Caído nunca está "NA FILA", então nunca vem)
+      const filtros = [FS.where("etapa", "==", "NA FILA"), ...(a ? [FS.where("ano", "==", a)] : []), ...baseSeg()];
       if (esc) filtros.push(esc.nomes.length > 1 ? FS.where("escola", "in", esc.nomes) : FS.where("escola", "==", esc.nomes[0]));
       const s0 = await FS.getDocs(FS.query(col, ...filtros, FS.orderBy(FS.documentId()), FS.limit(falta * 2 - cand.length)));
       s0.docs.forEach(d => cand.push(d.ref));
@@ -229,7 +234,7 @@ async function nomesDoCadastro() {
 export let gruposPR = [];
 export function pintarEscolas() {
   const temAno = Object.keys(meta.escolasAno || {}).length;
-  gruposPR = temAno ? gruposEscolas(meta, cadastroNomes || {}, a => (seg === "lf" ? a >= ANO() : a < ANO())) : [];
+  gruposPR = temAno ? gruposEscolas(meta, cadastroNomes || {}, a => ehFormatura() || (seg === "lf" ? a >= ANO() : a < ANO())) : [];
   ["rLoteEscola", "rEscola"].forEach(id => {
     const sel = $(id);
     if (!sel) return;

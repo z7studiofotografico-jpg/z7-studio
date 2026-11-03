@@ -390,6 +390,10 @@ async function abrir(email, dados, opc = {}) {
     ([em, d]) => {
       window.__EMAIL = em;
       window.__store = new Map(Object.entries(d));
+      // Formaturas abre na Venda Antecipada nos testes antigos (o cenário das abas troca de aba)
+      try {
+        if (!localStorage.getItem("z7fmparte")) localStorage.setItem("z7fmparte", "va");
+      } catch (_) {}
       window.open = u => {
         window.__aberto = u;
         return null;
@@ -816,7 +820,7 @@ await cenario("Adriano (admin), com os dados já atualizados no servidor", async
     await pg.locator(".panel.wide").getByRole("button", { name: "Fechar" }).click();
     await calmo(pg);
     // Repasse: turmas de anos anteriores, quem ficou só com o Kit 01, preço de repasse
-    await pg.locator("#viewFormaturas .segs").getByText("Repasse", { exact: true }).click();
+    await pg.locator("#viewFormaturas").getByRole("tab", { name: "Turmas anteriores" }).click();
     await calmo(pg);
     await pg.locator("#fmChips").getByText("🔁 Oferecer no repasse").click();
     await calmo(pg);
@@ -849,10 +853,7 @@ await cenario("Adriano (admin), com os dados já atualizados no servidor", async
     );
     await pg.locator(".panel.wide").getByRole("button", { name: "Fechar" }).click();
     await calmo(pg);
-    await pg
-      .locator("#viewFormaturas .segs")
-      .getByText(/Linha de Frente/)
-      .click();
+    await pg.locator("#viewFormaturas").getByRole("tab", { name: "Turmas deste ano" }).click();
     await calmo(pg);
   });
   await etapa(pg, "Dashboard", async () => {
@@ -1822,7 +1823,7 @@ await cenario("Relatórios para imprimir (um por card)", async () => {
     await etapa(pg, "lista da turma", async () => {
       await ir(pg, "#formaturas");
       await pg
-        .locator("#fmChips, .chips")
+        .locator("#fmChips")
         .getByText(/^Turmas/)
         .first()
         .click();
@@ -2596,6 +2597,72 @@ await cenario("Aluguel de becas · alunos dos colégios (status, estoque e produ
     "movimentos do estoque registrados"
   );
   ok(!erros.length, "sem erros" + (erros.length ? ": " + erros.join(" | ") : ""));
+});
+await cenario("Formaturas · abas Linha de Frente / Repasse / Venda Antecipada, virada e Pix", async () => {
+  const Y = new Date().getFullYear();
+  const aluno = (nome, escola, ano, seg, etapa = "NA FILA") => ({
+    nome,
+    nomeBusca: nome.toUpperCase(),
+    escola,
+    ano,
+    seg,
+    etapa,
+    resp: "",
+    respEmail: "",
+    contatos: [{ tipo: "Mãe", nome: "Mãe", tel: "21999990000" }],
+    telefones: ["21999990000"]
+  });
+  const d = Object.assign({}, base, {
+    "config/formatura_meta": { escolasAno: { ["COLEGIO GAMA|" + Y]: 2, ["COLEGIO DELTA|" + (Y - 1)]: 1 } },
+    "formaturaAlunos/g1": aluno("Gabi Gama", "COLEGIO GAMA", Y, "lf"),
+    "formaturaAlunos/g2": Object.assign(aluno("Caio Caido", "COLEGIO GAMA", Y, "lf", "CAÍDO"), {
+      caido: { motivo: "Mudou de escola", em: "2026-01-01" }
+    }),
+    "formaturaAlunos/d1": aluno("Duda Delta", "COLEGIO DELTA", Y - 1, "lf")
+  });
+  const { pg, erros, store } = await abrir(ADRIANO, migrar(d));
+  await ir(pg, "#formaturas");
+  await pg.locator("#viewFormaturas .seg", { hasText: "Linha de Frente" }).click();
+  await calmo(pg);
+  ok(
+    await pg
+      .locator("#viewFormaturas #rLoteBtn")
+      .waitFor({ state: "visible", timeout: 8000 })
+      .then(() => true)
+      .catch(() => false),
+    "Linha de Frente: o mesmo fluxo do PR (separar alunos)"
+  );
+  ok(!(await pg.locator("#viewFormaturas #rSegs").isVisible()), "Linha de Frente: sem as abas do PR dentro da Formatura");
+  await pg.locator("#viewFormaturas .chip", { hasText: "Caídos" }).first().click();
+  await calmo(pg);
+  ok(/Caio Caido/.test(await pg.textContent("#viewFormaturas")), "aba Caídos mostra o aluno caído");
+  // virada à mão: o colégio do ano passado passa para o Repasse
+  await pg.getByRole("button", { name: "🔁 Virada" }).click();
+  await calmo(pg);
+  await pg.locator(".sheet .virada-linha", { hasText: "Delta" }).getByRole("button", { name: "Virou Repasse" }).click();
+  await pg.locator(".sheet").last().getByRole("button", { name: "Sim" }).click();
+  await calmo(pg);
+  let st = await store();
+  ok(st["formaturaAlunos/d1"].seg === "rep" && st["formaturaAlunos/g1"].seg === "lf", "virada: só o colégio escolhido vai para o Repasse");
+  ok(
+    !!(st["config/formatura_meta"].viradas || {})["" + (Y - 1) + "|DELTA"] ||
+      Object.keys(st["config/formatura_meta"].viradas || {}).length === 1,
+    "virada anotada"
+  );
+  // Venda Antecipada: parcela paga por Pix, com a data
+  await pg.locator("#viewFormaturas .seg", { hasText: "Venda Antecipada" }).click();
+  await calmo(pg);
+  await pg.locator("#fmCorpo .card").filter({ hasText: "Lucas" }).getByRole("button", { name: "💠 Paga por Pix" }).click();
+  await pg.locator(".sheet").last().locator("input[type=date]").fill(dia(-2));
+  await pg.locator(".sheet").last().locator("button[type=submit]").click();
+  await calmo(pg);
+  st = await store();
+  const pgs = st["formandos/f1"].pagamentos || [];
+  ok(
+    pgs.length && pgs[pgs.length - 1].forma === "Pix" && pgs[pgs.length - 1].data === dia(-2),
+    "Paga por Pix: grava a forma e a data do Pix"
+  );
+  ok(!erros.length, "sem erros no console: " + erros.join(" | "));
 });
 await cenario("Convite: criar a senha dentro do app", async () => {
   const ctx = await browser.newContext({ viewport: { width: 420, height: 900 }, serviceWorkers: "block" });

@@ -18,6 +18,8 @@ service cloud.firestore {
     function admin() { return dono() || adminP(); }
     function adminP() { let p = perfil(); return p.ativo == true && p.papel == 'admin'; }
     function pode(m) { return dono() || podeP(m); }
+    // Formaturas: quem tem o módulo Formaturas ou Instituições (igual ao app)
+    function podeForm() { return pode('formaturas') || pode('colegios'); }
     function podeP(m) { let p = perfil(); return p.ativo == true && (p.papel == 'admin' || ('modulos' in p && m in p.modulos)); }
     // Carteira: quem não é admin vê os colégios sem responsável e os seus; formandos, só os seus
     // (o campo é lido direto: com .get() e valor padrão o Firebase deixava listar a coleção inteira;
@@ -222,6 +224,30 @@ service cloud.firestore {
         && !(resource.data.etapa in ['PAGO', 'ENTREGUE'] && mudou(['valor', 'formaPag', 'pagoEm', 'resp', 'respEmail'])));
       // a equipe inclui aluno à mão (sem planilha): entra na fila ou separado para si, nunca como venda
       allow create: if admin() || ((pode('rep') || (pode('lf') && anoAtual(request.resource.data)))
+        && request.resource.data.get('etapa', '') in ['NA FILA', 'INCOMPLETO', 'SEPARADO']
+        && request.resource.data.get('respEmail', '') in ['', email()]);
+      // apagar de verdade: só o admin (a equipe pede a exclusão, Regra 4)
+      allow delete: if admin();
+    }
+    // Formatura · Linha de Frente e Repasse (Etapa 5): o mesmo fluxo do PR, numa lista separada (nunca se liga ao PR)
+    // Ficha do contrato de cada colégio (Formaturas), com o PDF assinado em base64 (sem Storage)
+    match /contratos/{instId} {
+      allow read: if admin() || podeForm();
+      allow create, update: if admin() || podeForm();
+      allow delete: if admin();
+    }
+    match /formaturaAlunos/{id} {
+      // (resource == null: aluno que ainda não existe; o "+ Aluno" confere antes de criar)
+      allow read: if podeForm();
+      allow update: if admin() || (podeForm()
+        && respOk() && exclusaoOk()
+        // aluno Caído só volta para a fila pelo Adriano ("Resgatar aluno")
+        && !(resource.data.get('etapa', '') == 'CAÍDO' && mudou(['etapa']))
+        // a venda entra "a conferir": só o admin marca como conferida (a comissão só conta depois)
+        && (!mudou(['conferido']) || request.resource.data.conferido == false)
+        && !(resource.data.etapa in ['PAGO', 'ENTREGUE'] && mudou(['valor', 'formaPag', 'pagoEm', 'resp', 'respEmail'])));
+      // a equipe inclui aluno à mão (sem planilha): entra na fila ou separado para si, nunca como venda
+      allow create: if admin() || (podeForm()
         && request.resource.data.get('etapa', '') in ['NA FILA', 'INCOMPLETO', 'SEPARADO']
         && request.resource.data.get('respEmail', '') in ['', email()]);
       // apagar de verdade: só o admin (a equipe pede a exclusão, Regra 4)

@@ -39,6 +39,9 @@ body{background:var(--bg);color:var(--fg);font-family:var(--f-body);font-size:15
 .tile.soon{opacity:.7}
 .tile.soon .tile-n{color:var(--muted)}
 .segs{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.segs3{grid-template-columns:repeat(3,1fr);margin:10px 0}
+@media(max-width:520px){.segs3 .seg b{font-size:.95rem}.segs3 .seg small{display:none}}
+.virada-linha{display:flex;justify-content:space-between;align-items:center;gap:8px;padding:8px 0;border-bottom:1px solid var(--line)}
 .seg{display:flex;flex-direction:column;gap:2px;align-items:flex-start;text-align:left;border:1px solid var(--line);background:var(--surface);color:var(--fg);border-radius:12px;padding:12px 14px}
 .seg b{font-family:var(--f-display);text-transform:uppercase;letter-spacing:.03em;font-size:1.2rem;line-height:1.1}
 .seg small{color:var(--muted);font-size:.82rem}
@@ -109,7 +112,7 @@ details.guide summary{cursor:pointer;font-family:var(--f-display);font-weight:70
 .stat.late b{color:var(--late)} .stat.today b{color:var(--warn)} .stat.won b{color:var(--ok)}
 .chips{display:flex;gap:6px;overflow-x:auto;padding-bottom:4px;scrollbar-width:thin}
 .chip{flex:none;border:1px solid transparent;background:var(--chip);color:var(--fg);border-radius:999px;padding:6px 12px;font-family:var(--f-display);font-weight:600;letter-spacing:.05em;font-size:.95rem;text-transform:uppercase}
-.chip[aria-pressed="true"]{background:var(--fg);color:var(--bg)}
+.chip[aria-pressed="true"],.chip[aria-selected="true"]{background:var(--fg);color:var(--bg)}
 .chip .n{font-variant-numeric:tabular-nums;opacity:.7;margin-left:4px}
 .search{width:100%;padding:9px 12px;border-radius:8px;border:1px solid var(--line);background:var(--surface);color:var(--fg);font:inherit}
 .grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(320px,1fr));gap:12px}
@@ -333,3 +336,5 @@ details.tamtipo{border:1px solid var(--line,#ddd);border-radius:10px;padding:6px
 .chip.ch-fechado{border-color:var(--ok);background:var(--ok-soft);font-weight:700}
 .chip[aria-pressed=true].ch-pend,.chip[aria-pressed=true].ch-nao,.chip[aria-pressed=true].ch-visitado,.chip[aria-pressed=true].ch-fechado{outline:2px solid var(--fg)}
 @media (prefers-color-scheme:dark){.chip.ch-visitado{background:#1b2a4a}}
+
+.sugerido{background:#fff6cc;border-color:#e0b400}

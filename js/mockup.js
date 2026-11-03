@@ -323,6 +323,10 @@ export function openMockup({ nome = "", escola = "", preco = "", modo = "kit", t
   inp.hidden = true;
   drop.append(inp);
   p.append(drop);
+  // envio de muitas fotos (Formatura, até ~70): mostra o progresso e deixa tentar de novo as que falharam
+  const prog = el("p", "hint");
+  prog.hidden = true;
+  p.append(prog);
   const thumbs = el("div", "thumbs");
   p.append(thumbs);
 
@@ -424,15 +428,32 @@ export function openMockup({ nome = "", escola = "", preco = "", modo = "kit", t
     const imgs = todas.slice(0, Math.max(0, maxFotos - st.fotos.length));
     // passou do limite: avisa (antes as fotos a mais sumiam sem aviso)
     if (todas.length > imgs.length && toast) toast(`No máximo ${maxFotos} fotos por aluno: ${todas.length - imgs.length} ficaram de fora.`);
-    let falhou = 0;
+    const falhas = [];
+    let n = 0;
+    prog.hidden = imgs.length < 5;
     for (const f of imgs) {
+      prog.textContent = `Carregando as fotos… ${++n} de ${imgs.length}`;
       try {
         st.fotos.push(await fileToImg(f));
       } catch (_) {
-        falhou++;
+        // uma segunda tentativa (foto grande no celular às vezes falha na primeira)
+        try {
+          st.fotos.push(await fileToImg(f));
+        } catch (_e) {
+          falhas.push(f);
+        }
       }
+      if (n % 10 === 0) paintThumbs();
     }
-    if (falhou) avisoErro(new Error("foto"), `abrir ${falhou} foto${falhou > 1 ? "s" : ""} (use JPG ou PNG)`, toast);
+    prog.textContent = "";
+    prog.hidden = !falhas.length;
+    if (falhas.length) {
+      const de = el("button", "btn btn-sm", "Tentar de novo");
+      de.type = "button";
+      de.onclick = () => addFiles(falhas);
+      prog.append(`${falhas.length} foto${falhas.length > 1 ? "s" : ""} não abriu (use JPG ou PNG). `, de);
+      avisoErro(new Error("foto"), `abrir ${falhas.length} foto${falhas.length > 1 ? "s" : ""} (use JPG ou PNG)`, toast);
+    }
     paintThumbs();
     paintSlots();
     redraw();

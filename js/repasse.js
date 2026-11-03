@@ -38,15 +38,20 @@ import {
   precoTxt,
   tipoPR,
   mudarTipoPR,
+  ehFormatura,
+  baseSeg,
   $
 } from "./repasse-estado.js";
+// Caídos: o admin vê todos; a equipe, os que ela mesma marcou
+const soMinhaCaidos = () => (C.isAdmin ? [] : [FS.where("respEmail", "==", C.email || "")]);
 import { card } from "./repasse-cartao.js";
 import { sheet, field, actions } from "./repasse-janelas.js";
 import { openDados } from "./repasse-form.js";
 import { refreshStats, refreshLote, separarLote, loadMeta, pintarEscolas, escolaEscolhida } from "./repasse-lote.js";
 export { ETAPAS } from "./repasse-estado.js";
 let unsubList = null,
-  mounted = false;
+  mounted = false,
+  raiz = null; // a tela inteira do PR (fica dentro do card PR ou dentro de Formaturas)
 
 // ---------- tela ----------
 export function init(ctx) {
@@ -56,7 +61,38 @@ export function init(ctx) {
 }
 
 export function show() {
+  // card PR: o tipo volta para PR ou Paspatur (o último usado)
+  let t = "pr";
+  try {
+    t = localStorage.getItem("z7tipoPR") === "paspatur" ? "paspatur" : "pr";
+  } catch (_) {}
+  if (tipoPR !== t) mudarTipoPR(t);
+  if (tipoPR === "formatura") mudarTipoPR("pr");
+  mostrar($("viewRepasse"));
+}
+// Formaturas → Linha de Frente / Repasse: o mesmo motor, na coleção da formatura
+export function mostrarEm(container, frente) {
+  mudarTipoPR("formatura");
+  mudarSeg(frente === "rep" ? "rep" : "lf");
+  mostrar(container);
+}
+function mostrar(container) {
   if (!mounted) mount();
+  if (raiz.parentNode !== container) container.append(raiz);
+  const form = tipoPR === "formatura";
+  raiz.querySelector(".vhead").hidden = form;
+  $("rTipos").hidden = form;
+  $("rSegs").hidden = form;
+  $("rGuide").hidden = form;
+  const h = raiz.querySelector(".vhead h2");
+  if (h) h.textContent = tipoPR === "paspatur" ? "PR · Paspatur" : "PR";
+  if (!form) {
+    let s0 = seg;
+    try {
+      s0 = localStorage.getItem("z7seg") || seg;
+    } catch (_) {}
+    mudarSeg(s0);
+  }
   const ok = segsPermitidas();
   if (!ok.includes(seg)) mudarSeg(ok[0] || "lf");
   renderSegs();
@@ -65,10 +101,42 @@ export function show() {
   openTab(tab);
 }
 
+function importarAqui() {
+  openImport(
+    C,
+    {
+      sheet,
+      field,
+      actions,
+      get meta() {
+        return meta;
+      }
+    },
+    () => (loadMeta(), refreshStats())
+  );
+}
+// Formaturas: "Importar planilha" no topo da página grava na lista da formatura (formaturaAlunos)
+export async function importarFormatura() {
+  if (tipoPR !== "formatura") mudarTipoPR("formatura");
+  await loadMeta();
+  importarAqui();
+}
+// Formaturas: ao trocar de aba ou sair do card, para de ouvir a lista
+export function parar() {
+  if (unsubList) {
+    unsubList();
+    unsubList = null;
+  }
+}
+// abrir um aluno do PR já na tela certa (Formaturas usa o mesmo cadastro)
+export const novoAluno = () => openDados(null);
 function mount() {
   mounted = true;
-  const v = $("viewRepasse");
-  v.innerHTML = "";
+  const v0 = $("viewRepasse");
+  v0.innerHTML = "";
+  raiz = el("div", "pr-raiz");
+  v0.append(raiz);
+  const v = raiz;
   const head = el("div", "vhead");
   head.append(el("h2", null, tipoPR === "paspatur" ? "PR · Paspatur" : "PR"));
   const hb = el("div", "quick");
@@ -80,20 +148,7 @@ function mount() {
       U.mkBtn("🗂️ Prévias de um colégio", "", () => import("./previas-lote.js").then(m => m.abrirPreviasLote(C)).catch(e => C.handleErr(e)))
     );
   hb.append(botaoRelatorio(relatorioPR, () => C.me));
-  const imp = U.mkBtn("Importar planilha", "", () =>
-    openImport(
-      C,
-      {
-        sheet,
-        field,
-        actions,
-        get meta() {
-          return meta;
-        }
-      },
-      () => (loadMeta(), refreshStats())
-    )
-  );
+  const imp = U.mkBtn("Importar planilha", "", () => importarAqui());
   imp.id = "rImport";
   imp.hidden = !C.isAdmin;
   hb.append(imp);
@@ -112,7 +167,7 @@ function mount() {
   g.id = "rGuide";
   g.innerHTML = `<summary>Como funciona o PR</summary><ol>
     <li><b>Linha de Frente</b> são os ensaios deste ano; <b>Repasse</b> são os dos anos anteriores. Em 1º de janeiro tudo vira sozinho: a Linha de Frente do ano que acabou passa para o Repasse.</li>
-    <li><b>Separe o seu lote do dia</b> no quadro abaixo. O app não trava: separa 10 por vez e avisa quando você passar de 25 no dia na Linha de Frente ou de 20 no Repasse (os números mudam em ⚙️ Ajustes), para o WhatsApp não bloquear o número.</li>
+    <li><b>Separe o seu lote do dia</b> no quadro abaixo: toque em <b>Separar alunos</b> e diga quantos quer. Nunca vem o mesmo aluno duas vezes. Vá com calma nas mensagens novas para o WhatsApp não bloquear o número.</li>
     <li>Cada cartão mostra <b>para quem mandar</b> (mãe, pai ou aluno) e a mensagem pronta. O 1º contato só pede permissão para mandar a prévia.</li>
     <li>Respondeu que quer ver? Toque em <b>Quer ver a prévia</b>, depois em <b>🖼️ Prévia</b>: arraste a foto do aluno e o app monta o kit pronto para enviar.</li>
     <li><b>Pagou?</b> Toque em <b>Pagou</b>. O cartão pede para <b>confirmar o endereço</b> (ou agendar a retirada no estúdio) e vai para <b>Entregas</b>, separado por cidade e bairro para montar a rota.</li>
@@ -239,6 +294,8 @@ function renderChips() {
   ];
   if (C.isAdmin) tabs.push(["conferir", "A conferir"], ["incompletos", "Incompletos"]);
   else tabs.push(["incompletos", "Meus incompletos"]);
+  // Formatura: quem não vai querer (Caído), com o motivo; só o Adriano resgata para nova negociação
+  if (ehFormatura()) tabs.push(["caidos", "Caídos"]);
   tabs.forEach(([k, t]) => {
     const b = el("button", "chip", t);
     b.type = "button";
@@ -284,6 +341,7 @@ function openTab(k) {
           FS.limit(200)
         );
   if (k === "conferir") q = FS.query(col, FS.where("conferido", "==", false), FS.limit(300));
+  if (k === "caidos") q = FS.query(col, FS.where("etapa", "==", "CAÍDO"), ...baseSeg(), ...soMinhaCaidos(), FS.limit(500));
   if (q)
     unsubList = FS.onSnapshot(
       q,
@@ -313,7 +371,7 @@ async function buscar() {
     esc = $("rEscola").value,
     escE = escolaEscolhida(esc); // { ano, nomes } do colégio escolhido (uma linha por colégio e ano)
   const daEscola = it => !escE || ((!escE.ano || it.ano === escE.ano) && escE.nomes.includes(it.escola));
-  if (!C.pode("rep")) {
+  if (!C.pode("rep") && !ehFormatura()) {
     // Só Linha de Frente: carrega os ensaios do ano (uma vez a cada 10 min) e filtra aqui.
     if (!txt && !esc) {
       mudarItems([]);
@@ -400,6 +458,7 @@ function naTela() {
 }
 function renderList(loading, emptyMsg) {
   const list = $("rList");
+  if (!list) return; // (Formaturas: a tela saiu do ar)
   list.innerHTML = "";
   if (loading) {
     const e = el("div", "empty");
@@ -465,7 +524,8 @@ const NOMES_ABA = {
   conferir: "A conferir",
   incompletos: "Incompletos"
 };
-function relatorioPR() {
+// (Formaturas usa o mesmo relatório nas abas Linha de Frente e Repasse)
+export function relatorioPR() {
   const txt = id => ($(id) ? $(id).textContent : "–");
   const dataBR = d => (d ? U.fmtDate(d) + "/" + String(d).slice(0, 4) : "");
   const esc = $("rEscola") ? $("rEscola").value : "";

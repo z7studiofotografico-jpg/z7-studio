@@ -1,5 +1,5 @@
 // PR: o cartão de cada contato (para quem mandar, a mensagem pronta, os botões de cada etapa)
-import { excluir, faixaExclusao } from "./confirmar.js";
+import { excluir, faixaExclusao, confirmar, pedirTexto } from "./confirmar.js";
 import { openMockup, textoEscolha } from "./mockup.js";
 import { el, title } from "./ui.js";
 import * as U from "./util.js";
@@ -10,6 +10,7 @@ import { whatsAtivo } from "./numeros-tela.js";
 import { linhasRetorno, abrirRetorno } from "./retorno.js";
 import {
   colNome,
+  ehFormatura,
   C,
   tab,
   seg,
@@ -183,12 +184,26 @@ function desenharProximo(box, it, escolhido, blocked, li) {
   if (C.P.drivePrevias) row.append(U.mkBtn("🖼️ Fotos do aluno", "", () => abrirFotosDoAluno(C, it, precoTxt(it))));
   if (ns.mockup || it.etapa === "INTERESSADO")
     row.append(
-      U.mkBtn("🖼️ Prévia", "", () => openMockup({ nome: title(it.nome), escola: title(it.escola), preco: precoTxt(it), toast: U.toast }))
+      U.mkBtn("🖼️ Prévia", "", () =>
+        openMockup({
+          nome: title(it.nome),
+          escola: title(it.escola),
+          preco: precoTxt(it),
+          toast: U.toast,
+          maxFotos: ehFormatura() ? 70 : 15
+        })
+      )
     );
   if (it.etapa === "INTERESSADO")
     row.append(
       U.mkBtn("📷 Fotos para escolher", "", () =>
-        openMockup({ nome: title(it.nome), escola: title(it.escola), preco: precoTxt(it), modo: "escolha" })
+        openMockup({
+          nome: title(it.nome),
+          escola: title(it.escola),
+          preco: precoTxt(it),
+          modo: "escolha",
+          maxFotos: ehFormatura() ? 70 : 15
+        })
       )
     );
   if (it.etapa === "INTERESSADO" && d) {
@@ -363,5 +378,37 @@ function acoesDoCartao(it, li, e) {
     );
   if (it.etapa === "ENTREGUE" && it.followup) act.append(U.mkBtn("Concluir", "", () => save(it, { followup: null }, "Concluído")));
   act.append(U.mkBtn("Notas", "", () => openNotas(it)));
+  // Formatura: "Caído" (não vai querer) com o motivo obrigatório; só o Adriano resgata para nova negociação
+  if (ehFormatura()) {
+    if (it.etapa === "CAÍDO") {
+      act.append(el("p", "wait", "⬇️ Caído: " + (it.caidoMotivo || "sem motivo") + (it.caidoPor ? ` (${U.first(it.caidoPor)})` : "")));
+      if (C.isAdmin)
+        act.append(
+          U.mkBtn("↩️ Resgatar aluno para nova negociação", "btn-primary", async () => {
+            if (!(await confirmar("Resgatar o aluno?", `${title(it.nome)} volta para a fila e pode ser separado de novo.`))) return;
+            save(
+              it,
+              { etapa: "NA FILA", resp: "", respEmail: "", followup: null, resgatadoEm: U.todayStr(), resgatadoPor: C.me || "" },
+              "Aluno de volta na fila",
+              { semConfirmar: true }
+            );
+          })
+        );
+    } else if (!["PAGO", "ENTREGUE"].includes(it.etapa))
+      act.append(
+        U.mkBtn("⬇️ Caído", "", async () => {
+          const motivo = await pedirTexto("Marcar como Caído", `Por que ${U.first(title(it.nome))} não vai querer? (obrigatório)`, {
+            placeholder: "ex.: já comprou com outra empresa; sem condições agora"
+          });
+          if (!motivo) return;
+          save(
+            it,
+            { etapa: "CAÍDO", caidoMotivo: motivo, caidoEm: U.todayStr(), caidoPor: C.me || "", followup: null, atendendo: null },
+            "Marcado como Caído",
+            { semConfirmar: true }
+          );
+        })
+      );
+  }
   return act;
 }

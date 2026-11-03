@@ -5,7 +5,7 @@
 //  - 📋 Kits e preços: tabela do contrato (antecipado) e preço depois das fotos
 //  - Turmas: colégios fechados, com acesso à lista de formandos
 // Quem não é administrador vê só as turmas dos colégios que fechou.
-import { openTurma, cobrarWa, registrarPagamento, atrasado, oferecerKit, abrirPrevia, retornoFormando } from "./turma.js";
+import { openTurma, cobrarWa, registrarPagamento, pagaPorPix, atrasado, oferecerKit, abrirPrevia, retornoFormando } from "./turma.js";
 import { linhasRetorno } from "./retorno.js";
 import { kitsPadrao, candidatosPosFoto, ehRepasse, anoDaTurma } from "./contrato.js";
 import {
@@ -53,59 +53,120 @@ export function init(ctx) {
   db = ctx.db;
   Ev.init(ctx);
 }
+let prMod = null; // o motor do PR, usado nas abas Linha de Frente e Repasse
 export function hide() {
   unsubs.forEach(u => u());
   unsubs = [];
+  if (prMod) prMod.parar();
 }
 
+// Formaturas (Etapa 5): três abas. Linha de Frente e Repasse usam o mesmo fluxo de trabalho do PR, numa lista
+// própria (formaturaAlunos); a Venda Antecipada é a venda antes das fotos (boleto), com o painel de cobrança.
+let parte = "lf";
+try {
+  parte = localStorage.getItem("z7fmparte") || "lf";
+} catch (_) {}
 export function show() {
   const v = $("viewFormaturas");
   v.innerHTML = "";
+  hide();
   const head = el("div", "vhead");
   head.append(el("h2", null, "Formaturas"));
-  // preços mínimos dos kits e da formatura (antes ficavam em Instituições)
   const hb = el("div", "agact");
   hb.append(
-    U.mkBtn("+ Aluno", "btn-primary btn-sm", () => novoFormando()),
+    U.mkBtn("+ Instituição", "btn-verde btn-sm", () =>
+      import("./instituicoes.js").then(m => m.novaInstituicao(C, "publico")).catch(e => C.handleErr(e))
+    ),
+    U.mkBtn("+ Aluno", "btn-primary btn-sm", () =>
+      parte === "va" ? novoFormando() : import("./repasse.js").then(m => m.novoAluno()).catch(e => C.handleErr(e))
+    ),
     U.mkBtn("📋 Kits e preços", "btn-sm", () => openKits()),
     U.mkBtn("💲 Preços mínimos", "btn-sm", () => Ev.openPrecos()),
-    botaoRelatorio(relatorioFormaturas, () => C.me)
+    botaoRelatorio(
+      () => (parte === "va" ? relatorioFormaturas() : import("./repasse.js").then(m => m.relatorioPR())),
+      () => C.me
+    )
   );
+  if (C.isAdmin)
+    hb.append(
+      U.mkBtn("Importar planilha", "btn-sm", () =>
+        import("./repasse.js").then(m => (m.init(C), m.importarFormatura())).catch(e => C.handleErr(e))
+      ),
+      U.mkBtn("✏️ Mensagens", "btn-sm", () =>
+        import("./formatura-mensagens.js").then(m => m.editarMensagensFormatura(C)).catch(e => C.handleErr(e))
+      ),
+      U.mkBtn("🔁 Virada", "btn-sm", () => import("./formatura-virada.js").then(m => m.abrirVirada(C)).catch(e => C.handleErr(e)))
+    );
   head.append(hb);
   v.append(head);
-  v.append(
-    el("p", "hint", "Kits do contrato de formatura (venda antecipada e depois das fotos) dos colégios fechados. O PR fica no card próprio.")
-  );
+  const aviso = el("div", "notice");
+  aviso.hidden = true;
+  v.append(aviso);
+  if (C.isAdmin) import("./formatura-virada.js").then(m => m.avisoVirada(C, aviso)).catch(() => {});
+  // abas: Linha de Frente {ano} · Repasse · Venda Antecipada (os anos acompanham as viradas feitas à mão)
+  const segs = el("div", "segs segs3");
+  segs.setAttribute("role", "tablist");
+  const corpo = el("div");
+  v.append(segs, corpo);
+  const lfAno = new Date().getFullYear();
+  [
+    ["lf", "Linha de Frente " + lfAno, "turma de " + lfAno + " até a virada"],
+    ["rep", "Repasse", "turmas até " + (lfAno - 1) + ", já viradas"],
+    ["va", "Venda Antecipada", "antes das fotos · boleto e cobranças"]
+  ].forEach(([k, t, sub]) => {
+    const b = el("button", "seg");
+    b.type = "button";
+    b.setAttribute("role", "tab");
+    b.setAttribute("aria-selected", String(parte === k));
+    b.append(el("b", null, t), el("small", null, sub));
+    b.onclick = () => {
+      if (parte === k) return;
+      parte = k;
+      try {
+        localStorage.setItem("z7fmparte", k);
+      } catch (_) {}
+      show();
+    };
+    segs.append(b);
+  });
+  if (parte === "va") return mostrarVA(corpo);
+  // Linha de Frente / Repasse: o mesmo motor do PR, na lista da formatura
+  if (!C.pode("formaturas")) return corpo.append(el("div", "empty", "Sem acesso à Formatura."));
+  import("./repasse.js")
+    .then(m => {
+      prMod = m;
+      m.init(C);
+      m.mostrarEm(corpo, parte);
+    })
+    .catch(e => C.handleErr(e));
+}
+// Venda Antecipada: os contratos (kits e parcelas), com o painel de cobrança
+function mostrarVA(v) {
   // qual WhatsApp usar nas cobranças: o da empresa (admin) ou os da própria pessoa (equipe)
   const nUse = el("p", "lnum");
   v.append(nUse);
   pintarSeletor(nUse, C, "cobranca");
-  // Como no PR: Linha de Frente = turmas deste ano; Repasse = turmas de anos anteriores (vira sozinho em 1º de janeiro)
-  const segs = el("div", "segs");
-  segs.setAttribute("role", "tablist");
-  const ano = U.todayStr().slice(0, 4);
+  const sub = el("div", "chips");
+  sub.setAttribute("role", "tablist");
   [
-    ["lf", "Linha de Frente " + ano, "turmas deste ano"],
-    ["rep", "Repasse", "turmas de anos anteriores"]
-  ].forEach(([kk, t, sub]) => {
-    const b = el("button", "seg");
+    ["lf", "Turmas deste ano"],
+    ["rep", "Turmas anteriores"]
+  ].forEach(([kk, t]) => {
+    const b = el("button", "chip", t);
     b.type = "button";
     b.setAttribute("role", "tab");
     b.setAttribute("aria-selected", String(seg === kk));
-    b.append(el("b", null, t), el("small", null, sub));
     b.onclick = () => {
       seg = kk;
       try {
         localStorage.setItem("z7fmseg", kk);
-      } catch (_) {
-        /* sem armazenamento: fica só nesta sessão */
-      }
-      segs.querySelectorAll("button").forEach(x => x.setAttribute("aria-selected", String(x === b)));
+      } catch (_) {}
+      sub.querySelectorAll("button").forEach(x => x.setAttribute("aria-selected", String(x === b)));
       render();
     };
-    segs.append(b);
+    sub.append(b);
   });
-  v.append(segs);
+  v.append(sub);
   const k = el("div", "kpis");
   k.id = "fmKpis";
   v.append(k);
@@ -116,7 +177,6 @@ export function show() {
   corpo.id = "fmCorpo";
   corpo.append(el("div", "empty", "Carregando…"));
   v.append(corpo);
-  hide();
   forms = [];
   cobr = [];
   insts = [];
@@ -224,7 +284,7 @@ const abrirTurma = (i, novo) =>
     }
   );
 
-// Linha de Frente (turmas deste ano) ou Repasse (anos anteriores)
+// Venda Antecipada: turmas deste ano ou turmas de anos anteriores (oferecer kit a quem ficou só com o Kit 01)
 let seg = (() => {
   try {
     return localStorage.getItem("z7fmseg") || "lf";
@@ -379,7 +439,11 @@ function renderCobrancas(corpo, cob) {
       )
     );
     const act = el("div", "actions");
-    if (C.isAdmin) act.append(U.mkBtn("✅ Parcela paga", "btn-ok", () => registrarPagamento(C, f).catch(er => C.handleErr(er))));
+    if (C.isAdmin)
+      act.append(
+        U.mkBtn("✅ Parcela paga", "btn-ok", () => registrarPagamento(C, f).catch(er => C.handleErr(er))),
+        U.mkBtn("💠 Paga por Pix", "", () => pagaPorPix(C, f).catch(er => C.handleErr(er)))
+      );
     if (f.tel) act.append(U.mkBtn("💬 Cobrar", at ? "btn-primary" : "", () => cobrarWa(C, f)));
     act.append(U.mkBtn("📅 Pediu contato depois", "", () => retornoFormando(C, f)));
     const inst = insts.find(i => i.id === f.instId);
