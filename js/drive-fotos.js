@@ -1,5 +1,8 @@
 // Fotos do aluno direto do Google Drive (prévias em baixa, com marca d'água, geradas em "🗂️ Prévias de um colégio").
-// A pasta "Z7 – Prévias PR" fica como "qualquer pessoa com o link pode ver" e o link vai em Ajustes (drivePrevias).
+// A pasta "Z7 – Prévias PR" vai em Ajustes (drivePrevias). Dois jeitos de ler:
+//  · fechado (recomendado): a pasta é compartilhada só com os e-mails da equipe e cada pessoa entra com a conta
+//    Google dela no app (Ajustes → "ID do cliente Google"); o Drive confere quem pode ver;
+//  · aberto: pasta "qualquer pessoa com o link" + chave do Google (quem tiver o link vê as fotos).
 // Organização: Z7 – Prévias PR / "Prévias - 2022 - C.E. YONNE MARIA SIQUEIRA" / "CEYMS 02 - DOMINGOS JOSE.jpg" (folha)
 //                                                                         / "CEYMS 02 - DOMINGOS JOSE/" (fotos separadas)
 // O app só lê (chave do Google com a "Google Drive API" ativada); nada é gravado no Drive.
@@ -55,17 +58,23 @@ export function acharAluno(itens, it) {
   return pont.length ? pont[0].f : null;
 }
 
-// ---------- leitura no Drive (com a chave do Google do app) ----------
-export function criarDrive(chaveApi, buscar = fetch) {
+// ---------- leitura no Drive ----------
+// acesso = a chave do Google (texto) ou uma função que devolve o token da conta Google da pessoa (pasta fechada)
+export function criarDrive(acesso, buscar = fetch) {
   const cache = {};
+  const comToken = typeof acesso === "function";
+  const pedir = async url =>
+    comToken
+      ? buscar(url, { headers: { Authorization: "Bearer " + (await acesso()) } })
+      : buscar(url + (url.includes("?") ? "&" : "?") + "key=" + acesso);
   async function listar(pai) {
     if (cache[pai]) return cache[pai];
     let out = [],
       token = "";
     do {
       const q = encodeURIComponent(`'${pai}' in parents and trashed = false`);
-      const r = await buscar(
-        `${API}?q=${q}&fields=nextPageToken,files(id,name,mimeType)&pageSize=1000&orderBy=name&supportsAllDrives=true&includeItemsFromAllDrives=true&key=${chaveApi}${token ? "&pageToken=" + token : ""}`
+      const r = await pedir(
+        `${API}?q=${q}&fields=nextPageToken,files(id,name,mimeType)&pageSize=1000&orderBy=name&supportsAllDrives=true&includeItemsFromAllDrives=true${token ? "&pageToken=" + token : ""}`
       );
       if (!r.ok) {
         const t = await r.text();
@@ -74,8 +83,10 @@ export function criarDrive(chaveApi, buscar = fetch) {
             ? "A leitura do Google Drive ainda não está ligada (ativar a Google Drive API no Google Cloud)."
             : /API_KEY|keyInvalid|blocked/i.test(t)
               ? "A chave do Google não pode ler o Drive (libere a Google Drive API nessa chave)."
-              : r.status === 404
-                ? "Não achei a pasta do Drive: confira o link em Ajustes e se ela está como “qualquer pessoa com o link”."
+              : r.status === 404 || r.status === 403
+                ? comToken
+                  ? "Sua conta Google não tem acesso à pasta das prévias. Peça ao Adriano para compartilhar a pasta com o seu e-mail."
+                  : "Não achei a pasta do Drive: confira o link em Ajustes e se ela está como “qualquer pessoa com o link”."
                 : "O Google Drive respondeu " + r.status
         );
       }
@@ -86,11 +97,11 @@ export function criarDrive(chaveApi, buscar = fetch) {
     return (cache[pai] = out);
   }
   async function nomeDe(id) {
-    const r = await buscar(`${API}/${id}?fields=name&supportsAllDrives=true&key=${chaveApi}`);
+    const r = await pedir(`${API}/${id}?fields=name&supportsAllDrives=true`);
     return r.ok ? (await r.json()).name || "" : "";
   }
   async function baixar(id) {
-    const r = await buscar(`${API}/${id}?alt=media&supportsAllDrives=true&key=${chaveApi}`);
+    const r = await pedir(`${API}/${id}?alt=media&supportsAllDrives=true`);
     if (!r.ok) throw new Error("Não consegui baixar a foto (" + r.status + ").");
     return r.blob();
   }

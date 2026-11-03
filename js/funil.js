@@ -425,6 +425,11 @@ function card(l) {
     act.appendChild(mkBtn("✔ Conferir venda", "btn-ok", () => save(l.id, { conferido: true }, "Venda conferida: já conta no Dashboard")));
   if (C.isAdmin && l.etapa !== "PERDIDO") act.appendChild(mkBtn("📅 Marcar ensaio", "", () => marcarEnsaio(l)));
   act.appendChild(mkBtn("Editar", "", () => openForm(l)));
+  act.appendChild(
+    mkBtn("🆘 Ajuda de vendas", "", () =>
+      import("./ajuda-vendas.js").then(m => m.abrirAjuda(C, { card: "funil", aluno: l.nome, contato: l.nome })).catch(e => C.handleErr(e))
+    )
+  );
   el.appendChild(act);
   return el;
 }

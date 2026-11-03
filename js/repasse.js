@@ -24,6 +24,7 @@ import {
   meta,
   mudarTab,
   mudarSeg,
+  precoFaltando,
   mudarItems,
   tela,
   iniciar,
@@ -163,6 +164,10 @@ function mount() {
   segs.id = "rSegs";
   segs.setAttribute("role", "tablist");
   v.append(segs);
+  const semP = el("p", "wait");
+  semP.id = "rSemPreco";
+  semP.hidden = true;
+  v.append(semP);
   const g = el("details", "guide");
   g.id = "rGuide";
   g.innerHTML = `<summary>Como funciona o PR</summary><ol>
@@ -305,7 +310,15 @@ function renderChips() {
   });
 }
 
+function avisoPreco() {
+  const x = $("rSemPreco");
+  if (!x) return;
+  const t = precoFaltando();
+  x.textContent = t;
+  x.hidden = !t;
+}
 function openTab(k) {
+  avisoPreco();
   mudarTab(k);
   renderChips();
   $("rBusca").hidden = k !== "buscar";

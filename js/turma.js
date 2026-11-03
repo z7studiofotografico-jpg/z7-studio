@@ -507,9 +507,7 @@ function card(T, f, candSet) {
   if (comprou && !q0 && f.tel) act.append(U.mkBtn("💬 Cobrar", at ? "btn-primary" : "", () => cobrarWa(C, f)));
   act.append(
     U.mkBtn("🆘 Ajuda de vendas", "", () =>
-      import("./ajuda-vendas.js")
-        .then(m => m.abrirAjuda(C, { aluno: f.nome, colegio: T.inst.nome, modulo: "kit da formatura" }))
-        .catch(e => C.handleErr(e))
+      import("./ajuda-vendas.js").then(m => m.abrirAjuda(C, { card: "va", aluno: f.nome, colegio: T.inst.nome })).catch(e => C.handleErr(e))
     )
   );
   // pediu para pagar/falar outro dia: motivo + data (fica no histórico do formando)

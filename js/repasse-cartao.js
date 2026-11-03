@@ -1,7 +1,7 @@
 // PR: o cartão de cada contato (para quem mandar, a mensagem pronta, os botões de cada etapa)
 import { excluir, faixaExclusao, pedirTexto } from "./confirmar.js";
 import { openMockup, textoEscolha } from "./mockup.js";
-import { el, title } from "./ui.js";
+import { el, title, sheet as sheetUi } from "./ui.js";
 import * as U from "./util.js";
 import { faltando, situacaoTxt, enderecoTxt, historicoPlanilha } from "./repasse-dados.js";
 import { avisoTel } from "./aluno-id.js";
@@ -330,7 +330,7 @@ function acoesDoCartao(it, li, e) {
               aluno: it.nome,
               colegio: it.escola,
               precoModulo: precoTxt(it),
-              modulo: tipoPR === "paspatur" ? "Paspatur" : ehFormatura() ? "kit da formatura" : "kit PR",
+              card: tipoPR === "paspatur" ? "paspatur" : ehFormatura() ? "formatura" : "pr",
               contato: (contatoPadrao(it) || {}).nome
             })
           )
@@ -394,6 +394,12 @@ function acoesDoCartao(it, li, e) {
     );
   if (it.etapa === "ENTREGUE" && it.followup) act.append(U.mkBtn("Concluir", "", () => save(it, { followup: null }, "Concluído")));
   act.append(U.mkBtn("Notas", "", () => openNotas(it)));
+  if (C.isAdmin && (it.alteracoes || []).length)
+    act.append(
+      U.mkBtn("🕘 Histórico", "", () =>
+        import("./alteracoes.js").then(m => sheetHist("Histórico · " + U.first(title(it.nome)), m.linhasAlteracoes(it)))
+      )
+    );
   // Formatura: "Caído" (não vai querer) com o motivo obrigatório; só o Adriano resgata para nova negociação
   if (ehFormatura()) {
     if (it.etapa === "CAÍDO") {
@@ -440,4 +446,12 @@ function acoesDoCartao(it, li, e) {
       );
   }
   return act;
+}
+
+// quem mudou o quê e quando (só o Adriano vê)
+function sheetHist(t, linhas) {
+  sheetUi(t, (p, close) => {
+    linhas.forEach(l => p.append(el("div", "virada-linha", l)));
+    p.append(U.mkBtn("Fechar", "", close));
+  });
 }

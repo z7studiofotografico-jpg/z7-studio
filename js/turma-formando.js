@@ -1,5 +1,6 @@
 // Turma: o formulário do formando (novo, editar, venda depois das fotos) e o ID do aluno na turma.
 // T = a turma aberta (inst, lista de formandos, opções), montada em turma.js.
+import { comAlteracao } from "./alteracoes.js";
 import { lerReais, brl, dividir, pagamentosDe, pagasDe, recebido, proxVenc, ehKit01, ativo, FORMAS } from "./regras.js";
 import { kitsDe, plano, ehAdesao, anoDaTurma, vendaSugerida, proximoVenc, devolucao, DEVOLVE_DESISTENCIA } from "./contrato.js";
 import { el, title, field, inp, inpReais, sel, sheet, botoes } from "./ui.js";
@@ -273,7 +274,10 @@ export function formFormando(ctx, T, f, preset) {
       const agora = new Date().toISOString();
       try {
         if (f && !adm && !preset.venda) {
-          await FS.updateDoc(FS.doc(db, "formandos", f.id), { tel: tel.value.trim(), obs: obs.value.trim(), atualizadoEm: agora });
+          await FS.updateDoc(
+            FS.doc(db, "formandos", f.id),
+            comAlteracao(f, { tel: tel.value.trim(), obs: obs.value.trim(), atualizadoEm: agora }, C.me)
+          );
           fechar();
           U.toast("Salvo");
           return;
@@ -340,11 +344,15 @@ export function formFormando(ctx, T, f, preset) {
           const pags = pagamentosDe(f);
           await FS.updateDoc(
             FS.doc(db, "formandos", f.id),
-            Object.assign(body, {
-              pagamentos: pags,
-              pagas: pags.length,
-              proxVenc: proxVenc(Object.assign({}, f, body, { pagamentos: pags }))
-            })
+            comAlteracao(
+              f,
+              Object.assign(body, {
+                pagamentos: pags,
+                pagas: pags.length,
+                proxVenc: proxVenc(Object.assign({}, f, body, { pagamentos: pags }))
+              }),
+              C.me
+            )
           );
           // ID trocado: os outros kits do mesmo aluno ficam com o mesmo ID
           if (adm && codigo !== (f.codigo || "")) {

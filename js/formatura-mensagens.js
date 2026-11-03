@@ -2,7 +2,7 @@
 // (os produtos são outros). Os textos são editáveis pelo Adriano (config/app → msgFormatura); estes são só exemplos.
 // No texto: {oi} = "Olá, Maria!" · {aluno} = primeiro nome do aluno · {colegio} · {eu} = quem envia ·
 // {oferta} = preço e formas de pagamento · {pix} = chave Pix de cobrança
-import { el, sheet, botoes, title } from "./ui.js";
+import { el, sheet, botoes, title, topoDireita } from "./ui.js";
 import * as U from "./util.js";
 
 export const MSGS_FORMATURA = [
@@ -82,6 +82,15 @@ export function passoFormatura(it, c, o) {
 // Editor dos textos (só o admin)
 export function editarMensagensFormatura(C) {
   sheet("✏️ Mensagens da Formatura", (p, close) => {
+    // dúvidas e respostas novas entram aos poucos (vão para a Ajuda de vendas da Formatura)
+    if (C.isAdmin)
+      topoDireita(
+        p,
+        U.mkBtn("+ Incluir dúvida", "btn-primary btn-sm", () => {
+          close();
+          import("./ajuda-vendas.js").then(m => m.editarRespostas(C, "formatura", { incluir: true })).catch(e => C.handleErr(e));
+        })
+      );
     p.append(
       el(
         "p",

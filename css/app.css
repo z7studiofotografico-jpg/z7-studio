@@ -344,3 +344,6 @@ details.tamtipo{border:1px solid var(--line,#ddd);border-radius:10px;padding:6px
 .pd-comprar{border-left:4px solid var(--warn)}
 .pd-ficha-q{display:flex;gap:6px}
 #viewProdutos input[type=search]{width:100%;margin:8px 0}
+.h2-acoes{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.h2-acoes .h2-dir{margin-left:auto;display:flex;gap:6px;font-family:inherit;text-transform:none;letter-spacing:0}
+.ajv-extra{border-left:3px solid var(--line);padding-left:8px;display:grid;gap:6px}

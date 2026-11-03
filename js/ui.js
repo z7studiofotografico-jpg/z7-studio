@@ -77,6 +77,19 @@ export function sheet(tit, build, opts) {
   document.body.append(sh);
   return close;
 }
+// botões no canto superior direito de uma janela (ao lado do título)
+export function topoDireita(p, ...btns) {
+  let h = p.querySelector("h2");
+  if (!h) {
+    h = el("h2");
+    p.prepend(h);
+  }
+  h.classList.add("h2-acoes");
+  const d = el("span", "h2-dir");
+  d.append(...btns);
+  h.append(d);
+  return d;
+}
 export function botoes(close, okTxt, cls) {
   const a = el("div", "panel-actions");
   const sp = el("span");

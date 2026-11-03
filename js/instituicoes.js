@@ -357,7 +357,7 @@ function card(it) {
   act.append(
     U.mkBtn("🆘 Ajuda de vendas", "", () =>
       import("./ajuda-vendas.js")
-        .then(m => m.abrirAjuda(C, { colegio: it.nome, modulo: "formatura", contato: ((it.contatos || [])[0] || {}).nome }))
+        .then(m => m.abrirAjuda(C, { card: "instituicao", colegio: it.nome, contato: ((it.contatos || [])[0] || {}).nome }))
         .catch(e => C.handleErr(e))
     )
   );

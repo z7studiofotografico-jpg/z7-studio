@@ -90,6 +90,10 @@ export function show() {
     U.mkBtn("+ Aluno", "btn-primary btn-sm", () =>
       parte === "va" ? novoFormando() : import("./repasse.js").then(m => m.novoAluno()).catch(e => C.handleErr(e))
     ),
+    // prévia para o cliente (como no PR), aqui com até ~70 fotos por aluno
+    U.mkBtn("🖼️ Prévia e fotos", "btn-sm", () =>
+      import("./mockup.js").then(m => m.openMockup({ toast: U.toast, maxFotos: 70 })).catch(e => C.handleErr(e))
+    ),
     U.mkBtn("📋 Kits e preços", "btn-sm", () => openKits()),
     U.mkBtn("💲 Preços mínimos", "btn-sm", () => Ev.openPrecos()),
     botaoRelatorio(
@@ -99,6 +103,9 @@ export function show() {
   );
   if (C.isAdmin)
     hb.append(
+      U.mkBtn("🗂️ Prévias de um colégio", "btn-sm", () =>
+        import("./previas-lote.js").then(m => m.abrirPreviasLote(C)).catch(e => C.handleErr(e))
+      ),
       U.mkBtn("Importar planilha", "btn-sm", () =>
         import("./repasse.js").then(m => (m.init(C), m.importarFormatura())).catch(e => C.handleErr(e))
       ),
@@ -153,9 +160,7 @@ export function show() {
 // "🆘 Ajuda de vendas" no aluno da Venda Antecipada (sem telefone no texto para o Claude)
 const ajuda = f =>
   U.mkBtn("🆘 Ajuda de vendas", "", () =>
-    import("./ajuda-vendas.js")
-      .then(m => m.abrirAjuda(C, { aluno: f.nome, colegio: f.instNome, modulo: "kit da formatura" }))
-      .catch(e => C.handleErr(e))
+    import("./ajuda-vendas.js").then(m => m.abrirAjuda(C, { card: "va", aluno: f.nome, colegio: f.instNome })).catch(e => C.handleErr(e))
   );
 // Venda Antecipada: os contratos (kits e parcelas), com o painel de cobrança
 function mostrarVA(v) {

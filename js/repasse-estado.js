@@ -1,5 +1,6 @@
 // PR: estado compartilhado pelas partes da tela (lista, cartão, janelas, lote) e as regras pequenas do contato.
 // As outras partes leem o estado daqui (as variáveis exportadas acompanham as mudanças) e mudam pelas funções "mudar...".
+import { comAlteracao } from "./alteracoes.js";
 import * as U from "./util.js";
 export let C, FS, db, col;
 export let tab = "hoje",
@@ -37,9 +38,9 @@ export function iniciar(ctx) {
     P: {
       get: () =>
         tipoPR === "paspatur"
-          ? Object.assign({}, ctx0.P, limpo(ctx0.P.paspatur))
+          ? Object.assign({}, ctx0.P, SEM_PRECO, limpo(ctx0.P.paspatur))
           : tipoPR === "formatura"
-            ? Object.assign({}, ctx0.P, limpo(ctx0.P.formatura))
+            ? Object.assign({}, ctx0.P, SEM_PRECO, limpo(ctx0.P.formatura))
             : ctx0.P
     }
   });
@@ -54,6 +55,20 @@ export function iniciar(ctx) {
   } catch (_) {}
 }
 // preços do Paspatur: só os preenchidos substituem os do PR
+// Paspatur e Formatura têm preços próprios: o que estiver em branco fica em branco (nunca usa o preço do PR)
+export const CAMPOS_PRECO = ["lfPix", "lfCartao", "kitPreco", "kitPromo", "kitCartao", "kitFinal"];
+const SEM_PRECO = Object.fromEntries(CAMPOS_PRECO.map(k => [k, 0]));
+// aviso na tela: preço da aba ainda não cadastrado em Ajustes
+export function precoFaltando() {
+  if (tipoPR === "pr") return "";
+  const P = C.P;
+  const lf = seg === "lf";
+  const falta = lf ? !P.lfPix : !(P.kitPromo || P.kitPreco);
+  const nome = tipoPR === "paspatur" ? "do Paspatur" : "da Formatura";
+  return falta
+    ? `⚠️ Preço ${nome} (${lf ? "Linha de Frente" : "Repasse"}) em branco: o Adriano cadastra em Ajustes. As mensagens vão sair com [valor do kit].`
+    : "";
+}
 const limpo = o => Object.fromEntries(Object.entries(o || {}).filter(([, v]) => v !== "" && v != null && v !== 0));
 // Assumir o contato: quem não é admin só assume o que está sem responsável (ou já é seu)
 export const assumir = it => (!C.isAdmin && it.respEmail && it.respEmail !== C.email ? {} : { resp: C.me, respEmail: C.email || "" });
@@ -165,6 +180,7 @@ export async function save(it, patch, msg, o = {}) {
   }
   try {
     patch.atualizadoEm = new Date().toISOString();
+    comAlteracao(it, patch, C.me);
     await FS.updateDoc(FS.doc(db, colNome(), it.id), patch);
     Object.assign(it, patch);
     if (tab === "buscar") tela.renderList();

@@ -47,7 +47,8 @@ export function ligarAjustes(ctx, o) {
     ["pAval", "linkAvaliacao", "texto"],
     ["pFeriados", "feriadosExtras", "texto"],
     ["pDrive", "drivePrevias", "texto"],
-    ["pDriveChave", "driveChave", "texto"]
+    ["pDriveChave", "driveChave", "texto"],
+    ["pDriveCliente", "driveCliente", "texto"]
   ];
   // Preços do Paspatur (Etapa 4): config/app → paspatur = { lfPix, lfCartao, kitPreco, kitPromo, kitCartao, kitFinal }
   const PASPATUR = [
@@ -105,6 +106,8 @@ export function ligarAjustes(ctx, o) {
     if (ctx.isAdmin) mostrarErros();
     $("pVerComo").hidden = !ctx.isAdmin;
     $("pBackup").hidden = !ctx.isAdmin;
+    $("pAjuda").hidden = !ctx.isAdmin;
+    $("pLimpar").hidden = !ctx.isAdmin;
     secaoMeusNumeros(ctx, $("pMeusNum"));
     secaoNesteCelular(ctx, $("pNesteCel"));
     $("sheetPrices").hidden = false;
@@ -214,6 +217,8 @@ export function ligarAjustes(ctx, o) {
       ctx.handleErr(err);
     }
   });
+  $("pAjuda").onclick = () => import("./ajuda-vendas.js").then(m => m.editarRespostas(ctx, "pr")).catch(e => ctx.handleErr(e));
+  $("pLimpar").onclick = () => import("./limpar-dados.js").then(m => m.abrirLimpeza(ctx)).catch(e => ctx.handleErr(e));
   $("pBackup").onclick = async () => {
     const t = $("pBackupTxt");
     t.hidden = false;

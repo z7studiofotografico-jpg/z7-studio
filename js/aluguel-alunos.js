@@ -344,7 +344,20 @@ function card(a) {
   const act = el("div", "actions");
   act.append(
     U.mkBtn("🛍️ Produtos", "", () => produtos(a)),
-    U.mkBtn("Editar", "", () => form(a))
+    U.mkBtn("Editar", "", () => form(a)),
+    U.mkBtn("🆘 Ajuda de vendas", "", () =>
+      import("./ajuda-vendas.js")
+        .then(m =>
+          m.abrirAjuda(C, {
+            card: "aluguel",
+            aluno: a.nome,
+            colegio: a.instNome,
+            contato: a.responsavel,
+            precoModulo: a.valor ? brl(a.valor) : ""
+          })
+        )
+        .catch(e => C.handleErr(e))
+    )
   );
   if (a.tel && (st === "Pronto para retirada" || at))
     act.append(

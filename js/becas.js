@@ -319,6 +319,13 @@ function card(x) {
     .join("\n");
   if (notas) e.append(el("p", "notes", notas));
   const act = el("div", "actions");
+  act.append(
+    U.mkBtn("🆘 Ajuda de vendas", "", () =>
+      import("./ajuda-vendas.js")
+        .then(m => m.abrirAjuda(C, { card: "aluguel", contato: x.cliente, precoModulo: x.valor ? brl(x.valor) : "" }))
+        .catch(e => C.handleErr(e))
+    )
+  );
   if (x.status === "reservado") {
     act.append(U.mkBtn("📦 Retirou", "btn-ok", () => salvar(x, { status: "retirado", retiradoEm: U.todayStr() }, "Marcado como retirado")));
     if (x.tel)

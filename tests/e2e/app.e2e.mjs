@@ -2662,6 +2662,11 @@ await cenario("Formaturas · abas Linha de Frente / Repasse / Venda Antecipada, 
     "Linha de Frente: o mesmo fluxo do PR (separar alunos)"
   );
   ok(!(await pg.locator("#viewFormaturas #rSegs").isVisible()), "Linha de Frente: sem as abas do PR dentro da Formatura");
+  ok(
+    /Preço da Formatura \(Linha de Frente\) em branco/.test(await pg.textContent("#viewFormaturas")),
+    "preço da Formatura em branco: avisa (não usa o preço do PR)"
+  );
+  ok(await pg.getByRole("button", { name: "🖼️ Prévia e fotos" }).isVisible(), "Formatura tem o botão de prévia e fotos");
   await pg.locator("#viewFormaturas .chip", { hasText: "Caídos" }).first().click();
   await calmo(pg);
   ok(/Caio Caido/.test(await pg.textContent("#viewFormaturas")), "aba Caídos mostra o aluno caído");
@@ -2807,14 +2812,16 @@ await cenario("Ajuda de vendas (respostas prontas e texto para o Claude sem tele
   await pg.locator("article", { hasText: "Maria" }).first().getByRole("button", { name: "🆘 Ajuda de vendas" }).click();
   const sh = pg.locator(".sheet").last();
   await sh.getByRole("button", { name: "“Está caro”" }).click();
+  await sh.getByRole("button", { name: "Prévia" }).click();
   ok(/Olá, Rosa!.*Maria/s.test(await sh.locator("textarea").inputValue()), "resposta pronta com o nome do contato e do aluno");
-  await sh.getByRole("button", { name: "🤖 Copiar para perguntar ao Claude" }).click();
+  await sh.getByRole("button", { name: "🤖 Perguntar ao Claude (grátis)" }).click();
   await calmo(pg);
   const clip = await pg.evaluate(() => navigator.clipboard.readText().catch(() => ""));
   ok(
     /COLE AQUI A DÚVIDA DO CLIENTE/.test(clip) && /Aluno\(a\): Maria/.test(clip) && !/988887777|Silva|Rosa/.test(clip),
     "texto para o Claude: regras e dúvida, sem telefone, sobrenome nem contato"
   );
+  ok(/claude\.ai/.test(await pg.evaluate(() => window.__aberto || "")), "abre o Claude gratuito para colar");
   ok(!erros.length, "sem erros no console: " + erros.join(" | "));
 });
 await cenario("Convite: criar a senha dentro do app", async () => {

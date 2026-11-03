@@ -27,7 +27,9 @@ export const COLECOES = [
   "exclusoes",
   "importacoes",
   "contratos",
-  "respostas"
+  "respostas",
+  "paspatur",
+  "formaturaAlunos"
 ];
 // C = contexto do app (FS, db); aoAndar(texto) mostra o andamento
 export async function baixarCopia(C, aoAndar = () => {}) {

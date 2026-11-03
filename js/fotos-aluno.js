@@ -7,10 +7,43 @@ import { openMockup } from "./mockup.js";
 
 let drive = null,
   chaveUsada = "";
+// Pasta fechada: cada pessoa entra com a conta Google dela (Google Identity Services); o token vale ~1 hora
+let token = null;
+function carregarGsi() {
+  if (window.google && window.google.accounts && window.google.accounts.oauth2) return Promise.resolve();
+  return new Promise((res, rej) => {
+    const s = document.createElement("script");
+    s.src = "https://accounts.google.com/gsi/client";
+    s.onload = res;
+    s.onerror = () => rej(new Error("Não consegui abrir o login do Google. Verifique a internet."));
+    document.head.append(s);
+  });
+}
+export function tokenGoogle(cliente, email) {
+  if (token && token.ate > Date.now() + 60000) return Promise.resolve(token.v);
+  return carregarGsi().then(
+    () =>
+      new Promise((res, rej) => {
+        const tc = window.google.accounts.oauth2.initTokenClient({
+          client_id: cliente,
+          scope: "https://www.googleapis.com/auth/drive.readonly",
+          hint: email || "",
+          callback: r => {
+            if (r.error || !r.access_token) return rej(new Error("Entrada no Google cancelada ou recusada."));
+            token = { v: r.access_token, ate: Date.now() + (Number(r.expires_in) || 3600) * 1000 };
+            res(token.v);
+          },
+          error_callback: () => rej(new Error("Entrada no Google cancelada."))
+        });
+        tc.requestAccessToken({ prompt: "" });
+      })
+  );
+}
 function abrirDrive(C) {
-  const k = C.P.driveChave || ((self.Z7_CONFIG || {}).firebase || {}).apiKey || "";
+  const cliente = C.P.driveCliente || "";
+  const k = cliente ? "oauth:" + cliente : C.P.driveChave || ((self.Z7_CONFIG || {}).firebase || {}).apiKey || "";
   if (!drive || chaveUsada !== k) {
-    drive = criarDrive(k, (u, o) => fetch(u, o));
+    drive = criarDrive(cliente ? () => tokenGoogle(cliente, C.email) : k, (u, o) => fetch(u, o));
     chaveUsada = k;
   }
   return drive;

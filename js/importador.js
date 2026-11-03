@@ -257,25 +257,48 @@ export async function desfazer(C, id) {
     ))
   )
     return false;
-  // PR: tira também os telefones desses alunos do índice "fones" (senão o app acharia "repetidos" que não existem)
-  let tirarFone = null;
-  if (x.col === "repasse") {
-    const { entradasFones } = await import("./pedidos.js");
-    tirarFone = async (b, id) => {
-      const d = await FS.getDoc(FS.doc(db, "repasse", id));
-      if (d.exists())
-        entradasFones(id, d.data()).forEach(([t]) =>
-          b.set(FS.doc(db, "fones", t), { alunos: { [id]: FS.deleteField() } }, { merge: true })
-        );
-    };
-  }
+  // PR: tira também os telefones desses alunos do índice "fones" (senão o app acharia "repetidos" que não existem);
+  // PR, Paspatur e Formatura: a contagem de alunos por colégio e ano (lista de escolas) diminui junto
+  const META = { repasse: "repasse_meta", paspatur: "paspatur_meta", formaturaAlunos: "formatura_meta" }[x.col];
+  const { entradasFones } = x.col === "repasse" ? await import("./pedidos.js") : {};
+  const menos = { escolas: {}, anos: {}, escolasAno: {} };
+  const soma1 = (o, k) => k && (o[k] = (o[k] || 0) + 1);
   for (let i = 0; i < x.ids.length; i += 200) {
     const b = FS.writeBatch(db);
-    for (const d of x.ids.slice(i, i + 200)) {
-      if (tirarFone) await tirarFone(b, d);
-      b.delete(FS.doc(db, x.col, d));
+    for (const id0 of x.ids.slice(i, i + 200)) {
+      if (META) {
+        const d = await FS.getDoc(FS.doc(db, x.col, id0));
+        if (d.exists()) {
+          const v = d.data();
+          if (entradasFones)
+            entradasFones(id0, v).forEach(([t]) => b.set(FS.doc(db, "fones", t), { alunos: { [id0]: FS.deleteField() } }, { merge: true }));
+          soma1(menos.escolas, v.escola);
+          soma1(menos.anos, v.ano ? String(v.ano) : "");
+          soma1(menos.escolasAno, v.escola && v.ano ? v.escola + "|" + v.ano : "");
+        }
+      }
+      b.delete(FS.doc(db, x.col, id0));
     }
     await b.commit();
+  }
+  if (META) {
+    const m = (await FS.getDoc(FS.doc(db, "config", META))).data() || {};
+    const tira = (o, dm) => {
+      const r = Object.assign({}, o || {});
+      Object.entries(dm).forEach(([k, n]) => {
+        r[k] = (Number(r[k]) || 0) - n;
+        if (r[k] <= 0) delete r[k];
+      });
+      return r;
+    };
+    await FS.setDoc(
+      FS.doc(db, "config", META),
+      Object.assign({}, m, {
+        escolas: tira(m.escolas, menos.escolas),
+        anos: tira(m.anos, menos.anos),
+        escolasAno: tira(m.escolasAno, menos.escolasAno)
+      })
+    );
   }
   await FS.updateDoc(FS.doc(db, "importacoes", id), { status: "desfeita", desfeitaEm: new Date().toISOString(), desfeitaPor: C.me || "" });
   U.toast("Importação desfeita");
