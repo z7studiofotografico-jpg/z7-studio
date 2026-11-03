@@ -1,6 +1,15 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { textoParaClaude, precoCliente, preencherAjuda, listaPrecos, situacoesDo, CARDS } from "../js/ajuda-vendas.js";
+import {
+  textoParaClaude,
+  urlClaude,
+  limparDuvida,
+  precoCliente,
+  preencherAjuda,
+  listaPrecos,
+  situacoesDo,
+  CARDS
+} from "../js/ajuda-vendas.js";
 import { metaSemAnos } from "../js/limpar-dados.js";
 import { comAlteracao } from "../js/alteracoes.js";
 
@@ -63,4 +72,14 @@ test("Histórico de alterações: quem mudou o quê (e a etapa de/para)", () => 
   assert.equal(p.alteracoes[0].de, "SEPARADO");
   assert.equal(p.alteracoes[0].por, "Ana");
   assert.equal(comAlteracao({}, { atendendo: {} }, "Ana").alteracoes, undefined);
+});
+
+test("Perguntar ao Claude: a dúvida vai junto, sem telefone nem e-mail, e o link abre com o texto na caixa", () => {
+  assert.equal(limparDuvida("me chama no (21) 98888-7777 ou ana@x.com"), "me chama no [número] ou [e-mail]");
+  const t = textoParaClaude({ card: "pr", aluno: "Ana", duvida: "Dá para parcelar?" });
+  assert.match(t, /DÚVIDA DO CLIENTE:\nDá para parcelar\?/);
+  assert.doesNotMatch(t, /COLE AQUI/);
+  const u = urlClaude(t);
+  assert.match(u, /^https:\/\/claude\.ai\/new\?q=/);
+  assert.equal(decodeURIComponent(u.split("?q=")[1]), t);
 });

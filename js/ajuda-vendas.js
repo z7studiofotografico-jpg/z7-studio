@@ -22,6 +22,15 @@ import { carregarCatalogo } from "./estoque.js";
 export const FORMAS_TXT = "Pix, cartão de crédito (pode parcelar), link de pagamento e boleto";
 const PIX = "21998817771";
 export const CLAUDE_URL = "https://claude.ai/new";
+// o Claude abre com o texto já escrito na caixa (?q=); a pessoa só confere e envia
+export const urlClaude = t => CLAUDE_URL + "?q=" + encodeURIComponent(t);
+// a dúvida colada pelo vendedor perde telefones, e-mails e CPF antes de ir para o Claude
+export const limparDuvida = t =>
+  String(t || "")
+    .replace(/[\w.+-]+@[\w-]+\.[\w.]+/g, "[e-mail]")
+    .replace(/\+?\(?\d(?:[\s().-]*\d){7,}/g, "[número]")
+    .trim()
+    .slice(0, 1500);
 
 const S = {
   preco: ["preco", "Preço", "{oi} O valor de {produto} é {preco}. Posso te mandar a prévia para você ver como fica?"],
@@ -165,7 +174,17 @@ export function situacoesDo(card, guardado = {}) {
   ];
 }
 // texto para colar no Claude (fora do app): sem telefone e sem dados pessoais além do primeiro nome
-export function textoParaClaude({ card = "pr", aluno = "", colegio = "", cat = [], precoModulo = "", guardado = {} }) {
+export function textoParaClaude({
+  card = "pr",
+  aluno = "",
+  colegio = "",
+  cat = [],
+  precoModulo = "",
+  guardado = {},
+  duvida = "",
+  curto = false
+}) {
+  const d = limparDuvida(duvida);
   const c = cardDe(card);
   const precos = listaPrecos(cat, c.grupos);
   const respostas = situacoesDo(card, guardado)
@@ -188,14 +207,14 @@ export function textoParaClaude({ card = "pr", aluno = "", colegio = "", cat = [
     "",
     "FORMAS DE PAGAMENTO: " + FORMAS_TXT + ". Pix: " + PIX + ".",
     "",
-    ...(respostas.length ? ["RESPOSTAS QUE O ESTÚDIO JÁ USA (siga o mesmo tom):", ...respostas, ""] : []),
+    ...(respostas.length && !curto ? ["RESPOSTAS QUE O ESTÚDIO JÁ USA (siga o mesmo tom):", ...respostas, ""] : []),
     "CLIENTE:",
     ...(aluno ? [`- Aluno(a): ${U.first(title(aluno))}`] : []),
     ...(colegio ? [`- Colégio: ${title(colegio)}`] : []),
     "",
-    "COLE AQUI A DÚVIDA DO CLIENTE:",
-    "",
-    ""
+    ...(d
+      ? ["DÚVIDA DO CLIENTE:", d, "", "Sugira a resposta que o vendedor pode mandar no WhatsApp."]
+      : ["COLE AQUI A DÚVIDA DO CLIENTE:", "", ""])
   ].join("\n");
 }
 export function preencherAjuda(t, v) {
@@ -270,21 +289,47 @@ export async function abrirAjuda(C, o = {}) {
         if (!txt.value.trim()) return U.toast("Escolha uma situação primeiro.");
         U.toast((await copiar(txt.value)) ? "Resposta copiada. Cole no WhatsApp." : "Não consegui copiar: selecione o texto e copie.");
       }),
-      U.mkBtn("🤖 Perguntar ao Claude (grátis)", "", async () => {
-        const t = textoParaClaude({ card, aluno: o.aluno, colegio: o.colegio, cat, precoModulo: o.precoModulo, guardado: guardadoDe(C) });
-        const ok = await copiar(t);
-        U.toast(
-          ok ? "Copiado! No Claude, cole o texto (segure e “Colar”) e escreva a dúvida do cliente no fim." : "Não consegui copiar agora."
-        );
-        if (ok) window.open(CLAUDE_URL, "_blank", "noopener");
+      U.mkBtn("🤖 Perguntar ao Claude (grátis)", "", () => {
+        if (!duv.value.trim()) {
+          duv.focus();
+          return U.toast("Cole primeiro a mensagem do cliente no campo “Dúvida do cliente”.");
+        }
+        const t = textoParaClaude({
+          card,
+          aluno: o.aluno,
+          colegio: o.colegio,
+          cat,
+          precoModulo: o.precoModulo,
+          guardado: guardadoDe(C),
+          duvida: duv.value
+        });
+        // abre já (no celular, abrir depois de esperar é bloqueado) com o texto pronto na caixa do Claude;
+        // e também copia, caso o Claude abra sem o texto (aí é só colar)
+        // link muito grande (muitas respostas cadastradas): vai sem a lista de respostas, que é só exemplo de tom
+        let url = urlClaude(t);
+        if (url.length > 7000)
+          url = urlClaude(
+            textoParaClaude({ card, aluno: o.aluno, colegio: o.colegio, cat, precoModulo: o.precoModulo, duvida: duv.value, curto: true })
+          );
+        window.open(url, "_blank", "noopener");
+        copiar(t).catch(() => {});
+        U.toast("Abrindo o Claude com a pergunta pronta. Se a caixa vier vazia, segure e “Colar”.");
       })
     );
-    p.append(acoes);
+    const duv = el("textarea");
+    duv.rows = 3;
+    duv.placeholder = "Cole aqui a mensagem do cliente (ex.: “dá para pagar em 3 vezes?”)";
+    duv.id = "ajvDuvida";
+    const fd = el("div", "field");
+    const ld = el("label", null, "Dúvida do cliente (para perguntar ao Claude)");
+    ld.htmlFor = duv.id;
+    fd.append(ld, duv);
+    p.append(fd, acoes);
     p.append(
       el(
         "p",
         "hint",
-        "“Perguntar ao Claude” copia um texto sem telefone nem dados pessoais (só o primeiro nome, o colégio e os preços) e abre o Claude gratuito. Lá você cola, escreve a dúvida do cliente e ajusta a resposta antes de mandar. O app não envia nada."
+        "“Perguntar ao Claude” abre o Claude gratuito com a pergunta já escrita: as regras do estúdio, os preços, o primeiro nome do aluno, o colégio e a dúvida do cliente (telefones e e-mails da mensagem são tirados). Lá é só enviar, ler a sugestão e ajustar antes de mandar ao cliente. O app não envia nada sozinho."
       )
     );
     const a = el("div", "panel-actions");

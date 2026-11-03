@@ -2813,15 +2813,20 @@ await cenario("Ajuda de vendas (respostas prontas e texto para o Claude sem tele
   const sh = pg.locator(".sheet").last();
   await sh.getByRole("button", { name: "“Está caro”" }).click();
   await sh.getByRole("button", { name: "Prévia" }).click();
-  ok(/Olá, Rosa!.*Maria/s.test(await sh.locator("textarea").inputValue()), "resposta pronta com o nome do contato e do aluno");
+  ok(/Olá, Rosa!.*Maria/s.test(await sh.getByLabel("Resposta (ajuste antes de copiar)").inputValue()), "resposta pronta com o nome do contato e do aluno");
+  await sh.getByLabel("Dúvida do cliente (para perguntar ao Claude)").fill("Dá para pagar em 3 vezes? Meu zap é 21 98888-7777");
   await sh.getByRole("button", { name: "🤖 Perguntar ao Claude (grátis)" }).click();
   await calmo(pg);
-  const clip = await pg.evaluate(() => navigator.clipboard.readText().catch(() => ""));
+  const aberto = await pg.evaluate(() => window.__aberto || "");
+  const q = decodeURIComponent((aberto.split("?q=")[1] || "").replace(/\+/g, " "));
+  ok(/^https:\/\/claude\.ai\/new\?q=/.test(aberto), "abre o Claude gratuito já com a pergunta na caixa");
   ok(
-    /COLE AQUI A DÚVIDA DO CLIENTE/.test(clip) && /Aluno\(a\): Maria/.test(clip) && !/988887777|Silva|Rosa/.test(clip),
-    "texto para o Claude: regras e dúvida, sem telefone, sobrenome nem contato"
+    /DÚVIDA DO CLIENTE:\nDá para pagar em 3 vezes\?/.test(q) && /Nunca invente preço/.test(q) && /Aluno\(a\): Maria/.test(q),
+    "a pergunta leva a dúvida do cliente, as regras e o primeiro nome"
   );
-  ok(/claude\.ai/.test(await pg.evaluate(() => window.__aberto || "")), "abre o Claude gratuito para colar");
+  ok(!/98888|988887777|Silva|Rosa/.test(q), "sem telefone (nem o que o cliente escreveu), sobrenome ou contato: " + q.slice(-200));
+  const clip = await pg.evaluate(() => navigator.clipboard.readText().catch(() => ""));
+  ok(/DÚVIDA DO CLIENTE/.test(clip), "também fica copiada (se o Claude abrir vazio, é só colar)");
   ok(!erros.length, "sem erros no console: " + erros.join(" | "));
 });
 await cenario("Equipe edita os dados do aluno e o Adriano vê quem editou", async () => {
