@@ -50,3 +50,12 @@ test("prévias em lote: quem já comprou fica de fora (pelo nome e pelo número)
   );
   assert.equal(pastasDeQuemComprou(pastas, app, true).size, 2);
 });
+
+test("prévias em lote: o motivo de cada foto que não saiu, com o que fazer", async () => {
+  const { motivoErro } = await import("../js/previas-lote.js");
+  assert.match(motivoErro({ name: "NotFoundError" }, "a.jpg", null, "11 - MARCELLA "), /termina com espaço ou ponto/);
+  assert.match(motivoErro({ name: "NotFoundError" }, "a.jpg"), /não encontrado no servidor/);
+  assert.match(motivoErro({ name: "NotReadableError" }, "a.jpg"), /não deixou ler/);
+  assert.match(motivoErro(new Event("error"), "a.jpg", 0), /vazio/);
+  assert.match(motivoErro(new Event("error"), "a.jpg", 500000), /não abre no navegador/);
+});

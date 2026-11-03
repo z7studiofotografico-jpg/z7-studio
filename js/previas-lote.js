@@ -112,13 +112,37 @@ async function gravar(pasta, nome, blob) {
     await gravar1(pasta, nome, blob);
   }
 }
-async function lerFoto(h) {
-  try {
-    return await reduzir(await h.getFile());
-  } catch (e) {
-    await espera(500);
-    return reduzir(await h.getFile());
+// O motivo de uma foto não ter saído, em palavras simples, com o que fazer
+export function motivoErro(e, nome = "", tamanho = null, pasta = "") {
+  const n = (e && e.name) || "";
+  if (/[ .]$/.test(nome) || /[ .]$/.test(pasta))
+    return "o nome da pasta ou do arquivo termina com espaço ou ponto: renomeie no servidor (tire o espaço/ponto do fim)";
+  if (n === "NotFoundError")
+    return "arquivo não encontrado no servidor (foi movido/renomeado ou a conexão com o servidor caiu): confira se ele abre no computador";
+  if (n === "NotReadableError")
+    return "o servidor não deixou ler (arquivo aberto em outro programa ou sem permissão): feche o arquivo e tente de novo";
+  if (n === "NotAllowedError" || n === "SecurityError") return "sem permissão para ler a pasta: escolha a pasta do colégio de novo";
+  if (n === "QuotaExceededError") return "sem espaço no disco onde as prévias são salvas";
+  if (tamanho === 0) return "arquivo vazio (0 KB): copie a foto de novo para o servidor";
+  if (tamanho > 60 * 1024 * 1024) return `arquivo grande demais (${Math.round(tamanho / 1048576)} MB): salve uma versão menor`;
+  if (tamanho != null)
+    return "a imagem não abre no navegador (arquivo com defeito ou formato diferente, ex.: CMYK, HEIC ou RAW com nome .jpg): abra e salve de novo como JPG";
+  return "não consegui ler: " + ((e && (e.message || e.name)) || "erro desconhecido");
+}
+// lê e reduz uma foto; se falhar, devolve { erro } com o motivo (tenta 2 vezes)
+async function lerFoto(h, pastaNome) {
+  let file = null,
+    ultimo = null;
+  for (let t = 0; t < 2; t++) {
+    try {
+      file = await h.getFile();
+      return { img: await reduzir(file) };
+    } catch (e) {
+      ultimo = e;
+      if (t === 0) await espera(600);
+    }
   }
+  return { erro: motivoErro(ultimo, h.name, file ? file.size : null, pastaNome) };
 }
 
 // o = { col: "repasse" | "paspatur" | "formaturaAlunos" } (a lista onde procurar quem já comprou)
@@ -176,37 +200,74 @@ export function abrirPreviasLote(C, o = {}) {
     errosBox.hidden = true;
     p.append(info, barra, errosBox, acoes);
     // Só os que deram erro: a lista (para conferir no servidor) e gerar de novo apenas esses alunos
-    function mostrarErros(lista, fazer, destinoNome) {
+    function mostrarErros(lista, fazer, destinoNome, resumoFotos) {
       errosBox.textContent = "";
       errosBox.hidden = !lista.length;
       if (!lista.length) return;
-      errosBox.append(
-        el("b", null, `⚠️ ${lista.length} aluno${lista.length > 1 ? "s" : ""} com erro (foto que não abriu no servidor):`),
-        ...lista.map(([a]) => el("div", null, "• " + (a.caminho.length ? a.caminho : [a.nome]).join(" / "))),
-        el("p", "hint", "As outras prévias já estão salvas. Confira essas pastas no servidor e gere de novo só elas:")
-      );
+      errosBox.append(el("b", null, `⚠️ ${lista.length} aluno${lista.length > 1 ? "s" : ""} com foto que não saiu:`));
+      lista.forEach(([a]) => {
+        const d = el("div", "prev-erro");
+        const total = Math.min(a.arquivos.length, MAX_FOTOS);
+        d.append(
+          el(
+            "div",
+            null,
+            `• ${(a.caminho.length ? a.caminho : [a.nome]).join(" / ")} — ${a.geradas || 0} de ${total} foto${total > 1 ? "s" : ""} gerada${
+              total > 1 ? "s" : ""
+            }`
+          )
+        );
+        // os motivos iguais aparecem uma vez só, com quantas fotos
+        const porMotivo = {};
+        (a.erros || []).forEach(x => (porMotivo[x.motivo] = (porMotivo[x.motivo] || []).concat(x.arquivo ? [x.arquivo] : [])));
+        Object.entries(porMotivo).forEach(([m, arqs]) =>
+          d.append(
+            el(
+              "small",
+              "hint",
+              `   ↳ ${arqs.length ? arqs.length + " foto" + (arqs.length > 1 ? "s" : "") + " (" + arqs.slice(0, 4).join(", ") + (arqs.length > 4 ? "…" : "") + "): " : ""}${m}`
+            )
+          )
+        );
+        errosBox.append(d);
+      });
+      errosBox.append(el("p", "hint", "As outras prévias já estão salvas. Resolva o motivo no servidor e gere de novo só esses:"));
       const de = U.mkBtn("🔁 Gerar de novo só esses", "btn-primary", async () => {
         de.disabled = true;
         const ainda = [];
         let ok = 0;
-        for (const [a, i] of lista) {
-          info.textContent = `Gerando de novo: ${a.nome}…`;
+        for (const [n, [a, i]] of lista.entries()) {
+          info.textContent = `Gerando de novo ${n + 1} de ${lista.length}: ${a.nome}…`;
           try {
             await fazer(a, i);
             ok++;
-          } catch (_) {
+          } catch (e) {
+            if (!(a.erros || []).length) a.erros = [{ arquivo: "", motivo: motivoErro(e) }];
             ainda.push([a, i]);
           }
         }
         info.textContent =
-          `${ok} prévia${ok === 1 ? "" : "s"} refeita${ok === 1 ? "" : "s"} em “${destinoNome}”.` +
-          (ainda.length ? "" : " Tudo certo agora ✅");
+          `Tentei de novo ${lista.length} aluno${lista.length > 1 ? "s" : ""}: ${ok} ficou completo${ok === 1 ? "" : "s"}` +
+          (ainda.length
+            ? `, ${ainda.length} continua${ainda.length > 1 ? "m" : ""} com erro (motivo abaixo). `
+            : `. Tudo certo agora ✅ `) +
+          (resumoFotos ? resumoFotos() : "") +
+          ` Prévias em “${destinoNome}”.`;
         de.disabled = false;
-        mostrarErros(ainda, fazer, destinoNome);
+        mostrarErros(ainda, fazer, destinoNome, resumoFotos);
       });
       const cp = U.mkBtn("📋 Copiar a lista", "", () =>
         navigator.clipboard
-          .writeText(lista.map(([a]) => (a.caminho.length ? a.caminho : [a.nome]).join(" / ")).join("\n"))
+          .writeText(
+            lista
+              .map(
+                ([a]) =>
+                  (a.caminho.length ? a.caminho : [a.nome]).join(" / ") +
+                  "\n" +
+                  (a.erros || []).map(x => `  - ${x.arquivo}: ${x.motivo}`).join("\n")
+              )
+              .join("\n")
+          )
           .then(() => U.toast("Lista copiada"))
           .catch(() => U.toast("Não consegui copiar"))
       );
@@ -257,21 +318,22 @@ export function abrirPreviasLote(C, o = {}) {
         barra.max = alunos.length;
         let feitos = 0;
         const falharam = [];
+        // conta das fotos: quantas havia na pasta e quantas saíram (por aluno e no total)
+        const conta = { total: 0, geradas: 0, acima: 0 };
+        alunos.forEach(a => {
+          conta.total += a.arquivos.length;
+          conta.acima += Math.max(0, a.arquivos.length - MAX_FOTOS);
+        });
         const fazer = async (a, i) => {
           const fotos = [];
-          let faltou = 0;
+          a.erros = [];
+          a.geradas = 0;
           for (const h of a.arquivos.slice(0, MAX_FOTOS)) {
-            try {
-              fotos.push(await lerFoto(h));
-            } catch (_) {
-              faltou++;
-            }
+            const r = await lerFoto(h, a.nome);
+            if (r.img) fotos.push(r.img);
+            else a.erros.push({ arquivo: h.name, motivo: r.erro });
           }
-          if (!fotos.length) throw new Error("nenhuma foto abriu");
-          // saiu com foto faltando: conta como erro (gera de novo depois, completo)
-          if (faltou) {
-            throw Object.assign(new Error("foto faltando"), { parcial: true });
-          }
+          if (!fotos.length) throw Object.assign(new Error("nenhuma foto abriu"), { semFoto: true });
           // no cabeçalho: o nome do aluno sem o código da pasta ("CEYMS 01 - FABIOLA" → "FABIOLA"), e o código ao lado do colégio
           const cod = (a.nome.match(/^([A-Z0-9]+\s*\d+)\s*-\s*/i) || [])[1] || "";
           const st = {
@@ -297,9 +359,18 @@ export function abrirPreviasLote(C, o = {}) {
           for (let pg = 0; pg < paginas; pg++) {
             const cv = document.createElement("canvas");
             desenharFolha(cv, st, pg);
-            await gravar(pasta, nomes[i] + (paginas > 1 ? ` - pagina ${pg + 1}` : "") + ".jpg", await jpg(cv));
+            try {
+              await gravar(pasta, nomes[i] + (paginas > 1 ? ` - pagina ${pg + 1}` : "") + ".jpg", await jpg(cv));
+            } catch (e) {
+              a.erros.push({ arquivo: "prévia (página " + (pg + 1) + ")", motivo: "não consegui salvar: " + motivoErro(e) });
+              throw e;
+            }
           }
+          a.geradas = fotos.length;
+          // saiu, mas com foto faltando: a prévia fica salva e o aluno entra na lista para gerar de novo completo
+          if (a.erros.length) throw Object.assign(new Error("foto faltando"), { parcial: true });
         };
+        const somarGeradas = () => (conta.geradas = alunos.reduce((t, a) => t + (a.geradas || 0), 0));
         // um aluno com problema (arquivo que sumiu, pasta do Drive ainda baixando) não para os outros
         for (const [i, a] of alunos.entries()) {
           if (cancelar) break;
@@ -309,6 +380,8 @@ export function abrirPreviasLote(C, o = {}) {
             feitos++;
           } catch (e) {
             console.warn("[Z7] prévia de", a.nome, e);
+            if (e && e.parcial) feitos++;
+            else if (!(a.erros || []).length) a.erros = [{ arquivo: "", motivo: motivoErro(e) }];
             falharam.push([a, i]);
           }
           barra.value = i + 1;
@@ -320,18 +393,25 @@ export function abrirPreviasLote(C, o = {}) {
             info.textContent = `Tentando de novo: ${a.nome}…`;
             try {
               await fazer(a, i);
-              feitos++;
-            } catch (_) {
+            } catch (e) {
+              if (!(a.erros || []).length) a.erros = [{ arquivo: "", motivo: motivoErro(e) }];
               falharam.push([a, i]);
             }
           }
         }
-        if (falharam.length) mostrarErros(falharam, fazer, pasta.name);
+        somarGeradas();
+        const resumoFotos = () =>
+          `Fotos na pasta: ${conta.total} · fotos geradas: ${somarGeradas()} · não geradas: ${conta.total - conta.geradas}` +
+          (conta.acima ? ` (${conta.acima} passaram do limite de ${MAX_FOTOS} por aluno)` : "") +
+          ".";
+        if (falharam.length) mostrarErros(falharam, fazer, pasta.name, resumoFotos);
         info.textContent =
           (cancelar ? `Parado. ` : "Pronto! ") +
           `${feitos} prévia${feitos === 1 ? "" : "s"} salva${feitos === 1 ? "" : "s"} em “${pasta.name}”.` +
           resumoFora +
-          (falharam.length ? ` ⚠️ ${falharam.length} com erro (lista abaixo).` : "") +
+          " " +
+          resumoFotos() +
+          (falharam.length ? ` ⚠️ ${falharam.length} aluno${falharam.length > 1 ? "s" : ""} com foto que não saiu (motivo abaixo).` : "") +
           " Agora arraste essa pasta para o Google Drive.";
       } catch (e) {
         if (e && e.name === "AbortError") info.textContent = "Nenhuma pasta escolhida.";

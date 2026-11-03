@@ -2479,7 +2479,13 @@ await cenario("Prévias de um colégio (lote, no computador)", async () => {
   );
   const fim = await pg.locator(".sheet:last-of-type").textContent();
   ok(/1 de 3 ficaram de fora/.test(fim), "avisa quantos ficaram de fora");
-  ok(/1 aluno com erro/.test(fim) && /03 - PEDRO/.test(fim), "arquivo que não abre: lista qual aluno deu erro e continua os outros");
+  ok(
+    /1 aluno com foto que não saiu/.test(fim) &&
+      /03 - PEDRO — 0 de 1 foto gerada/.test(fim) &&
+      /arquivo não encontrado no servidor/.test(fim),
+    "arquivo que não abre: lista o aluno, quantas fotos saíram e o motivo: " + fim.slice(-400)
+  );
+  ok(/Fotos na pasta: 2 · fotos geradas: 1 · não geradas: 1/.test(fim), "conta das fotos: na pasta × geradas × não geradas");
   // o servidor voltou: gera de novo só quem deu erro
   await pg.evaluate(() => (window.__falha = false));
   await pg.getByRole("button", { name: "🔁 Gerar de novo só esses" }).click();
@@ -2488,6 +2494,11 @@ await cenario("Prévias de um colégio (lote, no computador)", async () => {
   });
   const g2 = Object.keys(await pg.evaluate(() => window.__gravados));
   ok(g2.includes(P + "03 - PEDRO.jpg") && g2.length === 4, "gera de novo só o que deu erro: " + g2.join(" | "));
+  ok(
+    /Tentei de novo 1 aluno: 1 ficou completo/.test(await pg.locator(".sheet:last-of-type").textContent()) &&
+      /fotos geradas: 2 · não geradas: 0/.test(await pg.locator(".sheet:last-of-type").textContent()),
+    "depois de gerar de novo: diz o que conseguiu e a conta atualizada"
+  );
   ok(!erros.length, "sem erros" + (erros.length ? ": " + erros.join(" | ") : ""));
 });
 await cenario("Fotos do aluno direto do Google Drive", async () => {
