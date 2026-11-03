@@ -65,3 +65,27 @@ test("prévias em lote: nomes que o Windows não abre", async () => {
   assert.match(motivoErro({ name: "NotFoundError" }, "a?.jpg"), /caractere que o Windows não aceita/);
   assert.match(motivoErro({ name: "NotFoundError" }, "a.jpg", null, "KAUÁ"), /acento gravado em outro formato/);
 });
+
+test("prévias: a pasta aberta pela janela comum vira a mesma estrutura (pastas e fotos)", async () => {
+  const { pastaDeArquivos, pastasComFotos } = await import("../js/previas-lote.js");
+  const f = (cam, name) => ({ name, webkitRelativePath: cam + "/" + name });
+  const raiz = pastaDeArquivos([
+    f("LEGACY/00 - Ana Maria  da Silva.", "IMG 1.JPG"),
+    f("LEGACY/00 - Ana Maria  da Silva.", "IMG 2.jpg"),
+    f("LEGACY/Beto", "x.png")
+  ]);
+  const alunos = await pastasComFotos(raiz);
+  assert.equal(raiz.name, "LEGACY");
+  assert.deepEqual(
+    alunos.map(a => [a.nome, a.arquivos.map(x => x.name)]),
+    [
+      ["00 - Ana Maria  da Silva.", ["IMG 1.JPG", "IMG 2.jpg"]],
+      ["Beto", ["x.png"]]
+    ]
+  );
+});
+
+test("prévias livres: o nome da pasta fica exatamente como está", async () => {
+  const { nomesDeSaida } = await import("../js/previas-lote.js");
+  assert.deepEqual(nomesDeSaida([{ nome: "00 - Ana  Maria (IRMÃ DO 38).", caminho: ["x"] }], true), ["00 - Ana  Maria (IRMÃ DO 38)."]);
+});

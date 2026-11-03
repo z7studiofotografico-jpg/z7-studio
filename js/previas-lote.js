@@ -85,11 +85,13 @@ export async function pastasComFotos(dir, caminho = []) {
   return out;
 }
 // nome do arquivo de saída: o da pasta do aluno (com a pasta de cima, se dois alunos tiverem o mesmo nome)
-export function nomesDeSaida(alunos) {
+// exato = true (importação livre): o nome fica como está (só sai o que o Windows não aceita em nome de arquivo)
+export function nomesDeSaida(alunos, exato = false) {
   const vistos = {};
+  const lp = exato ? n => String(n || "").replace(/[\\/:*?"<>|]+/g, "_") || "pasta" : limpo;
   return alunos.map(a => {
-    let n = limpo(a.nome);
-    if (vistos[n]) n = limpo(a.caminho.slice(-2).join(" - "));
+    let n = lp(a.nome);
+    if (vistos[n]) n = lp(a.caminho.slice(-2).join(" - "));
     while (vistos[n]) n += " (2)";
     vistos[n] = 1;
     return n;
@@ -148,15 +150,54 @@ async function lerFoto(h, pastaNome) {
   return { erro: motivoErro(ultimo, h.name, file ? file.size : null, pastaNome) };
 }
 
+// Escolher a pasta pela janela comum do navegador (outro caminho de leitura): serve quando o jeito normal dá
+// "arquivo não encontrado" mesmo com a foto abrindo no computador. Monta a mesma estrutura de pastas.
+export function pastaDeArquivos(files, nome = "") {
+  const raiz = { kind: "directory", name: nome, filhos: new Map(), arqs: [] };
+  for (const f of files) {
+    const partes = String(f.webkitRelativePath || f.name).split("/");
+    let d = raiz;
+    if (!raiz.name && partes.length > 1) raiz.name = partes[0];
+    for (const pt of partes.slice(1, -1)) {
+      if (!d.filhos.has(pt)) d.filhos.set(pt, { kind: "directory", name: pt, filhos: new Map(), arqs: [] });
+      d = d.filhos.get(pt);
+    }
+    d.arqs.push({ kind: "file", name: f.name, getFile: async () => f });
+  }
+  const pronto = d =>
+    Object.assign(d, {
+      async *values() {
+        yield* d.arqs;
+        for (const x of d.filhos.values()) yield pronto(x);
+      }
+    });
+  return pronto(raiz);
+}
+export function escolherPastaComum() {
+  return new Promise((res, rej) => {
+    const i = document.createElement("input");
+    i.type = "file";
+    i.webkitdirectory = true;
+    i.multiple = true;
+    i.onchange = () =>
+      i.files.length ? res(pastaDeArquivos([...i.files])) : rej(Object.assign(new Error("nenhuma"), { name: "AbortError" }));
+    i.addEventListener("cancel", () => rej(Object.assign(new Error("nenhuma"), { name: "AbortError" })));
+    i.click();
+  });
+}
 // o = { col: "repasse" | "paspatur" | "formaturaAlunos" } (a lista onde procurar quem já comprou)
+//     livre: true (Agendamento → Importação): qualquer pasta; nomes dos alunos e das fotos ficam exatamente como estão
 export function abrirPreviasLote(C, o = {}) {
-  const colNome = o.col || "repasse";
-  sheet("🖼️ Gerar prévias de um colégio", (p, close) => {
+  const colNome = o.col || "repasse",
+    livre = !!o.livre;
+  sheet(livre ? "📥 Importação · prévias de uma pasta" : "🖼️ Gerar prévias de um colégio", (p, close) => {
     p.append(
       el(
         "p",
         "hint",
-        "No computador: escolha a pasta do colégio no servidor (com uma pasta por aluno) e depois a pasta onde salvar. Para cada aluno sai uma imagem leve (~200 KB) com todas as fotos dele, a marca d'água e o nome. Depois, arraste a pasta de prévias para o Google Drive e compartilhe com o representante como Leitor."
+        livre
+          ? "Qualquer pasta (uma pasta por pessoa, com as fotos dentro). Entram todos, e os nomes das pastas e das fotos ficam exatamente como estão. Para cada pessoa sai uma imagem leve com as fotos, a marca d'água e o nome da pasta."
+          : "No computador: escolha a pasta do colégio no servidor (com uma pasta por aluno) e depois a pasta onde salvar. Para cada aluno sai uma imagem leve (~200 KB) com todas as fotos dele, a marca d'água e o nome. Depois, arraste a pasta de prévias para o Google Drive e compartilhe com o representante como Leitor."
       )
     );
     if (!window.showDirectoryPicker) {
@@ -175,14 +216,15 @@ export function abrirPreviasLote(C, o = {}) {
     // só quem vai ser trabalhado: quem já comprou fica de fora (o sistema fica mais leve)
     const soTrabalho = el("input");
     soTrabalho.type = "checkbox";
-    soTrabalho.checked = true;
+    soTrabalho.checked = !livre;
     const lTrab = el("label", "chk");
     lTrab.append(soTrabalho, document.createTextNode(" Pular quem já comprou (fica só no Dashboard)"));
     const semTel = el("input");
     semTel.type = "checkbox";
     const lSem = el("label", "chk");
     lSem.append(semTel, document.createTextNode(" Pular também quem está sem telefone"));
-    p.append(lTrab, lSem);
+    if (!livre) p.append(lTrab, lSem);
+    else separadas.parentNode.lastChild.textContent = " Também salvar as fotos separadas (com o mesmo nome do arquivo original)";
     const info = el("p", null, "");
     const barra = el("progress");
     barra.max = 1;
@@ -197,8 +239,12 @@ export function abrirPreviasLote(C, o = {}) {
     const fechar = el("button", "btn", "Fechar");
     fechar.type = "button";
     fechar.onclick = close;
+    // outro jeito de abrir a pasta (janela comum do navegador): quando o normal diz "arquivo não encontrado"
+    const irComum = el("button", "btn", "Abrir a pasta pela janela comum");
+    irComum.type = "button";
+    irComum.title = "Use se aparecer erro de arquivo não encontrado com as fotos abrindo no computador";
     const acoes = el("div", "panel-actions");
-    acoes.append(fechar, parar, ir);
+    acoes.append(fechar, parar, irComum, ir);
     const errosBox = el("div", "notes");
     errosBox.hidden = true;
     p.append(info, barra, errosBox, acoes);
@@ -235,7 +281,8 @@ export function abrirPreviasLote(C, o = {}) {
         // a pasta do aluno escolhida direto (caminho curto e acesso novo): resolve quando o lote não consegue abrir
         const esc = U.mkBtn("📂 Escolher a pasta deste aluno", "btn-sm", async () => {
           try {
-            const dir = await window.showDirectoryPicker({ id: "z7-aluno", mode: "read" });
+            // janela comum do navegador: outro caminho de leitura (resolve o "não encontrado" na maioria das vezes)
+            const dir = await escolherPastaComum();
             const achadas = (await pastasComFotos(dir)).flatMap(x => x.arquivos);
             if (!achadas.length) return U.toast("Não achei fotos nessa pasta.");
             a.arquivos = achadas.sort((x, y) => x.name.localeCompare(y.name, "pt-BR", { numeric: true }));
@@ -309,16 +356,17 @@ export function abrirPreviasLote(C, o = {}) {
     }
     let cancelar = false;
     parar.onclick = () => (cancelar = true);
-    ir.onclick = async () => {
+    irComum.onclick = () => ir.onclick(null, true);
+    ir.onclick = async (_ev, comum) => {
       let origem, destino;
       try {
-        origem = await window.showDirectoryPicker({ id: "z7-fotos", mode: "read" });
+        origem = comum ? await escolherPastaComum() : await window.showDirectoryPicker({ id: "z7-fotos", mode: "read" });
         info.textContent = "Procurando as fotos…";
         let alunos = await pastasComFotos(origem);
         if (!alunos.length) return (info.textContent = "Não achei fotos nessa pasta (nem nas pastas de dentro).");
         const col = nomeDoColegio(origem.name);
         let resumoFora = "";
-        if (soTrabalho.checked || semTel.checked) {
+        if (!livre && (soTrabalho.checked || semTel.checked)) {
           info.textContent = "Conferindo no app quem já comprou…";
           try {
             const doApp = await alunosDoColegio(C, colNome, col);
@@ -342,9 +390,12 @@ export function abrirPreviasLote(C, o = {}) {
         }
         info.textContent = `${alunos.length} aluno${alunos.length > 1 ? "s" : ""} para trabalhar em “${origem.name}”.${resumoFora} Agora escolha onde salvar as prévias.`;
         destino = await window.showDirectoryPicker({ id: "z7-previas", mode: "readwrite" });
-        const pasta = await destino.getDirectoryHandle(limpo(`Prévias - ${col.ano ? col.ano + " - " : ""}${col.nome}`), { create: true });
+        const pasta = await destino.getDirectoryHandle(
+          limpo(livre ? `Prévias - ${origem.name}` : `Prévias - ${col.ano ? col.ano + " - " : ""}${col.nome}`),
+          { create: true }
+        );
         await prep();
-        const nomes = nomesDeSaida(alunos);
+        const nomes = nomesDeSaida(alunos, livre);
         cancelar = false;
         ir.disabled = true;
         parar.hidden = false;
@@ -359,22 +410,27 @@ export function abrirPreviasLote(C, o = {}) {
           conta.acima += Math.max(0, a.arquivos.length - MAX_FOTOS);
         });
         const fazer = async (a, i) => {
-          const fotos = [];
+          const fotos = [],
+            nomesFotos = [];
           a.erros = [];
           a.geradas = 0;
           for (const h of a.arquivos.slice(0, MAX_FOTOS)) {
             const r = await lerFoto(h, a.nome);
-            if (r.img) fotos.push(r.img);
-            else a.erros.push({ arquivo: h.name, motivo: r.erro });
+            if (r.img) {
+              fotos.push(r.img);
+              nomesFotos.push(h.name);
+            } else a.erros.push({ arquivo: h.name, motivo: r.erro });
           }
           if (!fotos.length) throw Object.assign(new Error("nenhuma foto abriu"), { semFoto: true });
           // no cabeçalho: o nome do aluno sem o código da pasta ("CEYMS 01 - FABIOLA" → "FABIOLA"), e o código ao lado do colégio
           const cod = (a.nome.match(/^([A-Z0-9]+\s*\d+)\s*-\s*/i) || [])[1] || "";
-          const st = {
-            nome: a.nome.replace(/^[A-Z0-9]+\s*\d+\s*-\s*/i, "") || a.nome,
-            escola: [cod, col.nome, col.ano].filter(Boolean).join(" · "),
-            fotos
-          };
+          const st = livre
+            ? { nome: a.nome, escola: origem.name, fotos } // importação livre: o nome da pasta como está
+            : {
+                nome: a.nome.replace(/^[A-Z0-9]+\s*\d+\s*-\s*/i, "") || a.nome,
+                escola: [cod, col.nome, col.ano].filter(Boolean).join(" · "),
+                fotos
+              };
           const paginas = Math.ceil(fotos.length / POR_PAGINA);
           // as fotos separadas (pequenas, com marca e número): o representante monta o quadro e os porta-retratos
           // no app ("🖼️ Prévia e fotos") com as que a família escolher
@@ -387,7 +443,10 @@ export function abrirPreviasLote(C, o = {}) {
               const x = c.getContext("2d");
               x.drawImage(f, 0, 0);
               marca(x, 0, 0, c.width, c.height);
-              await gravar(sub, `${nomes[i]} - foto ${String(k + 1).padStart(2, "0")}.jpg`, await jpg(c));
+              const nomeArq = livre
+                ? nomesFotos[k].replace(/\.(png|webp|jpe?g)$/i, "") + ".jpg"
+                : `${nomes[i]} - foto ${String(k + 1).padStart(2, "0")}.jpg`;
+              await gravar(sub, nomeArq, await jpg(c));
             }
           }
           for (let pg = 0; pg < paginas; pg++) {

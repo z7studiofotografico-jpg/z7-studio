@@ -354,3 +354,4 @@ details.tamtipo{border:1px solid var(--line,#ddd);border-radius:10px;padding:6px
 .ev-paspatur{border-left-color:#0d9488;background:#dcf3ef}.ev-becascol{border-left-color:#1f7a4d;background:#e2f2e8}
 .agrow.ev-paspatur{border-left-color:#0d9488}.agrow.ev-becascol{border-left-color:#1f7a4d}
 @media (prefers-color-scheme:dark){.ev-paspatur{background:#123430}.ev-becascol{background:#17301f}}
+.btn-azul{background:#2563eb;border-color:#2563eb;color:#fff}.btn-azul:hover{background:#1d4ed8}

@@ -78,6 +78,13 @@ export function show() {
       () => C.me
     )
   );
+  // Importação: prévias de qualquer pasta (outros trabalhos), sem mudar o nome de ninguém (Adriano e Luciana)
+  if (marco())
+    hb.append(
+      U.mkBtn("📥 Importação", "btn-azul btn-sm", () =>
+        import("./previas-lote.js").then(m => m.abrirPreviasLote(C, { livre: true })).catch(e => C.handleErr(e))
+      )
+    );
   head.append(hb);
   v.append(head);
   v.append(
