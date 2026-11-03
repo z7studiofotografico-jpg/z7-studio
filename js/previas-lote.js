@@ -5,6 +5,46 @@
 import { el, sheet } from "./ui.js";
 import { prep, marca } from "./mockup.js";
 import { reduzir, desenharFolha } from "./previa.js";
+import { acharAluno } from "./drive-fotos.js";
+import { chaveColegio } from "./historico-dados.js";
+import { gruposEscolas } from "./escolas-pr.js";
+
+// Quem já comprou (venda no app ou "VENDIDO" na planilha) não precisa de prévia: só conta no Dashboard
+export const COMPROU = ["PAGO", "ENTREGUE"];
+// pastas de alunos que ficam de fora: as dos alunos do app que já compraram (pelo nome e pelo número do ID)
+export function pastasDeQuemComprou(pastas, alunosApp, pularSemTel = false) {
+  const fora = new Set();
+  const itens = pastas.map(p => ({ name: p.nome, pasta: p }));
+  alunosApp
+    .filter(it => COMPROU.includes(it.etapa) || (pularSemTel && it.etapa === "SEM TELEFONE"))
+    .forEach(it => {
+      const f = acharAluno(
+        itens.filter(x => !fora.has(x.pasta)),
+        it
+      );
+      if (f) fora.add(f.pasta);
+    });
+  return fora;
+}
+// alunos do app daquele colégio e ano (lista de escolas da importação: todos os jeitos de escrever o nome)
+async function alunosDoColegio(C, colNome, col) {
+  const { FS, db } = C;
+  const metaNome = { repasse: "repasse_meta", paspatur: "paspatur_meta", formaturaAlunos: "formatura_meta" }[colNome];
+  const meta = (await FS.getDoc(FS.doc(db, "config", metaNome))).data() || {};
+  const k = chaveColegio(col.nome);
+  const simples = c => String(c || "").replace(/([A-Z])\1+/g, "$1");
+  const mesmo = c => simples(c) === simples(k) || simples(k).startsWith(simples(c) + " ") || simples(c).startsWith(simples(k) + " ");
+  const gs = gruposEscolas(meta).filter(g => mesmo(g.chave) && (!col.ano || g.ano === Number(col.ano)));
+  const out = [];
+  for (const g of gs)
+    for (let i = 0; i < g.nomes.length; i += 30) {
+      const s = await FS.getDocs(
+        FS.query(FS.collection(db, colNome), FS.where("escola", "in", g.nomes.slice(i, i + 30)), FS.where("ano", "==", g.ano))
+      );
+      s.forEach(d => out.push(Object.assign({ id: d.id }, d.data())));
+    }
+  return out;
+}
 
 const FOTO = /\.(jpe?g|png|webp)$/i,
   POR_PAGINA = 30,
@@ -61,7 +101,9 @@ async function gravar(pasta, nome, blob) {
   await w.close();
 }
 
-export function abrirPreviasLote(C) {
+// o = { col: "repasse" | "paspatur" | "formaturaAlunos" } (a lista onde procurar quem já comprou)
+export function abrirPreviasLote(C, o = {}) {
+  const colNome = o.col || "repasse";
   sheet("🖼️ Gerar prévias de um colégio", (p, close) => {
     p.append(
       el(
@@ -83,6 +125,17 @@ export function abrirPreviasLote(C) {
       document.createTextNode(" Também salvar as fotos separadas, numeradas (para montar o quadro e os porta-retratos)")
     );
     p.append(lSep);
+    // só quem vai ser trabalhado: quem já comprou fica de fora (o sistema fica mais leve)
+    const soTrabalho = el("input");
+    soTrabalho.type = "checkbox";
+    soTrabalho.checked = true;
+    const lTrab = el("label", "chk");
+    lTrab.append(soTrabalho, document.createTextNode(" Pular quem já comprou (fica só no Dashboard)"));
+    const semTel = el("input");
+    semTel.type = "checkbox";
+    const lSem = el("label", "chk");
+    lSem.append(semTel, document.createTextNode(" Pular também quem está sem telefone"));
+    p.append(lTrab, lSem);
     const info = el("p", null, "");
     const barra = el("progress");
     barra.max = 1;
@@ -107,11 +160,34 @@ export function abrirPreviasLote(C) {
       try {
         origem = await window.showDirectoryPicker({ id: "z7-fotos", mode: "read" });
         info.textContent = "Procurando as fotos…";
-        const alunos = await pastasComFotos(origem);
+        let alunos = await pastasComFotos(origem);
         if (!alunos.length) return (info.textContent = "Não achei fotos nessa pasta (nem nas pastas de dentro).");
-        info.textContent = `${alunos.length} aluno${alunos.length > 1 ? "s" : ""} com fotos em “${origem.name}”. Agora escolha onde salvar as prévias.`;
-        destino = await window.showDirectoryPicker({ id: "z7-previas", mode: "readwrite" });
         const col = nomeDoColegio(origem.name);
+        let resumoFora = "";
+        if (soTrabalho.checked || semTel.checked) {
+          info.textContent = "Conferindo no app quem já comprou…";
+          try {
+            const doApp = await alunosDoColegio(C, colNome, col);
+            const fora = soTrabalho.checked
+              ? pastasDeQuemComprou(alunos, doApp, semTel.checked)
+              : pastasDeQuemComprou(
+                  alunos,
+                  doApp.filter(x => x.etapa === "SEM TELEFONE"),
+                  true
+                );
+            const total = alunos.length;
+            alunos = alunos.filter(a => !fora.has(a));
+            resumoFora = doApp.length
+              ? ` ${fora.size} de ${total} ficaram de fora (já compraram${semTel.checked ? " ou sem telefone" : ""}).`
+              : ` Não achei esse colégio${col.ano ? " de " + col.ano : ""} no app: vão todos os ${total}.`;
+          } catch (e) {
+            resumoFora = " Não consegui conferir no app quem já comprou: vão todos.";
+            console.warn("[Z7] prévias: quem comprou", e);
+          }
+          if (!alunos.length) return (info.textContent = "Todos os alunos dessa pasta já compraram: nada a gerar." + resumoFora);
+        }
+        info.textContent = `${alunos.length} aluno${alunos.length > 1 ? "s" : ""} para trabalhar em “${origem.name}”.${resumoFora} Agora escolha onde salvar as prévias.`;
+        destino = await window.showDirectoryPicker({ id: "z7-previas", mode: "readwrite" });
         const pasta = await destino.getDirectoryHandle(limpo(`Prévias - ${col.ano ? col.ano + " - " : ""}${col.nome}`), { create: true });
         await prep();
         const nomes = nomesDeSaida(alunos);
@@ -167,6 +243,7 @@ export function abrirPreviasLote(C) {
         info.textContent =
           (cancelar ? `Parado. ` : "Pronto! ") +
           `${feitos} prévia${feitos === 1 ? "" : "s"} salva${feitos === 1 ? "" : "s"} em “${pasta.name}”.` +
+          resumoFora +
           (puladas ? ` ${puladas} foto${puladas > 1 ? "s" : ""} não abriu (arquivo com problema) e ficou de fora.` : "") +
           " Agora arraste essa pasta para o Google Drive.";
       } catch (e) {

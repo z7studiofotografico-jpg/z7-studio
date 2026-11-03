@@ -2392,7 +2392,15 @@ await cenario("PR por colégio e ano · passar para a equipe", async () => {
   ok(!erros.length, "sem erros" + (erros.length ? ": " + erros.join(" | ") : ""));
 });
 await cenario("Prévias de um colégio (lote, no computador)", async () => {
-  const { pg, erros } = await abrir(ADRIANO, base);
+  // MARIA já comprou (PAGO no app): não precisa de prévia; JOAO ainda vai ser trabalhado
+  const { pg, erros } = await abrir(
+    ADRIANO,
+    Object.assign({}, base, {
+      "config/repasse_meta": { escolas: { "C.E. TESTE": 2 }, anos: { 2026: 2 }, escolasAno: { "C.E. TESTE|2026": 2 } },
+      "repasse/t1": { nome: "MARIA", escola: "C.E. TESTE", ano: 2026, etapa: "PAGO", valor: 297, pagoEm: "2026-10-01" },
+      "repasse/t2": { nome: "JOAO", escola: "C.E. TESTE", ano: 2026, etapa: "NA FILA" }
+    })
+  );
   await pg.evaluate(async () => {
     // fotos de verdade (geradas aqui) e pastas falsas no formato do Chrome (showDirectoryPicker)
     const foto = async cor => {
@@ -2452,17 +2460,12 @@ await cenario("Prévias de um colégio (lote, no computador)", async () => {
   const nomes = Object.keys(g).sort();
   const P = "Prévias - C.E. TESTE 2026/";
   ok(
-    [
-      P + "01 - MARIA.jpg",
-      P + "02 - JOAO.jpg",
-      P + "01 - MARIA/01 - MARIA - foto 01.jpg",
-      P + "01 - MARIA/01 - MARIA - foto 02.jpg",
-      P + "02 - JOAO/02 - JOAO - foto 01.jpg"
-    ].every(n => nomes.includes(n)) &&
-      nomes.length === 5 &&
+    [P + "02 - JOAO.jpg", P + "02 - JOAO/02 - JOAO - foto 01.jpg"].every(n => nomes.includes(n)) &&
+      nomes.length === 2 &&
       Object.values(g).every(t => t > 3000 && t < 600000),
-    "uma folha por aluno e as fotos separadas numeradas: " + nomes.join(" | ")
+    "só quem vai ser trabalhado (quem já comprou fica de fora): folha e fotos separadas numeradas: " + nomes.join(" | ")
   );
+  ok(/1 de 2 ficaram de fora/.test(await pg.locator(".sheet:last-of-type").textContent()), "avisa quantos ficaram de fora");
   ok(!erros.length, "sem erros" + (erros.length ? ": " + erros.join(" | ") : ""));
 });
 await cenario("Fotos do aluno direto do Google Drive", async () => {

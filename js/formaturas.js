@@ -104,7 +104,7 @@ export function show() {
   if (C.isAdmin)
     hb.append(
       U.mkBtn("🗂️ Prévias de um colégio", "btn-sm", () =>
-        import("./previas-lote.js").then(m => m.abrirPreviasLote(C)).catch(e => C.handleErr(e))
+        import("./previas-lote.js").then(m => m.abrirPreviasLote(C, { col: "formaturaAlunos" })).catch(e => C.handleErr(e))
       ),
       U.mkBtn("Importar planilha", "btn-sm", () =>
         import("./repasse.js").then(m => (m.init(C), m.importarFormatura())).catch(e => C.handleErr(e))

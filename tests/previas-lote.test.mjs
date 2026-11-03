@@ -34,3 +34,19 @@ test("nome do colégio a partir da pasta do servidor", async () => {
   assert.deepEqual(nomeDoColegio("2022-09-21 - SANTO ANTONIO - pronto"), { nome: "SANTO ANTONIO", ano: "2022" });
   assert.deepEqual(nomeDoColegio("C.E. TESTE 2026"), { nome: "C.E. TESTE 2026", ano: "" });
 });
+
+test("prévias em lote: quem já comprou fica de fora (pelo nome e pelo número)", async () => {
+  const { pastasDeQuemComprou } = await import("../js/previas-lote.js");
+  const pastas = [{ nome: "CEYMS 01 - MARIA SILVA" }, { nome: "CEYMS 02 - ANA COSTA" }, { nome: "CEYMS 03 - JOAO" }];
+  const app = [
+    { nome: "MARIA SILVA", etapa: "ENTREGUE" },
+    { nome: "ANA COSTA", etapa: "NA FILA" },
+    { nome: "JOAO PEDRO", etapa: "SEM TELEFONE" }
+  ];
+  const fora = pastasDeQuemComprou(pastas, app);
+  assert.deepEqual(
+    [...fora].map(p => p.nome),
+    ["CEYMS 01 - MARIA SILVA"]
+  );
+  assert.equal(pastasDeQuemComprou(pastas, app, true).size, 2);
+});

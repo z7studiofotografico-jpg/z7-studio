@@ -41,6 +41,7 @@ import {
   mudarTipoPR,
   ehFormatura,
   baseSeg,
+  colNome,
   $
 } from "./repasse-estado.js";
 // Caídos: o admin vê todos; a equipe, os que ela mesma marcou
@@ -147,7 +148,9 @@ function mount() {
   // admin, no computador: prévias leves com marca d'água de um colégio inteiro (para o representante)
   if (C.isAdmin)
     hb.append(
-      U.mkBtn("🗂️ Prévias de um colégio", "", () => import("./previas-lote.js").then(m => m.abrirPreviasLote(C)).catch(e => C.handleErr(e)))
+      U.mkBtn("🗂️ Prévias de um colégio", "", () =>
+        import("./previas-lote.js").then(m => m.abrirPreviasLote(C, { col: colNome() })).catch(e => C.handleErr(e))
+      )
     );
   hb.append(botaoRelatorio(relatorioPR, () => C.me));
   const imp = U.mkBtn("Importar planilha", "", () => importarAqui());
