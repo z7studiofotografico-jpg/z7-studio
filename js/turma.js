@@ -89,6 +89,20 @@ export async function pagaPorPix(ctx, f) {
   const d = await pedirData("Paga por Pix", "Data do Pix", { padrao: hoje(), max: hoje(), ok: "Registrar" });
   if (d) await registrarPagamento(ctx, f, { forma: "Pix", data: d });
 }
+// botão de dinheiro: fica desligado até terminar (dois toques seguidos não registram duas parcelas)
+export const umaVez = fn => async ev => {
+  const b = ev && ev.currentTarget;
+  if (b && b.disabled) return;
+  if (b) b.disabled = true;
+  try {
+    await fn();
+  } catch (e) {
+    if (C) C.handleErr(e);
+    else console.warn(e);
+  } finally {
+    if (b) b.disabled = false;
+  }
+};
 // chave Pix da empresa nas cobranças (a dos Ajustes ou a padrão)
 export const CHAVE_PIX = "21998817771";
 // Desfaz o último pagamento (lançado por engano)
@@ -479,8 +493,16 @@ function card(T, f, candSet) {
   const act = el("div", "actions");
   if (C.isAdmin && comprou && !q0)
     act.append(
-      U.mkBtn("✅ Parcela paga", "btn-ok", () => registrarPagamento(C, f).catch(er => C.handleErr(er))),
-      U.mkBtn("💠 Paga por Pix", "", () => pagaPorPix(C, f).catch(er => C.handleErr(er)))
+      U.mkBtn(
+        "✅ Parcela paga",
+        "btn-ok",
+        umaVez(() => registrarPagamento(C, f))
+      ),
+      U.mkBtn(
+        "💠 Paga por Pix",
+        "",
+        umaVez(() => pagaPorPix(C, f))
+      )
     );
   if (comprou && !q0 && f.tel) act.append(U.mkBtn("💬 Cobrar", at ? "btn-primary" : "", () => cobrarWa(C, f)));
   act.append(

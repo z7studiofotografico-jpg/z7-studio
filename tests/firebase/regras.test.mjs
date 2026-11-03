@@ -559,3 +559,28 @@ test("WhatsApp de trabalho: a pessoa pede a troca dos próprios números; só o 
   await assertFails(updateDoc(doc(p, "numeros", PEDRO), { numeros: ["21900000000"] })); // depois de liberado, não troca sozinho
   await assertSucceeds(getDocs(query(c(como(ADRIANO), "numeros"), where("status", "==", "pendente"), limit(50))));
 });
+
+test("estoque: a equipe só mexe no físico e no reservado, nunca negativo nem reservado acima do físico", async () => {
+  await semRegra(db => setDoc(doc(db, "produtos", "paspatur"), { nome: "Paspatur", preco: 30, fisico: 5, reservado: 1 }));
+  const db = como(ANA);
+  await assertSucceeds(updateDoc(doc(db, "produtos", "paspatur"), { fisico: 6, atualizadoEm: "x" }));
+  await assertFails(updateDoc(doc(db, "produtos", "paspatur"), { fisico: -1 }));
+  await assertFails(updateDoc(doc(db, "produtos", "paspatur"), { reservado: 9 }));
+  await assertFails(updateDoc(doc(db, "produtos", "paspatur"), { preco: 1 }));
+  await assertSucceeds(updateDoc(doc(como(ADRIANO), "produtos", "paspatur"), { preco: 35 }));
+});
+
+test("formatura: Caído só com motivo; só o Adriano tira do Caído; a equipe não apaga", async () => {
+  await semRegra(async db => {
+    await setDoc(doc(db, "formaturaAlunos", "a1"), { nome: "ANA", etapa: "SEPARADO", seg: "lf", resp: "Fabi", respEmail: FORM });
+    await setDoc(doc(db, "formaturaAlunos", "a2"), { nome: "CAIO", etapa: "CAÍDO", seg: "lf", caidoMotivo: "x", resp: "", respEmail: "" });
+  });
+  const db = como(FORM);
+  await assertFails(updateDoc(doc(db, "formaturaAlunos", "a1"), { etapa: "CAÍDO" }));
+  await assertSucceeds(updateDoc(doc(db, "formaturaAlunos", "a1"), { etapa: "CAÍDO", caidoMotivo: "Mudou de escola" }));
+  await assertFails(updateDoc(doc(db, "formaturaAlunos", "a2"), { etapa: "NA FILA" }));
+  await assertFails(deleteDoc(doc(db, "formaturaAlunos", "a1")));
+  await assertSucceeds(updateDoc(doc(como(ADRIANO), "formaturaAlunos", "a2"), { etapa: "NA FILA", resgateObs: "ok" }));
+  await assertFails(getDoc(doc(como(ANA), "contratos", "i1")));
+  await assertSucceeds(setDoc(doc(db, "contratos", "i1"), { numero: "1" }));
+});

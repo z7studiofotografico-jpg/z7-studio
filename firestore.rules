@@ -243,6 +243,9 @@ service cloud.firestore {
         && respOk() && exclusaoOk()
         // aluno Caído só volta para a fila pelo Adriano ("Resgatar aluno")
         && !(resource.data.get('etapa', '') == 'CAÍDO' && mudou(['etapa']))
+        // marcar Caído pede o motivo (observação obrigatória)
+        && !(request.resource.data.get('etapa', '') == 'CAÍDO' && mudou(['etapa'])
+             && request.resource.data.get('caidoMotivo', '').size() == 0)
         // a venda entra "a conferir": só o admin marca como conferida (a comissão só conta depois)
         && (!mudou(['conferido']) || request.resource.data.conferido == false)
         && !(resource.data.etapa in ['PAGO', 'ENTREGUE'] && mudou(['valor', 'formaPag', 'pagoEm', 'resp', 'respEmail'])));
@@ -263,7 +266,10 @@ service cloud.firestore {
     match /produtos/{id} {
       allow read: if membro();
       allow create, update: if admin() || (membro() && request.resource.data.keys().hasOnly(['fisico', 'reservado', 'atualizadoEm'])
-        && (resource == null || request.resource.data.diff(resource.data).affectedKeys().hasOnly(['fisico', 'reservado', 'atualizadoEm'])));
+        && (resource == null || request.resource.data.diff(resource.data).affectedKeys().hasOnly(['fisico', 'reservado', 'atualizadoEm']))
+        // estoque nunca negativo e reservado nunca maior que o físico (o app já confere; o banco garante)
+        && request.resource.data.get('fisico', 0) >= 0 && request.resource.data.get('reservado', 0) >= 0
+        && request.resource.data.get('reservado', 0) <= request.resource.data.get('fisico', 0));
       allow delete: if admin();
     }
     // Registro de cada movimento do estoque: só se acrescenta, ninguém muda

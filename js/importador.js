@@ -257,9 +257,24 @@ export async function desfazer(C, id) {
     ))
   )
     return false;
-  for (let i = 0; i < x.ids.length; i += 400) {
+  // PR: tira também os telefones desses alunos do índice "fones" (senão o app acharia "repetidos" que não existem)
+  let tirarFone = null;
+  if (x.col === "repasse") {
+    const { entradasFones } = await import("./pedidos.js");
+    tirarFone = async (b, id) => {
+      const d = await FS.getDoc(FS.doc(db, "repasse", id));
+      if (d.exists())
+        entradasFones(id, d.data()).forEach(([t]) =>
+          b.set(FS.doc(db, "fones", t), { alunos: { [id]: FS.deleteField() } }, { merge: true })
+        );
+    };
+  }
+  for (let i = 0; i < x.ids.length; i += 200) {
     const b = FS.writeBatch(db);
-    x.ids.slice(i, i + 400).forEach(d => b.delete(FS.doc(db, x.col, d)));
+    for (const d of x.ids.slice(i, i + 200)) {
+      if (tirarFone) await tirarFone(b, d);
+      b.delete(FS.doc(db, x.col, d));
+    }
     await b.commit();
   }
   await FS.updateDoc(FS.doc(db, "importacoes", id), { status: "desfeita", desfeitaEm: new Date().toISOString(), desfeitaPor: C.me || "" });

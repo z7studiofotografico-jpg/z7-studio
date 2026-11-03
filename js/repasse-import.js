@@ -61,6 +61,15 @@ export function openImport(ctx, ui, aoTerminar) {
     p.append(fAno);
     const out = el("div", "imp");
     p.append(out);
+    // importações anteriores deste módulo, com "Desfazer" (só os alunos novos daquela planilha são apagados)
+    const hist = el("details", "notes");
+    hist.append(el("summary", null, "Importações anteriores (desfazer)"));
+    const hb = el("div");
+    hist.append(hb);
+    hist.addEventListener("toggle", () => {
+      if (hist.open) import("./importador.js").then(m => m.ultimasImportacoes(C, colNome(), hb)).catch(e => C.handleErr(e));
+    });
+    p.append(hist);
     const acts = actions(close, "Importar");
     const ok = acts.querySelector("button[type=submit]");
     ok.disabled = true;
@@ -332,7 +341,9 @@ export function openImport(ctx, ui, aoTerminar) {
               id,
               Object.assign({}, d, {
                 etapa: "CAÍDO",
-                caido: { motivo: "Veio da planilha como CAIDO", em: agora.slice(0, 10), por: C.me || "" },
+                caidoMotivo: "Veio da planilha como CAIDO",
+                caidoEm: agora.slice(0, 10),
+                caidoPor: C.me || "",
                 followup: null,
                 resp: "",
                 respEmail: "",
@@ -374,6 +385,23 @@ export function openImport(ctx, ui, aoTerminar) {
           prog.textContent = `Importando… ${Math.min(i + 80, ops.length)} de ${ops.length}`;
         }
         await FS.setDoc(FS.doc(db, "config", metaNome()), { escolas, anos, escolasAno, importadoEm: agora }, { merge: true });
+        // registro para "Desfazer esta importação" (apaga só os alunos novos; os que já existiam continuam)
+        const novosIds = ops.filter(o => !o[2]).map(o => o[0]);
+        if (novosIds.length)
+          await FS.setDoc(FS.doc(FS.collection(db, "importacoes")), {
+            modulo: colNome(),
+            col: colNome(),
+            ids: novosIds.slice(0, 5000),
+            n: novosIds.length,
+            arquivo: [...inp.files]
+              .map(f => f.name)
+              .join(", ")
+              .slice(0, 300),
+            em: agora,
+            por: C.me || "",
+            porEmail: C.email || "",
+            status: "ativa"
+          });
         const nInc = ops.filter(([, d, m]) => !m && d.etapa === "INCOMPLETO").length;
         prog.textContent = `Pronto! ${novos - nInc - historico - semTel} novos na fila${nInc ? `, ${nInc} na aba Incompletos` : ""}${semTel ? `, ${semTel} sem telefone (só para o Dashboard)` : ""}${historico ? `, ${historico} que já compraram (só histórico, para o Dashboard)` : ""}${fora ? `, ${fora} de turma desmarcada ficaram fora do app` : ""}${atual ? ` e ${atual} atualizados` : ""}${voltou ? ` (${voltou} que estavam sem telefone agora têm número e foram para a fila)` : ""}.`;
         U.toast("Planilha importada ✅");

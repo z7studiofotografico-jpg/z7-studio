@@ -5,7 +5,17 @@
 //  - 📋 Kits e preços: tabela do contrato (antecipado) e preço depois das fotos
 //  - Turmas: colégios fechados, com acesso à lista de formandos
 // Quem não é administrador vê só as turmas dos colégios que fechou.
-import { openTurma, cobrarWa, registrarPagamento, pagaPorPix, atrasado, oferecerKit, abrirPrevia, retornoFormando } from "./turma.js";
+import {
+  openTurma,
+  cobrarWa,
+  registrarPagamento,
+  pagaPorPix,
+  umaVez,
+  atrasado,
+  oferecerKit,
+  abrirPrevia,
+  retornoFormando
+} from "./turma.js";
 import { linhasRetorno } from "./retorno.js";
 import { kitsPadrao, candidatosPosFoto, ehRepasse, anoDaTurma } from "./contrato.js";
 import {
@@ -448,8 +458,16 @@ function renderCobrancas(corpo, cob) {
     const act = el("div", "actions");
     if (C.isAdmin)
       act.append(
-        U.mkBtn("✅ Parcela paga", "btn-ok", () => registrarPagamento(C, f).catch(er => C.handleErr(er))),
-        U.mkBtn("💠 Paga por Pix", "", () => pagaPorPix(C, f).catch(er => C.handleErr(er)))
+        U.mkBtn(
+          "✅ Parcela paga",
+          "btn-ok",
+          umaVez(() => registrarPagamento(C, f))
+        ),
+        U.mkBtn(
+          "💠 Paga por Pix",
+          "",
+          umaVez(() => pagaPorPix(C, f))
+        )
       );
     if (f.tel) act.append(U.mkBtn("💬 Cobrar", at ? "btn-primary" : "", () => cobrarWa(C, f)));
     act.append(ajuda(f));

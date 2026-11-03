@@ -1,5 +1,5 @@
 // PR: o cartão de cada contato (para quem mandar, a mensagem pronta, os botões de cada etapa)
-import { excluir, faixaExclusao, confirmar, pedirTexto } from "./confirmar.js";
+import { excluir, faixaExclusao, pedirTexto } from "./confirmar.js";
 import { openMockup, textoEscolha } from "./mockup.js";
 import { el, title } from "./ui.js";
 import * as U from "./util.js";
@@ -401,10 +401,23 @@ function acoesDoCartao(it, li, e) {
       if (C.isAdmin)
         act.append(
           U.mkBtn("↩️ Resgatar aluno para nova negociação", "btn-primary", async () => {
-            if (!(await confirmar("Resgatar o aluno?", `${title(it.nome)} volta para a fila e pode ser separado de novo.`))) return;
+            // a observação do resgate é obrigatória (fica no aluno, junto com quem resgatou e quando)
+            const obs = await pedirTexto("Resgatar o aluno?", `${title(it.nome)} volta para a fila. Observação (obrigatória):`, {
+              placeholder: "ex.: a mãe pediu para falar de novo em março",
+              ok: "Resgatar"
+            });
+            if (!obs) return;
             save(
               it,
-              { etapa: "NA FILA", resp: "", respEmail: "", followup: null, resgatadoEm: U.todayStr(), resgatadoPor: C.me || "" },
+              {
+                etapa: "NA FILA",
+                resp: "",
+                respEmail: "",
+                followup: null,
+                resgatadoEm: U.todayStr(),
+                resgatadoPor: C.me || "",
+                resgateObs: obs
+              },
               "Aluno de volta na fila",
               { semConfirmar: true }
             );

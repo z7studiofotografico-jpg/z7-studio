@@ -1139,8 +1139,28 @@ await cenario("Adriano (admin), com os dados já atualizados no servidor", async
         /1 que já compraram/.test(await pg.textContent("body")),
       "quem já comprou entra só como histórico (fora das filas e das vendas do mês)"
     );
+    // Regra 7: a importação do PR pode ser desfeita (apaga só os alunos novos daquela planilha)
+    const impPR = Object.entries(s)
+      .filter(([k, x]) => k.startsWith("importacoes/") && x.col === "repasse")
+      .sort((a, b) => String(b[1].em).localeCompare(String(a[1].em)))[0];
+    ok(impPR && impPR[1].n > 0 && impPR[1].ids.every(id => s["repasse/" + id]), "importação do PR registrada para desfazer");
     await pg.locator(".sheet:visible").getByRole("button", { name: "Fechar" }).click();
     await calmo(pg);
+    if (impPR) {
+      await ir(pg, "#pr");
+      await pg.getByRole("button", { name: "Importar planilha" }).click();
+      const shI = pg.locator(".sheet:visible").last();
+      await shI.getByText("Importações anteriores (desfazer)").click();
+      await shI.getByRole("button", { name: "Desfazer" }).first().click();
+      await pg.locator(".sheet").last().getByRole("button", { name: "Sim" }).click();
+      await calmo(pg);
+      s = await store();
+      ok(
+        impPR[1].ids.every(id => !s["repasse/" + id]) && s[impPR[0]].status === "desfeita",
+        "Desfazer importação: os alunos novos saem e a importação fica marcada como desfeita"
+      );
+      await pg.evaluate(() => document.querySelectorAll(".sheet").forEach(x => (x.id ? (x.hidden = true) : x.remove())));
+    }
   });
   await etapa(pg, "Importar instituições", async () => {
     // Instituições: importar planilha (módulo instituicoes-import.js)
@@ -2624,7 +2644,8 @@ await cenario("Formaturas · abas Linha de Frente / Repasse / Venda Antecipada, 
     "config/formatura_meta": { escolasAno: { ["COLEGIO GAMA|" + Y]: 2, ["COLEGIO DELTA|" + (Y - 1)]: 1 } },
     "formaturaAlunos/g1": aluno("Gabi Gama", "COLEGIO GAMA", Y, "lf"),
     "formaturaAlunos/g2": Object.assign(aluno("Caio Caido", "COLEGIO GAMA", Y, "lf", "CAÍDO"), {
-      caido: { motivo: "Mudou de escola", em: "2026-01-01" }
+      caidoMotivo: "Mudou de escola",
+      caidoEm: "2026-01-01"
     }),
     "formaturaAlunos/d1": aluno("Duda Delta", "COLEGIO DELTA", Y - 1, "lf")
   });
@@ -2644,6 +2665,19 @@ await cenario("Formaturas · abas Linha de Frente / Repasse / Venda Antecipada, 
   await pg.locator("#viewFormaturas .chip", { hasText: "Caídos" }).first().click();
   await calmo(pg);
   ok(/Caio Caido/.test(await pg.textContent("#viewFormaturas")), "aba Caídos mostra o aluno caído");
+  await pg
+    .locator("#viewFormaturas article", { hasText: "Caio" })
+    .getByRole("button", { name: "↩️ Resgatar aluno para nova negociação" })
+    .click();
+  const shR = pg.locator(".sheet").last();
+  await shR.locator("button[type=submit]").click();
+  await calmo(pg);
+  ok((await store())["formaturaAlunos/g2"].etapa === "CAÍDO", "resgate sem observação não acontece");
+  await shR.locator("textarea").fill("Mãe pediu para falar em março");
+  await shR.locator("button[type=submit]").click();
+  await calmo(pg);
+  const g2 = (await store())["formaturaAlunos/g2"];
+  ok(g2.etapa === "NA FILA" && g2.resgateObs === "Mãe pediu para falar em março", "resgate com observação volta o aluno para a fila");
   // virada à mão: o colégio do ano passado passa para o Repasse
   await pg.getByRole("button", { name: "🔁 Virada" }).click();
   await calmo(pg);
