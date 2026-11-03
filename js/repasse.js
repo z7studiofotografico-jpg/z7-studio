@@ -304,8 +304,8 @@ function renderChips() {
   ];
   if (C.isAdmin) tabs.push(["conferir", "A conferir"], ["incompletos", "Incompletos"]);
   else tabs.push(["incompletos", "Meus incompletos"]);
-  // Formatura: quem não vai querer (Caído), com o motivo; só o Adriano resgata para nova negociação
-  if (ehFormatura()) tabs.push(["caidos", "Caídos"]);
+  // PR, Paspatur e Formatura: quem não vai querer (Caído), com o motivo; só o Adriano resgata para nova negociação
+  tabs.push(["caidos", "Caídos"]);
   tabs.forEach(([k, t]) => {
     const b = el("button", "chip", t);
     b.type = "button";
@@ -362,7 +362,14 @@ function openTab(k) {
           FS.limit(200)
         );
   if (k === "conferir") q = FS.query(col, FS.where("conferido", "==", false), FS.limit(300));
-  if (k === "caidos") q = FS.query(col, FS.where("etapa", "==", "CAÍDO"), ...baseSeg(), ...soMinhaCaidos(), FS.limit(500));
+  if (k === "caidos")
+    q = FS.query(
+      col,
+      FS.where("etapa", "==", "CAÍDO"),
+      ...(ehFormatura() ? baseSeg() : seg === "lf" ? baseLF() : []),
+      ...soMinhaCaidos(),
+      FS.limit(500)
+    );
   if (q)
     unsubList = FS.onSnapshot(
       q,

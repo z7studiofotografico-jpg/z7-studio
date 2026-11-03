@@ -593,3 +593,12 @@ test("edições da equipe: cria o aviso só com o próprio e-mail; só o admin l
   await assertFails(getDoc(doc(db, "edicoes", "e1")));
   await assertSucceeds(updateDoc(doc(como(ADRIANO), "edicoes", "e1"), { visto: true }));
 });
+
+test("PR: Caído só com motivo e só o admin resgata", async () => {
+  await semRegra(db => setDoc(doc(db, "repasse", "r3"), { nome: "DUDA", ano: 2099, etapa: "SEPARADO", resp: "Ana", respEmail: ANA }));
+  const db = como(ANA);
+  await assertFails(updateDoc(doc(db, "repasse", "r3"), { etapa: "CAÍDO" }));
+  await assertSucceeds(updateDoc(doc(db, "repasse", "r3"), { etapa: "CAÍDO", caidoMotivo: "Já comprou" }));
+  await assertFails(updateDoc(doc(db, "repasse", "r3"), { etapa: "NA FILA" }));
+  await assertSucceeds(updateDoc(doc(como(ADRIANO), "repasse", "r3"), { etapa: "NA FILA", resgateObs: "ok" }));
+});

@@ -400,8 +400,8 @@ function acoesDoCartao(it, li, e) {
         import("./alteracoes.js").then(m => sheetHist("Histórico · " + U.first(title(it.nome)), m.linhasAlteracoes(it)))
       )
     );
-  // Formatura: "Caído" (não vai querer) com o motivo obrigatório; só o Adriano resgata para nova negociação
-  if (ehFormatura()) {
+  // PR, Paspatur e Formatura: "Caído" (não vai querer) com o motivo obrigatório; só o Adriano resgata
+  {
     if (it.etapa === "CAÍDO") {
       act.append(el("p", "wait", "⬇️ Caído: " + (it.caidoMotivo || "sem motivo") + (it.caidoPor ? ` (${U.first(it.caidoPor)})` : "")));
       if (C.isAdmin)

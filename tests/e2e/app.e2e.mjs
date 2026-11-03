@@ -2802,7 +2802,7 @@ await cenario("Ajuda de vendas (respostas prontas e texto para o Claude sem tele
       telefones: ["21988887777"]
     }
   });
-  const { pg, erros } = await abrir(ADRIANO, migrar(d));
+  const { pg, erros, store } = await abrir(ADRIANO, migrar(d));
   await pg
     .context()
     .grantPermissions(["clipboard-read", "clipboard-write"])
@@ -2813,7 +2813,10 @@ await cenario("Ajuda de vendas (respostas prontas e texto para o Claude sem tele
   const sh = pg.locator(".sheet").last();
   await sh.getByRole("button", { name: "“Está caro”" }).click();
   await sh.getByRole("button", { name: "Prévia" }).click();
-  ok(/Olá, Rosa!.*Maria/s.test(await sh.getByLabel("Resposta (ajuste antes de copiar)").inputValue()), "resposta pronta com o nome do contato e do aluno");
+  ok(
+    /Olá, Rosa!.*Maria/s.test(await sh.getByLabel("Resposta (ajuste antes de copiar)").inputValue()),
+    "resposta pronta com o nome do contato e do aluno"
+  );
   await sh.getByLabel("Dúvida do cliente (para perguntar ao Claude)").fill("Dá para pagar em 3 vezes? Meu zap é 21 98888-7777");
   await sh.getByRole("button", { name: "🤖 Perguntar ao Claude (grátis)" }).click();
   await calmo(pg);
@@ -2827,6 +2830,20 @@ await cenario("Ajuda de vendas (respostas prontas e texto para o Claude sem tele
   ok(!/98888|988887777|Silva|Rosa/.test(q), "sem telefone (nem o que o cliente escreveu), sobrenome ou contato: " + q.slice(-200));
   const clip = await pg.evaluate(() => navigator.clipboard.readText().catch(() => ""));
   ok(/DÚVIDA DO CLIENTE/.test(clip), "também fica copiada (se o Claude abrir vazio, é só colar)");
+  // PR também tem Caídos (como na Formatura): motivo obrigatório
+  await pg.evaluate(() => document.querySelectorAll(".sheet").forEach(x => (x.id ? (x.hidden = true) : x.remove())));
+  await pg.locator("article", { hasText: "Maria" }).first().getByRole("button", { name: "⬇️ Caído" }).click();
+  const shC = pg.locator(".sheet").last();
+  await shC.locator("textarea").fill("Já comprou com outra empresa");
+  await shC.locator("button[type=submit]").click();
+  await calmo(pg);
+  ok((await store())["repasse/aj1"].etapa === "CAÍDO", "PR: marcar Caído com o motivo");
+  await pg.locator("#rChips").getByRole("button", { name: "Caídos" }).click();
+  await calmo(pg);
+  ok(
+    /Maria/.test(await pg.textContent("#rList")) && /Já comprou/.test(await pg.textContent("#rList")),
+    "PR: aba Caídos mostra o aluno e o motivo"
+  );
   ok(!erros.length, "sem erros no console: " + erros.join(" | "));
 });
 await cenario("Equipe edita os dados do aluno e o Adriano vê quem editou", async () => {
