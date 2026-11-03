@@ -2824,6 +2824,58 @@ await cenario("Ajuda de vendas (respostas prontas e texto para o Claude sem tele
   ok(/claude\.ai/.test(await pg.evaluate(() => window.__aberto || "")), "abre o Claude gratuito para colar");
   ok(!erros.length, "sem erros no console: " + erros.join(" | "));
 });
+await cenario("Equipe edita os dados do aluno e o Adriano vê quem editou", async () => {
+  const Y = new Date().getFullYear();
+  const d = Object.assign({}, base, {
+    "repasse/ed1": {
+      nome: "BIANCA VITORIA",
+      nomeBusca: "BIANCA VITORIA",
+      escola: "COLEGIO ALFA",
+      ano: Y - 1,
+      etapa: "SEPARADO",
+      resp: "Ana",
+      respEmail: ANA,
+      separadoEm: dia(0),
+      followup: dia(0),
+      contatos: [{ tipo: "Mãe", nome: "Rosa", tel: "21988887777" }],
+      telefones: ["21988887777"]
+    }
+  });
+  const eq = await abrir(ANA, migrar(d));
+  await ir(eq.pg, "#pr");
+  await calmo(eq.pg);
+  await eq.pg.locator("article", { hasText: "Bianca" }).first().getByRole("button", { name: "Editar dados" }).click();
+  const sh = eq.pg.locator(".sheet:visible").last();
+  await sh.getByLabel("WhatsApp").first().fill("21977776666");
+  await sh.locator("button[type=submit]").click();
+  await calmo(eq.pg);
+  const st = await eq.store();
+  const av = Object.entries(st).find(([k]) => k.startsWith("edicoes/"));
+  ok(
+    st["repasse/ed1"].telefones[0] === "21977776666" &&
+      av &&
+      av[1].porEmail === ANA &&
+      av[1].campos.includes("contatos") &&
+      /Bianca|BIANCA/.test(av[1].aluno),
+    "equipe edita o contato e fica o aviso: qual aluno, o que mudou e quem editou"
+  );
+  ok(!eq.erros.length, "equipe sem erros no console: " + eq.erros.join(" | "));
+  const adm = await abrir(ADRIANO, migrar(Object.assign({}, d, { [av[0]]: av[1] })));
+  await ir(adm.pg, "#pr");
+  await adm.pg.waitForFunction(
+    () => /edição de dados feita pela equipe/.test(document.getElementById("rEdicoes")?.textContent || ""),
+    null,
+    {
+      timeout: 8000
+    }
+  );
+  await adm.pg.getByRole("button", { name: "Ver quem editou" }).click();
+  const t = await adm.pg.locator(".sheet").last().textContent();
+  ok(/Bianca Vitoria/.test(t) && /editado por Ana/.test(t) && /contatos/.test(t), "Adriano vê qual aluno e quem editou");
+  await adm.pg.getByRole("button", { name: "Marcar todas como vistas" }).click();
+  await calmo(adm.pg);
+  ok((await adm.store())[av[0]].visto === true, "marcar como visto");
+});
 await cenario("Convite: criar a senha dentro do app", async () => {
   const ctx = await browser.newContext({ viewport: { width: 420, height: 900 }, serviceWorkers: "block" });
   abertos.push(ctx);

@@ -252,6 +252,8 @@ export function openDados(it) {
           Object.assign(patch, { followup: U.todayStr(), separadoEm: it.separadoEm || U.todayStr(), separadoSeg: segDe(it) });
       }
       close();
+      // equipe editou: avisa o Adriano (qual aluno, o que mudou e quem editou)
+      if (!C.isAdmin) avisarEdicao(it, patch);
       // telefone novo entra no índice (para achar a família depois); se falhar, não atrapalha o salvar
       const novosTels = patch.telefones.filter(t => !(it.telefones || []).includes(t));
       if (novosTels.length && colNome() === "repasse") {
@@ -270,4 +272,32 @@ export function openDados(it) {
       );
     });
   });
+}
+
+// O que mudou nos dados do aluno (para o aviso ao Adriano)
+export function camposMudados(it, patch) {
+  const ctt = cs => (cs || []).map(c => [c.tipo, U.chave(c.nome), c.tel].join("|")).join(";");
+  const out = [];
+  if (norm(patch.nome) !== norm(it.nome)) out.push(`nome: ${title(it.nome || "")} → ${title(patch.nome || "")}`);
+  if (norm(patch.escola) !== norm(it.escola)) out.push(`colégio: ${title(it.escola || "")} → ${title(patch.escola || "")}`);
+  if ((Number(patch.ano) || null) !== (Number(it.ano) || null)) out.push(`ano: ${it.ano || "—"} → ${patch.ano || "—"}`);
+  if ("codigo" in patch && patch.codigo !== (it.codigo || "")) out.push(`ID: ${it.codigo || "—"} → ${patch.codigo || "—"}`);
+  if (ctt(patch.contatos) !== ctt(it.contatos)) out.push("contatos");
+  return out;
+}
+function avisarEdicao(it, patch) {
+  const campos = camposMudados(it, patch);
+  if (!campos.length) return;
+  FS.addDoc(FS.collection(db, "edicoes"), {
+    col: colNome(),
+    alunoId: it.id,
+    aluno: patch.nome || it.nome || "",
+    escola: patch.escola || it.escola || "",
+    ano: patch.ano || it.ano || null,
+    campos,
+    por: C.me || "",
+    porEmail: C.email || "",
+    em: new Date().toISOString(),
+    visto: false
+  }).catch(e => console.warn("[Z7] aviso de edição", e));
 }

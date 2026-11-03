@@ -585,3 +585,11 @@ test("formatura: Caído só com motivo; só o Adriano tira do Caído; a equipe n
   await assertFails(getDoc(doc(como(ANA), "contratos", "i1")));
   await assertSucceeds(setDoc(doc(db, "contratos", "i1"), { numero: "1" }));
 });
+
+test("edições da equipe: cria o aviso só com o próprio e-mail; só o admin lê e marca como visto", async () => {
+  const db = como(ANA);
+  await assertSucceeds(setDoc(doc(db, "edicoes", "e1"), { aluno: "BIA", porEmail: ANA, visto: false }));
+  await assertFails(setDoc(doc(db, "edicoes", "e2"), { aluno: "BIA", porEmail: PEDRO, visto: false }));
+  await assertFails(getDoc(doc(db, "edicoes", "e1")));
+  await assertSucceeds(updateDoc(doc(como(ADRIANO), "edicoes", "e1"), { visto: true }));
+});

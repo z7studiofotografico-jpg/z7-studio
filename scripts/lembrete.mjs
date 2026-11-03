@@ -73,6 +73,8 @@ const becasRet = becasAbertas.filter(b => b.status === "reservado" && b.retirada
 // Para o Adriano (Regra 10): pedidos de exclusão da equipe, alunos de aluguel atrasados na devolução e
 // colégios que "Não fecharam" com o retorno chegando (7 dias antes)
 const exclPend = (await db.collection("exclusoes").where("status", "==", "pendente").get()).size;
+// dados de aluno editados pela equipe que o Adriano ainda não viu
+const edicoesPend = (await db.collection("edicoes").where("visto", "==", false).get()).size;
 const alugAtr = (await db.collection("alugueis").where("status", "==", "Retirou a beca").get()).docs.filter(d => {
   const x = d.data();
   return x.devolucao && x.devolucao < hoje && !x.excluido;
@@ -150,6 +152,7 @@ for (const t of tokensSnap.docs) {
       ped = souAdmin ? pedidosPR : 0,
       num = souAdmin ? pedNumeros : 0,
       exc = souAdmin ? exclPend : 0,
+      edi = souAdmin ? edicoesPend : 0,
       alA = souAdmin ? alugAtr : 0,
       nfv = souAdmin ? naoFechouVolta : 0,
       vir = souAdmin ? viradaPend : 0;
@@ -169,6 +172,7 @@ for (const t of tokensSnap.docs) {
       !bec &&
       !avisar &&
       !vir &&
+      !edi &&
       !ofe &&
       !ped &&
       !num &&
@@ -213,6 +217,7 @@ for (const t of tokensSnap.docs) {
         `📩 ${ped} pedido${ped > 1 ? "s" : ""} de aluno repetido no PR` +
           (trocaramColegio ? ` (🏫 ${trocaramColegio} trocou de colégio)` : "")
       );
+    if (edi) partes.push(`✏️ ${edi} aluno${edi > 1 ? "s" : ""} com dados editados pela equipe (ver quem editou no PR)`);
     if (exc) partes.push(`🗑️ ${exc} pedido${exc > 1 ? "s" : ""} de exclusão da equipe para aprovar`);
     if (alA) partes.push(`👘 ${alA} aluno${alA > 1 ? "s" : ""} atrasado${alA > 1 ? "s" : ""} na devolução da beca`);
     if (vir) partes.push(`🔁 Formatura: ${vir} aluno${vir > 1 ? "s" : ""} de turmas anteriores ainda na Linha de Frente (fazer a virada)`);

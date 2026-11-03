@@ -285,6 +285,11 @@ service cloud.firestore {
       allow delete: if admin();
     }
     // Importações de planilha (para desfazer): só o admin
+    // Edições de dados feitas pela equipe (aviso ao Adriano): a equipe só cria o aviso com o próprio e-mail
+    match /edicoes/{id} {
+      allow read, update, delete: if admin();
+      allow create: if membro() && request.resource.data.porEmail == email() && request.resource.data.visto == false;
+    }
     match /importacoes/{id} { allow read, write: if admin(); }
     // Pedidos de exclusão da equipe (Regra 4): a equipe cria o pedido; só o admin decide
     match /exclusoes/{id} {

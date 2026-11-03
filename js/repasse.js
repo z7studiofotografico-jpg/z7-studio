@@ -98,6 +98,7 @@ function mostrar(container) {
   if (!ok.includes(seg)) mudarSeg(ok[0] || "lf");
   renderSegs();
   loadMeta().then(refreshStats);
+  avisoEdicoes();
   refreshLote();
   openTab(tab);
 }
@@ -164,6 +165,10 @@ function mount() {
   segs.id = "rSegs";
   segs.setAttribute("role", "tablist");
   v.append(segs);
+  const edc = el("p", "notice");
+  edc.id = "rEdicoes";
+  edc.hidden = true;
+  v.append(edc);
   const semP = el("p", "wait");
   semP.id = "rSemPreco";
   semP.hidden = true;
@@ -310,6 +315,9 @@ function renderChips() {
   });
 }
 
+function avisoEdicoes() {
+  if (C.isAdmin) import("./edicoes.js").then(m => m.faixaEdicoes(C, $("rEdicoes"))).catch(() => {});
+}
 function avisoPreco() {
   const x = $("rSemPreco");
   if (!x) return;

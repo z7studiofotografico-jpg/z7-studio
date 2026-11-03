@@ -25,6 +25,7 @@ export const COLECOES = [
   "movEstoque",
   "produtos",
   "exclusoes",
+  "edicoes",
   "importacoes",
   "contratos",
   "respostas",

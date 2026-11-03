@@ -292,12 +292,12 @@ function travaDoCartao(it, li) {
 // Botões do cartão conforme a etapa (e: o cartão, para o aviso de venda a conferir)
 function acoesDoCartao(it, li, e) {
   const act = el("div", "actions");
-  if (it.etapa === "INCOMPLETO" || C.isAdmin)
-    act.append(
-      U.mkBtn(it.etapa === "INCOMPLETO" ? "Completar dados" : "Editar dados", it.etapa === "INCOMPLETO" ? "btn-primary" : "", () =>
-        openDados(it)
-      )
-    );
+  // a equipe também corrige os dados e os contatos; o Adriano é avisado de quem editou qual aluno
+  act.append(
+    U.mkBtn(it.etapa === "INCOMPLETO" ? "Completar dados" : "Editar dados", it.etapa === "INCOMPLETO" ? "btn-primary" : "", () =>
+      openDados(it)
+    )
+  );
   // admin: passar este aluno para alguém da equipe
   if (C.isAdmin && !["PAGO", "ENTREGUE", "SEM TELEFONE"].includes(it.etapa))
     act.append(
