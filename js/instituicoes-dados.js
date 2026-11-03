@@ -17,7 +17,7 @@ export const cartaoDoTipo = t => (t === "faculdade" || t === "profissionalizante
 export const semSeries = t => t === "faculdade" || t === "profissionalizante" || t === "superior";
 export const ETAPAS = ["A VISITAR", "AGENDAR VISITA", "VISITADO", "PROPOSTA ENVIADA", "FECHADO", "NÃO FECHOU"];
 export const ABERTAS = ["A VISITAR", "AGENDAR VISITA", "VISITADO", "PROPOSTA ENVIADA"];
-export const CARGOS = ["Direção", "Coordenação", "Secretaria", "Recepção", "Comissão de formatura", "Professor(a)", "Outro"];
+export const CARGOS = ["Direção", "Coordenação", "Secretaria", "Recepção", "Comercial / Marketing", "Comissão de formatura", "Professor(a)", "Outro"];
 export const FOTOGRAFO = ["Não tem fotógrafo", "Só datas comemorativas", "Já tem empresa de formatura", "Não sei"];
 export const RESULTADOS = [
   ["Fechou 🎉", "FECHADO"],
