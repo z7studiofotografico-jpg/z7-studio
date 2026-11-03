@@ -58,6 +58,8 @@ export function ligarAjustes(ctx, o) {
     ["pPasKitCartao", "kitCartao"],
     ["pPasKitFinal", "kitFinal"]
   ];
+  // Preços da Formatura (Linha de Frente e Repasse, Etapa 5): config/app → formatura = { mesmos campos }
+  const FORMATURA = PASPATUR.map(([id, k]) => [id.replace("pPas", "pFor"), k]);
   // Ajustes (só admin): os últimos erros do app registrados pelos aparelhos (defeitos, não falta de internet)
   async function mostrarErros() {
     try {
@@ -86,6 +88,7 @@ export function ligarAjustes(ctx, o) {
     });
     $("pEquipes").value = String(ctx.P.equipesDia || 1);
     PASPATUR.forEach(([id, k]) => ($(id).value = (ctx.P.paspatur || {})[k] || ""));
+    FORMATURA.forEach(([id, k]) => ($(id).value = (ctx.P.formatura || {})[k] || ""));
     feriadosExtras(ctx.P.feriadosExtras);
     listarFeriados();
     montarComissao();
@@ -193,7 +196,8 @@ export function ligarAjustes(ctx, o) {
     Object.assign(body, {
       equipesDia: Number($("pEquipes").value) || 1,
       comissao: lerComissao(),
-      paspatur: Object.fromEntries(PASPATUR.map(([id, k]) => [k, lerAjuste.reais($(id).value)]))
+      paspatur: Object.fromEntries(PASPATUR.map(([id, k]) => [k, lerAjuste.reais($(id).value)])),
+      formatura: Object.fromEntries(FORMATURA.map(([id, k]) => [k, lerAjuste.reais($(id).value)]))
     });
     // WhatsApp da empresa: número válido e que não seja o de trabalho de alguém da equipe (cada um com o seu)
     const outros = numerosDosOutros(ctx.usuarios, ctx.email, true);

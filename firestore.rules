@@ -263,13 +263,17 @@ service cloud.firestore {
       allow delete: if admin();
     }
     // Produtos e estoque (Etapa 6): todos leem o catálogo; a equipe só mexe nas quantidades (reserva/baixa das vendas)
+    function estoqueOk() {
+      return request.resource.data.get('fisico', 0) >= 0 && request.resource.data.get('reservado', 0) >= 0
+        && request.resource.data.get('reservado', 0) <= request.resource.data.get('fisico', 0);
+    }
     match /produtos/{id} {
       allow read: if membro();
-      allow create, update: if admin() || (membro() && request.resource.data.keys().hasOnly(['fisico', 'reservado', 'atualizadoEm'])
-        && (resource == null || request.resource.data.diff(resource.data).affectedKeys().hasOnly(['fisico', 'reservado', 'atualizadoEm']))
-        // estoque nunca negativo e reservado nunca maior que o físico (o app já confere; o banco garante)
-        && request.resource.data.get('fisico', 0) >= 0 && request.resource.data.get('reservado', 0) >= 0
-        && request.resource.data.get('reservado', 0) <= request.resource.data.get('fisico', 0));
+      // a equipe só mexe no estoque (físico e reservado), nunca no preço nem na ficha; nunca negativo e
+      // reservado nunca maior que o físico (o app já confere; o banco garante)
+      allow create: if admin() || (membro() && request.resource.data.keys().hasOnly(['fisico', 'reservado', 'atualizadoEm']) && estoqueOk());
+      allow update: if admin() || (membro()
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['fisico', 'reservado', 'atualizadoEm']) && estoqueOk());
       allow delete: if admin();
     }
     // Registro de cada movimento do estoque: só se acrescenta, ninguém muda
