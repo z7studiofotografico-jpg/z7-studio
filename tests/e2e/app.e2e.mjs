@@ -2710,6 +2710,34 @@ await cenario("Produtos e estoque (entrada, estorno com motivo, preço mínimo)"
   ok(st["produtos/paspatur"].preco === 50 && st["produtos/paspatur"].precoMin === 40, "preço e preço mínimo salvos");
   ok(!erros.length, "sem erros no console: " + erros.join(" | "));
 });
+await cenario("Dashboard por módulo (separado, por turma e por caixa)", async () => {
+  const Y = new Date().getFullYear();
+  const d = Object.assign({}, base, {
+    "paspatur/p1": { nome: "Ana", etapa: "PAGO", pagoEm: dia(-1), valor: 80, ano: Y - 1 },
+    "formaturaAlunos/a1": { nome: "Bia", etapa: "PAGO", pagoEm: dia(-2), valor: 300, ano: Y - 1, seg: "rep" }
+  });
+  const { pg, erros, store } = await abrir(ADRIANO, migrar(d));
+  await ir(pg, "#vendas");
+  await calmo(pg);
+  await pg.locator("#viewVendas .seg", { hasText: "Por módulo" }).click();
+  await pg.waitForFunction(() => /Por turma × por caixa/.test(document.getElementById("vdCorpo")?.textContent || ""), null, {
+    timeout: 15000
+  });
+  const st = await store();
+  const m = (st["resumos/modulos"] || {}).mods || {};
+  ok(
+    m.paspatur && m.paspatur.totalC === 8000 && m.frep && m.frep.totalC === 30000,
+    "resumo por módulo gravado (Paspatur e Formatura Repasse separados)"
+  );
+  ok(m.geral && m.geral.totalC >= 38000, "o Geral soma os módulos");
+  await pg.locator("#vdCorpo .chip", { hasText: "Paspatur" }).click();
+  await pg.waitForFunction(() => /R\$ 80,00/.test(document.getElementById("vdCorpo")?.textContent || ""), null, { timeout: 8000 });
+  ok(true, "painel do Paspatur mostra só o Paspatur");
+  await pg.locator("#vdCorpo .chip", { hasText: "Instituições" }).click();
+  await calmo(pg);
+  ok(/Por que não fecharam/.test(await pg.textContent("#vdCorpo")), "instituições: visitadas, fechadas e motivos de não fechar");
+  ok(!erros.length, "sem erros no console: " + erros.join(" | "));
+});
 await cenario("Convite: criar a senha dentro do app", async () => {
   const ctx = await browser.newContext({ viewport: { width: 420, height: 900 }, serviceWorkers: "block" });
   abertos.push(ctx);

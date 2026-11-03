@@ -10,6 +10,7 @@ import * as U from "./util.js";
 import { botaoRelatorio, copiaDaTela } from "./relatorio.js";
 import { prPorAno } from "./vendas-anos.js";
 import { areaHistorico } from "./vendas-historico.js";
+import { areaModulos } from "./vendas-modulos.js";
 let C,
   FS,
   db,
@@ -19,6 +20,7 @@ let C,
   charts = [];
 const AREAS = [
   ["geral", "Geral"],
+  ["mod", "🧩 Por módulo"],
   ["pr", "🖼️ PR"],
   ["form", "🎓 Formaturas"],
   ["funil", "💬 Funil"],
@@ -188,8 +190,13 @@ function desenhar() {
   if (!corpo) return;
   // o período (este mês, 12 meses…) não vale para o histórico por ano
   const chipsP = document.querySelector("#viewVendas > .chips");
-  if (chipsP) chipsP.hidden = area === "hist";
+  if (chipsP) chipsP.hidden = area === "hist" || area === "mod";
   // Histórico por ano: não depende do resumo dos meses
+  // Por módulo (Etapa 7): cada módulo separado, por turma e por caixa
+  if (area === "mod") {
+    corpo.innerHTML = "";
+    return areaModulos(corpo, { C, caixa, canvas, tabela, lista, registrar: ch => charts.push(ch), limpar: hide });
+  }
   if (area === "hist") {
     corpo.innerHTML = "";
     return areaHistorico(corpo, { C, caixa, canvas, tabela, lista, registrar: ch => charts.push(ch), limpar: hide });
