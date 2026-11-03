@@ -354,6 +354,13 @@ function card(it) {
   const act = el("div", "actions");
   act.append(U.mkBtn("📝 Registrar visita / contato", "btn-primary", () => openVisita(it)));
   if (it.etapa !== "FECHADO") act.append(U.mkBtn("❌ Não fechou", "", () => abrirNaoFechou(C, it, (patch, msg) => save(it, patch, msg))));
+  act.append(
+    U.mkBtn("🆘 Ajuda de vendas", "", () =>
+      import("./ajuda-vendas.js")
+        .then(m => m.abrirAjuda(C, { colegio: it.nome, modulo: "formatura", contato: ((it.contatos || [])[0] || {}).nome }))
+        .catch(e => C.handleErr(e))
+    )
+  );
   // admin: passar o PR deste colégio (de um ano) para alguém da equipe
   if (C.isAdmin && C.pode("pr")) act.append(U.mkBtn("📤 Passar o PR para a equipe", "", () => passarColegio(C, it)));
   if (it.etapa !== "FECHADO")

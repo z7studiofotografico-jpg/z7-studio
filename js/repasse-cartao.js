@@ -20,6 +20,7 @@ import {
   status,
   lockInfo,
   contatoPadrao,
+  tipoPR,
   precoTxt,
   parcDe,
   assumir,
@@ -321,6 +322,21 @@ function acoesDoCartao(it, li, e) {
     );
   if (ABERTAS.includes(it.etapa)) {
     act.append(U.mkBtn("Pagou 💰", "btn-ok", () => openPago(it)));
+    act.append(
+      U.mkBtn("🆘 Ajuda de vendas", "", () =>
+        import("./ajuda-vendas.js")
+          .then(m =>
+            m.abrirAjuda(C, {
+              aluno: it.nome,
+              colegio: it.escola,
+              precoModulo: precoTxt(it),
+              modulo: tipoPR === "paspatur" ? "Paspatur" : ehFormatura() ? "kit da formatura" : "kit PR",
+              contato: (contatoPadrao(it) || {}).nome
+            })
+          )
+          .catch(e2 => C.handleErr(e2))
+      )
+    );
     act.append(U.mkBtn("Remarcar +1d", "", () => save(it, { followup: U.addDays(1) }, "Remarcado para " + U.fmtDate(U.addDays(1)))));
     act.append(U.mkBtn("Não quer", "", () => save(it, { etapa: "NÃO QUER", followup: null, atendendo: null }, "Contato encerrado")));
     act.append(

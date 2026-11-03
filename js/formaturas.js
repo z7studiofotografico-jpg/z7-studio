@@ -140,6 +140,13 @@ export function show() {
     })
     .catch(e => C.handleErr(e));
 }
+// "🆘 Ajuda de vendas" no aluno da Venda Antecipada (sem telefone no texto para o Claude)
+const ajuda = f =>
+  U.mkBtn("🆘 Ajuda de vendas", "", () =>
+    import("./ajuda-vendas.js")
+      .then(m => m.abrirAjuda(C, { aluno: f.nome, colegio: f.instNome, modulo: "kit da formatura" }))
+      .catch(e => C.handleErr(e))
+  );
 // Venda Antecipada: os contratos (kits e parcelas), com o painel de cobrança
 function mostrarVA(v) {
   // qual WhatsApp usar nas cobranças: o da empresa (admin) ou os da própria pessoa (equipe)
@@ -445,6 +452,7 @@ function renderCobrancas(corpo, cob) {
         U.mkBtn("💠 Paga por Pix", "", () => pagaPorPix(C, f).catch(er => C.handleErr(er)))
       );
     if (f.tel) act.append(U.mkBtn("💬 Cobrar", at ? "btn-primary" : "", () => cobrarWa(C, f)));
+    act.append(ajuda(f));
     act.append(U.mkBtn("📅 Pediu contato depois", "", () => retornoFormando(C, f)));
     const inst = insts.find(i => i.id === f.instId);
     if (inst) act.append(U.mkBtn("Ver turma", "", () => abrirTurma(inst)));

@@ -523,7 +523,7 @@ await cenario("Adriano (admin), com os dados já atualizados no servidor", async
       s["ensaios/c1"].titulo === "" && s["privado/c1"] && s["privado/c1"].titulo === "Consulta médica",
       "assunto particular foi para 'privado'"
     );
-    ok((await visiveis(pg)).length === 7, "admin vê os 7 cards");
+    ok((await visiveis(pg)).length === 8, "admin vê os 8 cards");
     ok(/1 para hoje/.test(await pg.textContent("#tFunil")), "card do Funil conta o contato de hoje");
     ok(/atrasad/.test(await pg.textContent("#tFormaturas")), "card Formaturas mostra parcela atrasada");
     // Ajustes: 9.5 não pode virar 95
@@ -1798,7 +1798,15 @@ await cenario("Relatórios para imprimir (um por card)", async () => {
       await pg.getByRole("button", { name: "+ Aluno" }).click();
       const fa = pg.locator(".sheet:visible").filter({ hasText: "Incluir aluno no PR" }).last();
       await fa.getByLabel("WhatsApp").fill("20988887777");
-      ok(/DDD 20 não existe/.test(await fa.textContent()), "telefone errado: avisa na hora no cadastro");
+      ok(
+        await fa
+          .getByText(/DDD 20 não existe/)
+          .first()
+          .waitFor({ timeout: 4000 })
+          .then(() => true)
+          .catch(() => false),
+        "telefone errado: avisa na hora no cadastro"
+      );
       await pg.evaluate(() => document.querySelectorAll(".sheet").forEach(x => (x.id ? (x.hidden = true) : x.remove())));
       await incluirAluno(pg, { nome: "Zuleica Nova", colegio: "Colegio Alfa", tel: "20988887777", contato: "Rita" });
       const z = Object.values(await store()).find(x => x.nome === "Zuleica Nova");
@@ -2736,6 +2744,43 @@ await cenario("Dashboard por módulo (separado, por turma e por caixa)", async (
   await pg.locator("#vdCorpo .chip", { hasText: "Instituições" }).click();
   await calmo(pg);
   ok(/Por que não fecharam/.test(await pg.textContent("#vdCorpo")), "instituições: visitadas, fechadas e motivos de não fechar");
+  ok(!erros.length, "sem erros no console: " + erros.join(" | "));
+});
+await cenario("Ajuda de vendas (respostas prontas e texto para o Claude sem telefone)", async () => {
+  const Y = new Date().getFullYear();
+  const d = Object.assign({}, base, {
+    "repasse/aj1": {
+      nome: "MARIA DA SILVA",
+      nomeBusca: "MARIA DA SILVA",
+      escola: "COLEGIO ALFA",
+      ano: Y,
+      etapa: "SEPARADO",
+      resp: "Adriano",
+      respEmail: ADRIANO,
+      separadoEm: dia(0),
+      followup: dia(0),
+      contatos: [{ tipo: "Mãe", nome: "Rosa", tel: "21988887777" }],
+      telefones: ["21988887777"]
+    }
+  });
+  const { pg, erros } = await abrir(ADRIANO, migrar(d));
+  await pg
+    .context()
+    .grantPermissions(["clipboard-read", "clipboard-write"])
+    .catch(() => {});
+  await ir(pg, "#pr");
+  await calmo(pg);
+  await pg.locator("article", { hasText: "Maria" }).first().getByRole("button", { name: "🆘 Ajuda de vendas" }).click();
+  const sh = pg.locator(".sheet").last();
+  await sh.getByRole("button", { name: "“Está caro”" }).click();
+  ok(/Olá, Rosa!.*Maria/s.test(await sh.locator("textarea").inputValue()), "resposta pronta com o nome do contato e do aluno");
+  await sh.getByRole("button", { name: "🤖 Copiar para perguntar ao Claude" }).click();
+  await calmo(pg);
+  const clip = await pg.evaluate(() => navigator.clipboard.readText().catch(() => ""));
+  ok(
+    /COLE AQUI A DÚVIDA DO CLIENTE/.test(clip) && /Aluno\(a\): Maria/.test(clip) && !/988887777|Silva|Rosa/.test(clip),
+    "texto para o Claude: regras e dúvida, sem telefone, sobrenome nem contato"
+  );
   ok(!erros.length, "sem erros no console: " + erros.join(" | "));
 });
 await cenario("Convite: criar a senha dentro do app", async () => {
