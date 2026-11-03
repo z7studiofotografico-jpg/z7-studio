@@ -49,3 +49,32 @@ test("busca as fotos do aluno no Drive (colégio pelo ano e nome, aluno pelo nom
   const nada = await d.fotosDoAluno("raiz", { nome: "Domingos Jose", escola: "CIEP 225", ano: 2022 });
   assert.match(nada.erro, /ainda não estão no Drive/);
 });
+test("link direto da pasta de um colégio e nome com letra a menos (YONE × YONNE)", async () => {
+  const F = "application/vnd.google-apps.folder";
+  const arvore = {
+    col: [
+      { id: "s2", name: "CEYMS 02 - DOMINGOS JOSE.jpg", mimeType: "image/jpeg" },
+      { id: "p2", name: "CEYMS 02 - DOMINGOS JOSE", mimeType: F }
+    ],
+    p2: [{ id: "f1", name: "x.jpg", mimeType: "image/jpeg" }]
+  };
+  const buscar = async url => {
+    const u = decodeURIComponent(url);
+    if (/\/files\/col\?/.test(u)) return { ok: true, json: async () => ({ name: "Prévias - 2022 - C.E. YONE MARIA SIQUEIRA" }) };
+    const pai = u.match(/'([^']+)' in parents/)[1];
+    return { ok: true, json: async () => ({ files: arvore[pai] || [] }) };
+  };
+  const r = await criarDrive("K", buscar).fotosDoAluno("col", {
+    nome: "DOMINGOS JOSE",
+    escola: "C.E YONNE MARIA SIQUEIRA DE ANDRADE",
+    ano: 2022
+  });
+  assert.deepEqual(
+    r.fotos.map(f => f.id),
+    ["f1"]
+  );
+  assert.deepEqual(
+    r.folhas.map(f => f.id),
+    ["s2"]
+  );
+});

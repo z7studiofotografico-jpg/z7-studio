@@ -85,6 +85,10 @@ export function criarDrive(chaveApi, buscar = fetch) {
     } while (token);
     return (cache[pai] = out);
   }
+  async function nomeDe(id) {
+    const r = await buscar(`${API}/${id}?fields=name&supportsAllDrives=true&key=${chaveApi}`);
+    return r.ok ? (await r.json()).name || "" : "";
+  }
   async function baixar(id) {
     const r = await buscar(`${API}/${id}?alt=media&supportsAllDrives=true&key=${chaveApi}`);
     if (!r.ok) throw new Error("Não consegui baixar a foto (" + r.status + ").");
@@ -92,10 +96,16 @@ export function criarDrive(chaveApi, buscar = fetch) {
   }
   // { folhas: [arquivo], fotos: [arquivo] } do aluno, ou { erro }
   async function fotosDoAluno(raiz, it) {
-    const colegios = (await listar(raiz)).filter(f => f.mimeType === PASTA);
-    const k = chaveColegio(it.escola || "");
-    // mesmo colégio: a chave igual, ou uma começa com a outra ("YONNE MARIA SIQUEIRA" e "YONNE MARIA SIQUEIRA ANDRADE")
-    const mesmo = c => !!k && !!c && (c === k || k.startsWith(c + " ") || c.startsWith(k + " "));
+    // a pasta do link pode ser a geral ("Z7 – Prévias PR", com uma pasta por colégio) ou já a de um colégio
+    let colegios = (await listar(raiz)).filter(f => f.mimeType === PASTA && /^Pr[ée]vias\s*-/i.test(f.name));
+    if (!colegios.length) colegios = [{ id: raiz, name: await nomeDe(raiz) }];
+    // letras dobradas não contam ("YONE" e "YONNE"); uma chave pode ser o começo da outra ("… SIQUEIRA" e "… SIQUEIRA ANDRADE")
+    const simples = c => String(c || "").replace(/([A-Z])\1+/g, "$1");
+    const k = simples(chaveColegio(it.escola || ""));
+    const mesmo = c0 => {
+      const c = simples(c0);
+      return !!k && !!c && (c === k || k.startsWith(c + " ") || c.startsWith(k + " "));
+    };
     const col = colegios.find(f => {
       const c = lerPastaColegio(f.name);
       return mesmo(c.chave) && (!it.ano || !c.ano || c.ano === Number(it.ano));
