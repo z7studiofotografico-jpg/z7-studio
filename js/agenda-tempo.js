@@ -1,7 +1,7 @@
 // Agenda: contas de horário (puras, testadas em tests/agenda-tempo.test.mjs).
 import * as U from "./util.js";
 const SEMANA = ["dom", "seg", "ter", "qua", "qui", "sex", "sáb"];
-const ICO = { formatura: "🎓", fotos: "📸" };
+const ICO = { formatura: "🎓", fotos: "📸", paspatur: "🎞️", becas: "👘" };
 export const TIPOS_ENSAIO = [
   "Formatura individual",
   "Formatura em grupo",

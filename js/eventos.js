@@ -41,12 +41,17 @@ export function produtos(t) {
 // O vendedor sugere a data (fica "pendente", o dia já fica segurado) e só a Luciana confirma.
 export const KINDS = {
   formatura: { campo: "formatura", nome: "Formatura", ico: "🎓" },
-  fotos: { campo: "diaFotos", nome: "Dia de fotos", ico: "📸" }
+  fotos: { campo: "diaFotos", nome: "Dia de fotos", ico: "📸" },
+  // colégio que faz só o Paspatur, ou o aluguel de becas no colégio (medir e entregar): cada um no seu dia
+  paspatur: { campo: "diaPaspatur", nome: "Paspatur", ico: "🎞️" },
+  becas: { campo: "diaBecas", nome: "Aluguel de becas", ico: "👘" }
 };
 // Nome do compromisso com o nome da instituição: "Dia de fotos no Colégio Alfa", "Formatura do Colégio Alfa"
 export function nomeEvento(kind, instNome) {
   const n = title(instNome || "");
   if (!n) return KINDS[kind] ? KINDS[kind].nome : "Compromisso";
+  if (kind === "paspatur") return `Paspatur no ${n}`;
+  if (kind === "becas") return `Aluguel de becas no ${n}`;
   return kind === "fotos" ? `Dia de fotos no ${n}` : `Formatura do ${n}`;
 }
 const STATUS_TXT = { pendente: "⏳ aguardando a Luciana", confirmado: "✅ confirmado", recusado: "❌ recusado" };
@@ -153,7 +158,8 @@ export function camposEvento(kind, f, instNome, dia) {
   hora.type = "time";
   hora.value = (f && f.hora) || "";
   const r1 = el("div", "row2");
-  r1.append(field(kind === "formatura" ? "Dia da formatura" : "Dia das fotos", data), field("Horário", hora));
+  const rotDia = { formatura: "Dia da formatura", paspatur: "Dia das fotos do Paspatur", becas: "Dia de medir / entregar as becas" };
+  r1.append(field(rotDia[kind] || "Dia das fotos", data), field("Horário", hora));
   // feriado só avisa (pode marcar)
   const avFer = el("p", "wait");
   const verFer = () => {
@@ -184,7 +190,11 @@ export function camposEvento(kind, f, instNome, dia) {
     r2.append(field("Onde", onde), field("Local", local));
     box.append(r2);
   } else {
-    obs = inp((f && f.obs) || "Medir beca + ensaio de estúdio no colégio", "o que vai ser feito", 200);
+    const padrao = {
+      paspatur: "Fotos do Paspatur no colégio",
+      becas: "Medir e entregar as becas no colégio"
+    };
+    obs = inp((f && f.obs) || padrao[kind] || "Medir beca + ensaio de estúdio no colégio", "o que vai ser feito", 200);
     box.append(field("O que vai ser feito", obs));
   }
   if (f && f.status === "recusado")
@@ -394,6 +404,28 @@ export function openEvento(it, kind, dia) {
     }
     let avisado = false;
     const box = camposEvento(kind, ev, it.nome, dia);
+    // colégio que faz só as fotos (ex.: só o Paspatur no particular), sem formatura e sem aluguel de beca
+    let soFotos = null;
+    if (dBox) {
+      soFotos = el("input");
+      soFotos.type = "checkbox";
+      soFotos.checked = !!it.semFormatura && !(ev && ev.data);
+      const lSo = el("label", "chk");
+      lSo.append(soFotos, " Não tem formatura nem aluguel de beca: só as fotos (ex.: só o Paspatur)");
+      const lembrete = p.querySelector("p.hint");
+      p.insertBefore(lSo, dBox);
+      const sync = () => {
+        box.hidden = soFotos.checked;
+        if (lembrete) lembrete.hidden = soFotos.checked;
+        const t = p.querySelector("button[type=submit]");
+        if (t) {
+          t.dataset.orig = t.dataset.orig || t.textContent;
+          t.textContent = soFotos.checked && C.aprovador ? "Confirmar o dia das fotos" : t.dataset.orig;
+        }
+      };
+      soFotos.onchange = sync;
+      setTimeout(sync, 0);
+    }
     p.append(box);
     // Com quem foi combinado (recebe o WhatsApp e o e-mail) e a média de alunos (obrigatória)
     const resp = el("div", "imp");
@@ -474,7 +506,12 @@ export function openEvento(it, kind, dia) {
       evt.preventDefault();
       const f = box.valor(),
         fd = dBox ? dBox.valor() : null;
-      if (!f.data) {
+      const sem = !!(soFotos && soFotos.checked);
+      if (sem && !fd.data) {
+        dBox.erro("Escolha o dia das fotos.");
+        return;
+      }
+      if (!sem && !f.data) {
         box.erro("Escolha o dia.");
         return;
       }
@@ -506,6 +543,39 @@ export function openEvento(it, kind, dia) {
       if (fd) {
         fd.contato = contato;
         fd.alunos = nAl;
+      }
+      // Só as fotos: grava só o dia das fotos (sem formatura) e marca o colégio como "sem formatura"
+      if (sem) {
+        try {
+          if (ev && ev.data && ev.status !== "recusado") await liberar(it, kind);
+          const r = await reservarVarios(it, [["fotos", fd]]);
+          const patch = {
+            diaFotos: Object.assign(fd, { status: r.status, grupo: r.grupo, pedidoPor: C.me || "" }),
+            [K.campo]: null,
+            semFormatura: true,
+            atualizadoEm: new Date().toISOString()
+          };
+          if (!it.alunosConfirmados) {
+            patch.mediaAlunos = nAl;
+            patch.alunosEstimado = true;
+          }
+          if (ct.novo) patch.contatos = [...(it.contatos || []), contato];
+          await FS.updateDoc(FS.doc(db, "instituicoes", it.id), patch);
+          if (r.status === "confirmado") await avisarColegioPorEmail(it.id);
+          close();
+          painelAvisar(
+            C,
+            it.nome,
+            [Object.assign({ kind: "fotos" }, fd)],
+            contato,
+            nAl,
+            r.status === "confirmado" ? "Dia das fotos confirmado ✅" : "Dia segurado. Aguardando a Luciana aprovar."
+          );
+        } catch (e) {
+          dBox.erro(msgErroData(e));
+          if (!e.code) console.warn(e);
+        }
+        return;
       }
       // Sugestão (não obrigatório): lembra o vendedor do dia de medir beca + ensaio
       if (dBox && !fd.data && !avisado) {

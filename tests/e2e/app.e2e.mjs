@@ -2302,6 +2302,76 @@ await cenario("Agenda: agendar colégio no dia tocado", async () => {
   }
 });
 
+await cenario("Agenda: Paspatur, aluguel de becas e colégio só com fotos (sem formatura)", async () => {
+  const { pg, store, erros } = await abrir(ADRIANO, migrar(base));
+  const dia = n => {
+    const d = new Date();
+    d.setDate(d.getDate() + n);
+    while (feriado(iso(d)) || d.getDay() === 0) d.setDate(d.getDate() + 1);
+    return iso(d);
+  };
+  const agendar = async (tipo, data) => {
+    await ir(pg, "#agenda");
+    await pg.getByRole("button", { name: "+ Agendar colégio" }).click();
+    await calmo(pg);
+    let sh = pg.locator(".sheet").last();
+    await sh.getByLabel("O que vai marcar").selectOption(tipo);
+    await sh.getByLabel("Colégio").fill("Colegio Beta");
+    await sh.locator("button[type=submit]").click();
+    await calmo(pg);
+    sh = pg.locator(".sheet").last();
+    return sh;
+  };
+  const preencher = async sh => {
+    await sh.getByLabel("Média de alunos (obrigatório)").fill("40");
+    // da segunda vez a Marta já é contato do colégio (vem escolhida)
+    if (await sh.getByLabel("Nome", { exact: true }).isVisible()) {
+      await sh.getByLabel("Nome", { exact: true }).fill("Marta Diretora");
+      await sh.getByLabel("WhatsApp", { exact: true }).fill("21 98888-1111");
+    }
+  };
+  const d1 = dia(40),
+    d2 = dia(45),
+    d3 = dia(50);
+  let sh = await agendar("paspatur", d1);
+  ok(/Dia das fotos do Paspatur/.test(await sh.textContent()), "Paspatur: formulário próprio");
+  await sh.locator("input[type=date]").first().fill(d1);
+  await preencher(sh);
+  await sh.locator("button[type=submit]").click();
+  await calmo(pg);
+  let st = await store();
+  ok(
+    st["agenda/" + d1] && st["agenda/" + d1].kind === "paspatur" && st["instituicoes/i2"].diaPaspatur.data === d1,
+    "Paspatur agendado no colégio"
+  );
+  await pg.evaluate(() => document.querySelectorAll(".sheet").forEach(x => (x.id ? (x.hidden = true) : x.remove())));
+  sh = await agendar("becas", d2);
+  ok(/Dia de medir \/ entregar as becas/.test(await sh.textContent()), "Aluguel de becas: formulário próprio");
+  await sh.locator("input[type=date]").first().fill(d2);
+  await preencher(sh);
+  await sh.locator("button[type=submit]").click();
+  await calmo(pg);
+  st = await store();
+  ok(st["agenda/" + d2] && st["agenda/" + d2].kind === "becas", "Aluguel de becas agendado no colégio");
+  await pg.evaluate(() => document.querySelectorAll(".sheet").forEach(x => (x.id ? (x.hidden = true) : x.remove())));
+  // formatura → "Não tem formatura nem aluguel de beca": só o dia das fotos
+  sh = await agendar("formatura", d3);
+  await sh.getByLabel(/Não tem formatura nem aluguel de beca/).check();
+  await sh.locator("input[type=date]").first().fill(d3);
+  await preencher(sh);
+  await sh.locator("button[type=submit]").click();
+  await calmo(pg);
+  st = await store();
+  ok(
+    st["agenda/" + d3] &&
+      st["agenda/" + d3].kind === "fotos" &&
+      st["instituicoes/i2"].semFormatura === true &&
+      !st["instituicoes/i2"].formatura,
+    "colégio só com fotos: grava só o dia das fotos, sem formatura"
+  );
+  ok(erros.length === 0, "sem erros no console" + (erros.length ? ": " + erros.slice(0, 3).join(" | ") : ""));
+});
+
 await cenario("Cadastro sem módulos", async () => {
   const { pg } = await abrir(NOVO, Object.assign({}, base, { "config/app": { versaoDados: 4 } }));
   ok((await visiveis(pg)).length === 0, "não vê nenhum card");

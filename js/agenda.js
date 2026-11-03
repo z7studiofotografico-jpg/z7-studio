@@ -464,6 +464,8 @@ function agruparAlunos(lst) {
 export const TIPOS_EVENTO = {
   formatura: { ico: "🎓", nome: "Formatura", cor: "ev-formatura" },
   fotos: { ico: "📸", nome: "Dia de fotos", cor: "ev-fotos" },
+  paspatur: { ico: "🎞️", nome: "Paspatur no colégio", cor: "ev-paspatur" },
+  becasCol: { ico: "👘", nome: "Becas no colégio", cor: "ev-becascol" },
   ensaio: { ico: "📷", nome: "Ensaio", cor: "ev-ensaio" },
   comp: { ico: "📌", nome: "Compromisso", cor: "ev-comp" },
   bloqueio: { ico: "⛔", nome: "Dia bloqueado", cor: "ev-bloqueio" },
@@ -482,7 +484,11 @@ const tipoDe = it =>
         ? "formatura"
         : it.x.kind === "fotos"
           ? "fotos"
-          : "comp"
+          : it.x.kind === "paspatur"
+            ? "paspatur"
+            : it.x.kind === "becas"
+              ? "becasCol"
+              : "comp"
       : it.t === "e"
         ? "ensaio"
         : it.t === "p"

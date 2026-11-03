@@ -38,8 +38,8 @@ export function iniciar(ctx) {
 export const tela = { render() {} };
 export const ETAPAS_ENTREGA = ["Ensaio feito", "Fotos escolhidas", "Em edição", "Pronto", "Entregue"];
 export const $ = id => document.getElementById(id);
-export const CAMPO = { formatura: "formatura", fotos: "diaFotos" };
-export const ICO = { formatura: "🎓", fotos: "📸" };
+export const CAMPO = { formatura: "formatura", fotos: "diaFotos", paspatur: "diaPaspatur", becas: "diaBecas" };
+export const ICO = { formatura: "🎓", fotos: "📸", paspatur: "🎞️", becas: "👘" };
 export const MESES = [
   "janeiro",
   "fevereiro",

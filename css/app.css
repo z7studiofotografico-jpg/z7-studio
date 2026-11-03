@@ -351,3 +351,6 @@ details.tamtipo{border:1px solid var(--line,#ddd);border-radius:10px;padding:6px
 .lote-esc input[type=search]{width:100%;padding:8px 10px;border:1px solid var(--line);border-radius:10px;background:var(--surface);color:var(--fg);font:inherit}
 #viewFormaturas .vhead .agact,#viewProdutos .vhead .agact{justify-content:flex-start;flex-basis:100%}
 .prev-erro{margin:6px 0}.prev-erro small{display:block;margin-left:12px}
+.ev-paspatur{border-left-color:#0d9488;background:#dcf3ef}.ev-becascol{border-left-color:#1f7a4d;background:#e2f2e8}
+.agrow.ev-paspatur{border-left-color:#0d9488}.agrow.ev-becascol{border-left-color:#1f7a4d}
+@media (prefers-color-scheme:dark){.ev-paspatur{background:#123430}.ev-becascol{background:#17301f}}

@@ -24,13 +24,15 @@ export async function agendarColegio(ctx, dia) {
         "p",
         "hint",
         (dia ? `Dia ${U.fmtDate(dia)}/${dia.slice(0, 4)}. ` : "") +
-          "Para o dia de fotos no colégio (medir beca e fazer o ensaio do PR) ou para a formatura. A data fica segurada até a Luciana aprovar."
+          "Para o dia de fotos no colégio (medir beca e fazer o ensaio do PR), a formatura, o Paspatur ou o aluguel de becas no colégio. A data fica segurada até a Luciana aprovar."
       )
     );
     const tipoEv = sel(
       [
         ["fotos", "📸 Dia de fotos no colégio (PR)"],
-        ["formatura", "🎓 Formatura"]
+        ["formatura", "🎓 Formatura"],
+        ["paspatur", "🎞️ Paspatur (fotos no colégio)"],
+        ["becas", "👘 Aluguel de becas (medir / entregar no colégio)"]
       ],
       "fotos"
     );
