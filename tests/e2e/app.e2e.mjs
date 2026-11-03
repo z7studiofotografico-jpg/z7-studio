@@ -2664,6 +2664,52 @@ await cenario("Formaturas · abas Linha de Frente / Repasse / Venda Antecipada, 
   );
   ok(!erros.length, "sem erros no console: " + erros.join(" | "));
 });
+await cenario("Produtos e estoque (entrada, estorno com motivo, preço mínimo)", async () => {
+  const { pg, erros, store } = await abrir(ADRIANO, migrar(base));
+  await ir(pg, "#produtos");
+  await calmo(pg);
+  ok(/Paspatur/.test(await pg.textContent("#pdCorpo")), "catálogo aparece (Paspatur)");
+  await pg.locator("#pdCorpo .card", { hasText: "Paspatur" }).first().getByRole("button", { name: "📥 Entrada" }).click();
+  await pg.locator(".sheet").last().getByLabel("Quantidade").fill("10");
+  await pg.locator(".sheet").last().locator("button[type=submit]").click();
+  await pg.locator(".sheet").last().getByRole("button", { name: "Sim" }).click();
+  await calmo(pg);
+  let st = await store();
+  ok(st["produtos/paspatur"] && st["produtos/paspatur"].fisico === 10, "entrada de 10 paspatur no estoque físico");
+  ok(
+    Object.keys(st).some(k => k.startsWith("movEstoque/") && st[k].tipo === "entrada"),
+    "entrada fica no registro de movimentos"
+  );
+  // estorno sem motivo não passa
+  await pg.getByRole("button", { name: "↩️ Estorno" }).click();
+  const sh = pg.locator(".sheet").last();
+  await sh.getByLabel("Item").selectOption("paspatur");
+  await sh.getByLabel("Quantidade").fill("2");
+  await sh.locator("button[type=submit]").click();
+  await calmo(pg);
+  st = await store();
+  ok(st["produtos/paspatur"].fisico === 10, "estorno sem motivo não muda o estoque");
+  await sh.getByLabel("Motivo do estorno").fill("Cliente devolveu");
+  await sh.locator("button[type=submit]").click();
+  await pg.locator(".sheet").last().getByRole("button", { name: "Sim" }).click();
+  await calmo(pg);
+  st = await store();
+  ok(st["produtos/paspatur"].fisico === 12, "estorno com motivo volta ao estoque (" + st["produtos/paspatur"].fisico + ")");
+  // preço mínimo maior que o preço é recusado
+  await pg.locator("#pdCorpo .card", { hasText: "Paspatur" }).first().getByRole("button", { name: "✏️ Editar" }).click();
+  const ed = pg.locator(".sheet").last();
+  await ed.getByLabel("Preço (R$)").fill("50");
+  await ed.getByLabel("Preço mínimo (R$)").fill("60");
+  await ed.locator("button[type=submit]").click();
+  await calmo(pg);
+  ok(!(await store())["produtos/paspatur"].preco, "preço mínimo maior que o preço: não salva");
+  await ed.getByLabel("Preço mínimo (R$)").fill("40");
+  await ed.locator("button[type=submit]").click();
+  await calmo(pg);
+  st = await store();
+  ok(st["produtos/paspatur"].preco === 50 && st["produtos/paspatur"].precoMin === 40, "preço e preço mínimo salvos");
+  ok(!erros.length, "sem erros no console: " + erros.join(" | "));
+});
 await cenario("Convite: criar a senha dentro do app", async () => {
   const ctx = await browser.newContext({ viewport: { width: 420, height: 900 }, serviceWorkers: "block" });
   abertos.push(ctx);

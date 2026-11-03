@@ -88,6 +88,7 @@ const SHELL = [
   "./js/formatura-mensagens.js",
   "./js/formatura-virada.js",
   "./js/contrato-ficha.js",
+  "./js/produtos.js",
   "./js/becas.js",
   "./js/funil.js",
   "./js/equipe.js",

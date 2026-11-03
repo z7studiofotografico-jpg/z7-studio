@@ -93,13 +93,14 @@ function renderMe() {
 }
 // Módulos do app. Administradores e donos veem tudo; a equipe vê só o que foi marcado no cadastro (sem módulos = sem acesso).
 const MODULOS = [
-  ["funil", "Funil de vendas"],
-  ["lf", "PR · Linha de Frente"],
-  ["rep", "PR · Repasse"],
   ["agenda", "Agendamento"],
   ["colegios", "Instituições"],
+  ["becas", "Aluguel de becas"],
+  ["lf", "PR · Linha de Frente"],
+  ["rep", "PR · Repasse"],
   ["formaturas", "Formaturas"],
-  ["becas", "Aluguel de becas"]
+  ["produtos", "Produtos e estoque"],
+  ["funil", "Funil de vendas"]
 ];
 let verComo = lerVerComo();
 const emailReal = () => ((user && user.email) || "").toLowerCase();
@@ -152,6 +153,7 @@ const VIEWS = {
   vendas: "viewVendas",
   formaturas: "viewFormaturas",
   becas: "viewBecas",
+  produtos: "viewProdutos",
   instituicoes: "viewInst",
   colegios: "viewInst",
   "inst-particular": "viewInstTipo",
@@ -174,6 +176,7 @@ let repasseMod = null,
   vendasMod = null,
   formMod = null,
   becasMod = null,
+  prodMod = null,
   curView = "home";
 const APROVADORES = (CFG.aprovadores || []).map(e => String(e).toLowerCase());
 // Firestore com aviso de limite: toda consulta com limit(n) que voltar cheia avisa que a lista pode estar incompleta
@@ -341,6 +344,7 @@ async function route() {
     vendas: "vendas",
     formaturas: "formaturas",
     becas: "becas",
+    produtos: "produtos",
     funil: "funil",
     pr: "pr",
     repasse: "pr",
@@ -369,6 +373,17 @@ async function route() {
   if (vendasMod && key !== "vendas") vendasMod.hide();
   if (formMod && key !== "formaturas") formMod.hide();
   if (becasMod && key !== "becas") becasMod.hide();
+  if (key === "produtos") {
+    try {
+      if (!prodMod) {
+        prodMod = await import("./produtos.js");
+        prodMod.init(ctx);
+      }
+      prodMod.show();
+    } catch (e) {
+      telaFalhou($("viewProdutos"), "viewProdutos", e);
+    }
+  }
   if (key === "formaturas") {
     try {
       if (!formMod) {

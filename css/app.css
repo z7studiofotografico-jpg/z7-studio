@@ -338,3 +338,9 @@ details.tamtipo{border:1px solid var(--line,#ddd);border-radius:10px;padding:6px
 @media (prefers-color-scheme:dark){.chip.ch-visitado{background:#1b2a4a}}
 
 .sugerido{background:#fff6cc;border-color:#e0b400}
+.pd-grupo{margin:18px 0 6px;font-size:1rem;color:var(--muted);text-transform:uppercase;letter-spacing:.04em}
+.pd-est{display:flex;flex-wrap:wrap;gap:14px;align-items:baseline;margin:6px 0}
+.pd-est b{font-variant-numeric:tabular-nums}
+.pd-comprar{border-left:4px solid var(--warn)}
+.pd-ficha-q{display:flex;gap:6px}
+#viewProdutos input[type=search]{width:100%;margin:8px 0}
