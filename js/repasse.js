@@ -107,8 +107,8 @@ function mount() {
   g.innerHTML = `<summary>Como funciona o PR</summary><ol>
     <li><b>Linha de Frente</b> são os ensaios deste ano; <b>Repasse</b> são os dos anos anteriores. Em 1º de janeiro tudo vira sozinho: a Linha de Frente do ano que acabou passa para o Repasse.</li>
     <li><b>Separe o seu lote do dia</b> no quadro abaixo. O app não trava: separa 10 por vez e avisa quando você passar de 25 no dia na Linha de Frente ou de 20 no Repasse (os números mudam em ⚙️ Ajustes), para o WhatsApp não bloquear o número.</li>
-    <li>Cada cartão mostra <b>para quem mandar</b> (mãe, pai ou formando) e a mensagem pronta. O 1º contato só pede permissão para mandar a prévia.</li>
-    <li>Respondeu que quer ver? Toque em <b>Quer ver a prévia</b>, depois em <b>🖼️ Prévia</b>: arraste a foto do formando e o app monta o kit pronto para enviar.</li>
+    <li>Cada cartão mostra <b>para quem mandar</b> (mãe, pai ou aluno) e a mensagem pronta. O 1º contato só pede permissão para mandar a prévia.</li>
+    <li>Respondeu que quer ver? Toque em <b>Quer ver a prévia</b>, depois em <b>🖼️ Prévia</b>: arraste a foto do aluno e o app monta o kit pronto para enviar.</li>
     <li><b>Pagou?</b> Toque em <b>Pagou</b>. O cartão pede para <b>confirmar o endereço</b> (ou agendar a retirada no estúdio) e vai para <b>Entregas</b>, separado por cidade e bairro para montar a rota.</li>
     <li>Use o <b>WhatsApp mostrado no quadro do lote (📱)</b>: a equipe usa os próprios números de trabalho; o seletor troca por outro já liberado (ex.: o cliente bloqueou). O aviso de contatos por dia muda em ⚙️ Ajustes.</li></ol>`;
   v.append(g);
@@ -142,7 +142,7 @@ function mount() {
   const busca = el("div", "rbusca");
   busca.id = "rBusca";
   busca.hidden = true;
-  busca.innerHTML = `<input class="search" id="rQ" type="search" placeholder="Nome do formando ou telefone" aria-label="Buscar no repasse">
+  busca.innerHTML = `<input class="search" id="rQ" type="search" placeholder="Nome do aluno ou telefone" aria-label="Buscar no repasse">
     <select class="search" id="rEscola" aria-label="Filtrar por escola"><option value="">Ou escolha uma escola…</option></select>`;
   v.append(busca);
 

@@ -1,11 +1,12 @@
 // Instituições: cadastro (nova / editar) e registro de visita ou contato, com o próximo passo.
 import { el, title, field, inp, sel, sheet, botoes as actions, parseTel } from "./ui.js";
-import { reservarVarios, liberar, msgErroData, camposEvento, produtos, avisarColegioPorEmail } from "./eventos.js";
+import { reservarVarios, msgErroData, camposEvento, produtos, avisarColegioPorEmail } from "./eventos.js";
 import * as U from "./util.js";
 import { siglaDe } from "./aluno-id.js";
 import { TIPOS, CARTOES, CARGOS, FOTOGRAFO, RESULTADOS, PASSOS, SEGMENTOS, semSeries, norm, anoQueVem } from "./instituicoes-dados.js";
 import { C, FS, db, col, tipo, items } from "./instituicoes-estado.js";
 import { cadastroFalta, cadastroPendente } from "./instituicao-cadastro.js";
+import { abrirExcluirInst } from "./inst-excluir.js";
 // Atalhos de data do próximo passo
 function quandoBtns(target) {
   const q = el("div", "quick");
@@ -102,7 +103,7 @@ export function openForm(it) {
     extraQ.inputMode = "numeric";
     extraQ.className = "preco";
     const rx = el("div", "prow");
-    rx.append(el("span", null, semSeries(tipo) ? "Alunos formando (total)" : "Outras séries / total sem série"), extraQ);
+    rx.append(el("span", null, semSeries(tipo) ? "Alunos (total)" : "Outras séries / total sem série"), extraQ);
     segBox.append(rx);
     extraQ.addEventListener("input", somar);
     function somar() {
@@ -152,52 +153,13 @@ export function openForm(it) {
     nota.maxLength = 2000;
     nota.value = (it && it.notas) || "";
     p.append(field("Anotações gerais", nota));
-    // Apagar: o administrador apaga qualquer uma; o vendedor só a que está na conta dele
-    if (it && (C.isAdmin || (it.respEmail && it.respEmail === C.email))) {
-      const del = el("button", "btn btn-danger btn-sm", "Apagar instituição");
+    // Excluir (instituição inteira ou um ano) ou arquivar: o admin exclui; a equipe pede (Regra 4)
+    if (it && (C.isAdmin || C.ehMeu(it) || !it.respEmail)) {
+      const del = el("button", "btn btn-danger btn-sm", "🗑️ Excluir instituição ou ano");
       del.type = "button";
-      del.onclick = async () => {
-        if (del.dataset.ok) {
-          try {
-            // apaga junto os formandos (e parcelas) da turma, para nada ficar solto no Dashboard
-            const q = C.isAdmin
-              ? FS.query(FS.collection(db, "formandos"), FS.where("instId", "==", it.id))
-              : FS.query(FS.collection(db, "formandos"), FS.where("instId", "==", it.id), FS.where("respEmail", "==", C.email));
-            const fs = (await FS.getDocs(q)).docs;
-            if (!C.isAdmin) {
-              // dinheiro recebido e data confirmada com o colégio não somem pela mão da equipe
-              const pagos = fs.filter(d => {
-                const f = d.data();
-                return (f.pagas || 0) > 0 || (f.pagamentos || []).length;
-              }).length;
-              const confirmada = ["diaFotos", "formatura"].some(k => it[k] && it[k].status === "confirmado");
-              if (pagos || confirmada) {
-                U.toast(
-                  pagos
-                    ? `Tem ${pagos} formando${pagos > 1 ? "s" : ""} com parcela paga: só o administrador pode apagar`
-                    : "Tem data confirmada com o colégio: só o administrador pode apagar"
-                );
-                return;
-              }
-            }
-            await liberar(it, "formatura");
-            await liberar(it, "fotos");
-            for (let i = 0; i < fs.length; i += 400) {
-              const b = FS.writeBatch(db);
-              fs.slice(i, i + 400).forEach(d => b.delete(d.ref));
-              if (i + 400 >= fs.length) b.delete(FS.doc(db, "instituicoes", it.id));
-              await b.commit();
-            }
-            if (!fs.length) await FS.deleteDoc(FS.doc(db, "instituicoes", it.id));
-            U.toast(fs.length ? `Apagada, com ${fs.length} formando${fs.length > 1 ? "s" : ""}` : "Apagada");
-            close();
-          } catch (e) {
-            C.handleErr(e);
-          }
-        } else {
-          del.dataset.ok = 1;
-          del.textContent = "Toque de novo: apaga o colégio e os formandos dele";
-        }
+      del.onclick = () => {
+        close();
+        abrirExcluirInst(C, it);
       };
       p.append(del);
     }
@@ -434,7 +396,20 @@ export function openVisita(it) {
       if (etapa === "FECHADO") patch.fechadoEm = U.todayStr();
       if (formatura) patch.formatura = formatura;
       if (diaFotos) patch.diaFotos = diaFotos;
-      if (etapa === "NÃO FECHOU") patch.motivo = motivo.value.trim() || res.value;
+      if (etapa === "NÃO FECHOU") {
+        patch.motivo = motivo.value.trim() || res.value;
+        // retorno no ano seguinte (dá para mudar no botão "❌ Não fechou" do card)
+        const ret = quando.value || `${Number(U.todayStr().slice(0, 4)) + 1}-02-01`;
+        patch.naoFechou = {
+          motivo: res.value,
+          detalhe: motivo.value.trim(),
+          concorrente: "",
+          retorno: ret,
+          em: new Date().toISOString(),
+          por: C.me || ""
+        };
+        patch.followup = ret;
+      }
       const nomeF = falou.value.trim(),
         telF = parseTel(tel.value);
       close();

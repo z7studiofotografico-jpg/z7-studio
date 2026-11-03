@@ -1,4 +1,4 @@
-// PR: importar a planilha de formandos (só admin). Os dados puros ficam em repasse-dados.js.
+// PR: importar a planilha de alunos (só admin). Os dados puros ficam em repasse-dados.js.
 import { el, carregarLib } from "./ui.js";
 import { MAPA, hkey, linhaParaDoc, docId, faltando, norm, semTelefone } from "./repasse-dados.js";
 import * as U from "./util.js";
@@ -41,7 +41,7 @@ export function openImport(ctx, ui, aoTerminar) {
       el(
         "p",
         "hint",
-        "Escolha um ou vários arquivos Excel (.xlsx) ou CSV com as colunas da planilha de formandos (pode selecionar todas as planilhas de um ano de uma vez). Os dados vão direto do seu aparelho para o banco do app."
+        "Escolha um ou vários arquivos Excel (.xlsx) ou CSV com as colunas da planilha de alunos (pode selecionar todas as planilhas de um ano de uma vez). Os dados vão direto do seu aparelho para o banco do app."
       )
     );
     const inp = el("input");
@@ -142,7 +142,7 @@ export function openImport(ctx, ui, aoTerminar) {
         el(
           "p",
           null,
-          `${rows.length} formandos encontrados: ${rows.length - incompletos.length} completos e ${incompletos.length} incompletos.`
+          `${rows.length} alunos encontrados: ${rows.length - incompletos.length} completos e ${incompletos.length} incompletos.`
         )
       );
       // cada aluno grava o documento + até 4 telefones no índice; o plano gratuito do Firebase grava até 20 mil por dia

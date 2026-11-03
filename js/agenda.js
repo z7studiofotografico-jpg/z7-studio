@@ -133,7 +133,10 @@ export function show() {
       FS.onSnapshot(
         FS.query(colE, FS.where("data", ">=", U.addDays(-90)), FS.orderBy("data"), FS.limit(600)),
         snap => {
-          const todos = snap.docs.map(d => Object.assign({ id: d.id }, d.data(), privados[d.id] || {}));
+          // cancelados saem da agenda; o pedido de exclusão da equipe some para a equipe (o admin vê a pendência)
+          const todos = snap.docs
+            .map(d => Object.assign({ id: d.id }, d.data(), privados[d.id] || {}))
+            .filter(x => x.status !== "cancelado" && !(x.excluido && !C.isAdmin));
           mudar({ ensaios: todos.filter(x => x.kind !== "pessoal" && x.data >= hoje) });
           mudar({ comps: todos.filter(x => x.kind === "pessoal" && x.data >= hoje) });
           mudar({ passados: todos.filter(x => x.kind !== "pessoal" && x.data < hoje && x.status !== "remarcar" && x.status !== "faltou") });
@@ -419,22 +422,63 @@ function linhaFeriado(f) {
   r.append(t, el("span", "tag late", "Fechado"));
   return r;
 }
-const icone = it =>
+// Tipos de evento: ícone + nome + cor (a mesma na legenda, no calendário e na lista do dia)
+export const TIPOS_EVENTO = {
+  formatura: { ico: "🎓", nome: "Formatura", cor: "ev-formatura" },
+  fotos: { ico: "📸", nome: "Dia de fotos", cor: "ev-fotos" },
+  ensaio: { ico: "📷", nome: "Ensaio", cor: "ev-ensaio" },
+  comp: { ico: "📌", nome: "Compromisso", cor: "ev-comp" },
+  bloqueio: { ico: "⛔", nome: "Dia bloqueado", cor: "ev-bloqueio" },
+  visita: { ico: "🚗", nome: "Visita", cor: "ev-visita" },
+  retirada: { ico: "👘", nome: "Retirada de becas", cor: "ev-retirada" },
+  devolucao: { ico: "↩️", nome: "Devolução", cor: "ev-devolucao" },
+  feriado: { ico: "🚫", nome: "Feriado", cor: "ev-feriado" }
+};
+const tipoDe = it =>
   it.t === "b"
     ? it.ret
-      ? "👘"
-      : "↩️"
+      ? "retirada"
+      : "devolucao"
     : it.t === "c"
-      ? ICO[it.x.kind] || "📌"
+      ? it.x.kind === "formatura"
+        ? "formatura"
+        : it.x.kind === "fotos"
+          ? "fotos"
+          : "comp"
       : it.t === "e"
-        ? "📷"
+        ? "ensaio"
         : it.t === "p"
           ? it.x.diaInteiro
-            ? "⛔"
-            : "📌"
+            ? "bloqueio"
+            : "comp"
           : it.t === "f"
-            ? "🚫"
-            : "🚗";
+            ? "feriado"
+            : "visita";
+// nome curto do evento no quadradinho do dia (quem ou o quê)
+const nomeCurto = it => {
+  const x = it.x || {};
+  const n =
+    it.t === "c"
+      ? x.instNome
+      : it.t === "e" || it.t === "b"
+        ? x.cliente
+        : it.t === "p"
+          ? x.particular && !marco()
+            ? x.deQuem || "Ocupado"
+            : x.titulo
+          : it.t === "f"
+            ? x.nome
+            : x.nome;
+  return title(String(n || TIPOS_EVENTO[tipoDe(it)].nome))
+    .split(" ")
+    .slice(0, 2)
+    .join(" ");
+};
+function legendaEventos() {
+  const l = el("div", "ev-legenda");
+  Object.values(TIPOS_EVENTO).forEach(t => l.append(el("span", "ev " + t.cor, `${t.ico} ${t.nome}`)));
+  return l;
+}
 
 // ---------- Calendário do mês ----------
 function renderMes(box, ent) {
@@ -474,14 +518,12 @@ function renderMes(box, ent) {
     );
     b.type = "button";
     b.append(el("b", null, String(d)));
-    const ics = {};
-    lst.forEach(it => {
-      const k = icone(it);
-      ics[k] = (ics[k] || 0) + 1;
+    // vários eventos no mesmo dia: os 3 primeiros (ícone + nome, com a cor do tipo) e "+N" para o resto
+    lst.slice(0, 3).forEach(it => {
+      const t = TIPOS_EVENTO[tipoDe(it)];
+      b.append(el("span", "ev " + t.cor, `${t.ico} ${nomeCurto(it)}`));
     });
-    Object.entries(ics)
-      .slice(0, 4)
-      .forEach(([k, n]) => b.append(el("span", "ic", n > 1 ? k + n : k)));
+    if (lst.length > 3) b.append(el("span", "ev mais", `+${lst.length - 3}`));
     b.setAttribute("aria-label", `${diaTxt(ds)}: ${lst.length ? lst.length + " compromisso" + (lst.length > 1 ? "s" : "") : "livre"}`);
     b.onclick = () => {
       mudar({ selDia: selDia === ds ? "" : ds });
@@ -490,13 +532,7 @@ function renderMes(box, ent) {
     cal.append(b);
   }
   box.append(cal);
-  box.append(
-    el(
-      "p",
-      "hint",
-      "🎓 formatura · 📸 dia de fotos · 📷 ensaio · 📌 compromisso · ⛔ dia bloqueado · 🚗 visita · 👘 retirada de becas · ↩️ devolução · 🚫 feriado. Toque no dia para ver."
-    )
-  );
+  box.append(legendaEventos(), el("p", "hint", "Toque no dia para ver a lista completa."));
   if (selDia) {
     const card = el("article", "card agdia");
     const top = el("div", "card-top");
@@ -504,7 +540,11 @@ function renderMes(box, ent) {
     card.append(top);
     const lst = porDia[selDia] || [];
     if (!lst.length) card.append(el("p", "hint", selDia < hoje ? "Dia que já passou." : "Dia livre ✅"));
-    lst.forEach(it => card.append(linha(it)));
+    lst.forEach(it => {
+      const l = linha(it);
+      l.classList.add("ev-linha", TIPOS_EVENTO[tipoDe(it)].cor);
+      card.append(l);
+    });
     // feriado só avisa (aparece no dia), não bloqueia: dá para marcar qualquer coisa
     if (selDia >= hoje && (marco() || C.pode("colegios"))) {
       const a = el("div", "actions");

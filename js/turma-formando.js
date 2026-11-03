@@ -58,8 +58,8 @@ export function formFormando(ctx, T, f, preset) {
   // na venda depois das fotos (compra a mais de quem já tem o Kit 01) só aparecem os kits 02 a 05
   const kits = preset.venda ? kitsTodos.filter(k => !ehAdesao(k.id)) : kitsTodos;
   const tituloVenda = preset.venda === "rep" ? "Venda no repasse" : "Venda depois das fotos";
-  sheet(preset.venda ? tituloVenda : f ? "Editar formando" : "Novo formando", (fp, fechar) => {
-    const nome = inp(f ? title(f.nome) : base ? title(base.nome) : "", "nome do formando");
+  sheet(preset.venda ? tituloVenda : f ? "Editar aluno" : "Novo aluno", (fp, fechar) => {
+    const nome = inp(f ? title(f.nome) : base ? title(base.nome) : "", "nome do aluno");
     nome.required = true;
     nome.disabled = !!f && !adm;
     const tel = inp(f ? f.tel : base ? base.tel : "", "WhatsApp do responsável", 30);
@@ -376,7 +376,7 @@ export function formFormando(ctx, T, f, preset) {
           await FS.addDoc(col, novo);
         }
         fechar();
-        U.toast(preset.venda ? "Venda registrada 🎉" : f ? "Salvo" : "Formando incluído");
+        U.toast(preset.venda ? "Venda registrada 🎉" : f ? "Salvo" : "Aluno incluído");
       } catch (er) {
         C.handleErr(er);
       }

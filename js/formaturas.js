@@ -66,7 +66,7 @@ export function show() {
   // preços mínimos dos kits e da formatura (antes ficavam em Instituições)
   const hb = el("div", "agact");
   hb.append(
-    U.mkBtn("+ Formando", "btn-primary btn-sm", () => novoFormando()),
+    U.mkBtn("+ Aluno", "btn-primary btn-sm", () => novoFormando()),
     U.mkBtn("📋 Kits e preços", "btn-sm", () => openKits()),
     U.mkBtn("💲 Preços mínimos", "btn-sm", () => Ev.openPrecos()),
     botaoRelatorio(relatorioFormaturas, () => C.me)
@@ -233,14 +233,14 @@ let seg = (() => {
   }
 })();
 const noSeg = i => (seg === "rep") === ehRepasse(i, U.todayStr());
-// "+ Formando" direto no card: escolhe a turma e já abre o cadastro (sem precisar importar planilha)
+// "+ Aluno" direto no card: escolhe a turma e já abre o cadastro (sem precisar importar planilha)
 function novoFormando() {
   const lista = (C.isAdmin ? insts : insts.filter(i => C.ehMeu(i)))
     .slice()
     .sort((a, b) => (a.nome || "").localeCompare(b.nome || "", "pt-BR"));
   if (!lista.length) return U.toast("Nenhum colégio fechado ainda. Feche o colégio em Instituições para criar a turma.");
   if (lista.length === 1) return abrirTurma(lista[0], true);
-  sheet("Incluir formando", (p, close) => {
+  sheet("Incluir aluno", (p, close) => {
     const s0 = el("select");
     lista.forEach(i => {
       const o = el("option", null, title(i.nome) + (ehRepasse(i, U.todayStr()) ? ` (Repasse ${anoDaTurma(i)})` : ""));
@@ -449,7 +449,7 @@ function renderContrato(corpo, tipo) {
     const e = el("div", "empty");
     e.append(
       el("strong", null, adesao ? "Nenhuma adesão (Kit 01) ainda" : "Nenhum kit vendido ainda"),
-      el("span", null, "Abra a turma do colégio fechado (aba Turmas) e inclua os formandos.")
+      el("span", null, "Abra a turma do colégio fechado (aba Turmas) e inclua os alunos.")
     );
     corpo.append(e);
     return;
@@ -476,7 +476,7 @@ function renderTurmas(corpo) {
         r = resumoInst(i, fs);
       const e = el("article", "card" + (r.atr ? " late" : ""));
       const top = el("div", "card-top");
-      top.append(el("h3", "name", title(i.nome)), el("span", "stage", `${r.n} formando${r.n !== 1 ? "s" : ""}`));
+      top.append(el("h3", "name", title(i.nome)), el("span", "stage", `${r.n} aluno${r.n !== 1 ? "s" : ""}`));
       e.append(top);
       const meta = el("div", "meta");
       [
@@ -498,7 +498,7 @@ function renderTurmas(corpo) {
       });
       const act = el("div", "actions");
       act.append(
-        U.mkBtn("👥 Formandos e parcelas", "btn-primary", () => abrirTurma(i)),
+        U.mkBtn("👥 Alunos e parcelas", "btn-primary", () => abrirTurma(i)),
         U.mkBtn("🎓 Formatura", "", () => Ev.openEvento(i, "formatura")),
         U.mkBtn("📸 Dia de fotos", "", () => Ev.openEvento(i, "fotos"))
       );
@@ -564,7 +564,7 @@ function renderPosFoto(corpo) {
         null,
         seg === "rep"
           ? "Aqui aparecem os alunos de turmas de anos anteriores que ficaram só com o Kit 01."
-          : "Quando as fotos de uma turma ficarem prontas, marque em Turmas → Formandos → 📅 Contrato da turma → 📸 Fotos prontas."
+          : "Quando as fotos de uma turma ficarem prontas, marque em Turmas → Alunos → 📅 Contrato da turma → 📸 Fotos prontas."
       )
     );
     corpo.append(e);
@@ -603,7 +603,7 @@ function openKits() {
       el(
         "p",
         "hint",
-        "Tabela padrão para todas as turmas (cada turma pode ter a sua em Formandos → 📋 Kits desta turma). Antecipado = preço do contrato, até o dia da formatura. Depois das fotos = valor a mais para quem tem só o Kit 01. Repasse = preço para quem ficou só com o Kit 01 em turmas de anos anteriores. Deixe em branco o que não é oferecido."
+        "Tabela padrão para todas as turmas (cada turma pode ter a sua em Alunos → 📋 Kits desta turma). Antecipado = preço do contrato, até o dia da formatura. Depois das fotos = valor a mais para quem tem só o Kit 01. Repasse = preço para quem ficou só com o Kit 01 em turmas de anos anteriores. Deixe em branco o que não é oferecido."
       )
     );
     const ed = editorPrecos(p, kits, { bloqueado: !C.isAdmin });
@@ -652,7 +652,7 @@ async function relatorioFormaturas() {
         titulo: "Resumo",
         kpis: [
           ["Turmas", turmas.length],
-          ["Formandos com kit", tot.n],
+          ["Alunos com kit", tot.n],
           ["Vendido", moeda(tot.vend)],
           ["Recebido", moeda(tot.rec)],
           ["A receber", moeda(tot.aberto)],
@@ -667,7 +667,7 @@ async function relatorioFormaturas() {
       {
         titulo: "Cobranças em atraso",
         tabela: {
-          cols: ["ID", "Formando", "Colégio", "WhatsApp", "Kit", "Parcela", "Valor", "Venceu"],
+          cols: ["ID", "Aluno", "Colégio", "WhatsApp", "Kit", "Parcela", "Valor", "Venceu"],
           linhas: atr.map(({ f, venc }) => [
             f.codigo || "",
             title(f.nome),

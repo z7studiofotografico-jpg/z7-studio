@@ -106,13 +106,26 @@ test("vendedor não mexe em pagamento, valor nem responsável do formando", asyn
   await assertFails(setDoc(doc(db, "formandos", "f3e"), { nome: "Y", pagas: 0, pagamentos: [], respEmail: PEDRO }));
   await assertFails(deleteDoc(doc(db, "formandos", "f1"))); // tem parcela paga
 });
-test("apagar: o vendedor só apaga o colégio da conta dele, e formando sem parcela paga", async () => {
+test("apagar (Regra 4): a equipe nunca apaga de verdade; só pede a exclusão, e só o admin decide", async () => {
   const db = como(PEDRO);
   await semRegra(d => setDoc(doc(d, "formandos", "f7"), { instId: "i1", nome: "SEM PAGAR", pagas: 0, pagamentos: [], respEmail: PEDRO }));
   await assertFails(deleteDoc(doc(db, "instituicoes", "i3"))); // da Ana
   await assertFails(deleteDoc(doc(db, "instituicoes", "i2"))); // sem responsável
-  await assertSucceeds(deleteDoc(doc(db, "formandos", "f7")));
-  await assertSucceeds(deleteDoc(doc(db, "instituicoes", "i1")));
+  await assertFails(deleteDoc(doc(db, "formandos", "f7")));
+  await assertFails(deleteDoc(doc(db, "instituicoes", "i1")));
+  // pede a exclusão (marca "excluido" em nome dele e registra o pedido)
+  const pedido = { por: "Pedro", porEmail: PEDRO, em: "2026-11-03T10:00:00Z" };
+  await assertFails(updateDoc(doc(db, "instituicoes", "i1"), { excluido: Object.assign({}, pedido, { porEmail: ANA }) }));
+  await assertSucceeds(updateDoc(doc(db, "instituicoes", "i1"), { excluido: pedido }));
+  await assertSucceeds(updateDoc(doc(db, "formandos", "f7"), { excluido: pedido }));
+  await assertSucceeds(
+    setDoc(doc(db, "exclusoes", "instituicoes_i1"), Object.assign({ col: "instituicoes", docId: "i1", status: "pendente" }, pedido))
+  );
+  // quem pediu não desfaz nem decide
+  await assertFails(updateDoc(doc(db, "instituicoes", "i1"), { excluido: null }));
+  await assertFails(updateDoc(doc(db, "exclusoes", "instituicoes_i1"), { status: "devolvido" }));
+  // o admin decide e apaga
+  await assertSucceeds(updateDoc(doc(como(ADRIANO), "exclusoes", "instituicoes_i1"), { status: "excluido" }));
   await assertSucceeds(deleteDoc(doc(como(ADRIANO), "instituicoes", "i3")));
 });
 test("carteira: vendedor vê os colégios livres e os seus, e só os próprios formandos", async () => {
@@ -234,9 +247,9 @@ test("becas: equipe não muda valor nem caução, e o já pago só aumenta", asy
   await assertSucceeds(updateDoc(doc(db, "becas", "b1"), { pago: 600, status: "retirado" }));
   await assertFails(deleteDoc(doc(db, "becas", "b1")));
 });
-test("PR: equipe não apaga venda paga", async () => {
+test("PR: equipe não apaga aluno (só pede a exclusão); o admin apaga", async () => {
   await assertFails(deleteDoc(doc(como(ANA), "repasse", "r1")));
-  await assertSucceeds(deleteDoc(doc(como(ANA), "repasse", "r2")));
+  await assertFails(deleteDoc(doc(como(ANA), "repasse", "r2")));
   await assertSucceeds(deleteDoc(doc(como(ADRIANO), "repasse", "r1")));
 });
 

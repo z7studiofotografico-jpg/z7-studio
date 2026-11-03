@@ -12,6 +12,9 @@ import { C, FS, tipo, items, mudarTipo, mudarItems, iniciar, lockInfo, mensagem,
 import { openForm, openVisita } from "./instituicoes-form.js";
 import { cadastroFalta, cadastroPendente } from "./instituicao-cadastro.js";
 import { passarColegio } from "./passar-pr.js";
+import { abrirNaoFechou, listaNaoFecharam } from "./nao-fechou.js";
+import { abrirExcluirInst, faixaExclusaoInst } from "./inst-excluir.js";
+import { ocultoParaMim } from "./confirmar.js";
 export { TIPOS, CARTOES, CARGOS, cartaoDoTipo } from "./instituicoes-dados.js";
 export { agendarColegio } from "./instituicoes-agendar.js";
 // (o Agendamento importa estas daqui; continuam disponíveis)
@@ -37,6 +40,7 @@ export function show(t) {
   hb.append(U.mkBtn("+ Nova instituição", "btn-primary", () => openForm(null)));
   if (C.isAdmin) hb.append(U.mkBtn("Importar planilha", "", () => openImport(C, T.tipos, T.nome, items)));
   hb.append(botaoRelatorio(relatorioInst, () => C.me));
+  hb.append(U.mkBtn("❌ Não fecharam: motivos", "", () => listaNaoFecharam(items.filter(i => !ocultoParaMim(C, i)))));
   head.append(hb);
   v.append(head);
 
@@ -46,7 +50,7 @@ export function show(t) {
     <div class="stat"><b id="iAbertas">–</b><small>Em andamento</small></div>
     <div class="stat won"><b id="iFech">–</b><small>Fechadas</small></div>`;
   v.append(st);
-  const chips = el("div", "chips");
+  const chips = el("div", "chips-duas");
   chips.id = "iChips";
   v.append(chips);
   const q = el("input", "search");
@@ -87,6 +91,9 @@ export function hide() {
 }
 
 function filtra(i, k) {
+  // pedido de exclusão (equipe não vê) e arquivada (só em "Todas")
+  if (ocultoParaMim(C, i)) return false;
+  if (i.arquivado && k !== "todos") return false;
   if (k === "hoje") return ["late", "today"].includes(status(i)) || pendFotos(i);
   if (k === "pend") return pendFotos(i) || (cadastroPendente(i) && (C.isAdmin || C.ehMeu(i)));
   if (k === "meus") return C.ehMeu(i) && (ABERTAS.includes(i.etapa) || pendFotos(i));
@@ -101,26 +108,36 @@ function renderStats() {
   $("iAbertas").textContent = items.filter(i => ABERTAS.includes(i.etapa)).length;
   $("iFech").textContent = items.filter(i => i.etapa === "FECHADO").length;
 }
+// Filtros em duas linhas (item 2.3): visões e etapas, cada uma com cor e contagem
+const VISOES = [
+  ["hoje", "Para hoje", "ch-hoje"],
+  ["pend", "⚠️ Pendências", "ch-pend"],
+  ["NÃO FECHOU", "❌ Não fechou", "ch-nao"],
+  ["meus", "Só os meus", ""]
+];
+const COR_ETAPA = { "A VISITAR": "", "AGENDAR VISITA": "", VISITADO: "ch-visitado", "PROPOSTA ENVIADA": "", FECHADO: "ch-fechado" };
 function renderChips() {
   const c = $("iChips");
   if (!c) return;
   c.innerHTML = "";
   const n = k => items.filter(i => filtra(i, k)).length;
-  [["hoje", "Para hoje"], ["pend", "⚠️ Pendências"], ["meus", "Só os meus"], ...ETAPAS.map(e => [e, e]), ["todos", "Todas"]].forEach(
-    ([k, t]) => {
-      const b = el("button", "chip", t);
+  const linha = lst => {
+    const r = el("div", "chips chips-linha");
+    lst.forEach(([k, t, cor]) => {
+      const b = el("button", "chip " + (cor || ""), t);
       b.type = "button";
       b.setAttribute("aria-pressed", String(tab === k));
-      const s = el("span", "n", String(n(k)));
-      b.append(s);
+      b.append(el("span", "n", String(n(k))));
       b.onclick = () => {
         tab = k;
         renderChips();
         renderList();
       };
-      c.append(b);
-    }
-  );
+      r.append(b);
+    });
+    return r;
+  };
+  c.append(linha(VISOES), linha([...ETAPAS.filter(e => e !== "NÃO FECHOU").map(e => [e, title(e), COR_ETAPA[e]]), ["todos", "Todas", ""]]));
 }
 // Aviso no alto da tela: colégios da planilha com o cadastro para completar (o do representante; o admin vê todos)
 function avisoCadastro() {
@@ -182,8 +199,19 @@ function renderList() {
 function card(it) {
   const s = status(it);
   const e = el("article", "card " + (["late", "today", "won"].includes(s) ? s : ""));
+  const fx = faixaExclusaoInst(C, it);
+  if (fx) e.append(fx);
   const top = el("div", "card-top");
-  top.append(el("h3", "name", title(it.nome)), el("span", "stage", it.etapa));
+  top.append(el("h3", "name", title(it.nome)), el("span", "stage", it.arquivado ? "ARQUIVADA" : it.etapa));
+  // botão vermelho de excluir (Regra 6): instituição inteira ou um ano; a equipe pede ao Adriano
+  if (C.isAdmin || C.ehMeu(it) || !it.respEmail) {
+    const bx = el("button", "btn-excluir", "🗑️");
+    bx.type = "button";
+    bx.title = "Excluir instituição ou ano";
+    bx.setAttribute("aria-label", "Excluir instituição ou ano");
+    bx.onclick = () => abrirExcluirInst(C, it);
+    top.append(bx);
+  }
   e.append(top);
   const meta = el("div", "meta");
   const ps = it.alunosPorSerie || {};
@@ -196,7 +224,8 @@ function card(it) {
     [segs.join(", "), ""],
     [it.alunosConfirmados ? `${it.alunosConfirmados} alunos (confirmado)` : it.mediaAlunos ? `~${it.mediaAlunos} alunos (média)` : "", ""],
     [it.fotografoHoje || "", ""],
-    [it.motivo ? "Motivo: " + it.motivo : "", ""]
+    [it.motivo ? "Motivo: " + it.motivo : "", ""],
+    [it.naoFechou && it.naoFechou.concorrente ? "Concorrente: " + it.naoFechou.concorrente : "", ""]
   ].forEach(([v, c]) => {
     if (v) meta.append(el("span", "tag " + c, v));
   });
@@ -318,6 +347,7 @@ function card(it) {
   }
   const act = el("div", "actions");
   act.append(U.mkBtn("📝 Registrar visita / contato", "btn-primary", () => openVisita(it)));
+  if (it.etapa !== "FECHADO") act.append(U.mkBtn("❌ Não fechou", "", () => abrirNaoFechou(C, it, (patch, msg) => save(it, patch, msg))));
   // admin: passar o PR deste colégio (de um ano) para alguém da equipe
   if (C.isAdmin && C.pode("pr")) act.append(U.mkBtn("📤 Passar o PR para a equipe", "", () => passarColegio(C, it)));
   if (it.etapa !== "FECHADO")

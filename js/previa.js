@@ -43,7 +43,7 @@ function cabecalho(ctx, W, st, sub) {
   ctx.textAlign = "left";
   ctx.textBaseline = "alphabetic";
   ctx.font = "700 52px 'Barlow Condensed', sans-serif";
-  ctx.fillText((st.nome || "Formando").toUpperCase(), 165, 78);
+  ctx.fillText((st.nome || "Aluno").toUpperCase(), 165, 78);
   ctx.font = "600 26px 'Source Sans 3', sans-serif";
   ctx.fillStyle = "rgba(255,255,255,.8)";
   ctx.fillText(sub, 165, 118);

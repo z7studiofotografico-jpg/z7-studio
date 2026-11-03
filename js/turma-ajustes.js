@@ -142,7 +142,7 @@ export function kitsTurma(ctx, inst, desenhar) {
 export function importarFormandos(ctx, inst, lista) {
   setCtx(ctx);
   const col = FS.collection(db, "formandos");
-  sheet("Importar formandos", (fp, fechar) => {
+  sheet("Importar alunos", (fp, fechar) => {
     fp.append(
       el(
         "p",
@@ -170,11 +170,11 @@ export function importarFormandos(ctx, inst, lista) {
         const kits = kitsDe(C.P, inst);
         linhas = rows.map(r => formandoDaLinha(r, kits, inst, hoje())).filter(x => x.nome && !ja.has(norm(x.nome)));
         prev.textContent = linhas.length
-          ? `${linhas.length} formando${linhas.length > 1 ? "s" : ""} novo${linhas.length > 1 ? "s" : ""}: ${linhas
+          ? `${linhas.length} aluno${linhas.length > 1 ? "s" : ""} novo${linhas.length > 1 ? "s" : ""}: ${linhas
               .slice(0, 5)
               .map(x => title(x.nome))
               .join(", ")}${linhas.length > 5 ? "…" : ""}`
-          : "Nenhum formando novo na planilha.";
+          : "Nenhum aluno novo na planilha.";
         a.ok.disabled = !linhas.length;
       } catch (e) {
         avisoErro(e, "ler a planilha");
@@ -215,7 +215,7 @@ export function importarFormandos(ctx, inst, lista) {
           prev.textContent = `Importando… ${n} de ${linhas.length}`;
         }
         fechar();
-        U.toast(`${n} formando${n > 1 ? "s" : ""} importado${n > 1 ? "s" : ""}`);
+        U.toast(`${n} aluno${n > 1 ? "s" : ""} importado${n > 1 ? "s" : ""}`);
       } catch (e) {
         C.handleErr(e);
         prev.textContent = `Importados ${n} de ${linhas.length}. Importe de novo: quem já entrou não é duplicado.`;

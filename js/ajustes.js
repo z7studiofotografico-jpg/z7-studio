@@ -91,6 +91,7 @@ export function ligarAjustes(ctx, o) {
     o.renderPushState();
     if (ctx.isAdmin) mostrarErros();
     $("pVerComo").hidden = !ctx.isAdmin;
+    $("pBackup").hidden = !ctx.isAdmin;
     secaoMeusNumeros(ctx, $("pMeusNum"));
     secaoNesteCelular(ctx, $("pNesteCel"));
     $("sheetPrices").hidden = false;
@@ -195,6 +196,19 @@ export function ligarAjustes(ctx, o) {
       ctx.handleErr(err);
     }
   });
+  $("pBackup").onclick = async () => {
+    const t = $("pBackupTxt");
+    t.hidden = false;
+    $("pBackup").disabled = true;
+    try {
+      const m = await import("./backup.js");
+      await m.baixarCopia(ctx, x => (t.textContent = x));
+    } catch (e) {
+      t.textContent = "Não foi possível fazer a cópia: " + ((e && e.message) || e);
+    } finally {
+      $("pBackup").disabled = false;
+    }
+  };
   $("pVerComo").onclick = () => {
     $("sheetPrices").hidden = true;
     o.verComo();

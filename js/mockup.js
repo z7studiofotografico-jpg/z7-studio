@@ -368,7 +368,7 @@ export function openMockup({ nome = "", escola = "", preco = "", modo = "kit", t
     dica.textContent =
       m === "kit"
         ? "Escolha qual foto vai em cada lugar: a que o cliente pediu, ou a que já está impressa no kit."
-        : "Mande esta imagem e depois a mensagem pedindo para o formando responder com os números.";
+        : "Mande esta imagem e depois a mensagem pedindo para o aluno responder com os números.";
     redraw();
   }
   bKit.onclick = () => setModo("kit");

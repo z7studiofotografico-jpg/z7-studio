@@ -77,7 +77,7 @@ export async function registrarPagamento(ctx, f) {
     });
     return { n };
   });
-  U.toast(r.ja ? "Esse formando já está quitado" : `Parcela ${r.n} de ${U.first(title(f.nome))} registrada`);
+  U.toast(r.ja ? "Esse aluno já está quitado" : `Parcela ${r.n} de ${U.first(title(f.nome))} registrada`);
 }
 // Desfaz o último pagamento (lançado por engano)
 
@@ -155,7 +155,7 @@ export function openTurma(ctx, inst, kits, aoFechar, opcoes) {
     null,
     (p, fechar) => {
       const head = el("div", "vhead");
-      head.append(el("h2", null, "Formandos · " + title(T.inst.nome)), U.mkBtn("Fechar", "btn-sm", fechar));
+      head.append(el("h2", null, "Alunos · " + title(T.inst.nome)), U.mkBtn("Fechar", "btn-sm", fechar));
       p.append(head);
       T.resumo = el("div", "kpis");
       p.append(T.resumo);
@@ -163,7 +163,7 @@ export function openTurma(ctx, inst, kits, aoFechar, opcoes) {
       T.qtdBox = el("div", "notes");
       p.append(T.qtdBox);
       const bar = el("div", "actions");
-      bar.append(U.mkBtn("+ Formando", "btn-primary", () => abrirFormando(T)));
+      bar.append(U.mkBtn("+ Aluno", "btn-primary", () => abrirFormando(T)));
       bar.append(U.mkBtn("🖨️ Lista da turma", "", () => abrirRelatorio(relatorioTurma(T), C.me)));
       if (C.isAdmin) bar.append(U.mkBtn("Importar planilha", "", () => importarFormandos(C, T.inst, T.lista)));
       if (C.isAdmin)
@@ -172,8 +172,7 @@ export function openTurma(ctx, inst, kits, aoFechar, opcoes) {
           U.mkBtn("📋 Kits desta turma", "", () => kitsTurma(C, T.inst, () => desenhar(T)))
         );
       p.append(bar);
-      if (!C.isAdmin)
-        p.append(el("p", "hint", "Você cadastra os formandos. Pagamentos e valores são lançados pelo Adriano ou pela Luciana."));
+      if (!C.isAdmin) p.append(el("p", "hint", "Você cadastra os alunos. Pagamentos e valores são lançados pelo Adriano ou pela Luciana."));
       T.chips = el("div", "T.chips");
       p.append(T.chips);
       const q = inp("", "Buscar nome ou telefone");
@@ -197,14 +196,14 @@ export function openTurma(ctx, inst, kits, aoFechar, opcoes) {
           desenhar(T);
         },
         e => {
-          avisoErro(e, "carregar os formandos");
+          avisoErro(e, "carregar os alunos");
           T.lst.innerHTML = "";
           T.lst.append(
             el(
               "div",
               "empty",
               e.code === "permission-denied"
-                ? "Cole as regras novas do Firebase para usar a lista de formandos."
+                ? "Cole as regras novas do Firebase para usar a lista de alunos."
                 : "Não foi possível carregar."
             )
           );
@@ -264,11 +263,7 @@ function desenhar(T) {
   const total = T.inst.alunosConfirmados || nomesUnicos;
   if (total && total < MINIMO_FORMANDOS)
     T.qtdBox.append(
-      el(
-        "p",
-        "wait",
-        `⚠️ Turma com ${total} formandos: o contrato pede no mínimo ${MINIMO_FORMANDOS}. Renegociar com o colégio (item 4.3).`
-      )
+      el("p", "wait", `⚠️ Turma com ${total} alunos: o contrato pede no mínimo ${MINIMO_FORMANDOS}. Renegociar com o colégio (item 4.3).`)
     );
   const ct = T.inst.contratoTurma || {};
   // valores e vezes desta turma (aviso), marcando o que é diferente da tabela padrão
@@ -321,7 +316,7 @@ function desenhar(T) {
     rec = somar(ativos.map(recebido));
   T.resumo.innerHTML = "";
   [
-    ["Formandos", String(nomesUnicos)],
+    ["Alunos", String(nomesUnicos)],
     ["Antecipado · depois das fotos", `${ant} · ${pos}`],
     ["Só Kit 01 (oferecer depois)", String(semKit.length)],
     ["Vendido", brl(vendido)],
@@ -379,8 +374,8 @@ function desenhar(T) {
   if (!T.lista.length) {
     const e = el("div", "empty");
     e.append(
-      el("strong", null, "Nenhum formando ainda"),
-      el("span", null, "Toque em “+ Formando”" + (C.isAdmin ? " ou importe a planilha da turma." : "."))
+      el("strong", null, "Nenhum aluno ainda"),
+      el("span", null, "Toque em “+ Aluno”" + (C.isAdmin ? " ou importe a planilha da turma." : "."))
     );
     T.lst.append(e);
     return;
@@ -535,7 +530,7 @@ function relatorioTurma(T) {
       {
         titulo: "Alunos",
         tabela: {
-          cols: ["ID", "Formando", "Série", "Telefone / e-mail", "Kits", "Em aberto"],
+          cols: ["ID", "Aluno", "Série", "Telefone / e-mail", "Kits", "Em aberto"],
           linhas: arr.map(a => [
             a.codigo,
             title(a.nome),
@@ -545,14 +540,14 @@ function relatorioTurma(T) {
             a.aberto ? brl(a.aberto) + (a.atr ? " (atrasado)" : "") : "—"
           ])
         },
-        vazio: "Nenhum formando cadastrado."
+        vazio: "Nenhum aluno cadastrado."
       },
       ...(ruins.length
         ? [
             {
               titulo: "Telefones a conferir (" + ruins.length + ")",
               nota: "Estes números com certeza têm erro (DDD que não existe, celular sem o 9, número repetido). Peça o número certo.",
-              tabela: { cols: ["ID", "Formando", "Telefone"], linhas: ruins.map(a => [a.codigo, title(a.nome), telRelatorio(a.tel)]) }
+              tabela: { cols: ["ID", "Aluno", "Telefone"], linhas: ruins.map(a => [a.codigo, title(a.nome), telRelatorio(a.tel)]) }
             }
           ]
         : [])

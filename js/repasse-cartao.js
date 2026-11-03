@@ -33,9 +33,11 @@ import { abrirFotosDoAluno } from "./fotos-aluno.js";
 function telAvisos(it) {
   const ruins = (it.contatos || []).map(c => [c, avisoTel(c.tel)]).filter(([, a]) => a && !/fixo/.test(a));
   if (!ruins.length) return "";
-  return "⚠️ Telefone a conferir: " + ruins.map(([c, a]) => `${c.tipo || "contato"} (${a})`).join(", ");
+  return "⚠️ Telefone a conferir: " + ruins.map(([c, a]) => `${tipoTxt(c.tipo) || "contato"} (${a})`).join(", ");
 }
 
+// o contato do próprio aluno fica gravado como "Formando" (planilhas antigas); na tela aparece "Aluno"
+const tipoTxt = t => (t === "Formando" ? "Aluno" : t || "");
 export function card(it) {
   const s = status(it);
   const e = el("article", "card " + (["late", "today", "won"].includes(s) ? s : ""));
@@ -68,7 +70,7 @@ export function card(it) {
   if (cs.length > 1 && ns0) {
     quem.append(el("small", null, "Mandar para:"));
     cs.forEach(c => {
-      const b = el("button", "chip chip-sm", `${c.tipo}${c.nome ? " (" + U.first(title(c.nome)) + ")" : ""}`);
+      const b = el("button", "chip chip-sm", `${tipoTxt(c.tipo)}${c.nome ? " (" + U.first(title(c.nome)) + ")" : ""}`);
       b.type = "button";
       b.setAttribute("aria-pressed", String(c === escolhido));
       b.onclick = () => {
@@ -81,7 +83,7 @@ export function card(it) {
     e.append(quem);
   }
   const tels = el("div", "phone");
-  tels.textContent = cs.map(c => `${c.tipo}: ${c.tel}`).join(" · ") || "Sem telefone";
+  tels.textContent = cs.map(c => `${tipoTxt(c.tipo)}: ${c.tel}`).join(" · ") || "Sem telefone";
   e.append(tels);
 
   if (it.etapa === "INCOMPLETO") e.append(el("p", "wait", "Falta: " + (faltando(it).join(", ") || "conferir dados")));

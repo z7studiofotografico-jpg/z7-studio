@@ -1,6 +1,7 @@
 // Formatura e dia de fotos dos colégios: reserva na agenda, aprovação, avisos (WhatsApp e e-mail) e preços mínimos.
 // Antes ficava dentro de instituicoes.js; agora o card Formaturas é quem marca as datas e cuida dos preços,
 // e o Agendamento usa as mesmas funções.
+import { perguntarSeEnviou } from "./confirmar.js";
 import { feriado } from "./feriados.js";
 import { ASSINATURA_EMAIL, ESTUDIO, assuntoDatas } from "./mensagens.js";
 import { el, title, field, inp, sel, sheet, botoes as actions, avisoErro, wa, parseTel } from "./ui.js";
@@ -314,7 +315,8 @@ export function painelAvisar(ctx, instNome, eventos, contato, alunos, extra, aoE
         w.onclick = () => {
           wa(contato.tel, msg, U.toast);
           close();
-          if (aoEnviar) aoEnviar();
+          // só marca "avisado" se a pessoa confirmar o envio ao voltar do WhatsApp (Regra 9)
+          if (aoEnviar) perguntarSeEnviou(aoEnviar, "Você enviou o aviso para o colégio?");
         };
         a.append(w);
       }
@@ -428,7 +430,7 @@ export function openEvento(it, kind, dia) {
       novoC,
       el("p", "hint", "Preencha o WhatsApp ou o e-mail (de preferência o WhatsApp). A mensagem sai do WhatsApp de quem agendou."),
       field(it.alunosConfirmados ? "Alunos (quantidade confirmada)" : "Média de alunos (obrigatório)", alunos),
-      el("p", "hint", "Começamos com a média. Depois das fotos, a quantidade certa é confirmada na lista de formandos.")
+      el("p", "hint", "Começamos com a média. Depois das fotos, a quantidade certa é confirmada na lista de alunos.")
     );
     const errR = el("p", "err");
     errR.hidden = true;
@@ -527,7 +529,7 @@ export function openEvento(it, kind, dia) {
           atualizadoEm: new Date().toISOString()
         };
         if (fd && fd.data) patch.diaFotos = Object.assign(fd, { status: r.status, grupo: r.grupo, pedidoPor: C.me || "" });
-        // alunos: guarda a média (a quantidade certa vem depois, pela lista de formandos)
+        // alunos: guarda a média (a quantidade certa vem depois, pela lista de alunos)
         if (!it.alunosConfirmados) {
           patch.mediaAlunos = nAl;
           patch.alunosEstimado = true;

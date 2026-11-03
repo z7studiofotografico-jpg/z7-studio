@@ -156,7 +156,7 @@ function nextStep(l) {
       if (t <= 1)
         return {
           title: "2º follow-up (oferecer data)",
-          msg: `${n}, separei algumas datas livres para o seu ensaio. Quer que eu te mostre? Se vier com colegas no mesmo dia, cada um paga ${pv(C.P.g36)} (de 3 a 6 formandos).`,
+          msg: `${n}, separei algumas datas livres para o seu ensaio. Quer que eu te mostre? Se vier com colegas no mesmo dia, cada um paga ${pv(C.P.g36)} (de 3 a 6 alunos).`,
           then: { etapa: "FOLLOW-UP", days: 4, count: true }
         };
       return {

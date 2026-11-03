@@ -603,9 +603,9 @@ await cenario("Adriano (admin), com os dados já atualizados no servidor", async
     // Turma: novo formando com 400 em 3x
     await pg.locator("#fmChips").getByText("Turmas").click();
     await calmo(pg);
-    await pg.getByText("👥 Formandos e parcelas").click();
+    await pg.getByText("👥 Alunos e parcelas").click();
     await calmo(pg);
-    await pg.locator(".panel.wide").getByRole("button", { name: "+ Formando" }).click();
+    await pg.locator(".panel.wide").getByRole("button", { name: "+ Aluno" }).click();
     await calmo(pg);
     const f = pg.locator(".sheet").last();
     await f.getByLabel("Nome").fill("Julia Costa");
@@ -628,7 +628,7 @@ await cenario("Adriano (admin), com os dados já atualizados no servidor", async
     );
     // contrato: Kit 04 antecipado preenche valor e parcelas pela tabela
     const novoFormando = async () => {
-      await pg.locator(".panel.wide").getByRole("button", { name: "+ Formando" }).click();
+      await pg.locator(".panel.wide").getByRole("button", { name: "+ Aluno" }).click();
       await calmo(pg);
       return pg.locator(".sheet").last();
     };
@@ -798,7 +798,7 @@ await cenario("Adriano (admin), com os dados já atualizados no servidor", async
     await pg.locator(".panel.wide").getByRole("button", { name: "Fechar" }).click();
     await calmo(pg);
     // "+ Formando" direto no card Formaturas (sem planilha): escolhe a turma e já abre o cadastro
-    await pg.getByRole("button", { name: "+ Formando" }).first().click();
+    await pg.getByRole("button", { name: "+ Aluno" }).first().click();
     await calmo(pg);
     fk = pg.locator(".sheet").last();
     await fk.getByLabel("Turma (colégio)").selectOption("i1");
@@ -941,7 +941,7 @@ await cenario("Adriano (admin), com os dados já atualizados no servidor", async
     vt = await pg.textContent("#vdCorpo");
     if (process.env.FOTOS) await pg.screenshot({ path: process.env.FOTOS + "/dash-form.png", fullPage: true });
     ok(
-      /A receber · kits/.test(vt) && /Formandos com parcela atrasada/.test(vt) && /Equipe nas formaturas/.test(vt),
+      /A receber · kits/.test(vt) && /Alunos com parcela atrasada/.test(vt) && /Equipe nas formaturas/.test(vt),
       "Dashboard · Formaturas separado (vendido, recebido, a receber, atrasados)"
     );
     await pg.locator(".vdareas").getByText("💬 Funil").click();
@@ -1025,7 +1025,7 @@ await cenario("Adriano (admin), com os dados já atualizados no servidor", async
     const csv =
       "ESCOLA;FORMANDO;DATA;STATUS;CEL 2 (MÃE)\nColegio Beta;Joana Planilha;10/03/2025;CAIDO;21944443333 (Sonia)\nColegio Beta;Sem Telefone;10/03/2025;CAIDO;\n";
     await pg.locator(".sheet:visible input[type=file]").setInputFiles({ name: "pr.csv", mimeType: "text/csv", buffer: Buffer.from(csv) });
-    await pg.waitForFunction(() => /2 formandos encontrados/.test(document.body.textContent), null, { timeout: 8000 }).catch(() => {});
+    await pg.waitForFunction(() => /2 alunos encontrados/.test(document.body.textContent), null, { timeout: 8000 }).catch(() => {});
     ok(/1 completos e 1 incompletos/.test(await pg.textContent("body")), "importar PR: lê a planilha e mostra incompletos");
     await pg.locator(".sheet:visible button[type=submit]").click();
     await pg.waitForFunction(() => /Pronto!/.test(document.body.textContent), null, { timeout: 8000 }).catch(() => {});
@@ -1045,7 +1045,7 @@ await cenario("Adriano (admin), com os dados já atualizados no servidor", async
     await pg.getByRole("button", { name: "Importar planilha" }).click();
     await calmo(pg);
     await pg.locator(".sheet:visible input[type=file]").setInputFiles({ name: "pr.csv", mimeType: "text/csv", buffer: Buffer.from(csv) });
-    await pg.waitForFunction(() => /2 formandos encontrados/.test(document.body.textContent), null, { timeout: 8000 }).catch(() => {});
+    await pg.waitForFunction(() => /2 alunos encontrados/.test(document.body.textContent), null, { timeout: 8000 }).catch(() => {});
     await pg.locator(".sheet:visible button[type=submit]").click();
     await pg.waitForFunction(() => /Pronto!/.test(document.body.textContent), null, { timeout: 8000 }).catch(() => {});
     s = await store();
@@ -1087,7 +1087,7 @@ await cenario("Adriano (admin), com os dados já atualizados no servidor", async
         buffer: Buffer.from(cab + ";E.E NUTA BARTLET JAMES;9 ANO;-;ROBERTO;1;BLOQUEADO NUTA;;21977776666;;;\n")
       }
     ]);
-    await pg.waitForFunction(() => /4 formandos encontrados/.test(document.body.textContent), null, { timeout: 8000 }).catch(() => {});
+    await pg.waitForFunction(() => /4 alunos encontrados/.test(document.body.textContent), null, { timeout: 8000 }).catch(() => {});
     const imp = pg.locator(".sheet:visible").last();
     ok(
       /4 arquivos/.test(await imp.textContent()) && /fora do PR por ser de formatura/.test(await imp.textContent()),
@@ -1426,8 +1426,10 @@ await cenario("Pedro (vendedor: Linha de Frente, Agendamento, Instituições)", 
       .last()
       .getByRole("button", { name: /Enviar no WhatsApp/ })
       .click();
+    // volta do WhatsApp: o app pergunta se enviou (só marca com "Sim")
+    await pg.getByRole("button", { name: "Sim, enviei" }).click({ timeout: 8000 });
     await calmo(pg);
-    ok((await store())["agenda/" + dia(20)].avisadoWhats === true, "marcado como avisado depois de abrir o WhatsApp");
+    ok((await store())["agenda/" + dia(20)].avisadoWhats === true, "marcado como avisado depois de confirmar o envio");
     // Agendar colégio direto pela agenda (dia de fotos do PR)
     await pg.getByRole("button", { name: "+ Agendar colégio" }).click();
     await calmo(pg);
@@ -1649,7 +1651,7 @@ await cenario("Pedro (vendedor: Linha de Frente, Agendamento, Instituições)", 
         s["agenda/" + dia(12)].status === "pendente",
       "pedido de data pelo card Formaturas, com o e-mail de quem pediu"
     );
-    await pg.locator("#fmCorpo .card").filter({ hasText: "Alfa" }).getByText("👥 Formandos e parcelas").click();
+    await pg.locator("#fmCorpo .card").filter({ hasText: "Alfa" }).getByText("👥 Alunos e parcelas").click();
     await calmo(pg);
     const t = await pg.textContent(".panel.wide");
     ok(!/Parcela paga/.test(t) && /lançados pelo Adriano/.test(t), "na turma não registra pagamento");
@@ -1830,7 +1832,7 @@ await cenario("Relatórios para imprimir (um por card)", async () => {
       await pg
         .locator("#fmCorpo .card")
         .filter({ hasText: /Colegio Alfa/i })
-        .getByText(/Ver formandos|Abrir turma|Formandos/)
+        .getByText(/Ver alunos|Abrir turma|Alunos e parcelas/)
         .first()
         .click();
       await calmo(pg);

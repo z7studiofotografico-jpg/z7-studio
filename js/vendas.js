@@ -222,7 +222,7 @@ function desenhar() {
       el(
         "p",
         "hint",
-        "Ainda não há vendas registradas. Elas aparecem aqui quando um lead do Funil é marcado como Fechado, um kit do PR é pago, um formando entra numa turma, um aluguel de becas tem valor ou um ensaio do estúdio tem valor."
+        "Ainda não há vendas registradas. Elas aparecem aqui quando um lead do Funil é marcado como Fechado, um kit do PR é pago, um aluno entra numa turma, um aluguel de becas tem valor ou um ensaio do estúdio tem valor."
       )
     );
 
@@ -592,7 +592,7 @@ function areaForm(corpo, p, nomeP) {
   kpis(corpo, [
     ["A receber · adesão", moeda(A.aReceberCol || 0)],
     ["A receber · kits", moeda(A.aReceberAlb || 0)],
-    ["Formandos com parcela atrasada", String(A.atrasados || 0), A.atrasados ? "late" : ""],
+    ["Alunos com parcela atrasada", String(A.atrasados || 0), A.atrasados ? "late" : ""],
     ["Em aberto desses atrasados", moeda(A.atrasadoValor || 0)]
   ]);
   corpo.append(el("p", "hint", "A receber e atrasados são de hoje (não dependem do período)."));

@@ -14,7 +14,7 @@ const gerarCodigo = d => gerarCodigoPR(C, d, Object.keys(meta.escolas || {}));
 export function openDados(it) {
   const novo = !it;
   it = it || { nome: "", escola: "", ano: seg === "lf" ? ANO() : ANO() - 1, contatos: [] };
-  sheet(novo ? "Incluir aluno no PR" : "Dados do formando", (p, close) => {
+  sheet(novo ? "Incluir aluno no PR" : "Dados do aluno", (p, close) => {
     const mk = (v, ph) => {
       const i = el("input");
       i.value = v || "";
@@ -60,7 +60,7 @@ export function openDados(it) {
     const addLinha = (c = { tipo: "Mãe", nome: "", tel: "" }) => {
       const tp = el("select");
       ["Mãe", "Pai", "Responsável", "Formando", "Telefone", "Outro"].forEach(x => {
-        const o = el("option", null, x);
+        const o = el("option", null, x === "Formando" ? "Aluno" : x);
         o.value = x;
         tp.append(o);
       });

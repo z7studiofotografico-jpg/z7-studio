@@ -5,6 +5,7 @@ import { feriado } from "./feriados.js";
 import { nomeEvento } from "./instituicoes.js";
 import * as U from "./util.js";
 import { TIPOS_ENSAIO, diaTxt, min, fimDe, conflitosEm, resumoDiaEm, tipoDoLead } from "./agenda-tempo.js";
+import { excluir } from "./confirmar.js";
 let C, FS, db, colE, estado;
 // estado() → { ensaios, items, comps } da agenda aberta (para avisar de horário que bate)
 export function initForm(ctx, estadoAtual) {
@@ -195,15 +196,8 @@ export function openEnsaio(x, pre) {
       del.type = "button";
       a.prepend(del);
       del.onclick = async () => {
-        if (!p._del) {
-          p._del = true;
-          del.textContent = "Toque de novo para excluir";
-          return;
-        }
         try {
-          await FS.deleteDoc(FS.doc(db, "ensaios", x.id));
-          U.toast("Ensaio excluído");
-          close();
+          if (await excluir(C, { col: "ensaios", id: x.id, rotulo: `Ensaio de ${x.cliente || ""} em ${U.fmtDate(x.data)}` })) close();
         } catch (e) {
           C.handleErr(e);
         }

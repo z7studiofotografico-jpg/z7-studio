@@ -5,6 +5,7 @@ import * as U from "./util.js";
 import { openEnsaio, openComp } from "./agenda-form.js";
 import { diaTxt, fimDe } from "./agenda-tempo.js";
 import { C, FS, db, marco, quando, resumoDia } from "./agenda-estado.js";
+import { perguntarSeEnviou, faixaExclusao } from "./confirmar.js";
 // ---------- Visitas do vendedor (só informam) ----------
 export function linhaVisita(x) {
   const r = el("div", "agrow");
@@ -57,6 +58,8 @@ export function linhaEnsaio(x) {
   }
   act.append(U.mkBtn("Editar", "btn-sm", () => openEnsaio(x)));
   r.append(t, act);
+  const fx = faixaExclusao(C, "ensaios", x);
+  if (fx) t.append(fx);
   return r;
 }
 export function cardAnalisar(x) {
@@ -152,13 +155,15 @@ export async function lembrar(x) {
     return;
   }
   window.open(`https://wa.me/${tel}?text=${encodeURIComponent(msgLembrete(x))}`, "_blank", "noopener");
-  if (!x.lembrado) {
-    try {
-      await FS.updateDoc(FS.doc(db, "ensaios", x.id), { lembrado: true, lembradoEm: new Date().toISOString(), lembradoPor: C.me || "" });
-    } catch (e) {
-      avisoErro(e, "marcar como lembrado");
-    }
-  }
+  // o botão só some depois de confirmar que a mensagem foi enviada (Regra 9)
+  if (!x.lembrado)
+    perguntarSeEnviou(async () => {
+      try {
+        await FS.updateDoc(FS.doc(db, "ensaios", x.id), { lembrado: true, lembradoEm: new Date().toISOString(), lembradoPor: C.me || "" });
+      } catch (e) {
+        avisoErro(e, "marcar como lembrado");
+      }
+    }, "Você enviou o lembrete?");
 }
 
 // ---------- Compromissos (consulta médica, outros afazeres) ----------

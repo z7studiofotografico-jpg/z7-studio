@@ -300,3 +300,36 @@ details.tamtipo{border:1px solid var(--line,#ddd);border-radius:10px;padding:6px
 .foto-item .tag:empty{display:none}
 .foto-item.on{border-color:var(--ok)}
 .foto-item:disabled{opacity:.5;cursor:wait}
+/* Agenda: cor por tipo de evento (legenda, calendário e lista do dia) */
+.ev-legenda{display:flex;flex-wrap:wrap;gap:4px 6px;margin:6px 0}
+.ev{display:inline-block;font-size:.72rem;line-height:1.3;border-radius:4px;padding:1px 5px;background:var(--chip);color:var(--fg);border-left:3px solid var(--line)}
+.cal .d .ev{display:block;width:100%;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font-size:.66rem;padding:0 3px}
+.cal .d .ev.mais{background:none;border-left:0;color:var(--muted);font-weight:700}
+.ev-formatura{border-left-color:#7c3aed;background:#efe7fd}
+.ev-fotos{border-left-color:#2563eb;background:#e3ecfd}
+.ev-ensaio{border-left-color:#db2777;background:#fce4ef}
+.ev-comp{border-left-color:#6b7280;background:#eceef1}
+.ev-bloqueio{border-left-color:#b3202a;background:#f8e1e2}
+.ev-visita{border-left-color:#0891b2;background:#dff3f8}
+.ev-retirada{border-left-color:#1f7a4d;background:#e1f1e8}
+.ev-devolucao{border-left-color:#d97706;background:#fdeed6}
+.ev-feriado{border-left-color:#991b1b;background:#fde2e2}
+.agrow.ev-linha{border-left:4px solid var(--line);padding-left:8px;background:none}
+.agrow.ev-formatura{border-left-color:#7c3aed}.agrow.ev-fotos{border-left-color:#2563eb}.agrow.ev-ensaio{border-left-color:#db2777}.agrow.ev-comp{border-left-color:#6b7280}.agrow.ev-bloqueio{border-left-color:#b3202a}.agrow.ev-visita{border-left-color:#0891b2}.agrow.ev-retirada{border-left-color:#1f7a4d}.agrow.ev-devolucao{border-left-color:#d97706}.agrow.ev-feriado{border-left-color:#991b1b}
+@media (prefers-color-scheme:dark){.ev-formatura{background:#2a1f45}.ev-fotos{background:#1b2a4a}.ev-ensaio{background:#3d1a2c}.ev-comp{background:#2a2c31}.ev-bloqueio{background:#3b1b1e}.ev-visita{background:#14323a}.ev-retirada{background:#17301f}.ev-devolucao{background:#352812}.ev-feriado{background:#3b1b1e}}
+/* Barra de ações fixa na base do card (Agenda): fora da área de informações */
+.acao-base{display:flex;flex-wrap:wrap;gap:6px;margin:10px -14px -12px;padding:8px 14px;border-top:1px solid var(--line);background:var(--bg);border-radius:0 0 12px 12px}
+.acao-base .btn-danger{margin-left:auto}
+/* Pedido de exclusão feito pela equipe (só o admin vê) */
+.pend-exclusao{background:var(--late-soft);color:var(--late);border:1px solid var(--late);border-radius:10px;padding:8px 10px;margin-bottom:8px;display:flex;flex-direction:column;gap:6px}
+.pend-exclusao .row{display:flex;flex-wrap:wrap;gap:6px}
+.btn-excluir{background:var(--late);color:#fff;border:0;border-radius:8px;padding:2px 8px;font-size:.78rem;font-weight:700;cursor:pointer;flex:none}
+/* Instituições: filtros em duas linhas, com cor e contagem */
+.chips-linha{margin:4px 0}
+.chip.ch-hoje{border-color:var(--warn)}
+.chip.ch-pend{border-color:var(--warn);background:var(--warn-soft);font-weight:700}
+.chip.ch-nao{border-color:var(--late);background:var(--late-soft);font-weight:700}
+.chip.ch-visitado{border-color:#2563eb;background:#e3ecfd;font-weight:700}
+.chip.ch-fechado{border-color:var(--ok);background:var(--ok-soft);font-weight:700}
+.chip[aria-pressed=true].ch-pend,.chip[aria-pressed=true].ch-nao,.chip[aria-pressed=true].ch-visitado,.chip[aria-pressed=true].ch-fechado{outline:2px solid var(--fg)}
+@media (prefers-color-scheme:dark){.chip.ch-visitado{background:#1b2a4a}}
