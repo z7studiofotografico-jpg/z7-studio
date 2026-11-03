@@ -243,6 +243,8 @@ service cloud.firestore {
         && respOk() && exclusaoOk()
         // aluno Caído só volta para a fila pelo Adriano ("Resgatar aluno")
         && !(resource.data.get('etapa', '') == 'CAÍDO' && mudou(['etapa']))
+        // a virada (Linha de Frente → Repasse) é só do Adriano
+        && !mudou(['seg'])
         // marcar Caído pede o motivo (observação obrigatória)
         && !(request.resource.data.get('etapa', '') == 'CAÍDO' && mudou(['etapa'])
              && request.resource.data.get('caidoMotivo', '').size() == 0)

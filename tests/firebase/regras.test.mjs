@@ -579,6 +579,7 @@ test("formatura: Caído só com motivo; só o Adriano tira do Caído; a equipe n
   await assertFails(updateDoc(doc(db, "formaturaAlunos", "a1"), { etapa: "CAÍDO" }));
   await assertSucceeds(updateDoc(doc(db, "formaturaAlunos", "a1"), { etapa: "CAÍDO", caidoMotivo: "Mudou de escola" }));
   await assertFails(updateDoc(doc(db, "formaturaAlunos", "a2"), { etapa: "NA FILA" }));
+  await assertFails(updateDoc(doc(db, "formaturaAlunos", "a1"), { seg: "rep" }));
   await assertFails(deleteDoc(doc(db, "formaturaAlunos", "a1")));
   await assertSucceeds(updateDoc(doc(como(ADRIANO), "formaturaAlunos", "a2"), { etapa: "NA FILA", resgateObs: "ok" }));
   await assertFails(getDoc(doc(como(ANA), "contratos", "i1")));

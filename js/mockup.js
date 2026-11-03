@@ -17,12 +17,13 @@ function loadImg(src) {
 }
 // Foto do celular (12 MP ou mais) → reduzida para no máximo 1600 px, e o arquivo é liberado da memória.
 // (antes a foto ficava inteira na memória e o endereço nunca era liberado: com várias fotos o celular travava)
+// Formatura (até ~70 fotos): 1000 px, senão a memória do celular passa de ~400 MB e as imagens somem no iPhone
 const LADO_MAX = 1600;
-async function fileToImg(f) {
+async function fileToImg(f, ladoMax = LADO_MAX) {
   const url = URL.createObjectURL(f);
   try {
     const img = await loadImg(url);
-    const r = Math.min(1, LADO_MAX / Math.max(img.width, img.height));
+    const r = Math.min(1, ladoMax / Math.max(img.width, img.height));
     if (r === 1) {
       const c0 = document.createElement("canvas");
       c0.width = img.width;
@@ -429,16 +430,17 @@ export function openMockup({ nome = "", escola = "", preco = "", modo = "kit", t
     // passou do limite: avisa (antes as fotos a mais sumiam sem aviso)
     if (todas.length > imgs.length && toast) toast(`No máximo ${maxFotos} fotos por aluno: ${todas.length - imgs.length} ficaram de fora.`);
     const falhas = [];
+    const lado = maxFotos > 15 ? 1000 : LADO_MAX;
     let n = 0;
     prog.hidden = imgs.length < 5;
     for (const f of imgs) {
       prog.textContent = `Carregando as fotos… ${++n} de ${imgs.length}`;
       try {
-        st.fotos.push(await fileToImg(f));
+        st.fotos.push(await fileToImg(f, lado));
       } catch (_) {
         // uma segunda tentativa (foto grande no celular às vezes falha na primeira)
         try {
-          st.fotos.push(await fileToImg(f));
+          st.fotos.push(await fileToImg(f, lado));
         } catch (_e) {
           falhas.push(f);
         }
