@@ -49,7 +49,7 @@ async function alunosDoColegio(C, colNome, col) {
 
 const FOTO = /\.(jpe?g|png|webp)$/i,
   POR_PAGINA = 30,
-  MAX_FOTOS = 90;
+  MAX_FOTOS = 100;
 const limpo = n =>
   String(n || "")
     .replace(/[\\/:*?"<>|]+/g, " ")
@@ -117,8 +117,11 @@ export function motivoErro(e, nome = "", tamanho = null, pasta = "") {
   const n = (e && e.name) || "";
   if (/[ .]$/.test(nome) || /[ .]$/.test(pasta))
     return "o nome da pasta ou do arquivo termina com espaço ou ponto: renomeie no servidor (tire o espaço/ponto do fim)";
+  if (/[<>:"|?*]/.test(nome + pasta)) return 'o nome tem caractere que o Windows não aceita (< > : " | ? *): renomeie a pasta ou o arquivo';
+  if (nome + pasta !== (nome + pasta).normalize("NFC"))
+    return "o nome tem acento gravado em outro formato (pasta criada no Mac/celular): renomeie a pasta digitando o nome de novo";
   if (n === "NotFoundError")
-    return "arquivo não encontrado no servidor (foi movido/renomeado ou a conexão com o servidor caiu): confira se ele abre no computador";
+    return "o navegador não conseguiu abrir (a foto abre no computador?). Se abre, o mais comum é o caminho da pasta ser comprido demais para o Windows (limite de 260 letras, contando todas as pastas de cima): toque em “📂 Escolher a pasta deste aluno” ou encurte o nome da pasta";
   if (n === "NotReadableError")
     return "o servidor não deixou ler (arquivo aberto em outro programa ou sem permissão): feche o arquivo e tente de novo";
   if (n === "NotAllowedError" || n === "SecurityError") return "sem permissão para ler a pasta: escolha a pasta do colégio de novo";
@@ -229,6 +232,37 @@ export function abrirPreviasLote(C, o = {}) {
             )
           )
         );
+        // a pasta do aluno escolhida direto (caminho curto e acesso novo): resolve quando o lote não consegue abrir
+        const esc = U.mkBtn("📂 Escolher a pasta deste aluno", "btn-sm", async () => {
+          try {
+            const dir = await window.showDirectoryPicker({ id: "z7-aluno", mode: "read" });
+            const achadas = (await pastasComFotos(dir)).flatMap(x => x.arquivos);
+            if (!achadas.length) return U.toast("Não achei fotos nessa pasta.");
+            a.arquivos = achadas.sort((x, y) => x.name.localeCompare(y.name, "pt-BR", { numeric: true }));
+            esc.disabled = true;
+            info.textContent = `Gerando ${a.nome} (${a.arquivos.length} fotos)…`;
+            const i0 = lista.find(([x]) => x === a)[1];
+            try {
+              await fazer(a, i0);
+              info.textContent =
+                `✅ ${a.nome}: ${a.geradas} de ${Math.min(a.arquivos.length, MAX_FOTOS)} fotos geradas. ` +
+                (resumoFotos ? resumoFotos() : "");
+              mostrarErros(
+                lista.filter(([x]) => x !== a),
+                fazer,
+                destinoNome,
+                resumoFotos
+              );
+            } catch (e) {
+              if (!(a.erros || []).length) a.erros = [{ arquivo: "", motivo: motivoErro(e) }];
+              info.textContent = `⚠️ ${a.nome}: ainda com erro (motivo abaixo).`;
+              mostrarErros(lista, fazer, destinoNome, resumoFotos);
+            }
+          } catch (e) {
+            if (!(e && e.name === "AbortError")) U.toast("Não consegui abrir essa pasta.");
+          }
+        });
+        d.append(esc);
         errosBox.append(d);
       });
       errosBox.append(el("p", "hint", "As outras prévias já estão salvas. Resolva o motivo no servidor e gere de novo só esses:"));
@@ -400,10 +434,19 @@ export function abrirPreviasLote(C, o = {}) {
           }
         }
         somarGeradas();
-        const resumoFotos = () =>
-          `Fotos na pasta: ${conta.total} · fotos geradas: ${somarGeradas()} · não geradas: ${conta.total - conta.geradas}` +
-          (conta.acima ? ` (${conta.acima} passaram do limite de ${MAX_FOTOS} por aluno)` : "") +
-          ".";
+        // a conta sempre fecha: na pasta = geradas + com erro + acima do limite
+        const resumoFotos = () => {
+          conta.total = alunos.reduce((t, a) => t + a.arquivos.length, 0);
+          conta.acima = alunos.reduce((t, a) => t + Math.max(0, a.arquivos.length - MAX_FOTOS), 0);
+          const ger = somarGeradas(),
+            nao = conta.total - ger,
+            comErro = nao - conta.acima;
+          const partes = [
+            comErro ? `${comErro} dos alunos com erro (lista abaixo)` : "",
+            conta.acima ? `${conta.acima} acima do limite de ${MAX_FOTOS} por aluno` : ""
+          ].filter(Boolean);
+          return `Fotos na pasta: ${conta.total} · geradas: ${ger} · não geradas: ${nao}${partes.length ? " = " + partes.join(" + ") : ""}.`;
+        };
         if (falharam.length) mostrarErros(falharam, fazer, pasta.name, resumoFotos);
         info.textContent =
           (cancelar ? `Parado. ` : "Pronto! ") +
