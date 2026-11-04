@@ -196,7 +196,7 @@ export function abrirPreviasLote(C, o = {}) {
         "p",
         "hint",
         livre
-          ? "Qualquer pasta (uma pasta por pessoa, com as fotos dentro). Entram todos, e os nomes das pastas e das fotos ficam exatamente como estão. Para cada pessoa sai uma imagem leve com as fotos, a marca d'água e o nome da pasta."
+          ? "Só a conversão, no seu computador: escolha a pasta (uma pasta por aluno, com as fotos dentro) e onde salvar. Entram todos, e os nomes das pastas e das fotos ficam exatamente como estão. Para cada aluno sai uma imagem leve com as fotos, a marca d'água e o nome, pronta para mandar pelo WhatsApp (ex.: para o diretor vender o paspatur a quem ainda não comprou). Nada vai para a internet nem para o Google Drive."
           : "No computador: escolha a pasta do colégio no servidor (com uma pasta por aluno) e depois a pasta onde salvar. Para cada aluno sai uma imagem leve (~200 KB) com todas as fotos dele, a marca d'água e o nome. Depois, arraste a pasta de prévias para o Google Drive e compartilhe com o representante como Leitor."
       )
     );
@@ -514,7 +514,9 @@ export function abrirPreviasLote(C, o = {}) {
           " " +
           resumoFotos() +
           (falharam.length ? ` ⚠️ ${falharam.length} aluno${falharam.length > 1 ? "s" : ""} com foto que não saiu (motivo abaixo).` : "") +
-          " Agora arraste essa pasta para o Google Drive.";
+          (livre
+            ? " As prévias ficam só no seu computador, nessa pasta: é só mandar pelo WhatsApp para quem vai vender."
+            : " Agora arraste essa pasta para o Google Drive.");
       } catch (e) {
         if (e && e.name === "AbortError") info.textContent = "Nenhuma pasta escolhida.";
         else {
