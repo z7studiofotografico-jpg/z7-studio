@@ -201,7 +201,12 @@ function mount() {
     <div class="lote-esc"><div class="quick"><select id="rLoteEscola" aria-label="Escola do lote"><option value="">Turmas mais recentes primeiro</option></select>
     <button class="btn btn-primary btn-sm" id="rLoteBtn" type="button">Separar contatos</button></div>
     <input id="rLoteBusca" type="search" placeholder="🔎 Procurar colégio (ex.: yonne)" aria-label="Procurar colégio na lista">
-    <button class="btn btn-sm" id="rJuntar" type="button" hidden>🔀 Juntar com outro colégio</button></div>`;
+    <div class="quick" id="rFerColegio" hidden>
+      <button class="btn btn-sm" id="rJuntar" type="button">🔀 Juntar com outro colégio</button>
+      <button class="btn btn-sm" id="rVerAlunos" type="button">👥 Ver / excluir alunos</button>
+      <button class="btn btn-sm btn-danger" id="rExcluirCol" type="button">🗑️ Excluir colégio inteiro</button>
+      <button class="btn btn-sm" id="rAcertar" type="button">🔄 Acertar a lista</button>
+    </div></div>`;
   v.append(lote);
 
   // pedidos de aluno repetido (admin decide; a equipe vê a resposta)
@@ -238,7 +243,38 @@ function mount() {
   $("rEscola").addEventListener("change", buscar);
   // admin: colégio que veio errado da planilha ("G", "M"…) passa para o colégio certo
   // admin: o colégio escolhido no lote que veio errado da planilha ("G", "M"…) passa para o colégio certo
-  $("rJuntar").hidden = !C.isAdmin;
+  $("rFerColegio").hidden = !C.isAdmin;
+  const grupoDoLote = () => {
+    const de = gruposPR.find(g => g.valor === $("rLoteEscola").value);
+    if (!de) U.toast("Escolha primeiro, na lista acima, o colégio (com o ano).");
+    return de;
+  };
+  const depoisDaLista = () => {
+    $("rLoteEscola").value = "";
+    loadMeta().then(refreshStats);
+    openTab(tab);
+  };
+  // excluir o colégio e ano inteiro (ex.: importou o ano errado e duplicou)
+  $("rExcluirCol").onclick = () => {
+    const de = grupoDoLote();
+    if (de)
+      import("./juntar-colegio.js")
+        .then(m => m.excluirColegio(C, { de, colNome: colNome(), aoTerminar: depoisDaLista }))
+        .catch(e => C.handleErr(e));
+  };
+  // ver os alunos desse colégio (na Busca) para excluir um por um no 🗑️ do cartão
+  $("rVerAlunos").onclick = () => {
+    const v = $("rLoteEscola").value;
+    if (!grupoDoLote()) return;
+    openTab("buscar");
+    $("rEscola").value = v;
+    buscar();
+  };
+  // a lista com números errados ou colégio sem ninguém: conta de novo, colégio por colégio
+  $("rAcertar").onclick = () =>
+    import("./juntar-colegio.js")
+      .then(m => m.acertarLista(C, { colNome: colNome(), aoTerminar: depoisDaLista }))
+      .catch(e => C.handleErr(e));
   $("rJuntar").onclick = () => {
     const de = gruposPR.find(g => g.valor === $("rLoteEscola").value);
     if (!de) return U.toast("Escolha primeiro, na lista acima, o colégio que veio errado (com o ano).");

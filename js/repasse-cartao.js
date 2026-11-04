@@ -45,7 +45,7 @@ const tipoTxt = t => (t === "Formando" ? "Aluno" : t || "");
 export function card(it) {
   const s = status(it);
   const e = el("article", "card " + (["late", "today", "won"].includes(s) ? s : ""));
-  const fx = faixaExclusao(C, colNome(), it);
+  const fx = faixaExclusao(C, colNome(), it, () => import("./juntar-colegio.js").then(m => m.apagarAluno(C, colNome(), it)));
   if (fx) e.append(fx);
   const top = el("div", "card-top");
   // botão vermelho de excluir (Regra 6): o admin exclui; a equipe pede ao Adriano
@@ -54,7 +54,13 @@ export function card(it) {
   bx.title = "Excluir aluno";
   bx.setAttribute("aria-label", "Excluir aluno");
   bx.onclick = () =>
-    excluir(C, { col: colNome(), id: it.id, rotulo: `${title(it.nome) || "Aluno"} (${title(it.escola || "")} ${it.ano || ""})` });
+    excluir(C, {
+      col: colNome(),
+      id: it.id,
+      rotulo: `${title(it.nome) || "Aluno"} (${title(it.escola || "")} ${it.ano || ""})`,
+      // apaga e já tira o aluno da lista de colégios (e do índice de telefones)
+      apagar: () => import("./juntar-colegio.js").then(m => m.apagarAluno(C, colNome(), it))
+    });
   top.append(el("h3", "name", title(it.nome) || "Sem nome"), el("span", "stage", it.etapa), bx);
   e.append(top);
 

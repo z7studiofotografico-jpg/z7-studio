@@ -154,6 +154,33 @@ export function mostrarAlunos(ctx, v, o) {
     .catch(() => {});
 }
 
+// apaga os alunos do colégio e ano escolhidos; quem tem beca fora ou produto reservado/baixado fica (para não
+// bagunçar o estoque) e o app avisa quantos ficaram
+async function excluirDoColegio(lst) {
+  const presos = lst.filter(
+    a => a.status === "Retirou a beca" || (a.produtos || []).some(p => p.estado === "reservado" || p.estado === "baixado")
+  );
+  const vai = lst.filter(a => !presos.includes(a));
+  if (!vai.length) return U.toast("Todos esses alunos têm beca fora ou produto no estoque: exclua um por um.");
+  const ok = await confirmar(
+    "Excluir os alunos deste colégio?",
+    `Apagar ${vai.length} aluno${vai.length === 1 ? "" : "s"} (${title(lst[0].instNome || "")}, ${filtro.ano || "todos os anos"})?` +
+      (presos.length ? ` ${presos.length} com beca fora ou produto no estoque ficam (exclua um por um).` : "") +
+      " Não dá para desfazer.",
+    { perigo: true, sim: "Sim, excluir" }
+  );
+  if (!ok) return;
+  try {
+    for (let i = 0; i < vai.length; i += 400) {
+      const b = FS.writeBatch(db);
+      vai.slice(i, i + 400).forEach(a => b.delete(FS.doc(db, "alugueis", a.id)));
+      await b.commit();
+    }
+    U.toast(`${vai.length} aluno${vai.length === 1 ? "" : "s"} excluído${vai.length === 1 ? "" : "s"} ✅`);
+  } catch (e) {
+    C.handleErr(e);
+  }
+}
 function render() {
   const corpo = $("alLista");
   if (!corpo) return;
@@ -223,6 +250,12 @@ function render() {
       Object.entries(st)
         .map(([s0, n]) => `${n} ${s0.toLowerCase()}`)
         .join(", ");
+    // admin: excluir os alunos desse colégio e ano (importou errado, turma duplicada…)
+    if (C.isAdmin)
+      r.append(
+        " ",
+        U.mkBtn("🗑️ Excluir alunos deste colégio", "btn-danger btn-sm", () => excluirDoColegio(doCol))
+      );
   } else r.hidden = true;
   // status
   const chips = $("alChips");

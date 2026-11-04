@@ -103,3 +103,120 @@ export function abrirJuntar(C, { grupos, de, colNome, metaNome, aoTerminar }) {
     });
   });
 }
+
+// ---------- excluir e acertar a lista de colégios (a "janela cinza") ----------
+export const META_DE = { repasse: "repasse_meta", paspatur: "paspatur_meta", formaturaAlunos: "formatura_meta" };
+// tira da lista de escolas os alunos apagados: menos = [{ escola, ano }]
+export function metaMenos(meta, menos) {
+  const m = {
+    escolas: Object.assign({}, meta.escolas),
+    anos: Object.assign({}, meta.anos),
+    escolasAno: Object.assign({}, meta.escolasAno)
+  };
+  const tira = (o, k) => {
+    if (!k) return;
+    o[k] = (Number(o[k]) || 0) - 1;
+    if (o[k] <= 0) delete o[k];
+  };
+  menos.forEach(a => {
+    tira(m.escolas, a.escola);
+    tira(m.anos, a.ano ? String(a.ano) : "");
+    tira(m.escolasAno, a.escola && a.ano ? a.escola + "|" + a.ano : "");
+  });
+  return m;
+}
+async function atualizarMeta(C, colNome, menos) {
+  const nome = META_DE[colNome];
+  if (!nome || !menos.length) return;
+  const ref = C.FS.doc(C.db, "config", nome);
+  const m = (await C.FS.getDoc(ref)).data() || {};
+  await C.FS.setDoc(ref, Object.assign({}, m, metaMenos(m, menos)));
+}
+// apaga UM aluno (o 🗑️ do cartão) e já tira ele da lista de colégios; no PR, tira também os telefones do índice
+export async function apagarAluno(C, colNome, it) {
+  const { FS, db } = C;
+  const b = FS.writeBatch(db);
+  if (colNome === "repasse") {
+    const { entradasFones } = await import("./pedidos.js");
+    entradasFones(it.id, it).forEach(([t]) => b.set(FS.doc(db, "fones", t), { alunos: { [it.id]: FS.deleteField() } }, { merge: true }));
+  }
+  b.delete(FS.doc(db, colNome, it.id));
+  await b.commit();
+  await atualizarMeta(C, colNome, [{ escola: it.escola, ano: it.ano }]).catch(e => console.warn("[Z7] lista de colégios", e));
+}
+// apaga TODOS os alunos de um colégio e ano (importou o ano errado, turma duplicada…)
+export async function excluirColegio(C, { de, colNome, aoTerminar }) {
+  const { FS, db } = C;
+  const col = FS.collection(db, colNome);
+  const docs = [];
+  for (let i = 0; i < de.nomes.length; i += 30) {
+    const q = await FS.getDocs(FS.query(col, FS.where("escola", "in", de.nomes.slice(i, i + 30)), FS.where("ano", "==", de.ano)));
+    q.forEach(d => docs.push(d));
+  }
+  const vendidos = docs.filter(d => ["PAGO", "ENTREGUE"].includes(d.data().etapa) && !d.data().historico).length;
+  if (
+    !(await confirmar(
+      "Excluir o colégio inteiro?",
+      `Apagar os ${docs.length} alunos de “${de.rotulo}”? ` +
+        (vendidos ? `⚠️ ${vendidos} deles têm venda registrada no app. ` : "") +
+        "O colégio sai da lista. Não dá para desfazer (só pela cópia de segurança).",
+      { perigo: true, sim: "Sim, excluir tudo" }
+    ))
+  )
+    return false;
+  let feitos = 0;
+  const { entradasFones } = colNome === "repasse" ? await import("./pedidos.js") : {};
+  for (let i = 0; i < docs.length; i += 200) {
+    const b = FS.writeBatch(db);
+    docs.slice(i, i + 200).forEach(d => {
+      if (entradasFones)
+        entradasFones(d.id, d.data()).forEach(([t]) =>
+          b.set(FS.doc(db, "fones", t), { alunos: { [d.id]: FS.deleteField() } }, { merge: true })
+        );
+      b.delete(d.ref);
+    });
+    await b.commit();
+    feitos += Math.min(200, docs.length - i);
+  }
+  // a lista: esse colégio e ano saem por inteiro (mesmo se a conta estava errada)
+  const ref = FS.doc(db, "config", META_DE[colNome]);
+  const m = (await FS.getDoc(ref)).data() || {};
+  const nova = metaMenos(
+    m,
+    docs.map(d => ({ escola: d.data().escola, ano: d.data().ano }))
+  );
+  de.nomes.forEach(n => delete nova.escolasAno[n + "|" + de.ano]);
+  await FS.setDoc(ref, Object.assign({}, m, nova));
+  U.toast(`${feitos} aluno${feitos === 1 ? "" : "s"} de ${de.rotulo} excluído${feitos === 1 ? "" : "s"} ✅`);
+  if (aoTerminar) aoTerminar();
+  return true;
+}
+// confere cada colégio e ano da lista contando os alunos de verdade (tira os que não têm mais ninguém)
+export async function acertarLista(C, { colNome, aoTerminar }) {
+  const { FS, db } = C;
+  const ref = FS.doc(db, "config", META_DE[colNome]);
+  const m = (await FS.getDoc(ref)).data() || {};
+  const col = FS.collection(db, colNome);
+  const escolasAno = {};
+  let mudou = 0;
+  for (const k of Object.keys(m.escolasAno || {})) {
+    const i = k.lastIndexOf("|");
+    const escola = k.slice(0, i),
+      ano = Number(k.slice(i + 1));
+    const n = (await FS.getCountFromServer(FS.query(col, FS.where("escola", "==", escola), FS.where("ano", "==", ano)))).data().count;
+    if (n !== Number(m.escolasAno[k])) mudou++;
+    if (n) escolasAno[k] = n;
+  }
+  const escolas = {},
+    anos = {};
+  Object.entries(escolasAno).forEach(([k, n]) => {
+    const i = k.lastIndexOf("|");
+    escolas[k.slice(0, i)] = (escolas[k.slice(0, i)] || 0) + n;
+    anos[k.slice(i + 1)] = (anos[k.slice(i + 1)] || 0) + n;
+  });
+  await FS.setDoc(ref, Object.assign({}, m, { escolas, anos, escolasAno }));
+  U.toast(
+    mudou ? `Lista acertada: ${mudou} colégio${mudou > 1 ? "s" : ""} corrigido${mudou > 1 ? "s" : ""} ✅` : "A lista já estava certa ✅"
+  );
+  if (aoTerminar) aoTerminar();
+}

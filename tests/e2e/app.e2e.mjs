@@ -2786,6 +2786,18 @@ await cenario("Juntar colégio que veio errado da planilha (G e M → C.E. Rober
   );
   const ea = st["config/formatura_meta"].escolasAno;
   ok(ea["C.E ROBERTO LYRA|2025"] === 3 && !ea["G|2025"] && !ea["M|2025"], "lista de escolas: Roberto Lyra 2025 com 3, sem G e M");
+  // excluir o colégio inteiro (ano importado errado): os alunos saem e o colégio some da lista
+  await pg.selectOption("#rLoteEscola", { label: "2025 - C.E. Roberto Lyra (3)" });
+  await pg.getByRole("button", { name: "🗑️ Excluir colégio inteiro" }).click();
+  await pg.locator(".sheet").last().getByRole("button", { name: "Sim, excluir tudo" }).click();
+  await calmo(pg);
+  const st2 = await store();
+  ok(
+    !st2["formaturaAlunos/g1"] && !st2["formaturaAlunos/r1"] && !(st2["config/formatura_meta"].escolasAno || {})["C.E ROBERTO LYRA|2025"],
+    "excluir colégio inteiro: alunos apagados e o colégio sai da lista"
+  );
+  const ops = await pg.$$eval("#rLoteEscola option", os => os.map(o => o.textContent));
+  ok(!ops.some(o => /Roberto Lyra/.test(o)), "a lista do lote já não mostra o colégio excluído");
   ok(!erros.length, "sem erros" + (erros.length ? ": " + erros.join(" | ") : ""));
 });
 await cenario("Fotos do aluno direto do Google Drive", async () => {
