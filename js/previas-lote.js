@@ -275,7 +275,16 @@ export function abrirPreviasLote(C, o = {}) {
     fCol.append(lC, iCol);
     fTur.append(lT, iTurma);
     rCT.append(fCol, fTur);
-    if (livre) p.append(rCT);
+    // quantidade de alunos: só aparece no cabeçalho se for preenchida (o app não conta sozinho)
+    const iQtd = el("input");
+    iQtd.id = "impQtd";
+    iQtd.inputMode = "numeric";
+    iQtd.placeholder = "em branco = não aparece";
+    const fQtd = el("div", "field");
+    const lQ = el("label", null, "Quantidade de alunos (opcional)");
+    lQ.htmlFor = iQtd.id;
+    fQtd.append(lQ, iQtd);
+    if (livre) p.append(rCT, fQtd);
     const porFoto = el("input");
     porFoto.type = "checkbox";
     porFoto.checked = false;
@@ -499,7 +508,7 @@ export function abrirPreviasLote(C, o = {}) {
               ? {
                   // folha da turma: colégio e turma no cabeçalho, 20 por página, nome e sobrenome embaixo de cada foto
                   nome: iCol.value.trim() || origem.name,
-                  sub: [...cab, fotos.length + " alunos"].join(" · "),
+                  sub: [...cab, iQtd.value.trim() ? iQtd.value.trim() + " alunos" : ""].filter(Boolean).join(" · "),
                   fotos,
                   legendas: nomesFotos.map(nomeSobrenome),
                   porPagina: 20,

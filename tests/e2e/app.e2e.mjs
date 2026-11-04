@@ -2709,6 +2709,7 @@ await cenario("Agendamento · Importação: folha da turma (20 por página, nome
       nomes.includes(P + "Legacy School Nova Iguaçu - 5º ano A - pagina 2.jpg"),
     "23 alunos = 2 folhas de até 20, com o nome do colégio e da turma: " + nomes.join(" | ")
   );
+  ok(!(await sh.getByLabel("Quantidade de alunos (opcional)").inputValue()), "quantidade de alunos: em branco (só aparece se preencher)");
   if (process.env.FOTO) {
     const d = await pg.evaluate(async n => {
       const b = window.__blobs[n];

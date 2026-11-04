@@ -79,8 +79,10 @@ export function desenharFolha(cv, st, pagina) {
     ctx,
     W,
     st,
-    (st.sub || `${st.escola ? st.escola + " · " : ""}${st.fotos.length} fotos do kit`) +
-      (paginas > 1 ? ` · página ${pagina + 1} de ${paginas}` : "")
+    st.sub != null
+      ? [st.sub.trim(), paginas > 1 ? `página ${pagina + 1} de ${paginas}` : ""].filter(Boolean).join(" · ")
+      : `${st.escola ? st.escola + " · " : ""}${st.fotos.length} fotos do kit` +
+          (paginas > 1 ? ` · página ${pagina + 1} de ${paginas}` : "")
   );
   fotos.forEach((f, i) => {
     const x = margem + (i % COL) * (cw + gap),
