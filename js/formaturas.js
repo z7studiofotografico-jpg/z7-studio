@@ -33,7 +33,7 @@ import {
   ehKit01,
   fimDoMes
 } from "./regras.js";
-import { el, title, avisoErro, sheet, botoes } from "./ui.js";
+import { el, title, avisoErro, sheet, botoes, clicavel } from "./ui.js";
 import { editorPrecos } from "./precos.js";
 import * as Ev from "./eventos.js";
 import * as U from "./util.js";
@@ -378,9 +378,15 @@ function render() {
   ];
   if (tudoCarregado)
     kp.push(["🎓 Adesão a receber", moeda(somar(col.map(emAberto)))], ["📘 Kits a receber", moeda(somar(alb.map(emAberto)))]);
+  const destino = ["cobrancas", "cobrancas", "cobrancas", "adesao", "album"];
   kp.forEach(([t, v], i) => {
     const c = el("div", "kpi" + (i === 0 && atr.length ? " late" : ""));
     c.append(el("small", null, t), el("b", null, v));
+    // o número leva para a lista dele
+    clicavel(c, () => {
+      aba = destino[i];
+      render();
+    });
     k.append(c);
   });
   const cob = cobrancas(cf);

@@ -7,7 +7,7 @@
 // Partes: repasse-estado.js (estado e regras do contato), repasse-mensagens.js (textos), repasse-cartao.js (cartão),
 // repasse-janelas.js (venda, entrega, notas), repasse-form.js (dados e "+ Aluno"), repasse-lote.js (números e lote).
 import { openMockup } from "./mockup.js";
-import { el, title, emPartes } from "./ui.js";
+import { el, title, emPartes, clicavel } from "./ui.js";
 import * as U from "./util.js";
 import { norm } from "./repasse-dados.js";
 import { openImport } from "./repasse-import.js";
@@ -200,7 +200,8 @@ function mount() {
   lote.innerHTML = `<div><b>Seu lote de hoje</b><span id="rLoteTxt">…</span><small class="lnum" id="rLoteNum" hidden></small><p class="wait" id="rLoteAviso" hidden></p></div>
     <div class="lote-esc"><div class="quick"><select id="rLoteEscola" aria-label="Escola do lote"><option value="">Turmas mais recentes primeiro</option></select>
     <button class="btn btn-primary btn-sm" id="rLoteBtn" type="button">Separar contatos</button></div>
-    <input id="rLoteBusca" type="search" placeholder="🔎 Procurar colégio (ex.: yonne)" aria-label="Procurar colégio na lista"></div>`;
+    <input id="rLoteBusca" type="search" placeholder="🔎 Procurar colégio (ex.: yonne)" aria-label="Procurar colégio na lista">
+    <button class="btn btn-sm" id="rJuntar" type="button" hidden>🔀 Juntar com outro colégio</button></div>`;
   v.append(lote);
 
   // pedidos de aluno repetido (admin decide; a equipe vê a resposta)
@@ -219,8 +220,7 @@ function mount() {
   busca.id = "rBusca";
   busca.hidden = true;
   busca.innerHTML = `<input class="search" id="rQ" type="search" placeholder="Nome do aluno ou telefone" aria-label="Buscar no repasse">
-    <select class="search" id="rEscola" aria-label="Filtrar por escola"><option value="">Ou escolha uma escola…</option></select>
-    <button class="btn btn-sm" id="rJuntar" type="button" hidden>🔀 Juntar com outro colégio</button>`;
+    <select class="search" id="rEscola" aria-label="Filtrar por escola"><option value="">Ou escolha uma escola…</option></select>`;
   v.append(busca);
 
   const list = el("section", "grid");
@@ -237,10 +237,11 @@ function mount() {
   });
   $("rEscola").addEventListener("change", buscar);
   // admin: colégio que veio errado da planilha ("G", "M"…) passa para o colégio certo
-  $("rEscola").addEventListener("change", () => ($("rJuntar").hidden = !C.isAdmin || !$("rEscola").value));
+  // admin: o colégio escolhido no lote que veio errado da planilha ("G", "M"…) passa para o colégio certo
+  $("rJuntar").hidden = !C.isAdmin;
   $("rJuntar").onclick = () => {
-    const de = gruposPR.find(g => g.valor === $("rEscola").value);
-    if (!de) return U.toast("Escolha o colégio na lista (com o ano).");
+    const de = gruposPR.find(g => g.valor === $("rLoteEscola").value);
+    if (!de) return U.toast("Escolha primeiro, na lista acima, o colégio que veio errado (com o ano).");
     import("./juntar-colegio.js")
       .then(m =>
         m.abrirJuntar(C, {
@@ -249,15 +250,24 @@ function mount() {
           colNome: colNome(),
           metaNome: metaNome(),
           aoTerminar: () => {
-            $("rEscola").value = "";
-            $("rJuntar").hidden = true;
+            $("rLoteEscola").value = "";
             loadMeta().then(refreshStats);
-            buscar();
+            openTab(tab);
           }
         })
       )
       .catch(e => C.handleErr(e));
   };
+  // números do topo levam para a lista deles
+  const irPara = (id, fn) => clicavel($(id).closest(".stat"), fn, "Ver a lista");
+  irPara("rsHoje", () => openTab("hoje"));
+  irPara("rsInt", () => openTab("interessados"));
+  irPara("rsMes", () => openTab("entregas"));
+  // a fila é separada no "Seu lote de hoje"
+  irPara("rsFila", () => {
+    $("rLote").scrollIntoView({ behavior: "smooth", block: "center" });
+    $("rLoteBtn").focus();
+  });
   try {
     if (!localStorage.getItem("z7rguide")) g.open = true;
     g.addEventListener("toggle", () => {

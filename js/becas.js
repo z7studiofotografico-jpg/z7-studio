@@ -2,7 +2,7 @@
 // Coleção "becas": { cliente, tel, tipoEvento ("nosso" | "outro"), evento, dataEvento, retirada, retiradaHora, devolucao,
 //   qtd (total de becas), becasQtd: { pelerineAzul, infAzul, infPreta, tradPreta, americana }, faixasQtd: { azul, branca, ... }, capelosQtd: { capelo }, tamanhosQtd: { tradPreta: { M: 7, G: 5 }, ... } (por tipo de beca), tamanhos (texto, ex.: "Beca tradicional preta: 7 M, 5 G"; o jabor já vai com a beca), valor, caucao, pago, formaPag, status, obs }
 // Status: reservado → retirado → devolvido (ou cancelado). Retirada e devolução aparecem no Agendamento.
-import { el, title, field, inp, inpReais, sheet, botoes, wa as abrirWa, avisoErro, gradeQtd } from "./ui.js";
+import { el, title, field, inp, inpReais, sheet, botoes, wa as abrirWa, avisoErro, gradeQtd, clicavel } from "./ui.js";
 import { ENDERECO, ESTUDIO } from "./mensagens.js";
 import { lerReais, centavos, reais, brl } from "./regras.js";
 import * as U from "./util.js";
@@ -203,6 +203,10 @@ function render() {
   ].forEach(([t, v], i) => {
     const c = el("div", "kpi" + (i === 2 && atr.length ? " late" : ""));
     c.append(el("small", null, t), el("b", null, v));
+    clicavel(c, () => {
+      aba = ["fora", "proximas", "atrasadas", "proximas"][i];
+      render();
+    });
     k.append(c);
   });
   const abas = [

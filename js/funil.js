@@ -1,6 +1,6 @@
 // Funil de vendas: leads do WhatsApp, mensagens prontas, follow-ups e venda.
 // Antes ficava dentro do index.html; agora é um módulo como os outros.
-import { avisoErro, emPartes, norm } from "./ui.js";
+import { avisoErro, emPartes, norm, clicavel } from "./ui.js";
 import { campoReais, centavos, reais } from "./regras.js";
 import { ESTUDIO } from "./mensagens.js";
 import * as U from "./util.js";
@@ -218,7 +218,23 @@ function renderChips() {
     c.appendChild(b);
   });
 }
+let statsLigados = false;
 function renderStats() {
+  // os números do topo levam para a lista deles (uma vez só)
+  if (!statsLigados && $("sLate")) {
+    statsLigados = true;
+    [
+      ["sLate", "ABERTOS"],
+      ["sToday", "ABERTOS"],
+      ["sOpen", "ABERTOS"],
+      ["sWon", "FECHADO"]
+    ].forEach(([id, k]) =>
+      clicavel($(id).closest(".stat"), () => {
+        filter = k;
+        render();
+      })
+    );
+  }
   const st = leads.map(status);
   const late = st.filter(s => s === "late").length,
     today = st.filter(s => s === "today").length;

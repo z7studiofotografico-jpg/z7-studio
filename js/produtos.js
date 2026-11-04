@@ -2,7 +2,7 @@
 // e o estoque de cada item: Disponível = Físico − Reservado. Entrada de compra e estorno (com motivo) ficam no
 // registro de movimentos (movEstoque). Ninguém muda a quantidade à mão: só por entrada, reserva, baixa ou estorno.
 // Preços e ficha: só o administrador. A equipe com o módulo vê o estoque e lança entradas.
-import { el, sheet, field, title } from "./ui.js";
+import { el, sheet, field, title, clicavel } from "./ui.js";
 import * as U from "./util.js";
 import { brl } from "./regras.js";
 import { disponivel, precisaComprar, custoReal, margem } from "./catalogo.js";
@@ -105,6 +105,10 @@ function pintar() {
   ].forEach(([r, n]) => {
     const c = el("div", "kpi" + (r === "Abaixo do mínimo" && n ? " late" : ""));
     c.append(el("small", null, r), el("b", null, String(n)));
+    clicavel(c, () => {
+      filtro = { "Produtos de venda": "venda", Insumos: "insumo", "Com reserva": "todos", "Abaixo do mínimo": "comprar" }[r];
+      pintar();
+    });
     k.append(c);
   });
   chips.textContent = "";

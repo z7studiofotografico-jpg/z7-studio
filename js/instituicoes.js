@@ -1,7 +1,7 @@
 // Módulo Instituições: colégio particular, colégio público, colégio profissionalizante e faculdade.
 // Partes: instituicoes-dados.js (tipos e regras), instituicoes-estado.js (estado e gravação),
 // instituicoes-form.js (cadastro e visita), instituicoes-agendar.js (agendar pelo Agendamento), instituicoes-import.js.
-import { el, title, emPartes } from "./ui.js";
+import { el, title, emPartes, clicavel } from "./ui.js";
 import { linhaEvento } from "./eventos.js";
 import * as U from "./util.js";
 import { openImport } from "./instituicoes-import.js";
@@ -56,6 +56,19 @@ export function show(t) {
     <div class="stat"><b id="iAbertas">–</b><small>Em andamento</small></div>
     <div class="stat won"><b id="iFech">–</b><small>Fechadas</small></div>`;
   v.append(st);
+  // os números levam para a lista deles
+  [
+    ["iAtr", "hoje"],
+    ["iHoje", "hoje"],
+    ["iAbertas", "todos"],
+    ["iFech", "FECHADO"]
+  ].forEach(([id, k]) =>
+    clicavel(st.querySelector("#" + id).closest(".stat"), () => {
+      tab = k;
+      renderChips();
+      renderList();
+    })
+  );
   const chips = el("div", "chips-duas");
   chips.id = "iChips";
   v.append(chips);

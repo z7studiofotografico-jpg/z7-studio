@@ -2760,10 +2760,15 @@ await cenario("Juntar colégio que veio errado da planilha (G e M → C.E. Rober
   await ir(pg, "#formaturas");
   await pg.locator("#viewFormaturas .seg", { hasText: "Repasse" }).click();
   await calmo(pg);
-  await pg.locator("#viewFormaturas .chip", { hasText: "Buscar" }).first().click();
+  // os números do topo levam para a lista deles
+  await pg.locator("#viewFormaturas .stat", { hasText: "Interessados" }).click();
   await calmo(pg);
+  ok(
+    (await pg.locator("#viewFormaturas #rChips .chip", { hasText: "Interessados" }).getAttribute("aria-pressed")) === "true",
+    "tocar em “Interessados” abre a lista de interessados"
+  );
   for (const x of ["G", "M"]) {
-    await pg.selectOption("#rEscola", { label: `2025 - ${x} (1)` });
+    await pg.selectOption("#rLoteEscola", { label: `2025 - ${x} (1)` });
     await calmo(pg);
     await pg.getByRole("button", { name: "🔀 Juntar com outro colégio" }).click();
     const sh = pg.locator(".sheet").last();

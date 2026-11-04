@@ -77,6 +77,22 @@ export function sheet(tit, build, opts) {
   document.body.append(sh);
   return close;
 }
+// número do topo (Para hoje, Interessados…) que leva para a lista dele
+export function clicavel(box, fn, dica) {
+  if (!box) return box;
+  box.classList.add("stat-link");
+  box.setAttribute("role", "button");
+  box.tabIndex = 0;
+  if (dica) box.title = dica;
+  box.onclick = fn;
+  box.onkeydown = e => {
+    if (e.key === "Enter" || e.key === " ") {
+      e.preventDefault();
+      fn();
+    }
+  };
+  return box;
+}
 // botões no canto superior direito de uma janela (ao lado do título)
 export function topoDireita(p, ...btns) {
   let h = p.querySelector("h2");

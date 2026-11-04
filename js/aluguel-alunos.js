@@ -5,7 +5,7 @@
 // Status: Cadastrado → Beca medida (reserva beca, faixa e capelo) → Produtos em produção (se comprou algum) →
 // Pronto para retirada → Retirou a beca (baixa o estoque dos produtos) → Devolvida (beca volta ao estoque).
 // "Atrasado na devolução": retirou e passou da data de devolução (destaque para o Adriano).
-import { el, title, field, inp, inpReais, sel, sheet, botoes, wa } from "./ui.js";
+import { el, title, field, inp, inpReais, sel, sheet, botoes, wa, clicavel } from "./ui.js";
 import * as U from "./util.js";
 import { lerReais, brl } from "./regras.js";
 import { confirmar, confirmarStatus, excluir, faixaExclusao, ocultoParaMim, perguntarSeEnviou, pedirTexto } from "./confirmar.js";
@@ -174,6 +174,10 @@ function render() {
   ].forEach(([t, val], i) => {
     const c = el("div", "kpi" + (i === 3 && atr.length ? " late" : ""));
     c.append(el("small", null, t), el("b", null, val));
+    clicavel(c, () => {
+      filtro.status = ["ativos", "Beca medida", "Retirou a beca", "atrasados"][i];
+      render();
+    });
     k.append(c);
   });
   // filtros: ano e colégio
