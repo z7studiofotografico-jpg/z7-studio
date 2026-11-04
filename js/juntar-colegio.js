@@ -78,16 +78,14 @@ export function abrirJuntar(C, { grupos, de, colNome, metaNome, aoTerminar }) {
           const q = await FS.getDocs(FS.query(col, FS.where("escola", "in", de.nomes.slice(i, i + 30)), FS.where("ano", "==", de.ano)));
           for (let k = 0; k < q.docs.length; k += 400) {
             const b = FS.writeBatch(db);
-            q.docs
-              .slice(k, k + 400)
-              .forEach(d =>
-                b.update(d.ref, {
-                  escola: para.nomes[0],
-                  ano: para.ano,
-                  escolaAntes: d.data().escola,
-                  atualizadoEm: new Date().toISOString()
-                })
-              );
+            q.docs.slice(k, k + 400).forEach(d =>
+              b.update(d.ref, {
+                escola: para.nomes[0],
+                ano: para.ano,
+                escolaAntes: d.data().escola,
+                atualizadoEm: new Date().toISOString()
+              })
+            );
             await b.commit();
           }
           n += q.size;

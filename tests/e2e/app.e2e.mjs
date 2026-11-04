@@ -3215,8 +3215,13 @@ await cenario("Equipe edita os dados do aluno e o Adriano vê quem editou", asyn
   await sh.getByLabel("WhatsApp").first().fill("21977776666");
   await sh.locator("button[type=submit]").click();
   await calmo(eq.pg);
-  const st = await eq.store();
-  const av = Object.entries(st).find(([k]) => k.startsWith("edicoes/"));
+  // o aviso é gravado logo depois de salvar: espera ele chegar (até 5 s)
+  let st = await eq.store(),
+    av = null;
+  for (let t = 0; t < 25 && !(av = Object.entries(st).find(([k]) => k.startsWith("edicoes/"))); t++) {
+    await eq.pg.waitForTimeout(200);
+    st = await eq.store();
+  }
   ok(
     st["repasse/ed1"].telefones[0] === "21977776666" &&
       av &&
