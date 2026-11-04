@@ -110,6 +110,10 @@ test("prévias livres: fotos soltas na pasta escolhida viram uma prévia por fot
 test("importação: nome e sobrenome do arquivo; fotos soltas viram a folha (e as individuais só se pedir)", async () => {
   const { nomeSobrenome, montarImportacao } = await import("../js/previas-lote.js");
   assert.equal(nomeSobrenome("01 - Maria Eduarda Souza Lima.jpg"), "Maria Lima");
+  assert.equal(nomeSobrenome("26-(E.PART)LEGACY NIL-01- BERNARDO GOMES (2).jpg"), "BERNARDO GOMES");
+  assert.equal(nomeSobrenome("26-(E.PART)LEGACY NIL-01- BERNARDO GOMES.jpg"), "BERNARDO GOMES");
+  assert.equal(nomeSobrenome("31-(E.PART)LEGACY NIL-02- MARIA CLARA DOS SANTOS (4).JPG"), "MARIA SANTOS");
+  assert.equal(nomeSobrenome("26-(E.PART)LEGACY NIL-01- BERNARDO GOMES 3.jpg"), "BERNARDO GOMES");
   assert.equal(nomeSobrenome("ANA SOUZA.JPG"), "ANA SOUZA");
   assert.equal(nomeSobrenome("Pedro.png"), "Pedro");
   const h = n => ({ name: n });

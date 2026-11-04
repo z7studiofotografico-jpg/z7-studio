@@ -177,12 +177,18 @@ export function pastaDeArquivos(files, nome = "") {
 }
 // fotos soltas direto na pasta escolhida (sem uma pasta por aluno) viram uma prévia por foto, com o nome do arquivo
 // "01 - Maria Eduarda Souza Lima.jpg" → "Maria Lima" (nome e sobrenome, como está escrito no arquivo)
+// O nome do aluno é sempre a última parte do nome do arquivo, depois do último "-":
+// "26-(E.PART)LEGACY NIL-01- BERNARDO GOMES (2).jpg" → "BERNARDO GOMES" (sem o "(2)" do fim)
 export function nomeSobrenome(arquivo) {
-  const s = String(arquivo || "")
+  let s = String(arquivo || "")
     .replace(/\.(jpe?g|png|webp)$/i, "")
-    .replace(/^[A-Z]*\s*\d+\s*-\s*/i, "")
     .replace(/[_]+/g, " ")
+    .replace(/\s*\(\d+\)\s*$/, "") // "(2)" do fim
+    .replace(/[\s-]*\d+\s*$/, "") // numeral solto no fim
     .trim();
+  const i = s.lastIndexOf("-");
+  if (i >= 0 && /[a-zà-ú]{2}/i.test(s.slice(i + 1))) s = s.slice(i + 1);
+  s = s.replace(/^[\s\d.()-]+/, "").trim();
   const ps = s.split(/\s+/).filter(Boolean);
   return ps.length <= 2 ? ps.join(" ") : ps[0] + " " + ps[ps.length - 1];
 }
