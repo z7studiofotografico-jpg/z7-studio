@@ -2720,6 +2720,48 @@ await cenario("Agendamento · Importação: folha da turma (20 por página, nome
     "23 alunos = 2 folhas de até 20, com o nome do colégio e da turma: " + nomes.join(" | ")
   );
   ok(!(await sh.getByLabel("Quantidade de alunos (opcional)").inputValue()), "quantidade de alunos: em branco (só aparece se preencher)");
+  // de novo, agora com as fotos individuais: cada uma sai como foto com marca d'água (sem folha), com o nome do arquivo
+  await pg.evaluate(() => {
+    window.__gravados = {};
+  });
+  await pg.evaluate(async () => {
+    const itens = [];
+    for (let i = 1; i <= 3; i++) {
+      const c = document.createElement("canvas");
+      c.width = 400;
+      c.height = 600;
+      c.getContext("2d").fillRect(0, 0, 400, 600);
+      const f = new File([await new Promise(r => c.toBlob(r, "image/jpeg"))], "f.jpg", { type: "image/jpeg" });
+      itens.push({ kind: "file", name: `0${i}-(E.PART)LEGACY NIL-0${i}- ALUNO ${i} SILVA (2).jpg`, getFile: async () => f });
+    }
+    const origem = {
+      kind: "directory",
+      name: "Turma",
+      async *values() {
+        yield* itens;
+      }
+    };
+    const dirFalso = caminho => ({
+      name: caminho.split("/").pop(),
+      async getDirectoryHandle(n) {
+        return dirFalso(caminho ? caminho + "/" + n : n);
+      },
+      async getFileHandle(f) {
+        return {
+          async createWritable() {
+            return {
+              async write(b) {
+                window.__gravados[caminho + "/" + f] = b.size;
+              },
+              async close() {}
+            };
+          }
+        };
+      }
+    });
+    const fila = [origem, dirFalso("")];
+    window.showDirectoryPicker = async () => fila.shift();
+  });
   if (process.env.FOTO) {
     const d = await pg.evaluate(async n => {
       const b = window.__blobs[n];
@@ -2731,6 +2773,18 @@ await cenario("Agendamento · Importação: folha da turma (20 por página, nome
     }, P + "Legacy School Nova Iguaçu - 5º ano A - pagina 1.jpg");
     (await import("node:fs")).writeFileSync(process.env.FOTO, Buffer.from(d.split(",")[1], "base64"));
   }
+  await sh.getByLabel(/Também fazer as fotos individuais/).check();
+  await sh.getByRole("button", { name: "Escolher a pasta do colégio" }).click();
+  await pg.waitForFunction(() => Object.keys(window.__gravados).length >= 4, null, { timeout: 20000 });
+  await calmo(pg);
+  const n2 = Object.keys(await pg.evaluate(() => window.__gravados)).sort();
+  ok(
+    n2.includes(P + "01-(E.PART)LEGACY NIL-01- ALUNO 1 SILVA (2).jpg") &&
+      n2.includes(P + "03-(E.PART)LEGACY NIL-03- ALUNO 3 SILVA (2).jpg") &&
+      n2.includes(P + "Legacy School Nova Iguaçu - 5º ano A.jpg") &&
+      n2.length === 4,
+    "fotos individuais: cada foto sai sozinha com a marca (nome do arquivo), além da folha da turma: " + n2.join(" | ")
+  );
   ok(!erros.length, "sem erros" + (erros.length ? ": " + erros.join(" | ") : ""));
 });
 await cenario("Juntar colégio que veio errado da planilha (G e M → C.E. Roberto Lyra)", async () => {

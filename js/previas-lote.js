@@ -542,6 +542,25 @@ export function abrirPreviasLote(C, o = {}) {
                 escola: [cod, col.nome, col.ano].filter(Boolean).join(" · "),
                 fotos
               };
+          // foto individual (Importação): a própria foto com a marca d'água, como para o quadro (sem folha nem página)
+          if (livre && a.soltA) {
+            const f = fotos[0],
+              c = document.createElement("canvas");
+            c.width = f.width;
+            c.height = f.height;
+            const x = c.getContext("2d");
+            x.drawImage(f, 0, 0);
+            marca(x, 0, 0, c.width, c.height);
+            const nomeArq = nomesFotos[0].replace(/\.(png|webp|jpe?g)$/i, "") + ".jpg";
+            try {
+              await gravar(pasta, nomeArq, await jpg(c));
+            } catch (e) {
+              a.erros.push({ arquivo: nomeArq, motivo: "não consegui salvar: " + motivoErro(e) });
+              throw e;
+            }
+            a.geradas = 1;
+            return;
+          }
           const paginas = Math.ceil(fotos.length / (st.porPagina || POR_PAGINA));
           // as fotos separadas (pequenas, com marca e número): o representante monta o quadro e os porta-retratos
           // no app ("🖼️ Prévia e fotos") com as que a família escolher
