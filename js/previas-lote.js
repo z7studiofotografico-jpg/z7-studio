@@ -9,6 +9,7 @@ import { reduzir, desenharFolha } from "./previa.js";
 import { acharAluno } from "./drive-fotos.js";
 import { chaveColegio } from "./historico-dados.js";
 import { gruposEscolas } from "./escolas-pr.js";
+import { nomeDaFoto } from "./foto-nome.js";
 
 // Quem já comprou (venda no app ou "VENDIDO" na planilha) não precisa de prévia: só conta no Dashboard
 export const COMPROU = ["PAGO", "ENTREGUE"];
@@ -135,13 +136,14 @@ export function motivoErro(e, nome = "", tamanho = null, pasta = "") {
   return "não consegui ler: " + ((e && (e.message || e.name)) || "erro desconhecido");
 }
 // lê e reduz uma foto; se falhar, devolve { erro } com o motivo (tenta 2 vezes)
-async function lerFoto(h, pastaNome) {
+async function lerFoto(h, pastaNome, comNome = false) {
   let file = null,
     ultimo = null;
   for (let t = 0; t < 2; t++) {
     try {
       file = await h.getFile();
-      return { img: await reduzir(file) };
+      // folha da turma: o nome do aluno guardado dentro da foto (Título/Assunto), quando o arquivo tem só um código
+      return { img: await reduzir(file), nome: comNome ? await nomeDaFoto(file) : "" };
     } catch (e) {
       ultimo = e;
       if (t === 0) await espera(600);
@@ -285,6 +287,11 @@ export function abrirPreviasLote(C, o = {}) {
     lQ.htmlFor = iQtd.id;
     fQtd.append(lQ, iQtd);
     if (livre) p.append(rCT, fQtd);
+    // "Legacy - 5° ano - 87 alunos": o nome da pasta, do arquivo e o cabeçalho (a quantidade só se preencher)
+    const tituloImp = () =>
+      [iCol.value.trim(), iTurma.value.trim(), iQtd.value.trim() ? iQtd.value.trim().replace(/\s*alunos?$/i, "") + " alunos" : ""]
+        .filter(Boolean)
+        .join(" - ");
     const porFoto = el("input");
     porFoto.type = "checkbox";
     porFoto.checked = false;
@@ -430,7 +437,7 @@ export function abrirPreviasLote(C, o = {}) {
         info.textContent = "Procurando as fotos…";
         let alunos = await pastasComFotos(origem);
         if (!alunos.length) return (info.textContent = "Não achei fotos nessa pasta (nem nas pastas de dentro).");
-        const titulo = [iCol.value.trim(), iTurma.value.trim()].filter(Boolean).join(" - ");
+        const titulo = tituloImp();
         if (livre) alunos = montarImportacao(alunos, { individuais: porFoto.checked, titulo });
         const col = nomeDoColegio(origem.name);
         let resumoFora = "";
@@ -459,7 +466,7 @@ export function abrirPreviasLote(C, o = {}) {
         info.textContent = `${alunos.length} aluno${alunos.length > 1 ? "s" : ""} para trabalhar em “${origem.name}”.${resumoFora} Agora escolha onde salvar as prévias.`;
         destino = await window.showDirectoryPicker({ id: "z7-previas", mode: "readwrite" });
         const pasta = await destino.getDirectoryHandle(
-          limpo(livre ? `Prévias - ${origem.name}` : `Prévias - ${col.ano ? col.ano + " - " : ""}${col.nome}`),
+          limpo(livre ? tituloImp() || `Prévias - ${origem.name}` : `Prévias - ${col.ano ? col.ano + " - " : ""}${col.nome}`),
           { create: true }
         );
         await prep();
@@ -483,7 +490,7 @@ export function abrirPreviasLote(C, o = {}) {
           a.erros = [];
           a.geradas = 0;
           for (const h of a.arquivos.slice(0, a.max || MAX_FOTOS)) {
-            const r = await lerFoto(h, a.nome);
+            const r = await lerFoto(h, a.nome, !!a.folha);
             if (r.img) {
               // folha da turma: cada foto pequena (até 300 alunos sem pesar na memória)
               let im = r.img;
@@ -496,7 +503,8 @@ export function abrirPreviasLote(C, o = {}) {
                 im = t;
               }
               fotos.push(im);
-              nomesFotos.push(h.name);
+              // o nome do aluno: o que está dentro da foto (se houver) ou o do arquivo
+              nomesFotos.push(r.nome || h.name);
             } else a.erros.push({ arquivo: h.name, motivo: r.erro });
           }
           if (!fotos.length) throw Object.assign(new Error("nenhuma foto abriu"), { semFoto: true });
@@ -507,13 +515,13 @@ export function abrirPreviasLote(C, o = {}) {
             ? a.folha
               ? {
                   // folha da turma: colégio e turma no cabeçalho, 20 por página, nome e sobrenome embaixo de cada foto
-                  nome: iCol.value.trim() || origem.name,
-                  sub: [...cab, iQtd.value.trim() ? iQtd.value.trim() + " alunos" : ""].filter(Boolean).join(" · "),
+                  nome: tituloImp() || origem.name,
+                  sub: "",
                   fotos,
                   legendas: nomesFotos.map(nomeSobrenome),
                   porPagina: 20,
                   cols: 4,
-                  rodape: SITE + " · prévia com marca d'água",
+                  site: true,
                   marcaForte: true
                 }
               : {

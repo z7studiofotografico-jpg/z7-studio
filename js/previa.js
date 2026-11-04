@@ -42,11 +42,33 @@ function cabecalho(ctx, W, st, sub) {
   ctx.fillStyle = "#fff";
   ctx.textAlign = "left";
   ctx.textBaseline = "alphabetic";
-  ctx.font = "700 52px 'Barlow Condensed', sans-serif";
-  ctx.fillText((st.nome || "Aluno").toUpperCase(), 165, 78);
+  // título comprido ("LEGACY - 5° ANO - 87 ALUNOS"): a letra diminui até caber
+  const tit = (st.nome || "Aluno").toUpperCase();
+  let tam = 52;
+  ctx.font = `700 ${tam}px 'Barlow Condensed', sans-serif`;
+  while (tam > 24 && ctx.measureText(tit).width > W - 165 - 30) ctx.font = `700 ${(tam -= 2)}px 'Barlow Condensed', sans-serif`;
+  ctx.fillText(tit, 165, 78);
   ctx.font = "600 26px 'Source Sans 3', sans-serif";
   ctx.fillStyle = "rgba(255,255,255,.8)";
   ctx.fillText(sub, 165, 118);
+}
+// rodapé com o site, grande, em preto, e o "7" em vermelho (como na marca)
+export function site(ctx, W, H) {
+  const partes = [
+    ["www.z", TINTA],
+    ["7", "#d0202b"],
+    ["studio.com.br", TINTA]
+  ];
+  ctx.font = "800 34px 'Source Sans 3', sans-serif";
+  ctx.textBaseline = "alphabetic";
+  ctx.textAlign = "left";
+  const larg = partes.reduce((t, [p]) => t + ctx.measureText(p).width, 0);
+  let x = (W - larg) / 2;
+  partes.forEach(([p, cor]) => {
+    ctx.fillStyle = cor;
+    ctx.fillText(p, x, H - 26);
+    x += ctx.measureText(p).width;
+  });
 }
 function rodape(ctx, W, H, txt) {
   ctx.fillStyle = CINZA;
@@ -125,7 +147,8 @@ export function desenharFolha(cv, st, pagina) {
         ctx.fillText(t === String(t0) ? t : t.trim() + "…", x + cw / 2, y + ch - leg / 2 - 4);
       }
     });
-  rodape(ctx, W, H, st.rodape || "Prévia com marca d'água · o kit é entregue com todas as fotos, tratadas e sem marca");
+  if (st.site) site(ctx, W, H);
+  else rodape(ctx, W, H, st.rodape || "Prévia com marca d'água · o kit é entregue com todas as fotos, tratadas e sem marca");
 }
 
 // Álbum aberto (página dupla), com as fotos em layout de revista

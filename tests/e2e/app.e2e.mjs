@@ -2702,7 +2702,7 @@ await cenario("Agendamento · Importação: folha da turma (20 por página, nome
     timeout: 20000
   });
   const nomes = Object.keys(await pg.evaluate(() => window.__gravados)).sort();
-  const P = "Prévias - 00 - LEGACY NAO VAI PARA FORMATURA/";
+  const P = "Legacy School Nova Iguaçu - 5º ano A/";
   ok(
     nomes.length === 2 &&
       nomes.includes(P + "Legacy School Nova Iguaçu - 5º ano A - pagina 1.jpg") &&
