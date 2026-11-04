@@ -89,3 +89,20 @@ test("prévias livres: o nome da pasta fica exatamente como está", async () => 
   const { nomesDeSaida } = await import("../js/previas-lote.js");
   assert.deepEqual(nomesDeSaida([{ nome: "00 - Ana  Maria (IRMÃ DO 38).", caminho: ["x"] }], true), ["00 - Ana  Maria (IRMÃ DO 38)."]);
 });
+
+test("prévias livres: fotos soltas na pasta escolhida viram uma prévia por foto; pasta por aluno continua junta", async () => {
+  const { umaPorFoto } = await import("../js/previas-lote.js");
+  const h = n => ({ name: n });
+  const r = umaPorFoto([
+    { nome: "00 - LEGACY", caminho: [], arquivos: [h("ANA SOUZA.jpg"), h("BIA LIMA.JPG")] },
+    { nome: "CARLOS", caminho: ["CARLOS"], arquivos: [h("1.jpg"), h("2.jpg")] }
+  ]);
+  assert.deepEqual(
+    r.map(a => [a.nome, a.arquivos.length]),
+    [
+      ["ANA SOUZA", 1],
+      ["BIA LIMA", 1],
+      ["CARLOS", 2]
+    ]
+  );
+});

@@ -173,6 +173,19 @@ export function pastaDeArquivos(files, nome = "") {
     });
   return pronto(raiz);
 }
+// fotos soltas direto na pasta escolhida (sem uma pasta por aluno) viram uma prévia por foto, com o nome do arquivo
+export function umaPorFoto(alunos) {
+  return alunos.flatMap(a =>
+    a.arquivos.length > 1 && !a.caminho.length
+      ? a.arquivos.map(h => ({
+          nome: h.name.replace(/\.(jpe?g|png|webp)$/i, ""),
+          caminho: [...a.caminho, h.name],
+          arquivos: [h],
+          soltA: true
+        }))
+      : [a]
+  );
+}
 export function escolherPastaComum() {
   return new Promise((res, rej) => {
     const i = document.createElement("input");
@@ -225,6 +238,16 @@ export function abrirPreviasLote(C, o = {}) {
     lSem.append(semTel, document.createTextNode(" Pular também quem está sem telefone"));
     if (!livre) p.append(lTrab, lSem);
     else separadas.parentNode.lastChild.textContent = " Também salvar as fotos separadas (com o mesmo nome do arquivo original)";
+    // fotos soltas numa pasta (sem uma pasta por aluno): cada foto é de um aluno, com o nome do arquivo
+    const porFoto = el("input");
+    porFoto.type = "checkbox";
+    porFoto.checked = true;
+    const lPor = el("label", "chk");
+    lPor.append(
+      porFoto,
+      document.createTextNode(" Fotos soltas direto na pasta escolhida: uma prévia para cada foto (com o nome do arquivo)")
+    );
+    if (livre) p.append(lPor);
     const info = el("p", null, "");
     const barra = el("progress");
     barra.max = 1;
@@ -364,6 +387,7 @@ export function abrirPreviasLote(C, o = {}) {
         info.textContent = "Procurando as fotos…";
         let alunos = await pastasComFotos(origem);
         if (!alunos.length) return (info.textContent = "Não achei fotos nessa pasta (nem nas pastas de dentro).");
+        if (livre && porFoto.checked) alunos = umaPorFoto(alunos);
         const col = nomeDoColegio(origem.name);
         let resumoFora = "";
         if (!livre && (soTrabalho.checked || semTel.checked)) {
@@ -434,7 +458,8 @@ export function abrirPreviasLote(C, o = {}) {
           const paginas = Math.ceil(fotos.length / POR_PAGINA);
           // as fotos separadas (pequenas, com marca e número): o representante monta o quadro e os porta-retratos
           // no app ("🖼️ Prévia e fotos") com as que a família escolher
-          if (separadas.checked) {
+          // (foto solta = uma prévia por foto: não precisa da pasta com a mesma foto separada)
+          if (separadas.checked && !a.soltA) {
             const sub = await pasta.getDirectoryHandle(nomes[i], { create: true });
             for (const [k, f] of fotos.entries()) {
               const c = document.createElement("canvas");
