@@ -8,18 +8,45 @@ let C, FS, db;
 const loadXLSX = () => carregarLib("xlsx");
 
 // Quais destes identificadores já estão no PR: consultas de 30 em 30 (limite do Firestore), 5 ao mesmo tempo
-export async function jaExistem(FS, col, ids) {
+// aoAndar(feitos, total): mostra o andamento. Se o Firebase não responder em 40 s, para com um aviso claro
+// (o mais comum é ter passado do limite grátis do dia: as consultas ficam esperando sem dar erro)
+export const ESPERA_MAX = 40000;
+export async function jaExistem(FS, col, ids, aoAndar = () => {}, espera = ESPERA_MAX) {
   const grupos = [];
   for (let i = 0; i < ids.length; i += 30) grupos.push(ids.slice(i, i + 30));
   const achados = new Map(); // id → etapa atual
-  for (let i = 0; i < grupos.length; i += 5)
-    await Promise.all(
-      grupos
-        .slice(i, i + 5)
-        .map(async g =>
-          (await FS.getDocs(FS.query(col, FS.where(FS.documentId(), "in", g)))).docs.forEach(d => achados.set(d.id, d.data().etapa))
-        )
-    );
+  for (let i = 0; i < grupos.length; i += 5) {
+    let timer;
+    const demorou = new Promise((_, rej) => {
+      timer = setTimeout(
+        () =>
+          rej(
+            Object.assign(
+              new Error(
+                "O Firebase não respondeu. O mais comum é ter passado do limite grátis de hoje (muitas importações ou exclusões no mesmo dia): tente de novo depois das 4h da manhã. Nada foi gravado."
+              ),
+              { code: "sem-resposta" }
+            )
+          ),
+        espera
+      );
+    });
+    try {
+      await Promise.race([
+        Promise.all(
+          grupos
+            .slice(i, i + 5)
+            .map(async g =>
+              (await FS.getDocs(FS.query(col, FS.where(FS.documentId(), "in", g)))).docs.forEach(d => achados.set(d.id, d.data().etapa))
+            )
+        ),
+        demorou
+      ]);
+    } finally {
+      clearTimeout(timer);
+    }
+    aoAndar(Math.min(ids.length, (i + 5) * 30), ids.length);
+  }
   return achados;
 }
 
@@ -273,7 +300,7 @@ export function openImport(ctx, ui, aoTerminar) {
             return id;
           });
         prog.textContent = "Conferindo quem já está no app…";
-        const exist = await jaExistem(FS, col, idDe);
+        const exist = await jaExistem(FS, col, idDe, (f, t) => (prog.textContent = `Conferindo quem já está no app… ${f} de ${t}`));
         const agora = new Date().toISOString();
         let novos = 0,
           atual = 0,
@@ -417,7 +444,11 @@ export function openImport(ctx, ui, aoTerminar) {
             "err",
             e.code === "permission-denied"
               ? "Só administradores podem importar."
-              : "A importação parou no meio. Pode importar o mesmo arquivo de novo: quem já entrou não é duplicado."
+              : e.code === "sem-resposta" || e.code === "resource-exhausted"
+                ? e.code === "sem-resposta"
+                  ? e.message
+                  : "Passou do limite grátis do Firebase de hoje. Tente de novo depois das 4h da manhã: quem já entrou não é duplicado."
+                : "A importação parou no meio. Pode importar o mesmo arquivo de novo: quem já entrou não é duplicado."
           )
         );
         ok.disabled = false;
