@@ -106,3 +106,24 @@ test("prévias livres: fotos soltas na pasta escolhida viram uma prévia por fot
     ]
   );
 });
+
+test("importação: nome e sobrenome do arquivo; fotos soltas viram a folha (e as individuais só se pedir)", async () => {
+  const { nomeSobrenome, montarImportacao } = await import("../js/previas-lote.js");
+  assert.equal(nomeSobrenome("01 - Maria Eduarda Souza Lima.jpg"), "Maria Lima");
+  assert.equal(nomeSobrenome("ANA SOUZA.JPG"), "ANA SOUZA");
+  assert.equal(nomeSobrenome("Pedro.png"), "Pedro");
+  const h = n => ({ name: n });
+  const grupos = [
+    { nome: "00 - LEGACY", caminho: [], arquivos: [h("ANA.jpg"), h("BIA.jpg")] },
+    { nome: "CARLOS", caminho: ["CARLOS"], arquivos: [h("1.jpg")] }
+  ];
+  const so = montarImportacao(grupos, { titulo: "Legacy - 5A" });
+  assert.deepEqual(
+    so.map(a => [a.nome, !!a.folha]),
+    [
+      ["Legacy - 5A", true],
+      ["CARLOS", false]
+    ]
+  );
+  assert.equal(montarImportacao(grupos, { individuais: true }).length, 4);
+});

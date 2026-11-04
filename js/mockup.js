@@ -50,22 +50,23 @@ function cover(ctx, img, x, y, w, h, fy = 0.38) {
   ctx.drawImage(img, sx, sy, sw, sh, x, y, w, h);
 }
 // Marca d'água repetida em diagonal dentro de um retângulo.
-function marca(ctx, x, y, w, h) {
+// forte = true: marca mais junta e mais visível (folhas que vão para o diretor/colégio)
+function marca(ctx, x, y, w, h, forte = false) {
   ctx.save();
   ctx.beginPath();
   ctx.rect(x, y, w, h);
   ctx.clip();
-  const fs = Math.max(14, Math.round(Math.min(w, h) / 9));
+  const fs = Math.max(14, Math.round(Math.min(w, h) / (forte ? 14 : 9)));
   ctx.font = `700 ${fs}px 'Barlow Condensed', sans-serif`;
   ctx.textAlign = "center";
   ctx.textBaseline = "middle";
   ctx.translate(x + w / 2, y + h / 2);
   ctx.rotate(-Math.PI / 7);
-  const step = fs * 2.6,
+  const step = fs * (forte ? 1.9 : 2.6),
     span = Math.hypot(w, h);
   for (let yy = -span / 2; yy <= span / 2; yy += step) {
-    for (let xx = -span / 2; xx <= span / 2; xx += fs * 9) {
-      ctx.fillStyle = "rgba(255,255,255,.28)";
+    for (let xx = -span / 2; xx <= span / 2; xx += fs * (forte ? 10 : 9)) {
+      ctx.fillStyle = forte ? "rgba(255,255,255,.36)" : "rgba(255,255,255,.28)";
       ctx.fillText("PRÉVIA · Z7 STUDIO", xx + (Math.round(yy / step) % 2) * fs * 4.5, yy);
       ctx.fillStyle = "rgba(0,0,0,.10)";
       ctx.fillText("PRÉVIA · Z7 STUDIO", xx + (Math.round(yy / step) % 2) * fs * 4.5 + 1.5, yy + 1.5);

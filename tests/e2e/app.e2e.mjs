@@ -2642,6 +2642,86 @@ await cenario("Agendamento · Importação: prévias de qualquer pasta, sem muda
   );
   ok(!erros.length, "sem erros" + (erros.length ? ": " + erros.join(" | ") : ""));
 });
+await cenario("Agendamento · Importação: folha da turma (20 por página, nome embaixo, colégio e turma no topo)", async () => {
+  const { pg, erros } = await abrir(ADRIANO, base);
+  await pg.evaluate(async () => {
+    const foto = async cor => {
+      const c = document.createElement("canvas");
+      c.width = 800;
+      c.height = 1000;
+      const x = c.getContext("2d");
+      x.fillStyle = cor;
+      x.fillRect(0, 0, 800, 1000);
+      return new File([await new Promise(r => c.toBlob(r, "image/jpeg"))], "f.jpg", { type: "image/jpeg" });
+    };
+    const cores = ["#345", "#543", "#454", "#335", "#553"];
+    const itens = [];
+    for (let i = 1; i <= 23; i++) {
+      const f = await foto(cores[i % 5]);
+      itens.push({ kind: "file", name: `${String(i).padStart(2, "0")} - Aluno Numero ${i} Silva.jpg`, getFile: async () => f });
+    }
+    const origem = {
+      kind: "directory",
+      name: "00 - LEGACY NAO VAI PARA FORMATURA",
+      async *values() {
+        yield* itens;
+      }
+    };
+    window.__gravados = {};
+    window.__blobs = {};
+    const dirFalso = caminho => ({
+      name: caminho.split("/").pop(),
+      async getDirectoryHandle(n) {
+        return dirFalso(caminho ? caminho + "/" + n : n);
+      },
+      async getFileHandle(f) {
+        return {
+          async createWritable() {
+            return {
+              async write(b) {
+                window.__gravados[caminho + "/" + f] = b.size;
+                window.__blobs[caminho + "/" + f] = b;
+              },
+              async close() {}
+            };
+          }
+        };
+      }
+    });
+    const fila = [origem, dirFalso("")];
+    window.showDirectoryPicker = async () => fila.shift();
+  });
+  await ir(pg, "#agenda");
+  await pg.getByRole("button", { name: "📥 Importação" }).click();
+  const sh = pg.locator(".sheet:visible").last();
+  await sh.getByLabel("Colégio (cabeçalho)").fill("Legacy School Nova Iguaçu");
+  await sh.getByLabel("Turma (cabeçalho)").fill("5º ano A");
+  ok(!(await sh.getByLabel(/Também fazer as fotos individuais/).isChecked()), "fotos individuais: só quando marcar");
+  await sh.getByRole("button", { name: "Escolher a pasta do colégio" }).click();
+  await pg.waitForFunction(() => /Pronto!/.test(document.querySelector(".sheet:last-of-type")?.textContent || ""), null, {
+    timeout: 20000
+  });
+  const nomes = Object.keys(await pg.evaluate(() => window.__gravados)).sort();
+  const P = "Prévias - 00 - LEGACY NAO VAI PARA FORMATURA/";
+  ok(
+    nomes.length === 2 &&
+      nomes.includes(P + "Legacy School Nova Iguaçu - 5º ano A - pagina 1.jpg") &&
+      nomes.includes(P + "Legacy School Nova Iguaçu - 5º ano A - pagina 2.jpg"),
+    "23 alunos = 2 folhas de até 20, com o nome do colégio e da turma: " + nomes.join(" | ")
+  );
+  if (process.env.FOTO) {
+    const d = await pg.evaluate(async n => {
+      const b = window.__blobs[n];
+      return await new Promise(r => {
+        const fr = new FileReader();
+        fr.onload = () => r(fr.result);
+        fr.readAsDataURL(b);
+      });
+    }, P + "Legacy School Nova Iguaçu - 5º ano A - pagina 1.jpg");
+    (await import("node:fs")).writeFileSync(process.env.FOTO, Buffer.from(d.split(",")[1], "base64"));
+  }
+  ok(!erros.length, "sem erros" + (erros.length ? ": " + erros.join(" | ") : ""));
+});
 await cenario("Fotos do aluno direto do Google Drive", async () => {
   const Y = new Date().getFullYear();
   const F = "application/vnd.google-apps.folder";

@@ -174,6 +174,26 @@ export function pastaDeArquivos(files, nome = "") {
   return pronto(raiz);
 }
 // fotos soltas direto na pasta escolhida (sem uma pasta por aluno) viram uma prévia por foto, com o nome do arquivo
+// "01 - Maria Eduarda Souza Lima.jpg" → "Maria Lima" (nome e sobrenome, como está escrito no arquivo)
+export function nomeSobrenome(arquivo) {
+  const s = String(arquivo || "")
+    .replace(/\.(jpe?g|png|webp)$/i, "")
+    .replace(/^[A-Z]*\s*\d+\s*-\s*/i, "")
+    .replace(/[_]+/g, " ")
+    .trim();
+  const ps = s.split(/\s+/).filter(Boolean);
+  return ps.length <= 2 ? ps.join(" ") : ps[0] + " " + ps[ps.length - 1];
+}
+// Importação (Agendamento): as fotos soltas na pasta escolhida viram a FOLHA da turma (20 por página, com o nome de
+// cada aluno embaixo); com "fotos individuais" marcado, sai também uma prévia para cada foto
+export function montarImportacao(alunos, { individuais = false, titulo = "" } = {}) {
+  return alunos.flatMap(a => {
+    if (a.caminho.length) return [a]; // pasta por aluno: como antes
+    const folha = { nome: titulo || a.nome, caminho: [], arquivos: a.arquivos, folha: true, max: 300 };
+    return individuais ? [folha, ...umaPorFoto([a])] : [folha];
+  });
+}
+export const SITE = "www.z7studio.com.br";
 export function umaPorFoto(alunos) {
   return alunos.flatMap(a =>
     a.arquivos.length > 1 && !a.caminho.length
@@ -209,7 +229,7 @@ export function abrirPreviasLote(C, o = {}) {
         "p",
         "hint",
         livre
-          ? "Só a conversão, no seu computador: escolha a pasta (uma pasta por aluno, com as fotos dentro) e onde salvar. Entram todos, e os nomes das pastas e das fotos ficam exatamente como estão. Para cada aluno sai uma imagem leve com as fotos, a marca d'água e o nome, pronta para mandar pelo WhatsApp (ex.: para o diretor vender o paspatur a quem ainda não comprou). Nada vai para a internet nem para o Google Drive."
+          ? "Só a conversão, no seu computador: coloque o colégio e a turma, escolha a pasta com as fotos (uma foto por aluno, com o nome do aluno no arquivo) e onde salvar. Sai a folha da turma, 20 alunos por página, com o nome e sobrenome embaixo de cada foto, marca d'água e o site no rodapé, pronta para mandar pelo WhatsApp. Os nomes ficam como estão nos arquivos. Nada vai para a internet."
           : "No computador: escolha a pasta do colégio no servidor (com uma pasta por aluno) e depois a pasta onde salvar. Para cada aluno sai uma imagem leve (~200 KB) com todas as fotos dele, a marca d'água e o nome. Depois, arraste a pasta de prévias para o Google Drive e compartilhe com o representante como Leitor."
       )
     );
@@ -238,15 +258,29 @@ export function abrirPreviasLote(C, o = {}) {
     lSem.append(semTel, document.createTextNode(" Pular também quem está sem telefone"));
     if (!livre) p.append(lTrab, lSem);
     else separadas.parentNode.lastChild.textContent = " Também salvar as fotos separadas (com o mesmo nome do arquivo original)";
-    // fotos soltas numa pasta (sem uma pasta por aluno): cada foto é de um aluno, com o nome do arquivo
+    // Importação: colégio e turma (vão no cabeçalho da folha) e, se quiser, as fotos individuais também
+    const iCol = el("input"),
+      iTurma = el("input");
+    iCol.placeholder = "ex.: Legacy School Nova Iguaçu";
+    iTurma.placeholder = "ex.: 5º ano A";
+    const rCT = el("div", "row2");
+    const fCol = el("div", "field"),
+      fTur = el("div", "field");
+    iCol.id = "impColegio";
+    iTurma.id = "impTurma";
+    const lC = el("label", null, "Colégio (cabeçalho)"),
+      lT = el("label", null, "Turma (cabeçalho)");
+    lC.htmlFor = iCol.id;
+    lT.htmlFor = iTurma.id;
+    fCol.append(lC, iCol);
+    fTur.append(lT, iTurma);
+    rCT.append(fCol, fTur);
+    if (livre) p.append(rCT);
     const porFoto = el("input");
     porFoto.type = "checkbox";
-    porFoto.checked = true;
+    porFoto.checked = false;
     const lPor = el("label", "chk");
-    lPor.append(
-      porFoto,
-      document.createTextNode(" Fotos soltas direto na pasta escolhida: uma prévia para cada foto (com o nome do arquivo)")
-    );
+    lPor.append(porFoto, document.createTextNode(" Também fazer as fotos individuais (uma prévia para cada aluno, só quando precisar)"));
     if (livre) p.append(lPor);
     const info = el("p", null, "");
     const barra = el("progress");
@@ -279,7 +313,7 @@ export function abrirPreviasLote(C, o = {}) {
       errosBox.append(el("b", null, `⚠️ ${lista.length} aluno${lista.length > 1 ? "s" : ""} com foto que não saiu:`));
       lista.forEach(([a]) => {
         const d = el("div", "prev-erro");
-        const total = Math.min(a.arquivos.length, MAX_FOTOS);
+        const total = Math.min(a.arquivos.length, a.max || MAX_FOTOS);
         d.append(
           el(
             "div",
@@ -315,7 +349,7 @@ export function abrirPreviasLote(C, o = {}) {
             try {
               await fazer(a, i0);
               info.textContent =
-                `✅ ${a.nome}: ${a.geradas} de ${Math.min(a.arquivos.length, MAX_FOTOS)} fotos geradas. ` +
+                `✅ ${a.nome}: ${a.geradas} de ${Math.min(a.arquivos.length, a.max || MAX_FOTOS)} fotos geradas. ` +
                 (resumoFotos ? resumoFotos() : "");
               mostrarErros(
                 lista.filter(([x]) => x !== a),
@@ -387,7 +421,8 @@ export function abrirPreviasLote(C, o = {}) {
         info.textContent = "Procurando as fotos…";
         let alunos = await pastasComFotos(origem);
         if (!alunos.length) return (info.textContent = "Não achei fotos nessa pasta (nem nas pastas de dentro).");
-        if (livre && porFoto.checked) alunos = umaPorFoto(alunos);
+        const titulo = [iCol.value.trim(), iTurma.value.trim()].filter(Boolean).join(" - ");
+        if (livre) alunos = montarImportacao(alunos, { individuais: porFoto.checked, titulo });
         const col = nomeDoColegio(origem.name);
         let resumoFora = "";
         if (!livre && (soTrabalho.checked || semTel.checked)) {
@@ -431,35 +466,64 @@ export function abrirPreviasLote(C, o = {}) {
         const conta = { total: 0, geradas: 0, acima: 0 };
         alunos.forEach(a => {
           conta.total += a.arquivos.length;
-          conta.acima += Math.max(0, a.arquivos.length - MAX_FOTOS);
+          conta.acima += Math.max(0, a.arquivos.length - (a.max || MAX_FOTOS));
         });
         const fazer = async (a, i) => {
           const fotos = [],
             nomesFotos = [];
           a.erros = [];
           a.geradas = 0;
-          for (const h of a.arquivos.slice(0, MAX_FOTOS)) {
+          for (const h of a.arquivos.slice(0, a.max || MAX_FOTOS)) {
             const r = await lerFoto(h, a.nome);
             if (r.img) {
-              fotos.push(r.img);
+              // folha da turma: cada foto pequena (até 300 alunos sem pesar na memória)
+              let im = r.img;
+              if (a.folha && Math.max(im.width, im.height) > 440) {
+                const k = 440 / Math.max(im.width, im.height),
+                  t = document.createElement("canvas");
+                t.width = Math.round(im.width * k);
+                t.height = Math.round(im.height * k);
+                t.getContext("2d").drawImage(im, 0, 0, t.width, t.height);
+                im = t;
+              }
+              fotos.push(im);
               nomesFotos.push(h.name);
             } else a.erros.push({ arquivo: h.name, motivo: r.erro });
           }
           if (!fotos.length) throw Object.assign(new Error("nenhuma foto abriu"), { semFoto: true });
           // no cabeçalho: o nome do aluno sem o código da pasta ("CEYMS 01 - FABIOLA" → "FABIOLA"), e o código ao lado do colégio
           const cod = (a.nome.match(/^([A-Z0-9]+\s*\d+)\s*-\s*/i) || [])[1] || "";
+          const cab = [iTurma.value.trim() ? "Turma " + iTurma.value.trim() : ""].filter(Boolean);
           const st = livre
-            ? { nome: a.nome, escola: origem.name, fotos } // importação livre: o nome da pasta como está
+            ? a.folha
+              ? {
+                  // folha da turma: colégio e turma no cabeçalho, 20 por página, nome e sobrenome embaixo de cada foto
+                  nome: iCol.value.trim() || origem.name,
+                  sub: [...cab, fotos.length + " alunos"].join(" · "),
+                  fotos,
+                  legendas: nomesFotos.map(nomeSobrenome),
+                  porPagina: 20,
+                  cols: 4,
+                  rodape: SITE + " · prévia com marca d'água",
+                  marcaForte: true
+                }
+              : {
+                  nome: a.nome,
+                  sub: [iCol.value.trim() || origem.name, ...cab].join(" · "),
+                  fotos,
+                  rodape: SITE + " · prévia com marca d'água",
+                  marcaForte: true
+                } // importação: o nome da pasta/arquivo como está
             : {
                 nome: a.nome.replace(/^[A-Z0-9]+\s*\d+\s*-\s*/i, "") || a.nome,
                 escola: [cod, col.nome, col.ano].filter(Boolean).join(" · "),
                 fotos
               };
-          const paginas = Math.ceil(fotos.length / POR_PAGINA);
+          const paginas = Math.ceil(fotos.length / (st.porPagina || POR_PAGINA));
           // as fotos separadas (pequenas, com marca e número): o representante monta o quadro e os porta-retratos
           // no app ("🖼️ Prévia e fotos") com as que a família escolher
           // (foto solta = uma prévia por foto: não precisa da pasta com a mesma foto separada)
-          if (separadas.checked && !a.soltA) {
+          if (separadas.checked && !a.soltA && !a.folha) {
             const sub = await pasta.getDirectoryHandle(nomes[i], { create: true });
             for (const [k, f] of fotos.entries()) {
               const c = document.createElement("canvas");
@@ -521,7 +585,7 @@ export function abrirPreviasLote(C, o = {}) {
         // a conta sempre fecha: na pasta = geradas + com erro + acima do limite
         const resumoFotos = () => {
           conta.total = alunos.reduce((t, a) => t + a.arquivos.length, 0);
-          conta.acima = alunos.reduce((t, a) => t + Math.max(0, a.arquivos.length - MAX_FOTOS), 0);
+          conta.acima = alunos.reduce((t, a) => t + Math.max(0, a.arquivos.length - (a.max || MAX_FOTOS)), 0);
           const ger = somarGeradas(),
             nao = conta.total - ger,
             comErro = nao - conta.acima;

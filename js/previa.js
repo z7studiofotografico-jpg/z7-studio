@@ -56,39 +56,44 @@ function rodape(ctx, W, H, txt) {
 }
 
 // Uma página da folha com todas as fotos
+// st = { nome, escola, fotos, sub?, porPagina?, cols?, legendas? (nome embaixo de cada foto), rodape?, marcaForte? }
 export function desenharFolha(cv, st, pagina) {
+  const POR = st.porPagina || POR_PAGINA,
+    COL = st.cols || COLS,
+    leg = st.legendas ? 34 : 0;
   const W = 1080,
     gap = 12,
     margem = 30,
-    cw = (W - margem * 2 - gap * (COLS - 1)) / COLS,
-    ch = cw * 1.25;
-  const fotos = st.fotos.slice(pagina * POR_PAGINA, (pagina + 1) * POR_PAGINA),
-    linhas = Math.ceil(fotos.length / COLS) || 1;
+    cw = (W - margem * 2 - gap * (COL - 1)) / COL,
+    ch = cw * 1.25 + leg;
+  const fotos = st.fotos.slice(pagina * POR, (pagina + 1) * POR),
+    linhas = Math.ceil(fotos.length / COL) || 1;
   const H = 150 + 40 + linhas * (ch + gap) + 90;
   cv.width = W;
   cv.height = H;
   const ctx = cv.getContext("2d");
   ctx.fillStyle = FUNDO;
   ctx.fillRect(0, 0, W, H);
-  const paginas = Math.ceil(st.fotos.length / POR_PAGINA) || 1;
+  const paginas = Math.ceil(st.fotos.length / POR) || 1;
   cabecalho(
     ctx,
     W,
     st,
-    `${st.escola ? st.escola + " · " : ""}${st.fotos.length} fotos do kit${paginas > 1 ? ` · página ${pagina + 1} de ${paginas}` : ""}`
+    (st.sub || `${st.escola ? st.escola + " · " : ""}${st.fotos.length} fotos do kit`) +
+      (paginas > 1 ? ` · página ${pagina + 1} de ${paginas}` : "")
   );
   fotos.forEach((f, i) => {
-    const x = margem + (i % COLS) * (cw + gap),
-      y = 190 + Math.floor(i / COLS) * (ch + gap);
+    const x = margem + (i % COL) * (cw + gap),
+      y = 190 + Math.floor(i / COL) * (ch + gap);
     ctx.save();
     ctx.shadowColor = "rgba(0,0,0,.18)";
     ctx.shadowBlur = 8;
     ctx.fillStyle = "#fff";
     ctx.fillRect(x, y, cw, ch);
     ctx.restore();
-    cover(ctx, f, x + 5, y + 5, cw - 10, ch - 10, 0.35);
+    cover(ctx, f, x + 5, y + 5, cw - 10, ch - 10 - leg, 0.35);
     // número da foto (a família escolhe pelo número: "quadro 3, porta-retratos 1 e 5")
-    const n = String(pagina * POR_PAGINA + i + 1);
+    const n = String(pagina * POR + i + 1);
     ctx.fillStyle = "rgba(28,27,29,.85)";
     ctx.beginPath();
     ctx.arc(x + 26, y + 26, 18, 0, Math.PI * 2);
@@ -99,8 +104,26 @@ export function desenharFolha(cv, st, pagina) {
     ctx.textBaseline = "middle";
     ctx.fillText(n, x + 26, y + 27);
   });
-  marca(ctx, 0, 150, W, H - 150 - 70);
-  rodape(ctx, W, H, "Prévia com marca d'água · o kit é entregue com todas as fotos, tratadas e sem marca");
+  marca(ctx, 0, 150, W, H - 150 - 70, !!st.marcaForte);
+  // nome embaixo de cada foto (folha de uma turma), por cima da marca para ficar legível
+  if (st.legendas)
+    fotos.forEach((f, i) => {
+      const x = margem + (i % COL) * (cw + gap),
+        y = 190 + Math.floor(i / COL) * (ch + gap);
+      ctx.fillStyle = "#fff";
+      ctx.fillRect(x + 5, y + ch - leg - 5, cw - 10, leg);
+      ctx.textAlign = "center";
+      ctx.textBaseline = "middle";
+      const t0 = st.legendas[pagina * POR + i];
+      if (t0) {
+        ctx.fillStyle = TINTA;
+        ctx.font = "700 21px 'Source Sans 3', sans-serif";
+        let t = String(t0);
+        while (t.length > 3 && ctx.measureText(t).width > cw - 14) t = t.slice(0, -1);
+        ctx.fillText(t === String(t0) ? t : t.trim() + "…", x + cw / 2, y + ch - leg / 2 - 4);
+      }
+    });
+  rodape(ctx, W, H, st.rodape || "Prévia com marca d'água · o kit é entregue com todas as fotos, tratadas e sem marca");
 }
 
 // Álbum aberto (página dupla), com as fotos em layout de revista
