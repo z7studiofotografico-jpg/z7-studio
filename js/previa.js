@@ -75,7 +75,8 @@ export function desenharFolha(cv, st, pagina) {
     ctx,
     W,
     st,
-    `${st.escola ? st.escola + " · " : ""}${st.fotos.length} fotos do kit${paginas > 1 ? ` · página ${pagina + 1} de ${paginas}` : ""}`
+    (st.sub || `${st.escola ? st.escola + " · " : ""}${st.fotos.length} fotos do kit`) +
+      (paginas > 1 ? ` · página ${pagina + 1} de ${paginas}` : "")
   );
   fotos.forEach((f, i) => {
     const x = margem + (i % COLS) * (cw + gap),
@@ -98,6 +99,19 @@ export function desenharFolha(cv, st, pagina) {
     ctx.textAlign = "center";
     ctx.textBaseline = "middle";
     ctx.fillText(n, x + 26, y + 27);
+    // folha da turma: nome e turma de cada aluno embaixo da foto
+    const leg = st.legendas && st.legendas[pagina * POR_PAGINA + i];
+    if (leg) {
+      ctx.fillStyle = "rgba(28,27,29,.82)";
+      ctx.fillRect(x + 5, y + ch - 46, cw - 10, 41);
+      ctx.fillStyle = "#fff";
+      ctx.font = "700 15px 'Source Sans 3', sans-serif";
+      ctx.textAlign = "center";
+      ctx.textBaseline = "middle";
+      let t = String(leg);
+      while (t.length > 4 && ctx.measureText(t).width > cw - 20) t = t.slice(0, -2);
+      ctx.fillText(t === String(leg) ? t : t.trim() + "…", x + cw / 2, y + ch - 25);
+    }
   });
   marca(ctx, 0, 150, W, H - 150 - 70);
   rodape(ctx, W, H, "Prévia com marca d'água · o kit é entregue com todas as fotos, tratadas e sem marca");
