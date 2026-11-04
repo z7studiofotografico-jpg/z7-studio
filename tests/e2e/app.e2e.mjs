@@ -2628,8 +2628,6 @@ await cenario("Agendamento · Importação: prévias de qualquer pasta, sem muda
   await bt.click();
   const sh = pg.locator(".sheet:visible").last();
   ok(!/Pular quem já comprou/.test(await sh.textContent()), "importação livre: entram todos (sem pular ninguém)");
-  // este teste é de uma pasta por pessoa (sem turma)
-  await sh.getByLabel(/Cada foto é um aluno/).uncheck();
   await sh.getByRole("button", { name: "Escolher a pasta do colégio" }).click();
   await pg.waitForFunction(() => /Pronto!/.test(document.querySelector(".sheet:last-of-type")?.textContent || ""), null, {
     timeout: 15000
@@ -2642,70 +2640,6 @@ await cenario("Agendamento · Importação: prévias de qualquer pasta, sem muda
       nomes.includes(P + "Ana Maria  da Silva (IRMÃ DO 38)/DSC_0002.jpg"),
     "nomes da pasta e das fotos exatamente como estavam: " + nomes.join(" | ")
   );
-  ok(!erros.length, "sem erros" + (erros.length ? ": " + erros.join(" | ") : ""));
-});
-await cenario("Agendamento · Importação por turma (nome - turma e folha da turma)", async () => {
-  const { pg, erros } = await abrir(ADRIANO, base);
-  await pg.evaluate(async () => {
-    const foto = async () => {
-      const c = document.createElement("canvas");
-      c.width = 600;
-      c.height = 800;
-      c.getContext("2d").fillRect(0, 0, 600, 800);
-      return new File([await new Promise(r => c.toBlob(r, "image/jpeg"))], "f.jpg", { type: "image/jpeg" });
-    };
-    const arq = async name => {
-      const f = await foto();
-      return { kind: "file", name, getFile: async () => f };
-    };
-    const pasta = (name, itens) => ({
-      kind: "directory",
-      name,
-      async *values() {
-        yield* itens;
-      }
-    });
-    const origem = pasta("Legacy 2026", [
-      pasta("3001", [await arq("ANA SOUZA.jpg"), await arq("BIA LIMA.jpg")]),
-      pasta("3002", [await arq("CARLOS PEREIRA.jpg")])
-    ]);
-    window.__gravados = {};
-    const dirFalso = caminho => ({
-      name: caminho.split("/").pop(),
-      async getDirectoryHandle(n) {
-        return dirFalso(caminho ? caminho + "/" + n : n);
-      },
-      async getFileHandle(f) {
-        return {
-          async createWritable() {
-            return {
-              async write(b) {
-                window.__gravados[caminho + "/" + f] = b.size;
-              },
-              async close() {}
-            };
-          }
-        };
-      }
-    });
-    const fila = [origem, dirFalso("")];
-    window.showDirectoryPicker = async () => fila.shift();
-  });
-  await ir(pg, "#agenda");
-  await pg.getByRole("button", { name: "📥 Importação" }).click();
-  await pg.locator(".sheet:visible").last().getByRole("button", { name: "Escolher a pasta do colégio" }).click();
-  await pg.waitForFunction(() => /Pronto!/.test(document.querySelector(".sheet:last-of-type")?.textContent || ""), null, {
-    timeout: 15000
-  });
-  const nomes = Object.keys(await pg.evaluate(() => window.__gravados)).sort();
-  const P = "Prévias - Legacy 2026/";
-  ok(
-    nomes.includes(P + "3001/ANA SOUZA - 3001.jpg") &&
-      nomes.includes(P + "3001/BIA LIMA - 3001.jpg") &&
-      nomes.includes(P + "3002/CARLOS PEREIRA - 3002.jpg"),
-    "uma prévia por aluno, com a turma no fim do nome, separada por turma: " + nomes.join(" | ")
-  );
-  ok(nomes.includes(P + "3001/Turma 3001 - todos.jpg"), "folha da turma com todos os alunos (nome e turma de cada um)");
   ok(!erros.length, "sem erros" + (erros.length ? ": " + erros.join(" | ") : ""));
 });
 await cenario("Fotos do aluno direto do Google Drive", async () => {

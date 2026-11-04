@@ -173,21 +173,19 @@ export function pastaDeArquivos(files, nome = "") {
     });
   return pronto(raiz);
 }
-// Importação por turma: cada foto é um aluno (o nome é o do arquivo, sem a extensão) e a subpasta é a turma
-// ("Pasta escolhida / 3001 / ANA SOUZA.jpg" → aluno "ANA SOUZA", turma "3001"). Fotos soltas na pasta escolhida: sem turma.
+// fotos soltas direto na pasta escolhida (sem uma pasta por aluno) viram uma prévia por foto, com o nome do arquivo
 export function umaPorFoto(alunos) {
   return alunos.flatMap(a =>
-    a.arquivos.map(h => ({
-      nome: h.name.replace(/\.(jpe?g|png|webp)$/i, ""),
-      turma: a.caminho.length ? a.caminho[a.caminho.length - 1] : "",
-      caminho: [...a.caminho, h.name],
-      arquivos: [h],
-      soltA: true
-    }))
+    a.arquivos.length > 1 && !a.caminho.length
+      ? a.arquivos.map(h => ({
+          nome: h.name.replace(/\.(jpe?g|png|webp)$/i, ""),
+          caminho: [...a.caminho, h.name],
+          arquivos: [h],
+          soltA: true
+        }))
+      : [a]
   );
 }
-// nome do arquivo de cada aluno: o nome e, no fim, a turma ("ANA SOUZA - 3001")
-export const nomeComTurma = a => (a.turma ? `${a.nome} - ${a.turma}` : a.nome);
 export function escolherPastaComum() {
   return new Promise((res, rej) => {
     const i = document.createElement("input");
@@ -247,9 +245,7 @@ export function abrirPreviasLote(C, o = {}) {
     const lPor = el("label", "chk");
     lPor.append(
       porFoto,
-      document.createTextNode(
-        " Cada foto é um aluno (o nome do arquivo) e cada subpasta é uma turma: sai uma prévia por aluno (“NOME - TURMA”) e uma folha da turma com todos, com o nome e a turma de cada um"
-      )
+      document.createTextNode(" Fotos soltas direto na pasta escolhida: uma prévia para cada foto (com o nome do arquivo)")
     );
     if (livre) p.append(lPor);
     const info = el("p", null, "");
@@ -423,17 +419,7 @@ export function abrirPreviasLote(C, o = {}) {
           { create: true }
         );
         await prep();
-        const nomes = nomesDeSaida(
-          alunos.map(a => (a.soltA ? Object.assign({}, a, { nome: nomeComTurma(a) }) : a)),
-          livre
-        );
-        // turma = uma subpasta dentro das prévias (e a folha da turma com todos)
-        const dirTurma = {};
-        const pastaDa = async a => {
-          if (!a.soltA || !a.turma) return pasta;
-          const k = nomesDeSaida([{ nome: a.turma, caminho: [] }], true)[0];
-          return (dirTurma[k] = dirTurma[k] || (await pasta.getDirectoryHandle(k, { create: true })));
-        };
+        const nomes = nomesDeSaida(alunos, livre);
         cancelar = false;
         ir.disabled = true;
         parar.hidden = false;
@@ -463,9 +449,7 @@ export function abrirPreviasLote(C, o = {}) {
           // no cabeçalho: o nome do aluno sem o código da pasta ("CEYMS 01 - FABIOLA" → "FABIOLA"), e o código ao lado do colégio
           const cod = (a.nome.match(/^([A-Z0-9]+\s*\d+)\s*-\s*/i) || [])[1] || "";
           const st = livre
-            ? a.soltA
-              ? { nome: a.nome, escola: a.turma ? "Turma " + a.turma : origem.name, sub: a.turma ? "Turma " + a.turma : origem.name, fotos }
-              : { nome: a.nome, escola: origem.name, fotos } // importação livre: o nome da pasta como está
+            ? { nome: a.nome, escola: origem.name, fotos } // importação livre: o nome da pasta como está
             : {
                 nome: a.nome.replace(/^[A-Z0-9]+\s*\d+\s*-\s*/i, "") || a.nome,
                 escola: [cod, col.nome, col.ano].filter(Boolean).join(" · "),
@@ -494,23 +478,13 @@ export function abrirPreviasLote(C, o = {}) {
             const cv = document.createElement("canvas");
             desenharFolha(cv, st, pg);
             try {
-              await gravar(await pastaDa(a), nomes[i] + (paginas > 1 ? ` - pagina ${pg + 1}` : "") + ".jpg", await jpg(cv));
+              await gravar(pasta, nomes[i] + (paginas > 1 ? ` - pagina ${pg + 1}` : "") + ".jpg", await jpg(cv));
             } catch (e) {
               a.erros.push({ arquivo: "prévia (página " + (pg + 1) + ")", motivo: "não consegui salvar: " + motivoErro(e) });
               throw e;
             }
           }
           a.geradas = fotos.length;
-          // miniatura para a folha da turma (pequena, para não pesar na memória)
-          if (a.soltA) {
-            const f = fotos[0],
-              r = Math.min(1, 420 / Math.max(f.width, f.height)),
-              t = document.createElement("canvas");
-            t.width = Math.round(f.width * r);
-            t.height = Math.round(f.height * r);
-            t.getContext("2d").drawImage(f, 0, 0, t.width, t.height);
-            a.mini = t;
-          }
           // saiu, mas com foto faltando: a prévia fica salva e o aluno entra na lista para gerar de novo completo
           if (a.erros.length) throw Object.assign(new Error("foto faltando"), { parcial: true });
         };
@@ -540,34 +514,6 @@ export function abrirPreviasLote(C, o = {}) {
             } catch (e) {
               if (!(a.erros || []).length) a.erros = [{ arquivo: "", motivo: motivoErro(e) }];
               falharam.push([a, i]);
-            }
-          }
-        }
-        // folha de cada turma: todos os alunos dela, com o nome e a turma embaixo de cada foto
-        if (livre && !cancelar) {
-          const turmas = {};
-          alunos.filter(a => a.soltA && a.mini).forEach(a => (turmas[a.turma] = turmas[a.turma] || []).push(a));
-          for (const [turma, lst] of Object.entries(turmas)) {
-            if (lst.length < 2) continue;
-            info.textContent = `Montando a folha da turma ${turma || origem.name} (${lst.length} alunos)…`;
-            const st = {
-              nome: turma ? "Turma " + turma : origem.name,
-              escola: origem.name,
-              sub: `${turma ? "Turma " + turma + " · " : ""}${lst.length} alunos`,
-              fotos: lst.map(a => a.mini),
-              legendas: lst.map(a => (a.turma ? `${a.nome} · ${a.turma}` : a.nome))
-            };
-            const pgs = Math.ceil(lst.length / POR_PAGINA);
-            const destinoT = turma ? await pastaDa(lst[0]) : pasta;
-            const base = nomesDeSaida([{ nome: turma ? "Turma " + turma + " - todos" : "Todos", caminho: [] }], true)[0];
-            for (let pg = 0; pg < pgs; pg++) {
-              const cv = document.createElement("canvas");
-              desenharFolha(cv, st, pg);
-              try {
-                await gravar(destinoT, base + (pgs > 1 ? ` - pagina ${pg + 1}` : "") + ".jpg", await jpg(cv));
-              } catch (e) {
-                console.warn("[Z7] folha da turma", e);
-              }
             }
           }
         }
