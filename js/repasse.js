@@ -42,6 +42,7 @@ import {
   ehFormatura,
   baseSeg,
   colNome,
+  metaNome,
   $
 } from "./repasse-estado.js";
 // Caídos: o admin vê todos; a equipe, os que ela mesma marcou
@@ -49,7 +50,7 @@ const soMinhaCaidos = () => (C.isAdmin ? [] : [FS.where("respEmail", "==", C.ema
 import { card } from "./repasse-cartao.js";
 import { sheet, field, actions } from "./repasse-janelas.js";
 import { openDados } from "./repasse-form.js";
-import { refreshStats, refreshLote, separarLote, loadMeta, pintarEscolas, escolaEscolhida } from "./repasse-lote.js";
+import { refreshStats, refreshLote, separarLote, loadMeta, pintarEscolas, escolaEscolhida, gruposPR } from "./repasse-lote.js";
 export { ETAPAS } from "./repasse-estado.js";
 let unsubList = null,
   mounted = false,
@@ -218,7 +219,8 @@ function mount() {
   busca.id = "rBusca";
   busca.hidden = true;
   busca.innerHTML = `<input class="search" id="rQ" type="search" placeholder="Nome do aluno ou telefone" aria-label="Buscar no repasse">
-    <select class="search" id="rEscola" aria-label="Filtrar por escola"><option value="">Ou escolha uma escola…</option></select>`;
+    <select class="search" id="rEscola" aria-label="Filtrar por escola"><option value="">Ou escolha uma escola…</option></select>
+    <button class="btn btn-sm" id="rJuntar" type="button" hidden>🔀 Juntar com outro colégio</button>`;
   v.append(busca);
 
   const list = el("section", "grid");
@@ -234,6 +236,28 @@ function mount() {
     tq = setTimeout(buscar, 400);
   });
   $("rEscola").addEventListener("change", buscar);
+  // admin: colégio que veio errado da planilha ("G", "M"…) passa para o colégio certo
+  $("rEscola").addEventListener("change", () => ($("rJuntar").hidden = !C.isAdmin || !$("rEscola").value));
+  $("rJuntar").onclick = () => {
+    const de = gruposPR.find(g => g.valor === $("rEscola").value);
+    if (!de) return U.toast("Escolha o colégio na lista (com o ano).");
+    import("./juntar-colegio.js")
+      .then(m =>
+        m.abrirJuntar(C, {
+          grupos: gruposPR,
+          de,
+          colNome: colNome(),
+          metaNome: metaNome(),
+          aoTerminar: () => {
+            $("rEscola").value = "";
+            $("rJuntar").hidden = true;
+            loadMeta().then(refreshStats);
+            buscar();
+          }
+        })
+      )
+      .catch(e => C.handleErr(e));
+  };
   try {
     if (!localStorage.getItem("z7rguide")) g.open = true;
     g.addEventListener("toggle", () => {

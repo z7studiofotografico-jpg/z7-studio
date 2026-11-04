@@ -2723,6 +2723,56 @@ await cenario("Agendamento · Importação: folha da turma (20 por página, nome
   }
   ok(!erros.length, "sem erros" + (erros.length ? ": " + erros.join(" | ") : ""));
 });
+await cenario("Juntar colégio que veio errado da planilha (G e M → C.E. Roberto Lyra)", async () => {
+  const al = (nome, escola) => ({
+    nome,
+    nomeBusca: nome.toUpperCase(),
+    escola,
+    ano: 2025,
+    seg: "rep",
+    etapa: "NA FILA",
+    resp: "",
+    respEmail: "",
+    contatos: [],
+    telefones: []
+  });
+  const d = Object.assign({}, base, {
+    "config/formatura_meta": {
+      escolas: { G: 1, M: 1, "C.E ROBERTO LYRA": 1 },
+      anos: { 2025: 3 },
+      escolasAno: { "G|2025": 1, "M|2025": 1, "C.E ROBERTO LYRA|2025": 1 }
+    },
+    "formaturaAlunos/g1": al("Aluno Gê", "G"),
+    "formaturaAlunos/m1": al("Aluno Eme", "M"),
+    "formaturaAlunos/r1": al("Aluno Lyra", "C.E ROBERTO LYRA")
+  });
+  const { pg, store, erros } = await abrir(ADRIANO, migrar(d));
+  await ir(pg, "#formaturas");
+  await pg.locator("#viewFormaturas .seg", { hasText: "Repasse" }).click();
+  await calmo(pg);
+  await pg.locator("#viewFormaturas .chip", { hasText: "Buscar" }).first().click();
+  await calmo(pg);
+  for (const x of ["G", "M"]) {
+    await pg.selectOption("#rEscola", { label: `2025 - ${x} (1)` });
+    await calmo(pg);
+    await pg.getByRole("button", { name: "🔀 Juntar com outro colégio" }).click();
+    const sh = pg.locator(".sheet").last();
+    await sh.getByLabel("Colégio certo").selectOption({ label: "2025 - C.E. Roberto Lyra (" + (x === "G" ? 1 : 2) + ")" });
+    await sh.locator("button[type=submit]").click();
+    await pg.locator(".sheet").last().getByRole("button", { name: "Sim" }).click();
+    await calmo(pg);
+  }
+  const st = await store();
+  ok(
+    st["formaturaAlunos/g1"].escola === "C.E ROBERTO LYRA" &&
+      st["formaturaAlunos/m1"].escola === "C.E ROBERTO LYRA" &&
+      st["formaturaAlunos/g1"].escolaAntes === "G",
+    "G e M passaram para o C.E. Roberto Lyra (e fica guardado o nome antigo)"
+  );
+  const ea = st["config/formatura_meta"].escolasAno;
+  ok(ea["C.E ROBERTO LYRA|2025"] === 3 && !ea["G|2025"] && !ea["M|2025"], "lista de escolas: Roberto Lyra 2025 com 3, sem G e M");
+  ok(!erros.length, "sem erros" + (erros.length ? ": " + erros.join(" | ") : ""));
+});
 await cenario("Fotos do aluno direto do Google Drive", async () => {
   const Y = new Date().getFullYear();
   const F = "application/vnd.google-apps.folder";
