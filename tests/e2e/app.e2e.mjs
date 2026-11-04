@@ -624,8 +624,14 @@ await cenario("Adriano (admin), com os dados já atualizados no servidor", async
     );
     await f.locator("button[type=submit]").click();
     await esperaNome(pg, "Julia Costa");
-    s = await store();
-    const ju = Object.values(s).find(x => x.nome === "Julia Costa");
+    // a gravação termina logo depois do nome aparecer: espera até 5 s
+    let ju = null;
+    for (let t = 0; t < 25; t++) {
+      s = await store();
+      ju = Object.values(s).find(x => x.nome === "Julia Costa");
+      if (ju && ju.proxVenc) break;
+      await pg.waitForTimeout(200);
+    }
     ok(
       ju && ju.valor === 400 && ju.respEmail === PEDRO && ju.proxVenc,
       "formando novo com responsável do colégio e próximo vencimento" + (ju ? "" : " — na tela: " + (await erroVisivel(pg)))
@@ -657,7 +663,11 @@ await cenario("Adriano (admin), com os dados já atualizados no servidor", async
     );
     await fk.locator("button[type=submit]").click();
     await esperaNome(pg, "Caio Kit Um");
-    s = await store();
+    for (let t = 0; t < 25; t++) {
+      s = await store();
+      if (Object.values(s).some(x => x.nome === "Caio Kit Um")) break;
+      await pg.waitForTimeout(200);
+    }
     const bia = Object.values(s).find(x => x.nome === "Bia Antecipada"),
       caio = Object.values(s).find(x => x.nome === "Caio Kit Um");
     ok(
