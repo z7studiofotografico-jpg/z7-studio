@@ -54,7 +54,17 @@ test("prévias em lote: quem já comprou fica de fora (pelo nome e pelo número)
 test("prévias em lote: o motivo de cada foto que não saiu, com o que fazer", async () => {
   const { motivoErro } = await import("../js/previas-lote.js");
   assert.match(motivoErro({ name: "NotFoundError" }, "a.jpg", null, "11 - MARCELLA "), /termina com espaço ou ponto/);
-  assert.match(motivoErro({ name: "NotFoundError" }, "a.jpg"), /comprido demais para o Windows/);
+  assert.match(motivoErro({ name: "NotFoundError" }, "a.jpg"), /limite de 260 letras/);
+  const m = motivoErro({ name: "NotFoundError" }, "05 - ALLANA (1).JPG", null, "05 - ALLANA", ["00 - EDIÇÃO", "05 - ALLANA"]);
+  assert.match(m, /Área de Trabalho/);
+  assert.match(m, /de dentro de “00 - EDIÇÃO”/);
+  assert.match(m, /já são 43 letras/);
+  // pasta de cima com acento em outro formato (Mac) ou terminando com ponto: aponta qual pasta
+  assert.match(
+    motivoErro({ name: "NotFoundError" }, "a.jpg", null, "05 - X", ["00 - EDIÇÃO".normalize("NFD"), "05 - X"]),
+    /da pasta “00 - EDIÇÃO”.*outro formato/
+  );
+  assert.match(motivoErro({ name: "NotFoundError" }, "a.jpg", null, "05 - X", ["00 - FOTOS.", "05 - X"]), /pasta “00 - FOTOS\.”/);
   assert.match(motivoErro({ name: "NotReadableError" }, "a.jpg"), /não deixou ler/);
   assert.match(motivoErro(new Event("error"), "a.jpg", 0), /vazio/);
   assert.match(motivoErro(new Event("error"), "a.jpg", 500000), /não abre no navegador/);

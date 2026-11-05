@@ -118,15 +118,28 @@ async function gravar(pasta, nome, blob) {
   }
 }
 // O motivo de uma foto não ter saído, em palavras simples, com o que fazer
-export function motivoErro(e, nome = "", tamanho = null, pasta = "") {
+// caminho: as pastas entre a pasta do colégio e a foto (ex.: ["00 - EDIÇÃO", "05 - CIEP 225 - ALLANA"]); todas são conferidas
+export function motivoErro(e, nome = "", tamanho = null, pasta = "", caminho = []) {
   const n = (e && e.name) || "";
-  if (/[ .]$/.test(nome) || /[ .]$/.test(pasta))
-    return "o nome da pasta ou do arquivo termina com espaço ou ponto: renomeie no servidor (tire o espaço/ponto do fim)";
-  if (/[<>:"|?*]/.test(nome + pasta)) return 'o nome tem caractere que o Windows não aceita (< > : " | ? *): renomeie a pasta ou o arquivo';
-  if (nome + pasta !== (nome + pasta).normalize("NFC"))
-    return "o nome tem acento gravado em outro formato (pasta criada no Mac/celular): renomeie a pasta digitando o nome de novo";
-  if (n === "NotFoundError")
-    return "o navegador não conseguiu abrir (a foto abre no computador?). Se abre, o mais comum é o caminho da pasta ser comprido demais para o Windows (limite de 260 letras, contando todas as pastas de cima): toque em “📂 Escolher a pasta deste aluno” ou encurte o nome da pasta";
+  const pastas = [...new Set([...caminho, pasta].filter(Boolean))];
+  const comFimRuim = pastas.find(x => /[ .]$/.test(x));
+  if (/[ .]$/.test(nome)) return "o nome do arquivo termina com espaço ou ponto: renomeie no servidor (tire o espaço/ponto do fim)";
+  if (comFimRuim)
+    return `o nome da pasta “${comFimRuim.trim()}” termina com espaço ou ponto: renomeie no servidor (tire o espaço/ponto do fim)`;
+  const invalida = pastas.find(x => /[<>:"|?*]/.test(x));
+  if (/[<>:"|?*]/.test(nome) || invalida)
+    return `o nome ${invalida ? `da pasta “${invalida}”` : "do arquivo"} tem caractere que o Windows não aceita (< > : " | ? *): renomeie`;
+  const outroFormato = pastas.find(x => x !== x.normalize("NFC"));
+  if (nome !== nome.normalize("NFC") || outroFormato)
+    return `o nome ${outroFormato ? `da pasta “${outroFormato.normalize("NFC")}”` : "do arquivo"} tem acento gravado em outro formato (criada no Mac/celular): renomeie digitando o nome de novo`;
+  if (n === "NotFoundError") {
+    const letras = [...caminho, nome].join("\\").length;
+    const dentro = caminho.length > 1 ? ` ou tire a pasta do aluno de dentro de “${caminho[0]}” (fica mais curto)` : "";
+    return (
+      `o Windows não achou a foto por esse caminho. O mais comum é o caminho inteiro (servidor + todas as pastas + nome da foto) passar do limite de 260 letras do Windows${letras ? `: só dentro da pasta do colégio já são ${letras} letras` : ""}. ` +
+      `O que resolve sempre: copie a pasta deste aluno para a Área de Trabalho e toque em “📂 Escolher a pasta deste aluno”, escolhendo a cópia${dentro}. Renomear só a foto não adianta`
+    );
+  }
   if (n === "NotReadableError")
     return "o servidor não deixou ler (arquivo aberto em outro programa ou sem permissão): feche o arquivo e tente de novo";
   if (n === "NotAllowedError" || n === "SecurityError") return "sem permissão para ler a pasta: escolha a pasta do colégio de novo";
@@ -138,7 +151,7 @@ export function motivoErro(e, nome = "", tamanho = null, pasta = "") {
   return "não consegui ler: " + ((e && (e.message || e.name)) || "erro desconhecido");
 }
 // lê e reduz uma foto; se falhar, devolve { erro } com o motivo (tenta 2 vezes)
-async function lerFoto(h, pastaNome, comNome = false) {
+async function lerFoto(h, pastaNome, comNome = false, caminho = []) {
   let file = null,
     ultimo = null;
   for (let t = 0; t < 2; t++) {
@@ -151,7 +164,7 @@ async function lerFoto(h, pastaNome, comNome = false) {
       if (t === 0) await espera(600);
     }
   }
-  return { erro: motivoErro(ultimo, h.name, file ? file.size : null, pastaNome) };
+  return { erro: motivoErro(ultimo, h.name, file ? file.size : null, pastaNome, caminho) };
 }
 
 // Escolher a pasta pela janela comum do navegador (outro caminho de leitura): serve quando o jeito normal dá
@@ -502,7 +515,7 @@ export function abrirPreviasLote(C, o = {}) {
           a.erros = [];
           a.geradas = 0;
           for (const h of a.arquivos.slice(0, a.max || MAX_FOTOS)) {
-            const r = await lerFoto(h, a.nome, !!a.folha);
+            const r = await lerFoto(h, a.nome, !!a.folha, a.caminho);
             if (r.img) {
               // folha da turma: cada foto pequena (até 300 alunos sem pesar na memória)
               let im = r.img;

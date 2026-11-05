@@ -2560,7 +2560,7 @@ await cenario("Prévias de um colégio (lote, no computador)", async () => {
   const fim = await pg.locator(".sheet:last-of-type").textContent();
   ok(/1 de 3 ficaram de fora/.test(fim), "avisa quantos ficaram de fora");
   ok(
-    /1 aluno com foto que não saiu/.test(fim) && /03 - PEDRO — 0 de 1 foto gerada/.test(fim) && /comprido demais para o Windows/.test(fim),
+    /1 aluno com foto que não saiu/.test(fim) && /03 - PEDRO — 0 de 1 foto gerada/.test(fim) && /limite de 260 letras do Windows/.test(fim),
     "arquivo que não abre: lista o aluno, quantas fotos saíram e o motivo: " + fim.slice(-400)
   );
   ok(
