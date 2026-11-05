@@ -50,7 +50,7 @@ async function alunosDoColegio(C, colNome, col) {
 
 const FOTO = /\.(jpe?g|png|webp)$/i,
   POR_PAGINA = 30,
-  MAX_FOTOS = 100;
+  MAX_FOTOS = 250; // fotos por aluno (pasta) nas prévias em lote e na Importação
 const limpo = n =>
   String(n || "")
     .replace(/[\\/:*?"<>|]+/g, " ")
