@@ -69,13 +69,15 @@ export function nomeDoColegio(pasta) {
     .trim();
   return { nome: nome || s, ano };
 }
+// pasta de prévias que o próprio app gerou ("Prévias - 2022 - …"): não é aluno, não entra de novo
+export const ehPastaDePrevias = nome => /^pr[ée]vias\s*-/i.test(String(nome || "").trim());
 // Todas as pastas que têm fotos (cada uma é um aluno): [{ nome, caminho, arquivos: [FileHandle] }]
 export async function pastasComFotos(dir, caminho = []) {
   const out = [],
     fotos = [];
   for await (const h of dir.values()) {
     if (h.kind === "file" && FOTO.test(h.name)) fotos.push(h);
-    else if (h.kind === "directory") out.push(...(await pastasComFotos(h, [...caminho, h.name])));
+    else if (h.kind === "directory" && !ehPastaDePrevias(h.name)) out.push(...(await pastasComFotos(h, [...caminho, h.name])));
   }
   if (fotos.length)
     out.unshift({
@@ -471,6 +473,10 @@ export function abrirPreviasLote(C, o = {}) {
         }
         info.textContent = `${alunos.length} aluno${alunos.length > 1 ? "s" : ""} para trabalhar em “${origem.name}”.${resumoFora} Agora escolha onde salvar as prévias.`;
         destino = await window.showDirectoryPicker({ id: "z7-previas", mode: "readwrite" });
+        // salvar dentro da pasta das fotos mistura as prévias com as fotos (na próxima vez elas viram "alunos")
+        if (origem.resolve && (await origem.resolve(destino).catch(() => null)))
+          return (info.textContent =
+            "Escolha outro lugar para salvar: não pode ser a pasta das fotos nem uma pasta dentro dela (senão as prévias se misturam com as fotos dos alunos). Ex.: a Área de Trabalho ou a pasta das prévias no Drive.");
         const pasta = await destino.getDirectoryHandle(
           limpo(livre ? tituloImp() || `Prévias - ${origem.name}` : `Prévias - ${col.ano ? col.ano + " - " : ""}${col.nome}`),
           { create: true }
@@ -567,6 +573,7 @@ export function abrirPreviasLote(C, o = {}) {
           // (foto solta = uma prévia por foto: não precisa da pasta com a mesma foto separada)
           if (separadas.checked && !a.soltA && !a.folha) {
             const sub = await pasta.getDirectoryHandle(nomes[i], { create: true });
+            let salvas = 0;
             for (const [k, f] of fotos.entries()) {
               const c = document.createElement("canvas");
               c.width = f.width;
@@ -577,7 +584,15 @@ export function abrirPreviasLote(C, o = {}) {
               const nomeArq = livre
                 ? nomesFotos[k].replace(/\.(png|webp|jpe?g)$/i, "") + ".jpg"
                 : `${nomes[i]} - foto ${String(k + 1).padStart(2, "0")}.jpg`;
-              await gravar(sub, nomeArq, await jpg(c));
+              try {
+                await gravar(sub, nomeArq, await jpg(c));
+                salvas++;
+              } catch (e) {
+                // não deixa pasta vazia para trás
+                if (!salvas) await pasta.removeEntry(nomes[i]).catch(() => {});
+                a.erros.push({ arquivo: nomeArq, motivo: "não consegui salvar: " + motivoErro(e) });
+                throw e;
+              }
             }
           }
           for (let pg = 0; pg < paginas; pg++) {

@@ -131,3 +131,20 @@ test("importação: nome e sobrenome do arquivo; fotos soltas viram a folha (e a
   );
   assert.equal(montarImportacao(grupos, { individuais: true }).length, 4);
 });
+
+test("prévias em lote: a pasta de prévias já gerada (dentro da pasta das fotos) não vira aluno", async () => {
+  const colegio = pasta("2022-05-10 - ALVARINA DE CARVALHO", [
+    pasta("CEAC 01 - WESLEY WENDERSON", [arq("1.jpg"), arq("2.jpg")]),
+    pasta("CEAC 02 - TAIANE VITORIA", [arq("1.jpg")]),
+    pasta("Prévias - 2022 - ALVARINA DE CARVALHO", [
+      arq("CEAC 01 - WESLEY WENDERSON.jpg"),
+      pasta("CEAC 01 - WESLEY WENDERSON", [arq("CEAC 01 - WESLEY WENDERSON - foto 01.jpg")])
+    ]),
+    pasta("PREVIAS - 2022 - ALVARINA", [arq("x.jpg")])
+  ]);
+  const alunos = await pastasComFotos(colegio);
+  assert.deepEqual(
+    alunos.map(a => a.nome),
+    ["CEAC 01 - WESLEY WENDERSON", "CEAC 02 - TAIANE VITORIA"]
+  );
+});
