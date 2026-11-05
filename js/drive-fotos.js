@@ -25,12 +25,13 @@ export function lerPastaColegio(nome) {
   return { ano, chave: chaveColegio(s.replace(/^20\d\d\s*-\s*/, "")) };
 }
 // "CEYMS 02 - DOMINGOS JOSE" → { cod: "CEYMS 02", num: 2, nome: "DOMINGOS JOSE" }
+// também: "CIEP 384 - 07 - MARIA", "CIEP384 07 - MARIA", "EEMZC - 12 - JOAO", "21EEMZC-12 - JOAO"
 export function lerNomeAluno(nome) {
   const s = String(nome || "")
     .replace(/\.(jpe?g|png)$/i, "")
     .replace(/\s*-\s*pagina\s*\d+$/i, "");
-  const m = s.match(/^([A-Za-z]*\s*(\d+))\s*-\s*(.*)$/);
-  return m ? { cod: m[1].trim(), num: Number(m[2]), nome: m[3].trim() } : { cod: "", num: null, nome: s.trim() };
+  const m = s.match(/^(?:\d{2}(?=[A-Za-z]))?([A-Za-z.]*(?:\s*\d{2,4})?)\s*[-–]?\s*(\d{1,4})\s*[-–]\s*(.*\p{L}.*)$/u);
+  return m ? { cod: `${m[1].trim()} ${m[2]}`.trim(), num: Number(m[2]), nome: m[3].trim() } : { cod: "", num: null, nome: s.trim() };
 }
 const parecido = (a, b) => {
   const x = chave(a),

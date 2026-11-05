@@ -78,3 +78,27 @@ test("link direto da pasta de um colégio e nome com letra a menos (YONE × YONN
     ["s2"]
   );
 });
+
+test("acha a prévia com os jeitos de nomear das planilhas antigas (CIEP com número, SIGLA - NN, ano na frente)", () => {
+  const maria = { nome: "MARIA EDUARDA SILVA SOUZA", codigoOrig: "CIEP 384 - 07", codigo: "21CIEP384-07" };
+  const joao = { nome: "JOAO PEDRO LIMA", codigoOrig: "EEMZC - 12", codigo: "21EEMZC-12" };
+  for (const n of [
+    "CIEP384 07 - MARIA EDUARDA SILVA SOUZA.jpg",
+    "CIEP 384 - 07 - MARIA EDUARDA SILVA SOUZA.jpg",
+    "CIEP 384 07 - MARIA EDUARDA.jpg"
+  ]) {
+    assert.equal(lerNomeAluno(n).num, 7, n);
+    assert.ok(acharAluno([{ name: n }], maria), n);
+  }
+  for (const n of [
+    "EEMZC 12 - JOAO PEDRO LIMA.jpg",
+    "EEMZC - 12 - JOAO PEDRO LIMA.jpg",
+    "21EEMZC-12 - JOAO PEDRO LIMA.jpg",
+    "JOAO PEDRO LIMA.jpg"
+  ])
+    assert.ok(acharAluno([{ name: n }], joao), n);
+  assert.equal(lerNomeAluno("EEMZC - 12 - JOAO PEDRO LIMA").nome, "JOAO PEDRO LIMA");
+  // dois com o mesmo primeiro nome: o número decide
+  const itens = [{ name: "CIEP 384 - 06 - MARIA EDUARDA" }, { name: "CIEP 384 - 07 - MARIA EDUARDA" }];
+  assert.equal(acharAluno(itens, maria).name, "CIEP 384 - 07 - MARIA EDUARDA");
+});
