@@ -592,7 +592,7 @@ await cenario("Adriano (admin), com os dados já atualizados no servidor", async
     ok(
       s["formandos/f1"].retorno &&
         s["formandos/f1"].retorno.motivo === "Sem dinheiro agora, recebe dia 10" &&
-        s["formandos/f1"].retorno.data === dia(15) &&
+        s["formandos/f1"].retorno.data === iso(new Date(new Date(hoje).setDate(new Date(hoje).getDate() + 15))) &&
         s["formandos/f1"].motivos.length === 1,
       "Formaturas: 'Pediu contato depois' guarda motivo e data (histórico de motivos)"
     );
