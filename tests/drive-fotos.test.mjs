@@ -118,3 +118,8 @@ test("nome do aluno nos formatos novos das prévias", () => {
   assert.deepEqual([_ler("2025 -CEJPII- 002 - (N) FABRICIO LIMA").num, _ler("2025 -CEJPII- 002 - (N) FABRICIO LIMA").nome], [2, "FABRICIO LIMA"]);
   assert.equal(_ler("CEYMS 02 - DOMINGOS JOSE").nome, "DOMINGOS JOSE");
 });
+
+test("nome do aluno: número colado na sigla e sufixo -1", () => {
+  assert.deepEqual([_ler("2024 - CEPD 08 - THAIS GUEDES").num, _ler("2024 - CEPD 08 - THAIS GUEDES").nome], [8, "THAIS GUEDES"]);
+  assert.deepEqual([_ler("2025 -CIEP169- 01 - MARIA CLARA ABREU-1").num, _ler("2025 -CIEP169- 01 - MARIA CLARA ABREU-1").nome], [1, "MARIA CLARA ABREU"]);
+});

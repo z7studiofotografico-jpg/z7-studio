@@ -45,9 +45,11 @@ export function lerNomeAluno(nome) {
   // "01 - CIEP 225 - LORENA", "26 -CIEP336- 01 - DAVI", "01 - CIEP 460-2022- JAMILLE", "01-CEPD2025- GRACIELLY":
   // o nome é o último pedaço e o número do aluno é o último número curto antes dele
   if (/-/.test(r.nome)) {
-    const partes = s.split(/\s*-\s*/).filter(Boolean);
+    const partes = s.replace(/-\d{1,2}$/, "").split(/\s*-\s*/).filter(Boolean);
     const nome = partes.pop();
-    const nums = partes.filter(x => /^\d{1,3}$/.test(x));
+    let nums = partes.filter(x => /^\d{1,3}$/.test(x));
+    // "2024 - CEPD 08 - NOME": o número vem colado na sigla
+    if (!nums.length) nums = partes.map(x => (x.match(/[A-Za-z.]\s*(\d{1,3})$/) || [])[1]).filter(Boolean);
     if (nome && /\p{L}/u.test(nome) && nums.length) return { cod: partes.join(" "), num: Number(nums[nums.length - 1]), nome: nome.trim() };
   }
   return r;
