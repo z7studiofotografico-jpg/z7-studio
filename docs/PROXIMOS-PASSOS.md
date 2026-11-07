@@ -20,8 +20,8 @@ botão "Mudar ano" nas importações de Formatura/Paspatur, aba Vendidos (admin)
    - endereço completo obrigatório em toda venda (CEP preenche rua e bairro);
    - caído por "achou caro": oferecer Paspatur antes;
    - colégio: "Quem paga: cada aluno / o colégio" (colégio paga = entra direto em Vendido);
-   - tabela de preços organizada na ⚙️ (só admin), por grupo; descontos em R$ sem pedir, iguais para toda a equipe:
-     Linha de Frente PR 50 / Paspatur 20; Repasse PR 100 / Paspatur 40; acima disso, pedido de autorização;
+   - tabela de preços organizada na ⚙️ (só admin), por grupo; limites de desconto em R$ sem pedir, iguais para toda a
+     equipe, cadastrados pelo admin na ⚙️ (valores fora deste arquivo); acima do limite, pedido de autorização;
    - total do mês (quantidade e valor) no topo de "Minhas vendas";
    - botão para apagar as fotos de quem já comprou ou de incompleto sem contato.
 4. **Fichas**: ler a ficha de identificação nas fotos dos alunos com prévia e sem planilha e associar a nome e
