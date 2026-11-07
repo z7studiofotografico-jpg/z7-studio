@@ -20,18 +20,37 @@ export function idDaPasta(link) {
 }
 // "Prévias - 2022 - C.E. YONNE MARIA SIQUEIRA" → { ano: 2022, chave: "YONNE MARIA SIQUEIRA" }
 export function lerPastaColegio(nome) {
-  const s = String(nome || "").replace(/^Pr[ée]vias\s*-\s*/i, "");
-  const ano = Number((s.match(/^(20\d\d)\s*-\s*/) || [])[1]) || null;
-  return { ano, chave: chaveColegio(s.replace(/^20\d\d\s*-\s*/, "")) };
+  let s = String(nome || "").replace(/^Pr[ée]vias\s*-\s*/i, "");
+  let ano = Number((s.match(/^(20\d\d)\s*-\s*/) || [])[1]) || null;
+  s = s
+    .replace(/^20\d\d\s*-\s*/, "")
+    // formaturas: "Formatura (1) - C.E JOÃO PAULO II", "01 - FORMATURA - 2022-08-04 - C.E JOAO PAULO II", "… 2023"
+    .replace(/^\d{1,2}\s*-\s*/, "")
+    .replace(/^formatura\s*(\(\d+\))?\s*-\s*/i, "")
+    .replace(/^(20\d\d)-\d\d-\d\d\s*-\s*/, (x, a) => ((ano = ano || Number(a)), ""));
+  const fim = s.match(/\s+(20\d\d)$/);
+  if (fim) (ano = ano || Number(fim[1])), (s = s.slice(0, fim.index));
+  return { ano, chave: chaveColegio(s) };
 }
 // "CEYMS 02 - DOMINGOS JOSE" → { cod: "CEYMS 02", num: 2, nome: "DOMINGOS JOSE" }
 // também: "CIEP 384 - 07 - MARIA", "CIEP384 07 - MARIA", "EEMZC - 12 - JOAO", "21EEMZC-12 - JOAO"
 export function lerNomeAluno(nome) {
   const s = String(nome || "")
     .replace(/\.(jpe?g|png)$/i, "")
-    .replace(/\s*-\s*pagina\s*\d+$/i, "");
+    .replace(/\s*-\s*pagina\s*\d+$/i, "")
+    .replace(/\s*\([^)]*\)\s*/g, " ")
+    .trim();
   const m = s.match(/^(?:\d{2}(?=[A-Za-z]))?([A-Za-z.]*(?:\s*\d{2,4})?)\s*[-–]?\s*(\d{1,4})\s*[-–]\s*(.*\p{L}.*)$/u);
-  return m ? { cod: `${m[1].trim()} ${m[2]}`.trim(), num: Number(m[2]), nome: m[3].trim() } : { cod: "", num: null, nome: s.trim() };
+  const r = m ? { cod: `${m[1].trim()} ${m[2]}`.trim(), num: Number(m[2]), nome: m[3].trim() } : { cod: "", num: null, nome: s.trim() };
+  // "01 - CIEP 225 - LORENA", "26 -CIEP336- 01 - DAVI", "01 - CIEP 460-2022- JAMILLE", "01-CEPD2025- GRACIELLY":
+  // o nome é o último pedaço e o número do aluno é o último número curto antes dele
+  if (/-/.test(r.nome)) {
+    const partes = s.split(/\s*-\s*/).filter(Boolean);
+    const nome = partes.pop();
+    const nums = partes.filter(x => /^\d{1,3}$/.test(x));
+    if (nome && /\p{L}/u.test(nome) && nums.length) return { cod: partes.join(" "), num: Number(nums[nums.length - 1]), nome: nome.trim() };
+  }
+  return r;
 }
 const parecido = (a, b) => {
   const x = chave(a),

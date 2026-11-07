@@ -109,3 +109,12 @@ test("pasta por ano das prévias (Prévias 2026 / PREVIAS) é reconhecida; a do 
   assert.equal(_ehPastaAno("PREVIAS"), true);
   assert.equal(_ehPastaAno("Prévias - 2026 - CIEP 433"), false);
 });
+
+import { lerNomeAluno as _ler } from "../js/drive-fotos.js";
+test("nome do aluno nos formatos novos das prévias", () => {
+  assert.deepEqual([_ler("01 - CIEP 225 - LORENA RODRIGUES").num, _ler("01 - CIEP 225 - LORENA RODRIGUES").nome], [1, "LORENA RODRIGUES"]);
+  assert.deepEqual([_ler("26 -CIEP336- 07 - SOFIA SOUZA").num, _ler("26 -CIEP336- 07 - SOFIA SOUZA").nome], [7, "SOFIA SOUZA"]);
+  assert.deepEqual([_ler("01 - CIEP 460-2022- JAMILLE DE BRITO.jpg").num, _ler("01 - CIEP 460-2022- JAMILLE DE BRITO.jpg").nome], [1, "JAMILLE DE BRITO"]);
+  assert.deepEqual([_ler("2025 -CEJPII- 002 - (N) FABRICIO LIMA").num, _ler("2025 -CEJPII- 002 - (N) FABRICIO LIMA").nome], [2, "FABRICIO LIMA"]);
+  assert.equal(_ler("CEYMS 02 - DOMINGOS JOSE").nome, "DOMINGOS JOSE");
+});
