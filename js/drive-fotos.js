@@ -59,6 +59,8 @@ export function acharAluno(itens, it) {
   return pont.length ? pont[0].f : null;
 }
 
+// pasta que agrupa os colégios de um ano: "Prévias 2026", "PRÉVIAS", "Previas"
+export const ehPastaAno = nome => /^pr[ée]vias(\s+20\d\d)?$/i.test(String(nome || "").trim());
 // ---------- leitura no Drive ----------
 // acesso = a chave do Google (texto) ou uma função que devolve o token da conta Google da pessoa (pasta fechada)
 export function criarDrive(acesso, buscar = fetch) {
@@ -106,10 +108,17 @@ export function criarDrive(acesso, buscar = fetch) {
     if (!r.ok) throw new Error("Não consegui baixar a foto (" + r.status + ").");
     return r.blob();
   }
+  // pastas "Prévias - …" de cada colégio: direto na raiz ou dentro das pastas por ano ("Prévias 2026", "PREVIAS")
+  async function pastasColegios(raiz) {
+    const itens = (await listar(raiz)).filter(f => f.mimeType === PASTA);
+    const anos = itens.filter(f => ehPastaAno(f.name));
+    const dentro = (await Promise.all(anos.map(a => listar(a.id)))).flat().filter(f => f.mimeType === PASTA);
+    return itens.concat(dentro).filter(f => /^Pr[ée]vias\s*-/i.test(f.name));
+  }
   // { folhas: [arquivo], fotos: [arquivo] } do aluno, ou { erro }
   async function fotosDoAluno(raiz, it) {
     // a pasta do link pode ser a geral ("Z7 – Prévias PR", com uma pasta por colégio) ou já a de um colégio
-    let colegios = (await listar(raiz)).filter(f => f.mimeType === PASTA && /^Pr[ée]vias\s*-/i.test(f.name));
+    let colegios = await pastasColegios(raiz);
     if (!colegios.length) colegios = [{ id: raiz, name: await nomeDe(raiz) }];
     // letras dobradas não contam ("YONE" e "YONNE"); uma chave pode ser o começo da outra ("… SIQUEIRA" e "… SIQUEIRA ANDRADE")
     const simples = c => String(c || "").replace(/([A-Z])\1+/g, "$1");
@@ -141,5 +150,5 @@ export function criarDrive(acesso, buscar = fetch) {
       return { erro: `Não achei as fotos de ${it.nome} nas prévias de ${col.name.replace(/^Pr[ée]vias\s*-\s*/i, "")}.` };
     return { colegio: col.name, folhas, fotos };
   }
-  return { listar, baixar, fotosDoAluno };
+  return { listar, baixar, fotosDoAluno, pastasColegios };
 }

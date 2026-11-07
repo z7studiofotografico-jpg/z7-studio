@@ -102,3 +102,10 @@ test("acha a prévia com os jeitos de nomear das planilhas antigas (CIEP com nú
   const itens = [{ name: "CIEP 384 - 06 - MARIA EDUARDA" }, { name: "CIEP 384 - 07 - MARIA EDUARDA" }];
   assert.equal(acharAluno(itens, maria).name, "CIEP 384 - 07 - MARIA EDUARDA");
 });
+
+import { ehPastaAno as _ehPastaAno } from "../js/drive-fotos.js";
+test("pasta por ano das prévias (Prévias 2026 / PREVIAS) é reconhecida; a do colégio não", () => {
+  assert.equal(_ehPastaAno("Prévias 2026"), true);
+  assert.equal(_ehPastaAno("PREVIAS"), true);
+  assert.equal(_ehPastaAno("Prévias - 2026 - CIEP 433"), false);
+});
