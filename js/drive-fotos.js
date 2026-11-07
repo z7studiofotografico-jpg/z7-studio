@@ -200,8 +200,8 @@ export function criarDrive(acesso, buscar = fetch) {
       : [];
     const fotos = pasta ? (await listar(pasta.id)).filter(f => /image\//.test(f.mimeType) || /\.(jpe?g|png)$/i.test(f.name)) : [];
     if (!folhas.length && !fotos.length)
-      return { erro: `Não achei as fotos de ${it.nome} nas prévias de ${col.name.replace(/^Pr[ée]vias\s*-\s*/i, "")}.` };
-    return { colegio: col.name, folhas, fotos };
+      return { erro: `Não achei as fotos de ${it.nome} nas prévias de ${col2.name.replace(/^Pr[ée]vias\s*-\s*/i, "")}.` };
+    return { colegio: col2.name, folhas, fotos };
   }
   return { listar, baixar, fotosDoAluno, pastasColegios };
 }
