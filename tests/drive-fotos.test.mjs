@@ -123,3 +123,12 @@ test("nome do aluno: número colado na sigla e sufixo -1", () => {
   assert.deepEqual([_ler("2024 - CEPD 08 - THAIS GUEDES").num, _ler("2024 - CEPD 08 - THAIS GUEDES").nome], [8, "THAIS GUEDES"]);
   assert.deepEqual([_ler("2025 -CIEP169- 01 - MARIA CLARA ABREU-1").num, _ler("2025 -CIEP169- 01 - MARIA CLARA ABREU-1").nome], [1, "MARIA CLARA ABREU"]);
 });
+
+import { parecidoColegio as _par } from "../js/drive-fotos.js";
+test("colégio com nome parecido na pasta do Drive", () => {
+  assert.ok(_par("C. E. NUTA BARTLET JAMES", "NUTHA BARTLET JAMES") >= 0.75);
+  assert.ok(_par("C.E. DIUMA MADEIRA SALLES DE SOUZA", "DIUMA MADEIRA SALLES FERREIRA") >= 0.75);
+  assert.ok(_par("C. E. PROFESSORA JEANNETTE DE SOUZA COELHO MANNARINO", "P JEANNETTE S C MANNARINO") >= 0.75);
+  assert.equal(_par("CIEP 156 DR. ALBERT SABIN", "CIEP 155 MARIA JOAQUINA"), 0);
+  assert.ok(_par("C.E SANTO ANTONIO", "SANTO ANTONIO DE PADUA") < 0.75);
+});

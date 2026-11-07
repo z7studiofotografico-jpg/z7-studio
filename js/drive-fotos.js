@@ -80,6 +80,28 @@ export function acharAluno(itens, it) {
   return pont.length ? pont[0].f : null;
 }
 
+// 0 a 1: quanto dois nomes de colégio se parecem (palavras iguais; inicial "S" vale por "SOUZA"; números têm de bater)
+export function parecidoColegio(a, b) {
+  const norm = x =>
+    chaveColegio(x)
+      .replace(/([A-Z])\1+/g, "$1")
+      .replace(/([BCDFGJKLMNPQRSTVWXZ])H/g, "$1")
+      .split(" ")
+      .filter(Boolean);
+  const A = norm(a), B = norm(b);
+  if (!A.length || !B.length) return 0;
+  const numA = A.filter(w => /\d/.test(w)).join(), numB = B.filter(w => /\d/.test(w)).join();
+  if (numA !== numB) return 0;
+  const bate = (w, v) => w === v || (w.length === 1 && v.startsWith(w)) || (v.length === 1 && w.startsWith(v));
+  const [cur, lon] = A.length <= B.length ? [A, B] : [B, A];
+  const usados = new Set();
+  let n = 0, inteiras = 0;
+  cur.forEach(w => {
+    const j = lon.findIndex((v, i) => !usados.has(i) && bate(w, v));
+    if (j >= 0) usados.add(j), n++, w.length > 1 && lon[j].length > 1 && inteiras++;
+  });
+  return inteiras >= 2 ? n / lon.length : 0;
+}
 // pasta que agrupa os colégios de um ano: "Prévias 2026", "PRÉVIAS", "Previas"
 export const ehPastaAno = nome => /^pr[ée]vias(\s+20\d\d)?$/i.test(String(nome || "").trim());
 // ---------- leitura no Drive ----------
@@ -152,8 +174,18 @@ export function criarDrive(acesso, buscar = fetch) {
       const c = lerPastaColegio(f.name);
       return mesmo(c.chave) && (!it.ano || !c.ano || c.ano === Number(it.ano));
     });
-    if (!col) return { erro: `As prévias de ${it.escola || "este colégio"}${it.ano ? " (" + it.ano + ")" : ""} ainda não estão no Drive.` };
-    const itens = await listar(col.id);
+    // sem nome igual: o colégio do mesmo ano com o nome mais parecido ("NUTHA" e "NUTA", "S. C." e "SOUZA COELHO")
+    const col2 =
+      col ||
+      colegios
+        .map(f => ({ f, c: lerPastaColegio(f.name) }))
+        .filter(x => !it.ano || !x.c.ano || x.c.ano === Number(it.ano))
+        .map(x => ({ f: x.f, n: parecidoColegio(it.escola || "", x.c.chave) }))
+        .filter(x => x.n >= 0.75)
+        .sort((a, b) => b.n - a.n)
+        .reduce((acc, x, i, arr) => (i === 0 && (arr.length < 2 || arr[1].n < x.n) ? x.f : acc), null);
+    if (!col2) return { erro: `As prévias de ${it.escola || "este colégio"}${it.ano ? " (" + it.ano + ")" : ""} ainda não estão no Drive.` };
+    const itens = await listar(col2.id);
     const pasta = acharAluno(
       itens.filter(f => f.mimeType === PASTA),
       it
