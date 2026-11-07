@@ -976,6 +976,19 @@ await cenario("Adriano (admin), com os dados já atualizados no servidor", async
     await calmo(pg);
     s = await store();
     ok(s["repasse/r2"].conferido === true && s["repasse/r2"].conferidoPor === ADRIANO, "admin conferiu a venda do PR");
+    // venda que a equipe já entregou antes da conferência continua em "A conferir" (senão a comissão nunca é confirmada)
+    await pg.evaluate(() => {
+      window.__store.set("repasse/r2e", { nome: "ENZO ENTREGUE", ano: new Date().getFullYear(), etapa: "ENTREGUE", valor: 200,
+        formaPag: "Pix", respEmail: "pedro@vendas.com", conferido: false });
+      window.__fire();
+    });
+    await calmo(pg);
+    ok(/Enzo/i.test(await pg.textContent("#rList")), "venda já entregue e não conferida aparece em A conferir");
+    await pg.evaluate(() => {
+      window.__store.delete("repasse/r2e");
+      window.__fire();
+    });
+    await calmo(pg);
     // pedido de aluno repetido: o admin decide
     ok(/Ana Vendedora tentou incluir Carla Fila/.test(await pg.textContent("#rPedidos")), "admin vê o pedido de aluno repetido");
     await pg.locator("#rPedidos .notes").filter({ hasText: "Carla Fila" }).getByRole("button", { name: "Passar para Ana" }).click();

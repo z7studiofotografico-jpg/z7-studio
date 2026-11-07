@@ -565,8 +565,9 @@ async function buscar() {
 function naTela() {
   // pedido de exclusão: a equipe não vê mais; o admin vê com a pendência na frente
   let arr = (tab === "buscar" ? items.slice() : items.filter(noSeg)).filter(it => C.isAdmin || !(it.excluido && it.excluido.em));
-  // quem já comprou (entregue) fica só na aba Vendidos
-  if (tab !== "vendidos") arr = arr.filter(it => it.etapa !== "ENTREGUE");
+  // quem já comprou (entregue) fica só na aba Vendidos; em "A conferir" continua, senão a venda entregue
+  // antes da conferência sumiria e a comissão nunca seria confirmada
+  if (tab !== "vendidos" && tab !== "conferir") arr = arr.filter(it => it.etapa !== "ENTREGUE");
   if (tab === "hoje") {
     const t0 = U.todayStr();
     arr = arr.filter(it => ABERTAS.includes(it.etapa) && it.followup && it.followup <= t0);
