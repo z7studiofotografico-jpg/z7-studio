@@ -381,6 +381,8 @@ function renderChips() {
   else tabs.push(["incompletos", "Meus incompletos"]);
   // PR, Paspatur e Formatura: quem não vai querer (Caído), com o motivo; só o Adriano resgata para nova negociação
   tabs.push(["caidos", "Caídos"]);
+  // vendidos (entregues): só para consulta da administração; não aparecem na busca nem nas outras abas
+  if (C.isAdmin) tabs.push(["vendidos", "Vendidos"]);
   tabs.forEach(([k, t]) => {
     const b = el("button", "chip", t);
     b.type = "button";
@@ -436,6 +438,8 @@ function openTab(k) {
           FS.where("respEmail", "==", C.email || ""),
           FS.limit(200)
         );
+  if (k === "vendidos")
+    q = FS.query(col, FS.where("etapa", "==", "ENTREGUE"), ...(ehFormatura() ? baseSeg() : seg === "lf" ? baseLF() : []), FS.limit(1000));
   if (k === "conferir") q = FS.query(col, FS.where("conferido", "==", false), FS.limit(300));
   if (k === "caidos")
     q = FS.query(
@@ -553,9 +557,11 @@ async function buscar() {
 function naTela() {
   // pedido de exclusão: a equipe não vê mais; o admin vê com a pendência na frente
   let arr = (tab === "buscar" ? items.slice() : items.filter(noSeg)).filter(it => C.isAdmin || !(it.excluido && it.excluido.em));
+  // quem já comprou (entregue) fica só na aba Vendidos
+  if (tab !== "vendidos") arr = arr.filter(it => it.etapa !== "ENTREGUE");
   if (tab === "hoje") {
     const t0 = U.todayStr();
-    arr = arr.filter(it => (ABERTAS.includes(it.etapa) || it.etapa === "ENTREGUE") && it.followup && it.followup <= t0);
+    arr = arr.filter(it => ABERTAS.includes(it.etapa) && it.followup && it.followup <= t0);
   }
   return arr;
 }
@@ -625,7 +631,8 @@ const NOMES_ABA = {
   entregas: "Entregas",
   buscar: "Busca",
   conferir: "A conferir",
-  incompletos: "Incompletos"
+  incompletos: "Incompletos",
+  vendidos: "Vendidos"
 };
 // (Formaturas usa o mesmo relatório nas abas Linha de Frente e Repasse)
 export function relatorioPR() {
