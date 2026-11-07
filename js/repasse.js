@@ -381,8 +381,8 @@ function renderChips() {
   else tabs.push(["incompletos", "Meus incompletos"]);
   // PR, Paspatur e Formatura: quem não vai querer (Caído), com o motivo; só o Adriano resgata para nova negociação
   tabs.push(["caidos", "Caídos"]);
-  // vendidos (entregues): só para consulta da administração; não aparecem na busca nem nas outras abas
-  if (C.isAdmin) tabs.push(["vendidos", "Vendidos"]);
+  // vendidos (entregues): só para consulta; não aparecem na busca nem nas outras abas. A equipe vê só as vendas dela
+  tabs.push(["vendidos", C.isAdmin ? "Vendidos" : "Minhas vendas"]);
   tabs.forEach(([k, t]) => {
     const b = el("button", "chip", t);
     b.type = "button";
@@ -439,7 +439,15 @@ function openTab(k) {
           FS.limit(200)
         );
   if (k === "vendidos")
-    q = FS.query(col, FS.where("etapa", "==", "ENTREGUE"), ...(ehFormatura() ? baseSeg() : seg === "lf" ? baseLF() : []), FS.limit(1000));
+    q = C.isAdmin
+      ? FS.query(col, FS.where("etapa", "==", "ENTREGUE"), ...(ehFormatura() ? baseSeg() : seg === "lf" ? baseLF() : []), FS.limit(1000))
+      : FS.query(
+          col,
+          ...(seg === "lf" ? baseLF() : []),
+          FS.where("etapa", "==", "ENTREGUE"),
+          FS.where("respEmail", "==", C.email || ""),
+          FS.limit(500)
+        );
   if (k === "conferir") q = FS.query(col, FS.where("conferido", "==", false), FS.limit(300));
   if (k === "caidos")
     q = FS.query(
