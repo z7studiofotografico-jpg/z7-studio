@@ -7,8 +7,11 @@ import { openMockup } from "./mockup.js";
 
 let drive = null,
   chaveUsada = "";
-// Pasta fechada: cada pessoa entra com a conta Google dela (Google Identity Services); o token vale ~1 hora
-let token = null;
+// Pasta fechada: cada pessoa entra com a conta Google dela (Google Identity Services); o token vale ~1 hora.
+// Ler: só leitura. Gravar (admin, "📤 Enviar foto"): pede a permissão do Drive inteiro na hora de enviar.
+export const LEITURA = "https://www.googleapis.com/auth/drive.readonly",
+  ESCRITA = "https://www.googleapis.com/auth/drive";
+const tokens = {};
 function carregarGsi() {
   if (window.google && window.google.accounts && window.google.accounts.oauth2) return Promise.resolve();
   return new Promise((res, rej) => {
@@ -19,19 +22,22 @@ function carregarGsi() {
     document.head.append(s);
   });
 }
-export function tokenGoogle(cliente, email) {
+export function tokenGoogle(cliente, email, escopo = LEITURA) {
+  const token = tokens[escopo];
   if (token && token.ate > Date.now() + 60000) return Promise.resolve(token.v);
   return carregarGsi().then(
     () =>
       new Promise((res, rej) => {
         const tc = window.google.accounts.oauth2.initTokenClient({
           client_id: cliente,
-          scope: "https://www.googleapis.com/auth/drive.readonly",
+          scope: escopo,
           hint: email || "",
           callback: r => {
             if (r.error || !r.access_token) return rej(new Error("Entrada no Google cancelada ou recusada."));
-            token = { v: r.access_token, ate: Date.now() + (Number(r.expires_in) || 3600) * 1000 };
-            res(token.v);
+            if (escopo === ESCRITA && window.google.accounts.oauth2.hasGrantedAllScopes && !window.google.accounts.oauth2.hasGrantedAllScopes(r, ESCRITA))
+              return rej(new Error("Para enviar fotos, marque a opção do Google Drive na tela do Google (ver, editar e criar arquivos)."));
+            tokens[escopo] = { v: r.access_token, ate: Date.now() + (Number(r.expires_in) || 3600) * 1000 };
+            res(tokens[escopo].v);
           },
           error_callback: () => rej(new Error("Entrada no Google cancelada."))
         });
@@ -39,7 +45,7 @@ export function tokenGoogle(cliente, email) {
       })
   );
 }
-function abrirDrive(C) {
+export function abrirDrive(C) {
   const cliente = C.P.driveCliente || "";
   const k = cliente ? "oauth:" + cliente : C.P.driveChave || ((self.Z7_CONFIG || {}).firebase || {}).apiKey || "";
   if (!drive || chaveUsada !== k) {
@@ -48,7 +54,36 @@ function abrirDrive(C) {
   }
   return drive;
 }
+// Drive com permissão de gravar (admin): sempre com a conta Google da pessoa
+let driveEscrita = null,
+  chaveEscrita = "";
+export function abrirDriveEscrita(C) {
+  const cliente = C.P.driveCliente || "";
+  if (!cliente) return null;
+  if (!driveEscrita || chaveEscrita !== cliente) {
+    driveEscrita = criarDrive(() => tokenGoogle(cliente, C.email, ESCRITA), (u, o) => fetch(u, o));
+    chaveEscrita = cliente;
+  }
+  return driveEscrita;
+}
+// depois de enviar foto: a leitura procura de novo no Drive (sem a lista guardada)
+export function esquecerListas() {
+  if (drive) drive.esquecer();
+  if (driveEscrita) driveEscrita.esquecer();
+}
 const NOMES = ["Quadro", "Porta-retratos 1", "Porta-retratos 2"];
+// admin: aluno sem foto no Drive ganha o botão de enviar (gera a prévia e grava na pasta do colégio)
+function botaoEnviar(C, it, p, close, precoTxt) {
+  if (!C.isAdmin) return;
+  p.append(
+    U.mkBtn("📤 Enviar foto", "btn-primary", () => {
+      close();
+      import("./enviar-foto.js")
+        .then(m => m.enviarFotoAluno(C, it, { verFotos: () => abrirFotosDoAluno(C, it, precoTxt) }))
+        .catch(e => C.handleErr(e));
+    })
+  );
+}
 
 // precoTxt: o texto do preço do kit (o mesmo da prévia)
 export function abrirFotosDoAluno(C, it, precoTxt) {
@@ -76,6 +111,7 @@ export function abrirFotosDoAluno(C, it, precoTxt) {
     if (r.erro) {
       info.className = "wait";
       info.textContent = r.erro;
+      botaoEnviar(C, it, p, close, precoTxt);
       p.append(U.mkBtn("Fechar", "", close));
       return;
     }

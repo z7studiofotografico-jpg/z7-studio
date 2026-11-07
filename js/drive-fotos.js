@@ -5,11 +5,14 @@
 //  · aberto: pasta "qualquer pessoa com o link" + chave do Google (quem tiver o link vê as fotos).
 // Organização: Z7 – Prévias PR / "Prévias - 2022 - C.E. YONNE MARIA SIQUEIRA" / "CEYMS 02 - DOMINGOS JOSE.jpg" (folha)
 //                                                                         / "CEYMS 02 - DOMINGOS JOSE/" (fotos separadas)
-// O app só lê (chave do Google com a "Google Drive API" ativada); nada é gravado no Drive.
+// O app lê (chave do Google com a "Google Drive API" ativada). Só o admin grava, com o "📤 Enviar foto" do aluno
+// sem foto (a conta Google dele precisa ser Editor da pasta): a prévia sai igual à do gerador de prévias.
 import { chaveColegio } from "./historico-dados.js";
 import { chave } from "./util.js";
+import { lerCodigo } from "./aluno-id.js";
 
 const API = "https://www.googleapis.com/drive/v3/files";
+const UPLOAD = "https://www.googleapis.com/upload/drive/v3/files";
 const PASTA = "application/vnd.google-apps.folder";
 
 // link (ou id) da pasta do Drive → id
@@ -104,15 +107,63 @@ export function parecidoColegio(a, b) {
 }
 // pasta que agrupa os colégios de um ano: "Prévias 2026", "PRÉVIAS", "Previas"
 export const ehPastaAno = nome => /^pr[ée]vias(\s+20\d\d)?$/i.test(String(nome || "").trim());
+// nome do arquivo/pasta do aluno no Drive, no formato do gerador de prévias: "CEPNCP 01 - MARIA SILVA"
+// (o "acharAluno" acha de volta pelo nome e pelo número do ID)
+export function nomeArquivoAluno(it) {
+  const nome = chave((it && it.nome) || "")
+    .replace(/[\\/:*?"<>|]+/g, " ")
+    .replace(/-/g, " ")
+    .replace(/\s+/g, " ")
+    .trim() || "ALUNO";
+  const c = lerCodigo((it && (it.codigo || it.codigoOrig)) || "");
+  return (c ? `${c.sigla} ${String(c.n).padStart(2, "0")} - ` : "") + nome;
+}
+// a pasta "Prévias - …" do colégio do aluno (mesmo ano), entre as pastas de colégio do Drive; null se não houver
+export function pastaDoColegio(colegios, it) {
+  // letras dobradas não contam ("YONE" e "YONNE"); uma chave pode ser o começo da outra ("… SIQUEIRA" e "… SIQUEIRA ANDRADE")
+  const simples = c => String(c || "").replace(/([A-Z])\1+/g, "$1");
+  const k = simples(chaveColegio(it.escola || ""));
+  const mesmo = c0 => {
+    const c = simples(c0);
+    return !!k && !!c && (c === k || k.startsWith(c + " ") || c.startsWith(k + " "));
+  };
+  const col = colegios.find(f => {
+    const c = lerPastaColegio(f.name);
+    return mesmo(c.chave) && (!it.ano || !c.ano || c.ano === Number(it.ano));
+  });
+  // sem nome igual: o colégio do mesmo ano com o nome mais parecido ("NUTHA" e "NUTA", "S. C." e "SOUZA COELHO")
+  return (
+    col ||
+    colegios
+      .map(f => ({ f, c: lerPastaColegio(f.name) }))
+      .filter(x => !it.ano || !x.c.ano || x.c.ano === Number(it.ano))
+      .map(x => ({ f: x.f, n: parecidoColegio(it.escola || "", x.c.chave) }))
+      .filter(x => x.n >= 0.75)
+      .sort((a, b) => b.n - a.n)
+      .reduce((acc, x, i, arr) => (i === 0 && (arr.length < 2 || arr[1].n < x.n) ? x.f : acc), null)
+  );
+}
+// o aluno tem prévia nessa lista (itens da pasta do colégio): a pasta das fotos separadas ou a folha
+export function temFoto(itens, it) {
+  return !!(acharAluno(itens.filter(f => f.mimeType === PASTA), it) || acharAluno(itens.filter(f => f.mimeType !== PASTA), it));
+}
+// corpo do envio de um arquivo ao Drive (metadados + conteúdo, "multipart/related")
+export function corpoEnvio(meta, blob, tipo, b) {
+  return new Blob([
+    `--${b}\r\nContent-Type: application/json; charset=UTF-8\r\n\r\n${JSON.stringify(meta)}\r\n--${b}\r\nContent-Type: ${tipo}\r\n\r\n`,
+    blob,
+    `\r\n--${b}--`
+  ]);
+}
 // ---------- leitura no Drive ----------
 // acesso = a chave do Google (texto) ou uma função que devolve o token da conta Google da pessoa (pasta fechada)
 export function criarDrive(acesso, buscar = fetch) {
   const cache = {};
   const comToken = typeof acesso === "function";
-  const pedir = async url =>
+  const pedir = async (url, o = {}) =>
     comToken
-      ? buscar(url, { headers: { Authorization: "Bearer " + (await acesso()) } })
-      : buscar(url + (url.includes("?") ? "&" : "?") + "key=" + acesso);
+      ? buscar(url, Object.assign({}, o, { headers: Object.assign({}, o.headers || {}, { Authorization: "Bearer " + (await acesso()) }) }))
+      : buscar(url + (url.includes("?") ? "&" : "?") + "key=" + acesso, o);
   async function listar(pai) {
     if (cache[pai]) return cache[pai];
     let out = [],
@@ -163,27 +214,7 @@ export function criarDrive(acesso, buscar = fetch) {
     // a pasta do link pode ser a geral ("Z7 – Prévias PR", com uma pasta por colégio) ou já a de um colégio
     let colegios = await pastasColegios(raiz);
     if (!colegios.length) colegios = [{ id: raiz, name: await nomeDe(raiz) }];
-    // letras dobradas não contam ("YONE" e "YONNE"); uma chave pode ser o começo da outra ("… SIQUEIRA" e "… SIQUEIRA ANDRADE")
-    const simples = c => String(c || "").replace(/([A-Z])\1+/g, "$1");
-    const k = simples(chaveColegio(it.escola || ""));
-    const mesmo = c0 => {
-      const c = simples(c0);
-      return !!k && !!c && (c === k || k.startsWith(c + " ") || c.startsWith(k + " "));
-    };
-    const col = colegios.find(f => {
-      const c = lerPastaColegio(f.name);
-      return mesmo(c.chave) && (!it.ano || !c.ano || c.ano === Number(it.ano));
-    });
-    // sem nome igual: o colégio do mesmo ano com o nome mais parecido ("NUTHA" e "NUTA", "S. C." e "SOUZA COELHO")
-    const col2 =
-      col ||
-      colegios
-        .map(f => ({ f, c: lerPastaColegio(f.name) }))
-        .filter(x => !it.ano || !x.c.ano || x.c.ano === Number(it.ano))
-        .map(x => ({ f: x.f, n: parecidoColegio(it.escola || "", x.c.chave) }))
-        .filter(x => x.n >= 0.75)
-        .sort((a, b) => b.n - a.n)
-        .reduce((acc, x, i, arr) => (i === 0 && (arr.length < 2 || arr[1].n < x.n) ? x.f : acc), null);
+    const col2 = pastaDoColegio(colegios, it);
     if (!col2) return { erro: `As prévias de ${it.escola || "este colégio"}${it.ano ? " (" + it.ano + ")" : ""} ainda não estão no Drive.` };
     const itens = await listar(col2.id);
     const pasta = acharAluno(
@@ -203,5 +234,55 @@ export function criarDrive(acesso, buscar = fetch) {
       return { erro: `Não achei as fotos de ${it.nome} nas prévias de ${col2.name.replace(/^Pr[ée]vias\s*-\s*/i, "")}.` };
     return { colegio: col2.name, folhas, fotos };
   }
-  return { listar, baixar, fotosDoAluno, pastasColegios };
+  // ---------- gravação (só admin, com a conta Google que pode editar a pasta) ----------
+  async function respostaGravacao(r) {
+    if (r.ok) return r.json();
+    const t = await r.text().catch(() => "");
+    throw new Error(
+      r.status === 401
+        ? "A entrada no Google venceu. Tente de novo."
+        : /insufficient|scope/i.test(t)
+          ? "O app ainda não tem permissão para gravar no Drive. Entre de novo e marque a opção de ver, editar e criar arquivos do Google Drive."
+          : r.status === 403 || r.status === 404
+            ? "Sua conta Google não pode gravar na pasta das prévias. Ela precisa ser Editor da pasta no Drive."
+            : "O Google Drive respondeu " + r.status + " ao gravar."
+    );
+  }
+  async function criarPasta(pai, nome) {
+    if (!comToken) throw new Error("Para gravar no Drive, ligue a conta Google em Ajustes (ID do cliente Google).");
+    const f = await respostaGravacao(
+      await pedir(`${API}?supportsAllDrives=true&fields=id,name,mimeType`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json; charset=UTF-8" },
+        body: JSON.stringify({ name: nome, mimeType: PASTA, parents: [pai] })
+      })
+    );
+    if (cache[pai]) cache[pai] = cache[pai].concat([f]);
+    return f;
+  }
+  async function enviar(pai, nome, blob, tipo = "image/jpeg") {
+    if (!comToken) throw new Error("Para gravar no Drive, ligue a conta Google em Ajustes (ID do cliente Google).");
+    const b = "z7" + Math.random().toString(36).slice(2) + Date.now().toString(36);
+    const f = await respostaGravacao(
+      await pedir(`${UPLOAD}?uploadType=multipart&supportsAllDrives=true&fields=id,name,mimeType`, {
+        method: "POST",
+        headers: { "Content-Type": "multipart/related; boundary=" + b },
+        body: corpoEnvio({ name: nome, parents: [pai] }, blob, tipo, b)
+      })
+    );
+    if (cache[pai]) cache[pai] = cache[pai].concat([f]);
+    return f;
+  }
+  // vai para a lixeira do Drive (dá para recuperar por 30 dias)
+  async function lixeira(id) {
+    await respostaGravacao(
+      await pedir(`${API}/${id}?supportsAllDrives=true&fields=id`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json; charset=UTF-8" },
+        body: JSON.stringify({ trashed: true })
+      })
+    );
+  }
+  const esquecer = id => (id ? delete cache[id] : Object.keys(cache).forEach(k => delete cache[k]));
+  return { listar, baixar, fotosDoAluno, pastasColegios, nomeDe, criarPasta, enviar, lixeira, esquecer };
 }

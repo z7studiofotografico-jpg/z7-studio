@@ -106,6 +106,9 @@ export function show() {
       U.mkBtn("🗂️ Prévias de um colégio", "btn-sm", () =>
         import("./previas-lote.js").then(m => m.abrirPreviasLote(C, { col: "formaturaAlunos" })).catch(e => C.handleErr(e))
       ),
+      U.mkBtn("🔎 Conferir fotos", "btn-sm", () =>
+        import("./conferir-fotos.js").then(m => m.abrirConferirFotos(C, "formaturaAlunos")).catch(e => C.handleErr(e))
+      ),
       U.mkBtn("Importar planilha", "btn-sm", () =>
         import("./repasse.js").then(m => (m.init(C), m.importarFormatura())).catch(e => C.handleErr(e))
       ),

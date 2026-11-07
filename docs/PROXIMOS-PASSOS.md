@@ -6,9 +6,11 @@ botão "Mudar ano" nas importações de Formatura/Paspatur, aba Vendidos (admin)
 
 ## Fazer, nesta ordem
 
-1. **Revisão completa de código** e correção do que aparecer (rodar `node --test tests/*.test.mjs` antes e depois).
-2. **Alunos sem foto**: separar em "vendido" (normal não ter prévia; o gerador pula quem comprou) e
-   "não vendido" (precisa gerar prévia), por colégio e ano.
+1. ~~Revisão de código~~ (07/11: regras do banco, textos na tela, datas e fuso conferidos; corrigido "A conferir"
+   que escondia venda entregue). Falta revisar a fundo os importadores de planilha e as telas de Formaturas e Becas.
+2. ~~Alunos sem foto~~ (07/11): "🔎 Conferir fotos" (admin) no PR, Paspatur e Formatura separa por colégio e ano em
+   com foto · já comprou · sem telefone · falta gerar; quem falta tem "📤 Enviar foto" (também em "🖼️ Fotos do aluno"),
+   que gera a prévia e grava na pasta do colégio no Drive com a conta Google do admin (precisa ser Editor da pasta).
 3. **Telas novas do PR/Paspatur** (aprovadas pela Luciana):
    - lista única; filtro Todos / Só PR / Só Paspatur; filtro por pessoa da equipe com contagem;
    - no aluno, chave PR / Paspatur com confirmação ("Deseja vender como …?"); qualquer pessoa pode trocar; o valor troca junto;

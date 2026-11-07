@@ -2936,6 +2936,112 @@ await cenario("Fotos do aluno direto do Google Drive", async () => {
   );
   ok(!erros.length, "sem erros" + (erros.length ? ": " + erros.join(" | ") : ""));
 });
+await cenario("Conferir fotos e 📤 Enviar foto (admin grava a prévia no Drive)", async () => {
+  const Y = new Date().getFullYear(),
+    yy = String(Y).slice(-2);
+  const F = "application/vnd.google-apps.folder";
+  const ESC = "C.E YONNE MARIA SIQUEIRA DE ANDRADE";
+  const arvore = {
+    RAIZ123456789: [{ id: "col1", name: `Prévias - ${Y} - C.E. YONNE MARIA SIQUEIRA`, mimeType: F }],
+    col1: [
+      { id: "folha1", name: "CEYMS 02 - DOMINGOS JOSE.jpg", mimeType: "image/jpeg" },
+      { id: "pasta1", name: "CEYMS 02 - DOMINGOS JOSE", mimeType: F }
+    ]
+  };
+  const aluno = (nome, etapa, n) => ({
+    nome,
+    nomeBusca: nome,
+    escola: ESC,
+    ano: Y,
+    codigo: `${yy}CEYMS-${String(n).padStart(2, "0")}`,
+    etapa,
+    resp: "",
+    respEmail: "",
+    contatos: etapa === "SEM TELEFONE" ? [] : [{ tipo: "Mãe", nome: "Mãe", tel: "2199999000" + n }],
+    telefones: etapa === "SEM TELEFONE" ? [] : ["2199999000" + n]
+  });
+  const d = Object.assign({}, base, {
+    "config/app": Object.assign({}, base["config/app"] || {}, {
+      drivePrevias: "https://drive.google.com/drive/folders/RAIZ123456789?usp=sharing",
+      driveCliente: "123-teste.apps.googleusercontent.com"
+    }),
+    "config/repasse_meta": { escolasAno: { [ESC + "|" + Y]: 4 } },
+    "repasse/c1": aluno("DOMINGOS JOSE", "NA FILA", 2),
+    "repasse/c2": aluno("BRUNA PAGA", "ENTREGUE", 3),
+    "repasse/c3": aluno("SAULO SEMTEL", "SEM TELEFONE", 4),
+    "repasse/c4": aluno("FABIANA FALTA", "NA FILA", 5)
+  });
+  const { pg, erros, ctx } = await abrir(ADRIANO, d);
+  // login do Google falso: devolve o token com a permissão de gravar
+  await pg.evaluate(() => {
+    window.__escopos = [];
+    window.google = {
+      accounts: {
+        oauth2: {
+          hasGrantedAllScopes: () => true,
+          initTokenClient: o => ({
+            requestAccessToken: () => (window.__escopos.push(o.scope), setTimeout(() => o.callback({ access_token: "TOK", expires_in: 3600 }), 0))
+          })
+        }
+      }
+    };
+  });
+  const pedidos = [];
+  let n = 0;
+  await ctx.route(/googleapis\.com\/(upload\/)?drive\/v3\/files/, async rt => {
+    const q = rt.request();
+    const u = decodeURIComponent(q.url());
+    const h = { "access-control-allow-origin": "*" };
+    pedidos.push({ u, metodo: q.method(), auth: (q.headers() || {}).authorization || "" });
+    if (q.method() === "POST") {
+      const corpo = q.postDataBuffer().toString("latin1");
+      const meta = JSON.parse(/uploadType=multipart/.test(u) ? corpo.split("\r\n\r\n")[1].split("\r\n")[0] : corpo);
+      const f = { id: "novo" + ++n, name: Buffer.from(meta.name, "latin1").toString("utf8"), mimeType: meta.mimeType || "image/jpeg" };
+      (arvore[meta.parents[0]] = arvore[meta.parents[0]] || []).push(f);
+      return rt.fulfill({ contentType: "application/json", headers: h, body: JSON.stringify(f) });
+    }
+    const pai = (u.match(/'([^']+)' in parents/) || [])[1];
+    return rt.fulfill({ contentType: "application/json", headers: h, body: JSON.stringify({ files: arvore[pai] || [] }) });
+  });
+  await ir(pg, "#pr");
+  await pg.getByRole("button", { name: "🔎 Conferir fotos" }).click();
+  await pg.locator(".sheet:visible").getByRole("button", { name: "Conferir", exact: true }).click();
+  await pg.waitForFunction(() => /falta/.test(document.querySelector(".sheet .conf-fotos")?.textContent || ""), null, { timeout: 8000 });
+  if (process.env.FOTOS) await pg.screenshot({ path: process.env.FOTOS + "/conferir-fotos.png" });
+  let t = await pg.locator(".sheet:visible").textContent();
+  ok(
+    /4 alunos · 1 com foto/.test(t) && /já comprou: 1/.test(t) && /sem telefone: 1/.test(t) && /não comprou: 1 → falta gerar/.test(t),
+    "Conferir fotos separa: com foto, já comprou, sem telefone e falta gerar"
+  );
+  ok(/Fabiana Falta/i.test(t) && !/Bruna Paga/i.test(await pg.locator(".conf-aluno").allTextContents().then(x => x.join())), "só quem falta gerar tem a linha com o botão");
+  // envia a foto de quem falta
+  await pg.locator(".conf-aluno", { hasText: /Fabiana/i }).getByRole("button", { name: "📤 Enviar foto" }).click();
+  const [fc] = await Promise.all([pg.waitForEvent("filechooser"), pg.getByRole("button", { name: "Escolher as fotos" }).click()]);
+  await fc.setFiles([AQUI + "../../icons/icon-512.png", AQUI + "../../icons/icon-192.png"]);
+  await pg.getByRole("button", { name: "📤 Gravar no Drive" }).waitFor({ timeout: 8000 });
+  await pg.getByRole("button", { name: "📤 Gravar no Drive" }).click();
+  await pg.waitForFunction(() => /gravada em/.test(document.body.textContent), null, { timeout: 15000 });
+  if (process.env.FOTOS) await pg.screenshot({ path: process.env.FOTOS + "/enviar-foto.png" });
+  const sub = (arvore.col1 || []).find(f => f.name === "CEYMS 05 - FABIANA FALTA" && f.mimeType === F);
+  ok(
+    !!sub &&
+      (arvore[sub.id] || []).map(f => f.name).join() === "CEYMS 05 - FABIANA FALTA - foto 01.jpg,CEYMS 05 - FABIANA FALTA - foto 02.jpg" &&
+      arvore.col1.some(f => f.name === "CEYMS 05 - FABIANA FALTA.jpg"),
+    "grava no Drive a pasta das fotos numeradas e a folha, com o nome no formato do gerador"
+  );
+  ok(
+    pedidos.filter(x => x.metodo === "POST").every(x => x.auth === "Bearer TOK") &&
+      (await pg.evaluate(() => window.__escopos)).includes("https://www.googleapis.com/auth/drive"),
+    "grava com a conta Google do admin (permissão de gravar pedida na hora)"
+  );
+  await pg.locator(".sheet:visible").last().getByRole("button", { name: "Fechar" }).click();
+  ok(/✅ Fabiana Falta/i.test(await pg.locator(".conf-aluno").first().textContent()), "na lista, o aluno fica marcado como enviado");
+  // conferir de novo: agora ela tem foto
+  await pg.locator(".sheet:visible").getByRole("button", { name: "Conferir", exact: true }).click();
+  await pg.waitForFunction(() => /2 com foto/.test(document.querySelector(".sheet .notes")?.textContent || ""), null, { timeout: 8000 });
+  ok(/não comprou: 0 ✓/.test(await pg.locator(".sheet:visible").textContent()), "depois do envio, ninguém falta gerar");
+  ok(!erros.length, "sem erros" + (erros.length ? ": " + erros.join(" | ") : ""));
+});
 await cenario("Aluguel de becas · alunos dos colégios (status, estoque e produtos)", async () => {
   const Y = new Date().getFullYear();
   const d = Object.assign({}, base, {
