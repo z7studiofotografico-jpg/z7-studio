@@ -6,6 +6,7 @@
 import { el, sheet, sel, carregarLib } from "./ui.js";
 import * as U from "./util.js";
 import { confirmar } from "./confirmar.js";
+import { lerCodigo, fmtCodigo, codigoBusca } from "./aluno-id.js";
 
 export const chaveCab = h =>
   String(h || "")
@@ -304,6 +305,65 @@ export async function desfazer(C, id) {
   U.toast("Importação desfeita");
   return true;
 }
+// Mudar o ano de uma importação (Formatura/Paspatur; só o admin): o ID do documento começa com 9999 - ano,
+// então cada aluno é regravado com o ID do ano novo e o antigo é apagado. O código do aluno (26CJPI-100) troca o ano junto.
+export const idComAno = (id, ano) => String(9999 - Number(ano)).padStart(4, "0") + String(id).slice(4);
+export function docComAno(v, ano, agora = new Date()) {
+  const x = lerCodigo(v.codigo);
+  const codigo = x ? fmtCodigo(ano, x.sigla, x.n) : v.codigo || "";
+  const out = Object.assign({}, v, { ano: Number(ano), codigo, codigoBusca: codigo ? codigoBusca(codigo) : "", atualizadoEm: agora.toISOString() });
+  if (v.seg) out.seg = Number(ano) >= agora.getFullYear() ? "lf" : "rep";
+  return out;
+}
+export async function mudarAno(C, id) {
+  const { FS, db } = C;
+  const s = await FS.getDoc(FS.doc(db, "importacoes", id));
+  if (!s.exists()) return false;
+  const x = s.data();
+  if (x.col === "repasse") return U.toast("No PR use Desfazer e importe de novo"), false;
+  const novo = Number(String(prompt(`Novo ano para os ${x.n} registros de “${x.arquivo || "a planilha"}”:`) || "").trim());
+  if (!(novo >= 2000 && novo <= 2100)) return false;
+  if (!(await confirmar("Mudar o ano?", `Os ${x.n} registros passam para ${novo}.`))) return false;
+  const META = { paspatur: "paspatur_meta", formaturaAlunos: "formatura_meta" }[x.col];
+  const delta = { anos: {}, escolasAno: {} };
+  const soma = (o, k, n) => k && (o[k] = (o[k] || 0) + n);
+  const novos = [];
+  for (let i = 0; i < x.ids.length; i += 200) {
+    const b = FS.writeBatch(db);
+    for (const id0 of x.ids.slice(i, i + 200)) {
+      const d = await FS.getDoc(FS.doc(db, x.col, id0));
+      if (!d.exists()) continue;
+      const v = d.data();
+      const id1 = idComAno(id0, novo);
+      novos.push(id1);
+      if (id1 === id0) continue;
+      b.set(FS.doc(db, x.col, id1), docComAno(v, novo));
+      b.delete(FS.doc(db, x.col, id0));
+      soma(delta.anos, v.ano ? String(v.ano) : "", -1);
+      soma(delta.anos, String(novo), 1);
+      if (v.escola) {
+        soma(delta.escolasAno, v.ano ? v.escola + "|" + v.ano : "", -1);
+        soma(delta.escolasAno, v.escola + "|" + novo, 1);
+      }
+    }
+    await b.commit();
+  }
+  if (META) {
+    const m = (await FS.getDoc(FS.doc(db, "config", META))).data() || {};
+    const aplica = (o, dm) => {
+      const r = Object.assign({}, o || {});
+      Object.entries(dm).forEach(([k, n]) => {
+        r[k] = (Number(r[k]) || 0) + n;
+        if (r[k] <= 0) delete r[k];
+      });
+      return r;
+    };
+    await FS.setDoc(FS.doc(db, "config", META), Object.assign({}, m, { anos: aplica(m.anos, delta.anos), escolasAno: aplica(m.escolasAno, delta.escolasAno) }));
+  }
+  await FS.updateDoc(FS.doc(db, "importacoes", id), { ids: novos, n: novos.length, anoMudadoPara: novo, anoMudadoEm: new Date().toISOString() });
+  U.toast(`Ano mudado para ${novo}`);
+  return true;
+}
 // As últimas importações de um módulo, com o botão de desfazer
 export async function ultimasImportacoes(C, modulo, box) {
   const { FS, db } = C;
@@ -322,6 +382,8 @@ export async function ultimasImportacoes(C, modulo, box) {
     );
     if (x.status !== "desfeita")
       r.append(U.mkBtn("Desfazer", "btn-sm btn-danger", () => desfazer(C, x.id).then(() => ultimasImportacoes(C, modulo, box))));
+    if (x.status !== "desfeita" && x.col && x.col !== "repasse")
+      r.append(U.mkBtn("Mudar ano", "btn-sm", () => mudarAno(C, x.id).then(() => ultimasImportacoes(C, modulo, box))));
     box.append(r);
   });
 }

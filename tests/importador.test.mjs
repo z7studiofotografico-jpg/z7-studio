@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { mapearColunas, acharCabecalho, statusDaPlanilha } from "../js/importador.js";
+import { mapearColunas, acharCabecalho, statusDaPlanilha, idComAno, docComAno } from "../js/importador.js";
 import { CAMPOS_ALUGUEL, paraDocAluguel, lerTamanho } from "../js/aluguel-importar.js";
 
 test("importação: colunas em qualquer ordem, por nome e sinônimo; mapeamento lembrado vale primeiro", () => {
@@ -37,4 +37,14 @@ test("aluguel: linha da planilha vira aluno (P1 = P menos longa; faixa e capelo 
     "instituição (escolha acima)",
     "tamanho “ZZ” não reconhecido"
   ]);
+});
+
+test("mudar ano: ID e código do aluno trocam de ano; Linha de Frente vira Repasse no ano passado", () => {
+  assert.equal(idComAno("7973_c-e-joao-paulo-ii_100_dioneti", 2025), "7974_c-e-joao-paulo-ii_100_dioneti");
+  const d = docComAno({ ano: 2026, codigo: "26CJPI-100", seg: "lf", nome: "Ana" }, 2025, new Date("2026-11-07T12:00:00Z"));
+  assert.equal(d.ano, 2025);
+  assert.equal(d.codigo, "25CJPI-100");
+  assert.equal(d.codigoBusca, "25CJPI100");
+  assert.equal(d.seg, "rep");
+  assert.equal(d.nome, "Ana");
 });
