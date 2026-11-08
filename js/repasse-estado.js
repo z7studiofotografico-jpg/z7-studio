@@ -19,58 +19,72 @@ export const textoVendasMes = () =>
     : "Este mês: contando…";
 // Ligações com a tela principal (repasse.js preenche): quem grava avisa a lista para redesenhar
 export const tela = { renderList() {}, openTab() {} };
-// PR tem duas abas (Etapa 4): "pr" (coleção repasse) e "paspatur" (coleção paspatur): o mesmo fluxo, cada uma com a
-// sua lista, contagem e tabela de preços (Ajustes → paspatur = { kitPreco, kitPromo, … }; o que estiver em branco
-// usa o preço do PR). O C daqui devolve os preços da aba aberta.
+// Lista única (08/11/2026): PR e Paspatur ficam na mesma coleção (repasse). Cada aluno diz como está sendo
+// vendido no campo vendaComo ("paspatur"; vazio = PR) e o preço, as mensagens e a comissão seguem esse campo
+// (Ajustes → paspatur = { kitPreco, kitPromo, … }: o que estiver em branco fica em branco, nunca usa o do PR).
+// O filtro "Todos / Só PR / Só Paspatur" (filtroVenda) só escolhe o que aparece na lista.
 // O mesmo motor também trabalha a Linha de Frente e o Repasse da FORMATURA (Etapa 5): tipo "formatura", coleção
 // formaturaAlunos (separada do PR). Lá a frente não vem do ano: vem do campo "seg" ("lf" até o Adriano virar o
 // colégio para Repasse, à mão).
 export let tipoPR = "pr";
 export const ehFormatura = () => tipoPR === "formatura";
-export const colNome = () => (tipoPR === "paspatur" ? "paspatur" : tipoPR === "formatura" ? "formaturaAlunos" : "repasse");
-export const metaNome = () => (tipoPR === "paspatur" ? "paspatur_meta" : tipoPR === "formatura" ? "formatura_meta" : "repasse_meta");
+export const colNome = () => (tipoPR === "formatura" ? "formaturaAlunos" : "repasse");
+export const metaNome = () => (tipoPR === "formatura" ? "formatura_meta" : "repasse_meta");
 let ctx0 = null;
 export function mudarTipoPR(v) {
-  tipoPR = v === "paspatur" || v === "formatura" ? v : "pr";
+  tipoPR = v === "formatura" ? v : "pr";
   col = FS.collection(db, colNome());
-  if (tipoPR !== "formatura")
-    try {
-      localStorage.setItem("z7tipoPR", tipoPR);
-    } catch (_) {}
 }
+// filtro da lista do PR: "todos" | "pr" | "paspatur" (fica guardado no aparelho)
+export let filtroVenda = "todos";
+export function mudarFiltroVenda(v) {
+  filtroVenda = v === "pr" || v === "paspatur" ? v : "todos";
+  try {
+    localStorage.setItem("z7filtroVenda", filtroVenda);
+  } catch (_) {}
+}
+// filtro por pessoa da equipe (só o admin): "" = todos; senão o e-mail do responsável ("-" = sem responsável)
+export let filtroPessoa = "";
+export const mudarFiltroPessoa = v => (filtroPessoa = v || "");
+// como o aluno está sendo vendido: "paspatur" ou "pr" (Formatura: "formatura")
+export const vendaDe = it => (ehFormatura() ? "formatura" : it && it.vendaComo === "paspatur" ? "paspatur" : "pr");
+export const NOME_VENDA = { pr: "PR", paspatur: "Paspatur", formatura: "Formatura" };
+export const naVenda = it => filtroVenda === "todos" || ehFormatura() || vendaDe(it) === filtroVenda;
+// tabela de preços de um tipo de venda
+function precosDoTipo(t) {
+  const P = (ctx0 && ctx0.P) || {};
+  if (t === "paspatur") return Object.assign({}, P, SEM_PRECO, limpo(P.paspatur));
+  if (t === "formatura") return Object.assign({}, P, SEM_PRECO, limpo(P.formatura));
+  return P;
+}
+// preços do aluno (segue o vendaComo); sem aluno: os da lista aberta (Só Paspatur → Paspatur; senão PR)
+export const precos = it => precosDoTipo(it ? vendaDe(it) : ehFormatura() ? "formatura" : filtroVenda === "paspatur" ? "paspatur" : "pr");
 export function iniciar(ctx) {
   ctx0 = ctx;
-  C = Object.create(ctx, {
-    P: {
-      get: () =>
-        tipoPR === "paspatur"
-          ? Object.assign({}, ctx0.P, SEM_PRECO, limpo(ctx0.P.paspatur))
-          : tipoPR === "formatura"
-            ? Object.assign({}, ctx0.P, SEM_PRECO, limpo(ctx0.P.formatura))
-            : ctx0.P
-    }
-  });
+  // C.P: os preços da lista aberta (PR ou Formatura). Para um aluno, use precos(it).
+  C = Object.create(ctx, { P: { get: () => precosDoTipo(ehFormatura() ? "formatura" : "pr") } });
   FS = ctx.FS;
   db = ctx.db;
+  tipoPR = "pr";
   try {
-    tipoPR = localStorage.getItem("z7tipoPR") === "paspatur" ? "paspatur" : "pr";
+    const f = localStorage.getItem("z7filtroVenda");
+    filtroVenda = f === "pr" || f === "paspatur" ? f : "todos";
   } catch (_) {}
   col = FS.collection(db, colNome());
   try {
     seg = localStorage.getItem("z7seg") || "lf";
   } catch (_) {}
 }
-// preços do Paspatur: só os preenchidos substituem os do PR
 // Paspatur e Formatura têm preços próprios: o que estiver em branco fica em branco (nunca usa o preço do PR)
 export const CAMPOS_PRECO = ["lfPix", "lfCartao", "kitPreco", "kitPromo", "kitCartao", "kitFinal"];
 const SEM_PRECO = Object.fromEntries(CAMPOS_PRECO.map(k => [k, 0]));
 // aviso na tela: preço da aba ainda não cadastrado em Ajustes
 export function precoFaltando() {
-  if (tipoPR === "pr") return "";
-  const P = C.P;
+  if (!ehFormatura() && filtroVenda === "pr") return "";
+  const P = precosDoTipo(ehFormatura() ? "formatura" : "paspatur");
   const lf = seg === "lf";
   const falta = lf ? !P.lfPix : !(P.kitPromo || P.kitPreco);
-  const nome = tipoPR === "paspatur" ? "do Paspatur" : "da Formatura";
+  const nome = ehFormatura() ? "da Formatura" : "do Paspatur";
   return falta
     ? `⚠️ Preço ${nome} (${lf ? "Linha de Frente" : "Repasse"}) em branco: o Adriano cadastra em Ajustes. As mensagens vão sair com [valor do kit].`
     : "";
@@ -120,14 +134,14 @@ export function eu() {
   return f ? (/a$/i.test(f) ? "a " : "o ") + f : "a equipe";
 }
 export function precoTxt(it) {
-  const P = C.P;
+  const P = precos(it);
   if (it ? segDe(it) === "lf" : seg === "lf") return P.lfPix ? U.money(P.lfPix) : P.kitPreco ? U.money(P.kitPreco) : "[valor do kit]";
   if (P.kitPromo) return U.money(P.kitPromo);
   if (P.kitPreco) return U.money(P.kitPreco);
   return "[valor do kit]";
 }
 export function ofertaTxt(it) {
-  const P = C.P;
+  const P = precos(it);
   if (segDe(it) === "lf") {
     const pix = P.lfPix || P.kitPreco;
     if (!pix) return "Tudo por [valor do kit]";
@@ -147,7 +161,8 @@ export function ofertaTxt(it) {
 // Prazo da última oferta: a próxima sexta que esteja a pelo menos 3 dias de hoje.
 // Parcelas no cartão: a Linha de Frente tem o seu próprio número.
 export function parcDe(it) {
-  return it && segDe(it) === "lf" && C.P.lfParcelas ? C.P.lfParcelas : C.P.parcelas;
+  const P = precos(it);
+  return it && segDe(it) === "lf" && P.lfParcelas ? P.lfParcelas : P.parcelas;
 }
 export function sextaTxt() {
   const d = new Date();

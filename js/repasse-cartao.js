@@ -20,7 +20,8 @@ import {
   status,
   lockInfo,
   contatoPadrao,
-  tipoPR,
+  vendaDe,
+  precos,
   precoTxt,
   parcDe,
   assumir,
@@ -223,13 +224,14 @@ export function desenharProximo(box, it, escolhido, blocked, li) {
     row.append(a3);
   }
   // Depois que a última oferta foi enviada (Repasse), o link do cartão passa a ser o da última oferta.
-  const ultimaOferta = segDe(it) === "rep" && C.P.kitFinal && (it.tentInteresse || 0) >= 2;
-  const ultima = ultimaOferta && C.P.linkCartaoFinal;
+  const P = precos(it);
+  const ultimaOferta = segDe(it) === "rep" && P.kitFinal && (it.tentInteresse || 0) >= 2;
+  const ultima = ultimaOferta && P.linkCartaoFinal;
   // Pix Copia e Cola com o valor certo para o momento da conversa
-  const pixCod = segDe(it) === "lf" ? C.P.pixLF : ultimaOferta ? C.P.pixFinal : C.P.pixRep;
-  const pixVal = segDe(it) === "lf" ? C.P.lfPix || C.P.kitPreco : ultimaOferta ? C.P.kitFinal : C.P.kitPromo || C.P.kitPreco;
-  const link = ultima ? C.P.linkCartaoFinal : segDe(it) === "lf" ? C.P.linkCartaoLF || C.P.linkCartao : C.P.linkCartao;
-  const valCartao = ultima ? C.P.kitFinal : segDe(it) === "lf" ? C.P.lfCartao : C.P.kitCartao;
+  const pixCod = segDe(it) === "lf" ? P.pixLF : ultimaOferta ? P.pixFinal : P.pixRep;
+  const pixVal = segDe(it) === "lf" ? P.lfPix || P.kitPreco : ultimaOferta ? P.kitFinal : P.kitPromo || P.kitPreco;
+  const link = ultima ? P.linkCartaoFinal : segDe(it) === "lf" ? P.linkCartaoLF || P.linkCartao : P.linkCartao;
+  const valCartao = ultima ? P.kitFinal : segDe(it) === "lf" ? P.lfCartao : P.kitCartao;
   if (it.etapa === "INTERESSADO" && link && d) {
     const pc = parcDe(it);
     const lm = `Para pagar no cartão${valCartao ? ` (${U.money(valCartao)}` + (pc ? `, em até ${pc}x sem juros)` : ")") : pc ? ` (em até ${pc}x sem juros)` : ""}, é só usar este link seguro da InfinitePay:\n${link}\nDepois me manda o comprovante por aqui 😊${pixCod ? " Se preferir Pix, é só me avisar que te mando o código." : C.P.pix ? ` No Pix${pixVal ? ` (${U.money(pixVal)})` : ""}, a chave é ${C.P.pix}.` : ""}`;
@@ -340,7 +342,7 @@ function acoesDoCartao(it, li, e) {
               aluno: it.nome,
               colegio: it.escola,
               precoModulo: precoTxt(it),
-              card: tipoPR === "paspatur" ? "paspatur" : ehFormatura() ? "formatura" : "pr",
+              card: ehFormatura() ? "formatura" : vendaDe(it),
               contato: (contatoPadrao(it) || {}).nome
             })
           )
@@ -449,7 +451,7 @@ function acoesDoCartao(it, li, e) {
           if (!motivo) return;
           // achou caro: antes de deixar cair, oferecer a opção mais em conta
           // (PR → Paspatur; Formatura → PR ou as fotos digitais)
-          const ofertas = colNome() === "repasse" ? ["o Paspatur"] : ehFormatura() ? ["o PR", "as fotos digitais"] : [];
+          const ofertas = ehFormatura() ? ["o PR", "as fotos digitais"] : vendaDe(it) === "pr" ? ["o Paspatur"] : [];
           if (ofertas.length && motivoPreco(motivo)) {
             const txt = ofertas.join(" ou ");
             const r = await escolher(
@@ -461,6 +463,12 @@ function acoesDoCartao(it, li, e) {
               ]
             );
             if (!r) return;
+            // PR: "Vou oferecer agora" já passa o aluno para Paspatur (as mensagens saem com o valor do Paspatur)
+            if (r === "o Paspatur") {
+              const { trocarVenda } = await import("./venda-como.js");
+              if (await trocarVenda(it, "paspatur")) return;
+              return U.toast("Ofereça o Paspatur e volte aqui se não quiser");
+            }
             if (r !== "nao") return U.toast(`Ofereça ${r} e volte aqui se não quiser`);
             motivo += ` (ofereceu ${txt} e não quis)`;
           }

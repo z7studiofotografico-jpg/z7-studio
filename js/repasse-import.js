@@ -1,5 +1,5 @@
 // PR: importar a planilha de alunos (só admin). Os dados puros ficam em repasse-dados.js.
-import { colNome, metaNome, ehFormatura } from "./repasse-estado.js";
+import { colNome, metaNome, ehFormatura, filtroVenda } from "./repasse-estado.js";
 import { el, carregarLib } from "./ui.js";
 import { MAPA, hkey, linhaParaDoc, docId, faltando, norm, semTelefone } from "./repasse-dados.js";
 import * as U from "./util.js";
@@ -86,6 +86,20 @@ export function openImport(ctx, ui, aoTerminar) {
     const fAno = field("Ano das fotos (de todos os alunos destes arquivos)", anoIn);
     fAno.hidden = true;
     p.append(fAno);
+    // lista única do PR: os alunos novos destes arquivos entram como PR ou como Paspatur (a chave do aluno troca depois)
+    const como = el("select");
+    [
+      ["pr", "🖼️ PR"],
+      ["paspatur", "🎞️ Paspatur"]
+    ].forEach(([v, t]) => {
+      const o = el("option", null, t);
+      o.value = v;
+      como.append(o);
+    });
+    como.value = filtroVenda === "paspatur" ? "paspatur" : "pr";
+    const fComo = field("Vender estes alunos como", como);
+    fComo.hidden = ehFormatura();
+    p.append(fComo);
     const out = el("div", "imp");
     p.append(out);
     // importações anteriores deste módulo, com "Desfazer" (só os alunos novos daquela planilha são apagados)
@@ -114,6 +128,8 @@ export function openImport(ctx, ui, aoTerminar) {
       porArquivo = [];
       const fs = [...inp.files];
       if (!fs.length) return;
+      // planilha com PASPATUR no nome: os alunos entram como Paspatur (dá para mudar antes de importar)
+      if (!ehFormatura() && fs.some(f => /PASPATUR/.test(norm(f.name)))) como.value = "paspatur";
       out.append(el("p", "hint", "Lendo as planilhas…"));
       try {
         X = await loadXLSX();
@@ -404,6 +420,7 @@ export function openImport(ctx, ui, aoTerminar) {
         for (let i = 0; i < ops.length; i += 80) {
           const b = FS.writeBatch(db);
           ops.slice(i, i + 80).forEach(([id, data, merge]) => {
+            if (!merge && !ehFormatura() && como.value === "paspatur") data.vendaComo = "paspatur";
             if (merge) b.set(FS.doc(db, colNome(), id), data, { merge: true });
             else b.set(FS.doc(db, colNome(), id), data);
             if (colNome() === "repasse") indexarFones(FS, db, b, id, data);

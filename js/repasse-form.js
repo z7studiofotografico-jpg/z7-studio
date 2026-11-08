@@ -4,7 +4,7 @@ import * as U from "./util.js";
 import { norm, faltando, docId, semTelefone } from "./repasse-dados.js";
 import { codigoBusca, comAno, avisoTel } from "./aluno-id.js";
 import { procurarRepetido, pedirAluno, indexarFones, gerarCodigoPR } from "./pedidos.js";
-import { C, FS, db, tab, seg, meta, ANO, segDe, save, tela, colNome, ehFormatura } from "./repasse-estado.js";
+import { C, FS, db, tab, seg, meta, ANO, segDe, save, tela, colNome, ehFormatura, filtroVenda } from "./repasse-estado.js";
 import { sheet, field, actions } from "./repasse-janelas.js";
 import { refreshStats, refreshLote } from "./repasse-lote.js";
 // ID do aluno novo (26CEPNCP-01): ver gerarCodigoPR em pedidos.js
@@ -33,6 +33,21 @@ export function openDados(it) {
     codigo.maxLength = 30;
     codigo.autocapitalize = "characters";
     p.append(field("Nome do aluno", nome), r1, field("ID do aluno", codigo));
+    // aluno novo no PR: entra como PR ou Paspatur (lista única; a chave na janela do aluno troca depois)
+    let como = null;
+    if (novo && !ehFormatura()) {
+      como = el("select");
+      [
+        ["pr", "🖼️ PR"],
+        ["paspatur", "🎞️ Paspatur"]
+      ].forEach(([v, t]) => {
+        const o = el("option", null, t);
+        o.value = v;
+        como.append(o);
+      });
+      como.value = filtroVenda === "paspatur" ? "paspatur" : "pr";
+      p.append(field("Vender como", como));
+    }
     // colégios que já existem no PR (para escrever igual)
     const dlE = el("datalist");
     dlE.id = "rEscolas" + Date.now();
@@ -148,6 +163,7 @@ export function openDados(it) {
         ...(meu ? { separadoEm: hoje, separadoSeg: ehFormatura() ? seg : d.ano >= ANO() ? "lf" : "rep" } : {}),
         // Formatura: a frente vem da aba aberta (Linha de Frente ou Repasse), não do ano
         ...(ehFormatura() ? { seg } : {}),
+        ...(como && como.value === "paspatur" ? { vendaComo: "paspatur" } : {}),
         manual: true,
         incluidoPor: C.email || "",
         importadoEm: agora,
@@ -173,7 +189,7 @@ export function openDados(it) {
         U.toast(aviso);
       };
       try {
-        // (Paspatur tem a sua lista: a procura de repetido é só no PR)
+        // (PR e Paspatur estão na mesma lista: a procura de repetido vale para os dois; Formatura tem a sua)
         const achado = colNome() === "repasse" ? await procurarRepetido(C, docNovo) : null;
         if (achado) return await repetido(achado);
         if (!docNovo.codigo) docNovo.codigo = await gerarCodigo(docNovo).catch(e => (console.warn("[Z7] ID do aluno", e), ""));

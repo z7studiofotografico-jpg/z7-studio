@@ -1,4 +1,4 @@
-// Ajustes → "🧹 Limpar para reimportar" (só o Adriano): apaga os alunos de PR, Paspatur ou Formatura (por ano ou
+// Ajustes → "🧹 Limpar para reimportar" (só o Adriano): apaga os alunos do PR (com os do Paspatur) ou da Formatura (por ano ou
 // tudo) para mandar as planilhas certas de novo. Pede a cópia de segurança antes, confirma com Sim/Não e respeita
 // o limite grátis do Firebase (20 mil gravações por dia): se passar, para no meio e avisa para continuar amanhã.
 // O PR também tira os telefones desses alunos do índice "fones"; a lista de escolas (meta) é ajustada junto.
@@ -7,8 +7,8 @@ import * as U from "./util.js";
 import { confirmar } from "./confirmar.js";
 
 export const LISTAS = [
-  ["repasse", "PR", "repasse_meta"],
-  ["paspatur", "PR · Paspatur", "paspatur_meta"],
+  // lista única (08/11/2026): o Paspatur está dentro do PR
+  ["repasse", "PR (com os alunos do Paspatur)", "repasse_meta"],
   ["formaturaAlunos", "Formatura (Linha de Frente e Repasse)", "formatura_meta"]
 ];
 export const LIMITE_POR_VEZ = 12000;

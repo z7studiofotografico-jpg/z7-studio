@@ -41,6 +41,12 @@ import {
   precoTxt,
   tipoPR,
   mudarTipoPR,
+  filtroVenda,
+  mudarFiltroVenda,
+  filtroPessoa,
+  mudarFiltroPessoa,
+  naVenda,
+  vendaDe,
   ehFormatura,
   baseSeg,
   colNome,
@@ -52,7 +58,15 @@ import {
 const soMinhaCaidos = () => (C.isAdmin ? [] : [FS.where("respEmail", "==", C.email || "")]);
 import { card } from "./repasse-cartao.js";
 // lista compacta: uma linha por aluno; tocar abre o cartão completo embaixo
-const linha = it => linhaCompacta(it, { card, status, situacao: situacaoTxt, abrir: abrirJanela });
+const linha = it =>
+  linhaCompacta(it, {
+    card,
+    status,
+    situacao: situacaoTxt,
+    abrir: abrirJanela,
+    // lista única: o selo mostra quem está sendo vendido como Paspatur
+    selo: x => (!ehFormatura() && vendaDe(x) === "paspatur" ? "🎞️ Paspatur" : "")
+  });
 import { sheet, field, actions } from "./repasse-janelas.js";
 import { openDados } from "./repasse-form.js";
 import { refreshStats, refreshLote, separarLote, loadMeta, pintarEscolas, escolaEscolhida, gruposPR } from "./repasse-lote.js";
@@ -69,12 +83,6 @@ export function init(ctx) {
 }
 
 export function show() {
-  // card PR: o tipo volta para PR ou Paspatur (o último usado)
-  let t = "pr";
-  try {
-    t = localStorage.getItem("z7tipoPR") === "paspatur" ? "paspatur" : "pr";
-  } catch (_) {}
-  if (tipoPR !== t) mudarTipoPR(t);
   if (tipoPR === "formatura") mudarTipoPR("pr");
   mostrar($("viewRepasse"));
 }
@@ -92,8 +100,6 @@ function mostrar(container) {
   $("rTipos").hidden = form;
   $("rSegs").hidden = form;
   $("rGuide").hidden = form;
-  const h = raiz.querySelector(".vhead h2");
-  if (h) h.textContent = tipoPR === "paspatur" ? "PR · Paspatur" : "PR";
   if (!form) {
     let s0 = seg;
     try {
@@ -147,7 +153,7 @@ function mount() {
   v0.append(raiz);
   const v = raiz;
   const head = el("div", "vhead");
-  head.append(el("h2", null, tipoPR === "paspatur" ? "PR · Paspatur" : "PR"));
+  head.append(el("h2", null, "PR"));
   const hb = el("div", "quick");
   hb.append(U.mkBtn("+ Aluno", "btn-primary", () => openDados(null)));
   hb.append(U.mkBtn("🖼️ Prévia e fotos", "", () => openMockup({ preco: precoTxt(), toast: U.toast })));
@@ -170,7 +176,7 @@ function mount() {
   head.append(hb);
   v.append(head);
 
-  // abas PR e Paspatur (Etapa 4): o mesmo fluxo, listas e preços separados
+  // lista única (08/11): filtro Todos / Só PR / Só Paspatur e, para o admin, por pessoa da equipe
   const tipos = el("div", "chips tipos-pr");
   tipos.id = "rTipos";
   v.append(tipos);
@@ -327,25 +333,51 @@ function renderTipos() {
   const c = $("rTipos");
   if (!c) return;
   c.innerHTML = "";
+  // as contagens usam a mesma regra da lista (cada filtro conta respeitando o outro)
+  const daTela = daAba();
+  const n = k => daTela.filter(it => daPessoa(it) && (k === "todos" || vendaDe(it) === k)).length;
   [
-    ["pr", "🖼️ PR"],
-    ["paspatur", "🎞️ Paspatur"]
+    ["todos", "Todos"],
+    ["pr", "🖼️ Só PR"],
+    ["paspatur", "🎞️ Só Paspatur"]
   ].forEach(([k, t]) => {
-    const b = el("button", "chip", t);
+    const b = el("button", "chip", items.length ? `${t} (${n(k)})` : t);
     b.type = "button";
-    b.setAttribute("aria-pressed", String(tipoPR === k));
+    b.setAttribute("aria-pressed", String(filtroVenda === k));
     b.onclick = () => {
-      if (tipoPR === k) return;
-      mudarTipoPR(k);
-      const h = document.querySelector("#viewRepasse .vhead h2");
-      if (h) h.textContent = k === "paspatur" ? "PR · Paspatur" : "PR";
-      renderTipos();
-      loadMeta().then(refreshStats);
-      refreshLote();
-      openTab(tab);
+      if (filtroVenda === k) return;
+      mudarFiltroVenda(k);
+      avisoPreco();
+      renderList();
     };
     c.append(b);
   });
+  // admin: só os alunos de uma pessoa da equipe (com quantos cada uma tem nesta aba)
+  if (C.isAdmin) {
+    const conta = new Map();
+    daTela.filter(naVenda).forEach(it => {
+      const k = it.respEmail || "-";
+      const x = conta.get(k) || { n: 0, nome: it.respEmail ? U.first(title(it.resp || it.respEmail)) : "Sem responsável" };
+      x.n++;
+      conta.set(k, x);
+    });
+    if (filtroPessoa && !conta.has(filtroPessoa)) conta.set(filtroPessoa, { n: 0, nome: U.first(title(filtroPessoa)) });
+    const sel = el("select", "search filtro-pessoa");
+    sel.setAttribute("aria-label", "Filtrar por pessoa da equipe");
+    const op = (v, t) => {
+      const o = el("option", null, t);
+      o.value = v;
+      sel.append(o);
+    };
+    op("", "👥 Toda a equipe" + (items.length ? ` (${daTela.filter(naVenda).length})` : ""));
+    [...conta.entries()].sort((a, b) => b[1].n - a[1].n).forEach(([k, x]) => op(k, `${x.nome} (${x.n})`));
+    sel.value = filtroPessoa;
+    sel.onchange = () => {
+      mudarFiltroPessoa(sel.value);
+      renderList();
+    };
+    c.append(sel);
+  }
 }
 function renderSegs() {
   renderTipos();
@@ -571,8 +603,8 @@ async function buscar() {
   }
 }
 
-// Os contatos que a aba mostra (a lista e o relatório usam a mesma regra)
-function naTela() {
+// Os contatos que a aba mostra (a lista e o relatório usam a mesma regra), antes dos filtros PR/Paspatur e pessoa
+function daAba() {
   // pedido de exclusão: a equipe não vê mais; o admin vê com a pendência na frente
   let arr = (tab === "buscar" ? items.slice() : items.filter(noSeg)).filter(it => C.isAdmin || !(it.excluido && it.excluido.em));
   // quem já comprou (entregue) fica só na aba Vendidos; em "A conferir" continua, senão a venda entregue
@@ -583,6 +615,11 @@ function naTela() {
     arr = arr.filter(it => ABERTAS.includes(it.etapa) && it.followup && it.followup <= t0);
   }
   return arr;
+}
+// lista única: Todos / Só PR / Só Paspatur; admin: só os de uma pessoa da equipe
+const daPessoa = it => !C.isAdmin || !filtroPessoa || ehFormatura() || (it.respEmail || "-") === filtroPessoa;
+function naTela() {
+  return daAba().filter(it => naVenda(it) && daPessoa(it));
 }
 // total geral de vendidos (pagos + entregues) da lista aberta: contagem no servidor, sem baixar os alunos
 async function totalVendidos() {
@@ -605,6 +642,7 @@ function renderList(loading, emptyMsg) {
     list.append(e);
     return;
   }
+  if (!ehFormatura()) renderTipos(); // as contagens dos filtros seguem a lista carregada
   const arr = naTela();
   if (tab === "vendidos") {
     // total do mês (quantidade e valor pagos no mês, entregues ou não) no topo de Vendidos / Minhas vendas;

@@ -1,7 +1,7 @@
 // PR: janelinhas do contato: registrar a venda, entrega (endereço e data) e notas
 import { el, title, sheet as abrirSheet, field, botoes } from "./ui.js";
 import * as U from "./util.js";
-import { C, segDe, assumir, save } from "./repasse-estado.js";
+import { C, segDe, assumir, save, precos } from "./repasse-estado.js";
 import { lerCep, mostrarCep, buscarCep, faltaEndereco } from "./cep.js";
 
 // Janela do PR: a do app, já com o cursor no primeiro campo
@@ -18,7 +18,7 @@ export function openPago(it) {
   sheet("Registrar venda", (p, close) => {
     p.append(el("p", "hint", title(it.nome) + " · " + title(it.escola)));
     // Valor sai da tabela de preços (Ajustes); "outro valor" fica marcado para conferência
-    const P = C.P,
+    const P = precos(it),
       lf = segDe(it) === "lf";
     const tabela = (
       lf

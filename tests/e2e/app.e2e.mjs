@@ -3667,8 +3667,21 @@ await cenario("Ajuda de vendas (respostas prontas e texto para o Claude sem tele
   await shC.getByRole("button", { name: "Achou caro" }).click();
   await shC.locator("button[type=submit]").click();
   await pg.getByRole("button", { name: "Vou oferecer agora" }).click();
+  // lista única: oferecer o Paspatur já pergunta se quer vender como Paspatur ("Não" deixa como PR)
+  const shV = pg.locator(".sheet", { hasText: "Deseja vender como Paspatur?" }).last();
+  ok(
+    await shV
+      .waitFor({ timeout: 4000 })
+      .then(() => true)
+      .catch(() => false),
+    "oferecer o Paspatur pergunta se quer vender como Paspatur"
+  );
+  await shV.getByRole("button", { name: "Não", exact: true }).click();
   await calmo(pg);
-  ok((await store())["repasse/aj1"].etapa !== "CAÍDO", "achou caro: pede para oferecer o Paspatur e não marca caído");
+  ok(
+    (await store())["repasse/aj1"].etapa !== "CAÍDO" && !(await store())["repasse/aj1"].vendaComo,
+    "achou caro: pede para oferecer o Paspatur e não marca caído"
+  );
   await pg.locator("article", { hasText: "Maria" }).first().getByRole("button", { name: "⬇️ Caído" }).click();
   shC = pg.locator(".sheet").last();
   await shC.getByRole("button", { name: "Achou caro" }).click();
@@ -3687,6 +3700,134 @@ await cenario("Ajuda de vendas (respostas prontas e texto para o Claude sem tele
     "PR: aba Caídos mostra o aluno e o motivo"
   );
   ok(!erros.length, "sem erros no console: " + erros.join(" | "));
+});
+await cenario("PR lista única: filtro PR/Paspatur, pessoa da equipe e chave na janela do aluno", async () => {
+  const Y = new Date().getFullYear();
+  const aluno = (nome, extra) =>
+    Object.assign(
+      {
+        nome,
+        nomeBusca: nome,
+        escola: "COLEGIO ALFA",
+        ano: Y - 1,
+        etapa: "INTERESSADO",
+        separadoEm: dia(-2),
+        followup: dia(0),
+        tentInteresse: 0,
+        contatos: [{ tipo: "Mãe", nome: "Rosa", tel: "21988881111" }],
+        telefones: ["21988881111"]
+      },
+      extra
+    );
+  const d = Object.assign({}, base, {
+    "config/app": Object.assign({}, base["config/app"], {
+      kitPreco: 350,
+      kitPromo: 300,
+      paspatur: { kitPreco: 120, kitPromo: 100, lfPix: 90 }
+    }),
+    "repasse/u1": aluno("JOAO PR", { resp: "Ana", respEmail: ANA }),
+    "repasse/u2": aluno("MARIA PASPATUR", { vendaComo: "paspatur", resp: "Ana", respEmail: ANA }),
+    "repasse/u3": aluno("CARLA PAGA", { vendaComo: "paspatur", etapa: "PAGO", pagoEm: dia(-1), valor: 100, resp: "Ana", respEmail: ANA }),
+    "repasse/u4": aluno("BRUNO ADRIANO", { resp: "Adriano", respEmail: ADRIANO })
+  });
+  // admin: lista única com filtro e pessoa da equipe
+  {
+    const { pg, erros } = await abrir(ADRIANO, migrar(d), { compacta: true });
+    await ir(pg, "#pr");
+    await pg.locator("#rSegs").getByText("Repasse").click();
+    await calmo(pg);
+    await pg.locator("#rChips").getByText("Interessados").click();
+    await calmo(pg);
+    const lista = () => pg.textContent("#rList");
+    ok(/Joao Pr/i.test(await lista()) && /Maria Paspatur/i.test(await lista()), "Todos: PR e Paspatur na mesma lista");
+    ok((await pg.locator("#rList .tag.pas").count()) === 1, "o aluno do Paspatur tem o selo 🎞️ Paspatur");
+    await pg
+      .locator("#rTipos")
+      .getByRole("button", { name: /Só Paspatur/ })
+      .click();
+    await calmo(pg);
+    ok(!/Joao Pr/i.test(await lista()) && /Maria Paspatur/i.test(await lista()), "Só Paspatur: esconde os do PR");
+    await pg.locator("#rTipos").getByRole("button", { name: /Só PR/ }).click();
+    await calmo(pg);
+    ok(/Joao Pr/i.test(await lista()) && !/Maria Paspatur/i.test(await lista()), "Só PR: esconde os do Paspatur");
+    await pg
+      .locator("#rTipos")
+      .getByRole("button", { name: /^Todos/ })
+      .click();
+    await calmo(pg);
+    const sel = pg.locator("#rTipos select");
+    ok(/Ana \(2\)/.test(await sel.textContent()) && /Adriano \(1\)/.test(await sel.textContent()), "filtro por pessoa com a contagem");
+    await sel.selectOption(ADRIANO);
+    await calmo(pg);
+    ok(/Bruno Adriano/i.test(await lista()) && !/Joao Pr/i.test(await lista()), "filtro por pessoa mostra só os dela");
+    await sel.selectOption("");
+    await calmo(pg);
+    ok(!erros.length, "sem erros no console: " + erros.join(" | "));
+    await pg.close();
+  }
+  // equipe: a chave na janela do aluno, com a pergunta e o valor que troca junto
+  {
+    const { pg, erros, store } = await abrir(ANA, migrar(d), { compacta: true });
+    await ir(pg, "#pr");
+    await pg.locator("#rChips").getByText("Interessados").click();
+    await calmo(pg);
+    await pg.locator("#rList button.lc-linha", { hasText: /Joao Pr/i }).click();
+    let ja = pg.locator(".sheet.janela-aluno, .janela-aluno").last();
+    await ja
+      .locator(".venda-como")
+      .getByRole("button", { name: /Paspatur/ })
+      .click();
+    const q = pg.locator(".sheet", { hasText: "Deseja vender como Paspatur?" }).last();
+    await q.waitFor();
+    const txt = await q.textContent();
+    ok(
+      /Deseja vender como Paspatur\?/.test(txt) && /R\$\s*300,00.*R\$\s*100,00/s.test(txt),
+      "pergunta e mostra o valor que muda: " + txt.slice(0, 160)
+    );
+    await q.getByRole("button", { name: "Sim, trocar" }).click();
+    await calmo(pg);
+    ok((await store())["repasse/u1"].vendaComo === "paspatur", "trocou para Paspatur");
+    await pg
+      .waitForFunction(() => /Paspatur/.test(document.querySelector(".venda-como [aria-pressed=true]")?.textContent || ""), null, {
+        timeout: 4000
+      })
+      .catch(() => {});
+    ok(/Paspatur/.test(await ja.locator(".venda-como [aria-pressed=true]").textContent()), "a chave mostra Paspatur");
+    // a mensagem pronta já sai com o valor do Paspatur
+    await ja.getByRole("tab", { name: "Conversa" }).click();
+    await calmo(pg);
+    ok(
+      /R\$\s*100,00/.test(await ja.textContent()) && !/R\$\s*300,00/.test(await ja.textContent()),
+      "a mensagem sai com o valor do Paspatur"
+    );
+    await ja.getByRole("button", { name: /Voltar para a lista/ }).click();
+    // pago: a equipe não troca
+    await pg.locator("#rChips").getByText("Entregar").click();
+    await calmo(pg);
+    await pg.locator("#rList button.lc-linha", { hasText: /Carla Paga/i }).click();
+    ja = pg.locator(".janela-aluno").last();
+    ok(await ja.locator(".venda-como").getByRole("button", { name: /PR/ }).isDisabled(), "venda paga: a equipe não troca");
+    await ja.getByRole("button", { name: /Voltar para a lista/ }).click();
+    // + Aluno: escolhe como vender
+    await pg.getByRole("button", { name: "+ Aluno" }).click();
+    const f = pg.locator(".sheet").last();
+    await f.getByLabel("Nome do aluno").fill("Pedro Novo Paspatur");
+    await f.getByLabel("Colégio").fill("Colegio Alfa");
+    await f.getByLabel("Vender como").selectOption("paspatur");
+    await f.locator("button[type=submit]").click();
+    await calmo(pg);
+    await f.locator("button[type=submit]").click(); // incluir assim mesmo (vai para Incompletos)
+    await esperaNome(pg, "Pedro Novo Paspatur");
+    const novo = Object.values(await store()).find(x => x && x.nomeBusca === "PEDRO NOVO PASPATUR");
+    ok(
+      novo && novo.vendaComo === "paspatur",
+      "+ Aluno entra como Paspatur " +
+        (novo
+          ? ""
+          : JSON.stringify(Object.values(await store()).filter(x => x && /PEDRO NOVO/i.test(x.nome || ""))) + (await erroVisivel(pg)))
+    );
+    ok(!erros.length, "sem erros no console: " + erros.join(" | "));
+  }
 });
 await cenario("Registrar venda: endereço completo obrigatório e CEP preenche a rua", async () => {
   const Y = new Date().getFullYear();

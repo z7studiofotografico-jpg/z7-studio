@@ -9,7 +9,21 @@ import { openMockup } from "./mockup.js";
 import { miniaturasDoAluno, driveLiberado } from "./fotos-aluno.js";
 import { linhasRetorno } from "./retorno.js";
 import { situacaoTxt, enderecoTxt, historicoPlanilha, prazoEntrega } from "./repasse-dados.js";
-import { C, ABERTAS, status, contatoPadrao, tipoPR, precoTxt, ehFormatura, colNome, save, segDe, segNome } from "./repasse-estado.js";
+import {
+  C,
+  ABERTAS,
+  status,
+  contatoPadrao,
+  vendaDe,
+  precoTxt,
+  ehFormatura,
+  colNome,
+  save,
+  segDe,
+  segNome,
+  precos
+} from "./repasse-estado.js";
+import { chaveVenda } from "./venda-como.js";
 import { card, desenharProximo } from "./repasse-cartao.js";
 import { openPago, openEntrega } from "./repasse-janelas.js";
 
@@ -22,7 +36,7 @@ const ABAS = [
 ];
 let abaAtual = "resumo";
 const dataBR = d => (d ? String(d).slice(0, 10).split("-").reverse().join("/") : "");
-const cardAjuda = () => (tipoPR === "paspatur" ? "paspatur" : ehFormatura() ? "formatura" : "pr");
+const cardAjuda = it => (ehFormatura() ? "formatura" : vendaDe(it));
 const tipoTxt = t => (t === "Formando" ? "Aluno" : t || "");
 
 export function abrirJanela(it0) {
@@ -53,6 +67,8 @@ export function abrirJanela(it0) {
           )
         );
         topo.append(volta, nome, el("span", "lc-selo ja-selo", it.etapa || ""));
+        // PR e Paspatur na mesma lista: a chave diz como o aluno está sendo vendido
+        if (!ehFormatura()) topo.append(chaveVenda(it));
         // abas
         abas.innerHTML = "";
         ABAS.forEach(([k, t]) => {
@@ -118,7 +134,7 @@ function previa(box, it) {
   const fotos = el("div", "ja-fotos");
   box.append(el("h3", null, "Fotos do aluno no Drive"), fotos);
   const o = { precoTxt: precoTxt(it), salvar: (patch, msg) => save(it, patch, msg) };
-  if (!C.P.drivePrevias || driveLiberado(C)) miniaturasDoAluno(C, it, fotos, o);
+  if (!precos(it).drivePrevias || driveLiberado(C)) miniaturasDoAluno(C, it, fotos, o);
   else
     fotos.append(
       el("p", "hint", "Entre com a sua conta Google para ver as fotos aqui (vale por 1 hora)."),
@@ -179,7 +195,7 @@ function conversa(box, it) {
         .join("\n");
       const duvida = [ult, resp.value.trim() ? "Cliente: " + resp.value.trim() : ""].filter(Boolean).join("\n");
       const t = m.textoParaClaude({
-        card: cardAjuda(),
+        card: cardAjuda(it),
         aluno: it.nome,
         colegio: it.escola,
         cat,

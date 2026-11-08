@@ -119,7 +119,9 @@ export function resumir(fontes, hoje, emailPorNome) {
       const lf = Number(r.ano) >= Number(d.slice(0, 4)),
         c = centavos(r.valor),
         mp = mes(d);
-      venda(d, r.valor, lf ? "Kit PR · Linha de Frente" : "Kit PR · Repasse", "PR", pessoa);
+      // lista única: quem foi vendido como Paspatur aparece com o nome certo (mesma comissão do PR)
+      const kit = r.vendaComo === "paspatur" ? "Paspatur" : "Kit PR";
+      venda(d, r.valor, kit + (lf ? " · Linha de Frente" : " · Repasse"), "PR", pessoa);
       if (mp) {
         const R = M(mp).pr;
         R.v += c;

@@ -21,10 +21,19 @@ const RETIROU = ["Retirou a beca", "Devolvida"];
 // Uma lista de recebimentos: { mod, data (dia do dinheiro), c (centavos), turma (ano), itens: [{ produto, qtd }] }
 export function recebimentos(f) {
   const out = [];
+  // lista única (08/11/2026): o Paspatur está no PR, com vendaComo "paspatur" (a coleção antiga fica vazia)
   const pr = (lista, mod) =>
     (lista || [])
       .filter(x => PAGOS.includes(x.etapa) && x.pagoEm && !x.historico && !x.excluido)
-      .forEach(x => out.push({ mod, data: x.pagoEm, c: cent(x.valor), turma: Number(x.ano) || 0, itens: [] }));
+      .forEach(x =>
+        out.push({
+          mod: x.vendaComo === "paspatur" ? "paspatur" : mod,
+          data: x.pagoEm,
+          c: cent(x.valor),
+          turma: Number(x.ano) || 0,
+          itens: []
+        })
+      );
   pr(f.repasse, "pr");
   pr(f.paspatur, "paspatur");
   (f.formaturaAlunos || [])
