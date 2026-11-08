@@ -362,3 +362,10 @@ details.tamtipo{border:1px solid var(--line,#ddd);border-radius:10px;padding:6px
 .conf-fotos { margin-top: 10px; }
 .conf-aluno { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 4px 0; border-top: 1px solid rgba(0, 0, 0, .06); }
 .conf-aluno span { flex: 1; min-width: 0; overflow-wrap: anywhere; }
+
+/* PR: prazo de entrega (pagamento + 20 dias) e total do mês em Vendidos */
+.prazo { display: inline-block; margin: 4px 0; padding: 2px 8px; border-radius: 4px; font-size: .85rem; font-weight: 600; }
+.prazo.verde { background: var(--ok-soft); color: var(--ok); }
+.prazo.amarelo { background: var(--warn-soft); color: var(--warn); }
+.prazo.vermelho { background: var(--late-soft); color: var(--late); }
+.vend-mes { font-weight: 700; font-size: 1rem; }

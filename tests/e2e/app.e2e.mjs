@@ -989,6 +989,17 @@ await cenario("Adriano (admin), com os dados já atualizados no servidor", async
       window.__fire();
     });
     await calmo(pg);
+    // venda paga: prazo de entrega (pagamento + 20 dias) em cores no cartão
+    await pg.locator("#rChips").getByText("Entregas").click();
+    await calmo(pg);
+    const pz = pg.locator(".card", { hasText: "Bruno" }).locator(".prazo");
+    ok((await pz.count()) === 1 && /Entregar até .* faltam 20 dias/.test(await pz.textContent()) && /verde/.test(await pz.getAttribute("class")), "venda paga mostra o prazo de entrega em verde (20 dias)");
+    // total do mês (quantidade e valor) no topo de Vendidos
+    await pg.locator("#rChips").getByText("Vendidos").click();
+    await calmo(pg);
+    ok(/Este mês: \d+ vendas? · R\$\s?[\d.]+,\d\d/.test(await pg.textContent("#rVendMes")), "Vendidos mostra o total do mês (quantidade e valor)");
+    await pg.locator("#rChips").getByText("A conferir").click();
+    await calmo(pg);
     // pedido de aluno repetido: o admin decide
     ok(/Ana Vendedora tentou incluir Carla Fila/.test(await pg.textContent("#rPedidos")), "admin vê o pedido de aluno repetido");
     await pg.locator("#rPedidos .notes").filter({ hasText: "Carla Fila" }).getByRole("button", { name: "Passar para Ana" }).click();

@@ -11,6 +11,12 @@ export const mudarTab = v => (tab = v);
 export const mudarSeg = v => (seg = v);
 export const mudarItems = v => (items = v);
 export const mudarMeta = v => (meta = v);
+// vendas pagas no mês (admin: de todos; equipe: só as dela), contadas no topo; aparecem também em Vendidos/Minhas vendas
+export const vendasMes = { n: 0, v: 0, pronto: false };
+export const textoVendasMes = () =>
+  vendasMes.pronto
+    ? `Este mês: ${vendasMes.n} venda${vendasMes.n === 1 ? "" : "s"} · ${new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" }).format(vendasMes.v)}`
+    : "Este mês: contando…";
 // Ligações com a tela principal (repasse.js preenche): quem grava avisa a lista para redesenhar
 export const tela = { renderList() {}, openTab() {} };
 // PR tem duas abas (Etapa 4): "pr" (coleção repasse) e "paspatur" (coleção paspatur): o mesmo fluxo, cada uma com a

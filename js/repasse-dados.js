@@ -206,6 +206,24 @@ export function situacaoTxt(it, s) {
   if (it.etapa === "ENTREGUE") return "Entregue" + (it.entregueEm ? " em " + dia(it.entregueEm) : "");
   return it.etapa === "NA FILA" ? "Ainda na fila" : it.etapa === "INCOMPLETO" ? "Fora da fila até completar" : "Encerrado";
 }
+// Prazo de entrega do kit: pagamento + 20 dias. Verde; amarelo faltando 3 dias ou menos; vermelho no dia e depois.
+export const PRAZO_DIAS = 20;
+export function prazoEntrega(it, hoje) {
+  if (!it || it.etapa !== "PAGO" || !/^\d{4}-\d{2}-\d{2}/.test(it.pagoEm || "")) return null;
+  const d = s => Date.UTC(+s.slice(0, 4), +s.slice(5, 7) - 1, +s.slice(8, 10));
+  const fimMs = d(it.pagoEm) + PRAZO_DIAS * 864e5;
+  const fim = new Date(fimMs).toISOString().slice(0, 10);
+  const falta = Math.round((fimMs - d(hoje)) / 864e5);
+  const dm = fim.slice(8, 10) + "/" + fim.slice(5, 7);
+  const cor = falta <= 0 ? "vermelho" : falta <= 3 ? "amarelo" : "verde";
+  const texto =
+    falta < 0
+      ? `⏰ Entrega atrasada ${-falta} dia${falta === -1 ? "" : "s"} (prazo era ${dm})`
+      : falta === 0
+        ? `⏰ Prazo de entrega: hoje (${dm})`
+        : `⏰ Entregar até ${dm} · falta${falta === 1 ? "" : "m"} ${falta} dia${falta === 1 ? "" : "s"}`;
+  return { fim, falta, cor, texto };
+}
 // Endereço de entrega numa linha (só quando pagou e vai receber em casa)
 export function enderecoTxt(it) {
   if (it.etapa !== "PAGO" || !(it.entregaTipo || "").startsWith("Entrega")) return "";

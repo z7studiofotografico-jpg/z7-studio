@@ -3,7 +3,7 @@ import { excluir, faixaExclusao, pedirTexto } from "./confirmar.js";
 import { openMockup, textoEscolha } from "./mockup.js";
 import { el, title, sheet as sheetUi } from "./ui.js";
 import * as U from "./util.js";
-import { faltando, situacaoTxt, enderecoTxt, historicoPlanilha } from "./repasse-dados.js";
+import { faltando, situacaoTxt, enderecoTxt, historicoPlanilha, prazoEntrega } from "./repasse-dados.js";
 import { avisoTel } from "./aluno-id.js";
 import { fmtTel } from "./numeros.js";
 import { whatsAtivo } from "./numeros-tela.js";
@@ -109,6 +109,8 @@ export function card(it) {
   const fu = el("div", "fu " + (s === "late" ? "late" : s === "today" ? "today" : it.followup ? "" : "none"));
   fu.textContent = situacaoTxt(it, s);
   e.append(fu);
+  const pz = prazoEntrega(it, U.todayStr());
+  if (pz) e.append(el("p", "prazo " + pz.cor, pz.texto));
   // pediu contato depois (motivo e data) e o histórico de motivos
   linhasRetorno(it).forEach(x => e.append(x));
   const end = enderecoTxt(it);

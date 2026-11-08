@@ -23,7 +23,9 @@ import {
   noSeg,
   $,
   tela,
-  metaNome
+  metaNome,
+  vendasMes,
+  textoVendasMes
 } from "./repasse-estado.js";
 
 export async function refreshStats() {
@@ -58,14 +60,10 @@ export async function refreshStats() {
     const docs = s0 => s0.docs.map(d => d.data()).filter(noSeg);
     set("rsHoje", docs(h).filter(x => ABERTAS.includes(x.etapa) && x.followup && x.followup <= today).length);
     set("rsInt", docs(i).length);
-    set(
-      "rsMes",
-      U.money(
-        docs(m)
-          .filter(x => (x.pagoEm || "") >= mes)
-          .reduce((a, x) => a + (Number(x.valor) || 0), 0)
-      )
-    );
+    const doMes = docs(m).filter(x => (x.pagoEm || "") >= mes);
+    Object.assign(vendasMes, { n: doMes.length, v: doMes.reduce((a, x) => a + (Number(x.valor) || 0), 0), pronto: true });
+    set("rsMes", U.money(vendasMes.v));
+    set("rVendMes", textoVendasMes());
     // Fila: conta por ano (só filtros de igualdade, não precisa de índice extra no Firebase)
     const anos = ehFormatura() ? [null] : seg === "lf" ? [Y] : anosRepasse();
     const cs = await Promise.all(

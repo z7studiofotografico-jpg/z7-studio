@@ -160,3 +160,19 @@ test("colunas TEL MAE / TEL PAI / CELULAR MAE e RESPONSÁVEL das planilhas de 20
   const so = linhaParaDoc({ nome: "Ana Lima", escola: "CIEP 1", c1: "21988887777", respNome: "MARIA LIMA" }, null, 2027);
   assert.equal(so.responsavel, "Maria Lima");
 });
+
+test("prazo de entrega: pagamento + 20 dias, verde · amarelo (3 dias) · vermelho (no dia e atrasado)", async () => {
+  const { prazoEntrega } = await import("../js/repasse-dados.js");
+  const p = h => prazoEntrega({ etapa: "PAGO", pagoEm: "2026-11-10" }, h);
+  assert.equal(p("2026-11-10").fim, "2026-11-30");
+  assert.equal(p("2026-11-26").cor, "verde");
+  assert.equal(p("2026-11-27").cor, "amarelo");
+  assert.match(p("2026-11-29").texto, /falta 1 dia$/);
+  assert.equal(p("2026-11-30").cor, "vermelho");
+  assert.match(p("2026-12-02").texto, /atrasada 2 dias \(prazo era 30\/11\)/);
+  // virada de mês e de ano
+  assert.equal(prazoEntrega({ etapa: "PAGO", pagoEm: "2026-12-20" }, "2026-12-20").fim, "2027-01-09");
+  // só para quem pagou e ainda não recebeu
+  assert.equal(prazoEntrega({ etapa: "ENTREGUE", pagoEm: "2026-11-10" }, "2026-11-12"), null);
+  assert.equal(prazoEntrega({ etapa: "PAGO" }, "2026-11-12"), null);
+});

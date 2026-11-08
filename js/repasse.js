@@ -43,7 +43,8 @@ import {
   baseSeg,
   colNome,
   metaNome,
-  $
+  $,
+  textoVendasMes
 } from "./repasse-estado.js";
 // Caídos: o admin vê todos; a equipe, os que ela mesma marcou
 const soMinhaCaidos = () => (C.isAdmin ? [] : [FS.where("respEmail", "==", C.email || "")]);
@@ -590,10 +591,18 @@ function renderList(loading, emptyMsg) {
     return;
   }
   const arr = naTela();
+  if (tab === "vendidos") {
+    // total do mês (quantidade e valor pagos no mês, entregues ou não) no topo de Vendidos / Minhas vendas
+    const t = el("div", "notes vend-mes", textoVendasMes());
+    t.id = "rVendMes";
+    t.style.gridColumn = "1/-1";
+    list.append(t);
+  }
   if (!arr.length) {
     const e = el("div", "empty");
     e.style.gridColumn = "1/-1";
     const msgs = {
+      vendidos: ["Nenhuma venda entregue ainda", "Quem comprou e já recebeu o kit aparece aqui, só para consulta."],
       conferir: ["Nenhuma venda para conferir ✓", "As vendas registradas pela equipe aparecem aqui até você conferir o comprovante."],
       hoje: ["Nada para hoje", "Separe o seu lote do dia no quadro acima para começar."],
       interessados: ["Nenhum interessado ainda", "Quem responder que quer ver a prévia aparece aqui."],
