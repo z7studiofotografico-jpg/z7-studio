@@ -242,7 +242,7 @@ export function openDados(it) {
         return criar(patch, falta);
       }
       if (it.etapa === "SEM TELEFONE" && !semTelefone(patch)) {
-        // achou o telefone: sai do "só Dashboard" e vai para a fila (ou Incompletos, se ainda faltar algo)
+        // achou o telefone: sai do "sem telefone" e vai para a fila (ou Incompletos, se ainda faltar algo)
         Object.assign(patch, { etapa: falta.length ? "INCOMPLETO" : "NA FILA", semTelefone: false });
       } else if (it.etapa === "INCOMPLETO" || it.etapa === "NA FILA") {
         // aluno de alguém da equipe: completo, volta para a lista dessa pessoa; sem dono, vai para a fila

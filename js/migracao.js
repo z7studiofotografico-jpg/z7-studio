@@ -15,7 +15,7 @@ export const VERSAO_DADOS = 12;
 // - Mário Piragibe é aluguel de becas: aluno sem telefone lá não é falha (não conta em "Sem telefone")
 const DO_ADRIANO = /JOAO PAULO II|CIEP 156/;
 const NOME_CERTO = { "E.E. Zenóbio da Costa": "C.E. Zenóbio da Costa", "Waldemar Raythe": "C.E. Waldemar Raythe" };
-// v11: aluno do PR importado sem nenhum telefone sai dos Incompletos (etapa "SEM TELEFONE": só conta no Dashboard)
+// v11: aluno do PR importado sem nenhum telefone sai dos Incompletos (etapa "SEM TELEFONE": fora das filas e do Dashboard)
 // v10: WhatsApp da empresa corrigido (combinado com o Adriano em 27/10/2026)
 // - (21) 97105-9512 é de um representante (vai no cadastro dele em Equipe): sai da Linha de Frente da empresa
 // - o Repasse é (21) 3743-0000 (estava (21) 3774-0000)
@@ -129,8 +129,8 @@ export function planejar(cols, emailDe) {
     if ((x.contatos || []).length || (x.telefones || []).length || x.semTelefone) continue;
     // (só quem não está com ninguém da equipe: o aluno incluído à mão por alguém continua com essa pessoa)
     if (x.etapa === "INCOMPLETO" && !x.respEmail)
-      muda("PR sem telefone (só Dashboard)", "repasse", x.id, { etapa: "SEM TELEFONE", semTelefone: true, followup: null });
-    else if (x.historico) muda("PR sem telefone (só Dashboard)", "repasse", x.id, { semTelefone: true });
+      muda("PR sem telefone (fora das filas)", "repasse", x.id, { etapa: "SEM TELEFONE", semTelefone: true, followup: null });
+    else if (x.historico) muda("PR sem telefone (fora das filas)", "repasse", x.id, { semTelefone: true });
   }
   // v12: colégios das planilhas do Drive (importados com a observação "Já trabalhamos…")
   for (const x of cols.instituicoes || []) {

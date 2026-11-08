@@ -314,7 +314,7 @@ export function openImport(ctx, ui, aoTerminar) {
           const id = idDe[i];
           if (exist.has(id)) {
             atual++;
-            // estava sem telefone e a planilha agora traz o número: sai do "só Dashboard" e vai para a fila
+            // estava sem telefone e a planilha agora traz o número: sai do "sem telefone" e vai para a fila
             const achou = exist.get(id) === "SEM TELEFONE" && !semTelefone(d);
             if (achou) voltou++;
             const extra = achou ? { etapa: faltando(d).length ? "INCOMPLETO" : "NA FILA", semTelefone: false } : {};
@@ -346,7 +346,7 @@ export function openImport(ctx, ui, aoTerminar) {
           }
           if (semTelefone(d)) {
             semTel++;
-            // sem telefone: fora das filas e dos Incompletos; só conta no Dashboard (PR por ano das fotos)
+            // sem telefone: fora das filas, dos Incompletos e do Dashboard
             return [
               id,
               Object.assign({}, d, {
@@ -430,7 +430,7 @@ export function openImport(ctx, ui, aoTerminar) {
             status: "ativa"
           });
         const nInc = ops.filter(([, d, m]) => !m && d.etapa === "INCOMPLETO").length;
-        prog.textContent = `Pronto! ${novos - nInc - historico - semTel} novos na fila${nInc ? `, ${nInc} na aba Incompletos` : ""}${semTel ? `, ${semTel} sem telefone (só para o Dashboard)` : ""}${historico ? `, ${historico} que já compraram (só histórico, para o Dashboard)` : ""}${fora ? `, ${fora} de turma desmarcada ficaram fora do app` : ""}${atual ? ` e ${atual} atualizados` : ""}${voltou ? ` (${voltou} que estavam sem telefone agora têm número e foram para a fila)` : ""}.`;
+        prog.textContent = `Pronto! ${novos - nInc - historico - semTel} novos na fila${nInc ? `, ${nInc} na aba Incompletos` : ""}${semTel ? `, ${semTel} sem telefone (fora das filas e do Dashboard)` : ""}${historico ? `, ${historico} que já compraram (só histórico, para o Dashboard)` : ""}${fora ? `, ${fora} de turma desmarcada ficaram fora do app` : ""}${atual ? ` e ${atual} atualizados` : ""}${voltou ? ` (${voltou} que estavam sem telefone agora têm número e foram para a fila)` : ""}.`;
         U.toast("Planilha importada ✅");
         aoTerminar();
         const fechar = U.mkBtn("Fechar", "btn-primary", close);

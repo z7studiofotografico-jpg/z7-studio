@@ -1,6 +1,6 @@
 // "🔎 Conferir fotos" (só admin): compara os alunos do app com as prévias no Google Drive, por colégio e ano.
 // Quem está sem foto fica separado em: já comprou (normal: o gerador de prévias pula quem comprou),
-// sem telefone (só conta no Dashboard) e falta gerar (precisa de prévia). Cada um que falta tem o "📤 Enviar foto".
+// sem telefone (fora das filas e do Dashboard) e falta gerar (precisa de prévia). Cada um que falta tem o "📤 Enviar foto".
 import { el, sheet, title } from "./ui.js";
 import * as U from "./util.js";
 import { idDaPasta, pastaDoColegio, temFoto } from "./drive-fotos.js";
@@ -150,7 +150,7 @@ export function abrirConferirFotos(C, colNome = "repasse") {
         total.append(
           el("b", null, `${soma.alunos} alunos · ${soma.com} com foto`),
           el("div", null, `Sem foto, já comprou: ${soma.comprou} (normal, não precisa)`),
-          el("div", null, `Sem foto, sem telefone: ${soma.semTel} (só no Dashboard, não precisa)`),
+          el("div", null, `Sem foto, sem telefone: ${soma.semTel} (fora das filas e do Dashboard, não precisa)`),
           el("div", null, `Sem foto, não comprou: ${soma.faltam}${soma.faltam ? " → falta gerar a prévia" : " ✓"}`)
         );
         if (soma.faltam) {

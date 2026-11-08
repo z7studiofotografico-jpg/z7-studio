@@ -1,10 +1,9 @@
 // Dashboard → PR: "PR por ano das fotos" (só admin). Para cada ano: quantos alunos foram fotografados,
 // quantos compraram (inclusive o histórico importado das planilhas antigas: VENDIDO), a conversão
 // e quantos ainda estão na fila do Repasse. Usa só contagens no servidor (não baixa os alunos).
-// Quem veio da planilha sem nenhum telefone (etapa "SEM TELEFONE") fica FORA das contas:
-// aparece só na coluna "Sem telefone" e no quadro por colégio, para a equipe ficar atenta a pegar o número.
+// Quem veio da planilha sem nenhum telefone (etapa "SEM TELEFONE") não aparece em nada do Dashboard
+// (nem nas contas, nem em coluna própria): não foi oferecido a ninguém e bagunçaria a conversão.
 import { el } from "./ui.js";
-import { chaveColegio } from "./historico-dados.js";
 
 const pct = (a, b) => (b ? Math.round((a / b) * 100) + "%" : "—");
 export function prPorAno(corpo, C, caixa, tabela) {
@@ -12,7 +11,7 @@ export function prPorAno(corpo, C, caixa, tabela) {
   const box = caixa(
     corpo,
     "PR por ano das fotos",
-    "Fotografados × compraram (com o histórico das planilhas antigas). Quem veio sem telefone não entra nas contas."
+    "Fotografados × compraram (com o histórico das planilhas antigas). Quem veio sem telefone não aparece aqui."
   );
   const espera = el("p", "hint", "Contando…");
   box.append(espera);
@@ -29,85 +28,36 @@ export function prPorAno(corpo, C, caixa, tabela) {
       const linhas = await Promise.all(
         anos.map(async a => {
           const ano = FS.where("ano", "==", a);
-          const [todos, compraram, fila, semTelTodos, semTelOk] = await Promise.all([
+          const [todos, compraram, fila, semTel] = await Promise.all([
             conta(ano),
             conta(ano, FS.where("etapa", "in", ["PAGO", "ENTREGUE"])),
             conta(ano, FS.where("etapa", "==", "NA FILA")),
-            conta(ano, FS.where("etapa", "==", "SEM TELEFONE")),
-            // colégio de aluguel de becas (ex.: Mário Piragibe): sem telefone lá não é falha
-            conta(ano, FS.where("semTelOk", "==", true))
+            conta(ano, FS.where("etapa", "==", "SEM TELEFONE"))
           ]);
-          return { a, total: todos - semTelTodos, compraram, fila, semTel: semTelTodos - semTelOk, todos: todos - semTelOk };
+          return { a, total: todos - semTel, compraram, fila };
         })
       );
       espera.remove();
       const soma = k => linhas.reduce((t, x) => t + x[k], 0);
-      const linha = (rot, x) => [rot, x.total, x.compraram, pct(x.compraram, x.total), x.fila, `${x.semTel} (${pct(x.semTel, x.todos)})`];
+      const linha = (rot, x) => [rot, x.total, x.compraram, pct(x.compraram, x.total), x.fila];
       const todas = linhas.map(x => linha(String(x.a), x));
       if (linhas.length > 1)
         todas.push(
           linha("Geral", {
             total: soma("total"),
             compraram: soma("compraram"),
-            fila: soma("fila"),
-            semTel: soma("semTel"),
-            todos: soma("todos")
+            fila: soma("fila")
           })
         );
       tabela(
         box,
-        ["Ano das fotos", "Fotografados", "Compraram", "Conversão", "Na fila do Repasse", "Sem telefone"],
+        ["Ano das fotos", "Fotografados", "Compraram", "Conversão", "Na fila do Repasse"],
         todas,
         "Nenhum ano importado ainda."
       );
-      if (linhas.length)
-        box.append(
-          el(
-            "p",
-            "hint",
-            "Sem telefone = alunos que vieram da planilha sem nenhum número. Não entram em Fotografados nem na conversão; a % é sobre todos os alunos da planilha daquele ano."
-          )
-        );
-      if (soma("semTel")) await semTelefonePorColegio(corpo, C, caixa, tabela);
     } catch (e) {
       console.warn("[Z7] PR por ano", e);
       espera.textContent = "Não foi possível contar agora.";
     }
   })();
-}
-
-// Quantos vieram sem telefone em cada colégio e ano (para cobrar a ficha completa no dia das fotos)
-async function semTelefonePorColegio(corpo, C, caixa, tabela) {
-  const { FS, db } = C;
-  const s = await FS.getDocs(FS.query(FS.collection(db, "repasse"), FS.where("etapa", "==", "SEM TELEFONE"), FS.limit(3000)));
-  const m = new Map(),
-    anos = new Set();
-  // o nome como está no cadastro de Instituições (ex.: "C.E. João Paulo II"), quando o colégio está cadastrado
-  const nomes = {};
-  (await FS.getDocs(FS.query(FS.collection(db, "instituicoes"), FS.limit(1000)))).forEach(d => {
-    const k = chaveColegio(d.data().nome || "");
-    if (k) nomes[k] = d.data().nome;
-  });
-  s.forEach(d => {
-    const x = d.data();
-    if (x.semTelOk) return;
-    const esc = String(x.escola || "(sem colégio)").trim();
-    const k = chaveColegio(esc) || esc; // "C.M CYRO MONTEIRO" e "CYRO MONTEIRO" são o mesmo colégio
-    const a = Number(x.ano) || 0;
-    anos.add(a);
-    const r = m.get(k) || { esc: nomes[k] || esc, ano: a, total: 0, anos: {} };
-    if (a >= r.ano) Object.assign(r, { esc: nomes[k] || esc, ano: a }); // o nome do cadastro ou o mais recente
-    r.total++;
-    r.anos[a] = (r.anos[a] || 0) + 1;
-    m.set(k, r);
-  });
-  const ord = [...anos].sort((a, b) => b - a);
-  const box = caixa(corpo, "Sem telefone por colégio", "Alunos que vieram da planilha sem nenhum número, por ano das fotos");
-  tabela(
-    box,
-    ["Colégio", ...ord.map(String), "Total"],
-    [...m.values()]
-      .sort((a, b) => b.total - a.total || a.esc.localeCompare(b.esc, "pt-BR"))
-      .map(r => [r.esc, ...ord.map(a => r.anos[a] || "—"), r.total])
-  );
 }
