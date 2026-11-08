@@ -109,9 +109,12 @@ function render(corpo, st, inst, ano, ref) {
     linha("Quem fechou", c.respNome || "—"),
     linha("Quem paga", (R.QUEM_PAGA.find(([k]) => k === c.quemPaga) || [, "—"])[1]),
     linha(
-      c.quemPaga === "colegio" ? "Valor combinado (total)" : "Valor por aluno",
-      c.valor ? brl(c.valor) + (Number(c.parcelas) > 1 ? ` em ${c.parcelas}x` : "") : "—"
+      "Preço por item",
+      R.ITENS_PACOTE.filter(([k]) => Number((c.precos || {})[k]))
+        .map(([k, n]) => `${n} ${brl(c.precos[k])}`)
+        .join(" · ") + (Number(c.parcelas) > 1 ? ` · em ${c.parcelas}x` : "")
     ),
+    ...(c.quemPaga === "colegio" ? [linha("Valor combinado (total)", c.valor ? brl(c.valor) : "")] : []),
     linha("Quem costuma receber", c.quemPaga === "colegio" ? "—" : (R.RECEBE.find(([k]) => k === c.recebePadrao) || [, "Estúdio"])[1]),
     linha("Contato do colégio", [ct.nome, ct.cargo && ct.cargo.replace("(a)", "").toLowerCase(), ct.tel].filter(Boolean).join(" · ")),
     linha("Entrega combinada", ent.data ? `${dataBR(ent.data)}${ent.com ? " com " + ent.com : ""}` : ""),
@@ -207,7 +210,13 @@ function render(corpo, st, inst, ano, ref) {
       const n = el("div", "lc-nome");
       n.append(
         el("b", null, title(a.nome || "")),
-        el("small", null, [a.serie, pago[a.id] ? "pagou " + brl(pago[a.id]) : ""].filter(Boolean).join(" · "))
+        el(
+          "small",
+          null,
+          [a.serie, R.precoAluno(a, c) ? "pacote " + brl(R.precoAluno(a, c)) : "", pago[a.id] ? "pagou " + brl(pago[a.id]) : ""]
+            .filter(Boolean)
+            .join(" · ")
+        )
       );
       const it = el("div", "meta");
       itens.forEach(x => it.append(el("span", "tag " + (x === "paspatur" ? "warn" : "svc"), R.nomeItem(x))));
@@ -281,15 +290,23 @@ function formContrato(c, inst, ano, ref) {
     const valor = inpReais(x.valor != null ? x.valor : "", "0,00");
     const parc = inp(String(x.parcelas || 1), "1", 2);
     parc.inputMode = "numeric";
+    // preço de cada item: o valor do aluno é a soma dos itens do pacote dele (e a comissão sai item por item)
+    const precos = el("div", "row2");
+    const precoCx = R.ITENS_PACOTE.map(([k, n]) => {
+      const i = inpReais((x.precos || {})[k] != null ? x.precos[k] : "", "0,00");
+      precos.append(field(n + " (R$)", i));
+      return [k, i];
+    });
     if (c && !admin) {
       quem.disabled = true;
       valor.disabled = true;
       parc.disabled = true;
+      precoCx.forEach(([, i]) => (i.disabled = true));
     }
-    const fValor = field("Valor por aluno", valor);
+    const fValor = field("Valor total (o colégio paga)", valor);
     const fRecebe = field("Quem costuma receber", recebe);
     const sync = () => {
-      fValor.querySelector("label").textContent = quem.value === "colegio" ? "Valor total" : "Valor por aluno";
+      fValor.hidden = quem.value !== "colegio";
       fRecebe.hidden = quem.value === "colegio";
     };
     quem.onchange = sync;
@@ -297,7 +314,7 @@ function formContrato(c, inst, ano, ref) {
     const r1 = el("div", "row2");
     r1.append(field("Quem fechou", sResp), field("Quem paga", quem));
     const r2 = el("div", "row3");
-    r2.append(fValor, field("Parcelas", parc), fRecebe);
+    r2.append(field("Parcelas", parc), fRecebe, fValor);
     const ct = x.contato || {};
     const cNome = inp(ct.nome || "", "nome");
     const cCargo = sel(R.CARGOS, ct.cargo || "Diretor(a)");
@@ -331,6 +348,7 @@ function formContrato(c, inst, ano, ref) {
     err.hidden = true;
     p.append(
       r1,
+      field("Preço de cada item (o aluno paga a soma do pacote dele)", precos),
       r2,
       r3,
       r4,
@@ -367,7 +385,8 @@ function formContrato(c, inst, ano, ref) {
           respEmail: sResp.value,
           respNome: nomeResp,
           quemPaga: quem.value,
-          valor: lerReais(valor.value) || 0,
+          valor: quem.value === "colegio" ? lerReais(valor.value) || 0 : 0,
+          precos: Object.fromEntries(precoCx.map(([k, i]) => [k, lerReais(i.value) || 0])),
           parcelas: Math.max(1, parseInt(parc.value, 10) || 1)
         });
       try {
@@ -375,7 +394,8 @@ function formContrato(c, inst, ano, ref) {
           const mud = [];
           if (body.entrega.data !== (en.data || "") || body.entrega.com !== (en.com || ""))
             mud.push("entrega " + dataBR(body.entrega.data));
-          if (body.valor != null && Number(body.valor) !== Number(x.valor)) mud.push("valor " + brl(body.valor));
+          if (body.valor != null && Number(body.valor) !== Number(x.valor || 0)) mud.push("valor " + brl(body.valor));
+          if (body.precos && JSON.stringify(body.precos) !== JSON.stringify(x.precos || {})) mud.push("preços dos itens");
           if (body.quemPaga && body.quemPaga !== x.quemPaga) mud.push("quem paga");
           if (body.respEmail && body.respEmail !== x.respEmail) mud.push("quem fechou: " + nomeResp);
           if (body.contato.nome !== (ct.nome || "") || body.contato.tel !== (ct.tel || "")) mud.push("contato");
@@ -489,10 +509,14 @@ function formPagamento(pg, st, ref) {
       "escolha o aluno"
     );
     sAluno.required = porAluno;
-    const valor = inpReais(
-      x.valor != null ? x.valor : porAluno && c.valor ? Number(c.valor) / Math.max(1, Number(c.parcelas) || 1) : "",
-      "0,00"
-    );
+    const valor = inpReais(x.valor != null ? x.valor : "", "0,00");
+    const sugerir = () => {
+      const a = st.alunos.find(y => y.id === sAluno.value);
+      const tot = porAluno ? (a ? R.precoAluno(a, c) : 0) : Number(c.valor) || 0;
+      if (!pg && tot) valor.value = (Math.round((tot / Math.max(1, Number(c.parcelas) || 1)) * 100) / 100).toFixed(2).replace(".", ",");
+    };
+    sAluno.addEventListener("change", sugerir);
+    sugerir();
     valor.required = true;
     const data = el("input");
     data.type = "date";
@@ -562,6 +586,8 @@ function formPagamento(pg, st, ref) {
         recebidoPor: recebe.value,
         comprovante: comp.value.trim(),
         comprovanteOk: ok.checked,
+        // o que este pagamento paga, item por item (base da comissão)
+        itens: R.itensDoPagamento(al || null, c, st.alunos),
         atualizadoEm: agora()
       };
       try {

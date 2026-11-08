@@ -3246,7 +3246,9 @@ await cenario("Contrato do colégio (pacote por aluno, quem recebeu, repasse e p
     await pg.getByRole("button", { name: "+ Criar contrato" }).click();
     const f = pg.locator(".sheet").last();
     await f.getByLabel("Quem fechou").selectOption(ANA);
-    await f.getByLabel("Valor por aluno").fill("150");
+    await f.getByLabel("Paspatur (R$)").fill("100");
+    await f.getByLabel("Certificado (R$)").fill("30");
+    await f.getByLabel("Canudo (R$)").fill("20");
     await f.getByLabel("Contato do colégio").fill("Márcia");
     await f.getByLabel("Cargo").selectOption("Coordenador(a)");
     await f.getByLabel("Entrega combinada (dia/mês/ano)").fill(`${Y}-12-12`);
@@ -3260,9 +3262,10 @@ await cenario("Contrato do colégio (pacote por aluno, quem recebeu, repasse e p
         c.respEmail === ANA &&
         c.respNome === "Ana Vendedora" &&
         c.quemPaga === "alunos" &&
-        c.valor === 150 &&
+        c.precos.paspatur === 100 &&
+        c.precos.canudo === 20 &&
         c.entrega.data === `${Y}-12-12`,
-      "contrato criado: quem fechou, quem paga, valor e entrega com o ano"
+      "contrato criado: quem fechou, quem paga, preço de cada item e entrega com o ano"
     );
     ok(c.pacotePadrao.join() === "paspatur,certificado,canudo", "pacote padrão: paspatur + certificado + canudo");
     // pagamento em dinheiro com a coordenadora → falta repassar · colégio
@@ -3282,6 +3285,7 @@ await cenario("Contrato do colégio (pacote por aluno, quem recebeu, repasse e p
     st = await store();
     const pg1 = Object.entries(st).find(([k]) => k.startsWith(`contratosColegio/i1_${Y}/pagamentos/`));
     ok(pg1 && pg1[1].repassadoEm && pg1[1].historico.length === 2, "repassado: data e quem fez ficam guardados");
+    ok(pg1[1].itens.paspatur === 100 && pg1[1].itens.certificado === 30, "o pagamento guarda os itens do pacote (base da comissão)");
     // pacote aplicado a vários
     await painel.getByLabel("Marcar Pedro Henrique").check();
     await painel.getByRole("button", { name: "Aplicar pacote a 1" }).click();

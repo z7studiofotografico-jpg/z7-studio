@@ -124,6 +124,11 @@ export function formaDe(s) {
 }
 export function taxa(P, linha, forma) {
   const cfg = (P && P.comissao) || {};
+  // Contrato do colégio: porcentagem de cada item (beca, paspatur, certificado, canudo), definida nos Ajustes
+  if (linha === "contrato") {
+    const v = cfg.contrato && cfg.contrato[forma];
+    return v != null && v !== "" ? Number(v) : 0;
+  }
   if (linha === "adesao") {
     const v = cfg.adesao != null && cfg.adesao !== "" ? cfg.adesao : cfg.colacao; // "colacao" = nome antigo da chave
     return v != null && v !== "" ? Number(v) : COMISSAO_PADRAO.adesao;

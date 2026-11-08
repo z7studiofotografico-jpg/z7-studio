@@ -269,7 +269,7 @@ service cloud.firestore {
       allow update: if admin() || (pode('becas') && exclusaoOk() && !mudou(['valor', 'contratoZerado']));
       allow delete: if admin();
     }
-    // Contrato do colégio (Aluguel de becas): o admin e o representante que fechou. Depois de criado, valor, parcelas,
+    // Contrato do colégio (Aluguel de becas): o admin e o representante que fechou. Depois de criado, valor, preços, parcelas,
     // quem paga e quem fechou só o admin muda. Pagamentos na subcoleção: o representante lança e marca o repasse do
     // colégio; o dinheiro que está com ele mesmo só o admin confirma; conferir (comissão) só o admin.
     function meuContrato(cid) {
@@ -279,7 +279,7 @@ service cloud.firestore {
       allow read: if pode('becas');
       allow create: if admin() || (pode('becas') && request.resource.data.get('respEmail', '') == email());
       allow update: if admin() || (pode('becas') && resource.data.get('respEmail', '') == email()
-        && !mudou(['valor', 'parcelas', 'respEmail', 'respNome', 'quemPaga', 'instId', 'ano']));
+        && !mudou(['valor', 'precos', 'parcelas', 'respEmail', 'respNome', 'quemPaga', 'instId', 'ano']));
       allow delete: if admin();
       match /pagamentos/{pid} {
         allow read: if pode('becas');

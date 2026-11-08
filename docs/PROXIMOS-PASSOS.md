@@ -46,11 +46,12 @@ botão "Mudar ano" nas importações de Formatura/Paspatur, aba Vendidos (admin)
   - cada pagamento diz quem recebeu (estúdio, contato do colégio ou representante); "Falta repassar" separado por
     colégio e representante; o representante marca que o colégio repassou e avisa o próprio repasse, que só o
     admin confirma; conferir é do admin;
-  - comissão de quem fechou: % do Álbum de formatura (venda antecipada) pela forma de pagamento, sobre o que está no
-    caixa e conferido;
+  - preço de cada item no contrato (o aluno paga a soma do pacote dele); comissão de quem fechou item por item, com a
+    porcentagem de cada item em ⚙️ Ajustes → Comissão; cada pagamento conferido se divide pelos itens do pacote
+    (pagamento antigo sem itens usa a taxa do Álbum de formatura);
   - relatório de produção com colégio, unidade, representante, entrega e contato no topo; aluno, turma, itens e
     "PRECISA DE FOTO" para quem tem paspatur; totais por item;
   - cada mudança guarda quem fez e quando.
 - Dashboard (08/11): pagamento do contrato que chega ao estúdio entra como venda "Contrato do colégio" (origem Becas)
-  no mês em que entrou; a comissão de quem fechou entra no Desempenho da pessoa depois de conferida.
+  no mês em que entrou; a comissão de quem fechou (item por item) entra no Desempenho da pessoa depois de conferida.
 - **Falta:** colar as regras novas (`firestore.rules`) no Firebase.

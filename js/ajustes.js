@@ -3,6 +3,7 @@
 import * as FS from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
 import { collection, doc, setDoc } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
 import { COMISSAO_PADRAO, FORMAS, taxa } from "./regras.js";
+import { ITENS_PACOTE } from "./contrato-colegio-regras.js";
 import { formatarCampos } from "./ui.js";
 import { num, toast } from "./util.js";
 import { definirExtras as feriadosExtras, feriadosEntre } from "./feriados.js";
@@ -181,6 +182,20 @@ export function ligarAjustes(ctx, o) {
     ic.setAttribute("aria-label", "Comissão da adesão (Kit 01)");
     ic.value = String(taxa({ comissao: cfg }, "adesao")).replace(".", ",");
     t.appendChild(ic);
+    // Contrato do colégio: porcentagem de cada item, sobre cada pagamento conferido (dividido pelos itens do pacote)
+    ITENS_PACOTE.forEach(([k, n]) => {
+      const sp = document.createElement("span");
+      sp.textContent = "📄 Contrato do colégio · " + n;
+      sp.style.gridColumn = "1 / 3";
+      t.appendChild(sp);
+      const i = document.createElement("input");
+      i.inputMode = "decimal";
+      i.dataset.pct = "1";
+      i.dataset.item = k;
+      i.setAttribute("aria-label", "Comissão do contrato do colégio · " + n);
+      i.value = String(taxa({ comissao: cfg }, "contrato", k)).replace(".", ",");
+      t.appendChild(i);
+    });
   }
   function lerComissao() {
     const o = { pr: {}, form: {} };
@@ -188,6 +203,8 @@ export function ligarAjustes(ctx, o) {
       o[i.dataset.l][i.dataset.f] = num(i.value);
     });
     o.adesao = num($("comAdesao").value);
+    o.contrato = {};
+    document.querySelectorAll("#comTab input[data-item]").forEach(i => (o.contrato[i.dataset.item] = num(i.value)));
     return o;
   }
   $("pCancel").onclick = () => {

@@ -103,3 +103,47 @@ test("dashboard: pagamento no caixa entra como venda; comissão só do conferido
   assert.equal(m.pessoas["ana@x.com"].vend, 15000);
   assert.deepEqual(m.pessoas["ana@x.com"].com, { "form|Pix": 10000 });
 });
+
+test("comissão item por item: o pagamento se divide pelos preços dos itens do pacote", () => {
+  const c = { precos: { paspatur: 100, certificado: 30, canudo: 20 }, pacotePadrao: ["paspatur", "certificado", "canudo"] };
+  const joao = { pacote: ["certificado", "canudo"] };
+  assert.equal(R.precoAluno(joao, c), 50);
+  assert.equal(R.precoAluno({}, c), 150);
+  assert.deepEqual(R.itensDoPagamento(joao, c), { certificado: 30, canudo: 20 });
+  assert.deepEqual(R.itensDoPagamento(null, c, [joao, {}]), { paspatur: 100, certificado: 60, canudo: 40 });
+  const P = { comissao: { contrato: { paspatur: 20, certificado: 10, canudo: 5 } } };
+  // 75 de 150: paspatur 50 (20% = 10) + certificado 15 (10% = 1,50) + canudo 10 (5% = 0,50) = 12,00
+  const p = { valor: 75, itens: { paspatur: 100, certificado: 30, canudo: 20 } };
+  assert.deepEqual(R.baseItens(p), { paspatur: 5000, certificado: 1500, canudo: 1000 });
+  assert.equal(R.comissaoPagamento(p, P), 1200);
+  const r = R.resumoDinheiro([Object.assign({ recebidoPor: "estudio", conferido: true }, p)], c, [joao, {}], P);
+  assert.equal(r.combinado, 200);
+  assert.equal(r.comissao, 12);
+});
+
+test("dashboard: comissão do contrato item por item, com a taxa de cada item", async () => {
+  const { resumir, comissaoDe } = await import("../js/calc.js");
+  const { taxa } = await import("../js/regras.js");
+  const r = resumir(
+    {
+      contratos: [
+        {
+          respEmail: "ana@x.com",
+          pagamentos: [
+            {
+              valor: 75,
+              data: "2026-11-02",
+              recebidoPor: "estudio",
+              conferido: true,
+              itens: { paspatur: 100, certificado: 30, canudo: 20 }
+            }
+          ]
+        }
+      ]
+    },
+    "2026-11-08"
+  );
+  const pes = r.meses["2026-11"].pessoas["ana@x.com"];
+  const P = { comissao: { contrato: { paspatur: 20, certificado: 10, canudo: 5 } } };
+  assert.equal(comissaoDe(pes, (l, f) => taxa(P, l, f)).total, 1200);
+});

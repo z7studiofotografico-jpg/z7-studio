@@ -2,7 +2,7 @@
 // script noturno do GitHub, que grava o resumo pronto em resumos/dashboard.
 // Assim o Dashboard abre lendo 1 documento em vez de milhares.
 import { centavos, reais, pagamentosDe, formaDe, ehKit01, emAberto, atrasado, ativo, LEAD, PR, INST, BECA, ENSAIO } from "./regras.js";
-import { ondeEsta } from "./contrato-colegio-regras.js";
+import { ondeEsta, baseItens } from "./contrato-colegio-regras.js";
 
 const mes = d => {
   const m = String(d || "").slice(0, 7);
@@ -218,7 +218,7 @@ export function resumir(fontes, hoje, emailPorNome) {
     );
 
   // Contrato do colégio: entra como venda quando o dinheiro chega ao estúdio (pago direto ou repassado);
-  // a comissão de quem fechou usa a taxa do Álbum de formatura (venda antecipada) e só conta depois de conferido
+  // a comissão de quem fechou é item por item e só conta depois de conferido
   contratos.forEach(c => {
     const pessoa = quem(c.respEmail, c.respNome);
     (c.pagamentos || [])
@@ -226,7 +226,11 @@ export function resumir(fontes, hoje, emailPorNome) {
       .forEach(p => {
         const d = p.repassadoEm || p.data;
         venda(d, p.valor, "Contrato do colégio", "Becas", pessoa);
-        if (p.conferido) comissao(d, p.valor, "form", formaDe(p.forma) || "Dinheiro", pessoa);
+        if (!p.conferido) return;
+        // item por item (porcentagem de cada item nos Ajustes); pagamento antigo sem itens: taxa do Álbum
+        const b = baseItens(p);
+        if (b) Object.entries(b).forEach(([k, c]) => comissao(d, reais(c), "contrato", k, pessoa));
+        else comissao(d, p.valor, "form", formaDe(p.forma) || "Dinheiro", pessoa);
       });
   });
 
