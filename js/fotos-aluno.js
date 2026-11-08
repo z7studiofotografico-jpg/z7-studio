@@ -49,8 +49,11 @@ export function tokenGoogle(cliente, email, escopo = LEITURA) {
       })
   );
 }
+// Leitura: com a chave (pasta aberta com link; a equipe vê sem entrar no Google), a não ser que em Ajustes esteja
+// "cada pessoa entra com a conta Google" (driveLeitura = "conta"). O ID do cliente Google serve para o admin gravar.
+const leComConta = C => !!C.P.driveCliente && C.P.driveLeitura === "conta";
 export function abrirDrive(C) {
-  const cliente = C.P.driveCliente || "";
+  const cliente = leComConta(C) ? C.P.driveCliente : "";
   const k = cliente ? "oauth:" + cliente : C.P.driveChave || ((self.Z7_CONFIG || {}).firebase || {}).apiKey || "";
   if (!drive || chaveUsada !== k) {
     drive = criarDrive(cliente ? () => tokenGoogle(cliente, C.email) : k, (u, o) => fetch(u, o));
@@ -210,7 +213,7 @@ export function abrirFotosDoAluno(C, it, precoTxt) {
 const jaBaixadas = new Map();
 // Já dá para ler o Drive sem abrir a tela do Google? (chave do Google, ou entrada feita há menos de 1 hora)
 export function driveLiberado(C) {
-  if (!C.P.driveCliente) return true;
+  if (!leComConta(C)) return true;
   const t = tokens[LEITURA];
   return !!(t && t.ate > Date.now() + 60000);
 }
@@ -240,7 +243,8 @@ export async function miniaturasDoAluno(C, it, box, o = {}) {
   const info = el("p", "hint", "Procurando as fotos no Google Drive…");
   box.append(info);
   const acoes = el("div", "actions");
-  const trocar = U.mkBtn("🔄 Trocar as fotos", "", () => trocarFotos(C, it, o.salvar));
+  // trocar e enviar fotos: só o administrador
+  const trocar = C.isAdmin ? U.mkBtn("🔄 Trocar as fotos", "", () => trocarFotos(C, it, o.salvar)) : null;
   let r;
   try {
     r = await abrirDrive(C).fotosDoAluno(raiz, it);
@@ -251,9 +255,8 @@ export async function miniaturasDoAluno(C, it, box, o = {}) {
   }
   if (r.erro) {
     info.className = "wait";
-    info.textContent = r.erro + " Se as fotos estão com outro nome, toque em “🔄 Trocar as fotos” e escolha.";
-    acoes.append(trocar);
-    if (C.isAdmin) acoes.append(botaoEnviarNovas(C, it, o));
+    info.textContent = r.erro + (C.isAdmin ? " Se as fotos estão com outro nome, toque em “🔄 Trocar as fotos” e escolha." : "");
+    if (C.isAdmin) acoes.append(trocar, botaoEnviarNovas(C, it, o));
     box.append(acoes);
     return;
   }
@@ -275,11 +278,8 @@ export async function miniaturasDoAluno(C, it, box, o = {}) {
     b.setAttribute("aria-label", rot === String(Number(rot)) ? "Foto " + rot : rot);
     grade.append(b);
   });
-  acoes.append(
-    U.mkBtn("🖼️ Enviar a folha / montar o quadro", "btn-primary", () => abrirFotosDoAluno(C, it, o.precoTxt || "")),
-    trocar
-  );
-  if (C.isAdmin) acoes.append(botaoEnviarNovas(C, it, o));
+  acoes.append(U.mkBtn("🖼️ Enviar a folha / montar o quadro", "btn-primary", () => abrirFotosDoAluno(C, it, o.precoTxt || "")));
+  if (C.isAdmin) acoes.append(trocar, botaoEnviarNovas(C, it, o));
   box.append(acoes);
   // baixa uma a uma (prévias pequenas, com marca d'água); a janela redesenha quando o aluno muda: guarda o que já baixou
   const D = abrirDrive(C);

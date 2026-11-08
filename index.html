@@ -307,7 +307,10 @@
       <div class="field"><label for="pDrive">Pasta das prévias no Google Drive (link)</label><input id="pDrive" type="password" autocomplete="off" maxlength="300" placeholder="https://drive.google.com/drive/folders/…"></div>
       <div class="field"><label for="pDriveChave">Chave do Google para ler o Drive (opcional)</label><input id="pDriveChave" type="password" autocomplete="off" maxlength="80" placeholder="em branco: usa a chave do app"></div>
     </div>
-    <div class="field"><label for="pDriveCliente">Pasta fechada: ID do cliente Google (OAuth). Preenchido = cada pessoa entra com a conta Google dela</label><input id="pDriveCliente" maxlength="120" placeholder="ex.: 1234-abc.apps.googleusercontent.com"></div>
+    <div class="row2">
+      <div class="field"><label for="pDriveCliente">ID do cliente Google (OAuth): para o admin enviar fotos ao Drive</label><input id="pDriveCliente" maxlength="120" placeholder="ex.: 1234-abc.apps.googleusercontent.com"></div>
+      <div class="field"><label for="pDriveLeitura">Como a equipe vê as fotos</label><select id="pDriveLeitura"><option value="">Sem entrar no Google (pasta aberta com link)</option><option value="conta">Cada pessoa entra com a conta Google (pasta fechada)</option></select></div>
+    </div>
     <div class="row2">
       <div class="field"><label for="pEntrega">Como entregam</label><input id="pEntrega" maxlength="120" placeholder="em casa, na sua região, ou retirada no estúdio"></div>
     </div>

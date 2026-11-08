@@ -49,7 +49,8 @@ export function ligarAjustes(ctx, o) {
     ["pFeriados", "feriadosExtras", "texto"],
     ["pDrive", "drivePrevias", "texto"],
     ["pDriveChave", "driveChave", "texto"],
-    ["pDriveCliente", "driveCliente", "texto"]
+    ["pDriveCliente", "driveCliente", "texto"],
+    ["pDriveLeitura", "driveLeitura", "texto"]
   ];
   // Preços do Paspatur (Etapa 4): config/app → paspatur = { lfPix, lfCartao, kitPreco, kitPromo, kitCartao, kitFinal }
   const PASPATUR = [
