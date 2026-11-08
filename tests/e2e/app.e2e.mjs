@@ -3411,6 +3411,67 @@ await cenario("Ajuda de vendas (respostas prontas e texto para o Claude sem tele
   );
   ok(!erros.length, "sem erros no console: " + erros.join(" | "));
 });
+await cenario("Registrar venda: endereço completo obrigatório e CEP preenche a rua", async () => {
+  const Y = new Date().getFullYear();
+  const d = Object.assign({}, base, {
+    "repasse/v1": {
+      nome: "LUANA COSTA",
+      nomeBusca: "LUANA COSTA",
+      escola: "COLEGIO ALFA",
+      ano: Y - 1,
+      etapa: "INTERESSADO",
+      resp: "Ana",
+      respEmail: ANA,
+      separadoEm: dia(-1),
+      followup: dia(0),
+      contatos: [{ tipo: "Mãe", nome: "Rosa", tel: "21988881111" }],
+      telefones: ["21988881111"]
+    }
+  });
+  const { pg, erros, store, ctx } = await abrir(ANA, migrar(d));
+  await ctx.route(/viacep\.com\.br\/ws\/26540000\/json/, rt =>
+    rt.fulfill({
+      contentType: "application/json",
+      headers: { "access-control-allow-origin": "*" },
+      body: JSON.stringify({ cep: "26540-000", logradouro: "Rua Doutor Rufino", bairro: "Centro", localidade: "Nilópolis", uf: "RJ" })
+    })
+  );
+  await ir(pg, "#pr");
+  await calmo(pg);
+  await pg.locator("#rChips").getByText("Interessados").click();
+  await calmo(pg);
+  await pg.locator("article", { hasText: "Luana" }).first().getByRole("button", { name: "Pagou 💰" }).click();
+  const sh = pg.locator(".sheet:visible").last();
+  await sh.getByRole("button", { name: "Salvar venda" }).click();
+  await calmo(pg);
+  ok(
+    (await store())["repasse/v1"].etapa === "INTERESSADO" && /Falta preencher: CEP, Rua, Número, Bairro, Cidade/.test(await sh.locator("p.wait:visible").textContent()),
+    "sem endereço completo a venda não salva e o app diz o que falta"
+  );
+  await sh.getByLabel("CEP").fill("26540-000");
+  await pg.waitForFunction(() => /preenchidos/.test(document.body.textContent), null, { timeout: 8000 });
+  ok(
+    (await sh.getByLabel("Rua").inputValue()) === "Rua Doutor Rufino" &&
+      (await sh.getByLabel("Bairro").inputValue()) === "Centro" &&
+      (await sh.getByLabel("Cidade").inputValue()) === "Nilópolis",
+    "o CEP preenche rua, bairro e cidade"
+  );
+  await sh.getByLabel("Número").fill("290");
+  await sh.getByPlaceholder("R$").fill("250");
+  await sh.getByRole("button", { name: "Salvar venda" }).click();
+  await calmo(pg);
+  const v = (await store())["repasse/v1"];
+  ok(
+    v.etapa === "PAGO" &&
+      v.conferido === false &&
+      v.endereco &&
+      v.endereco.cep === "26540000" &&
+      v.endereco.rua === "Rua Doutor Rufino" &&
+      v.endereco.numero === "290",
+    "venda salva com o endereço completo (e a conferir)"
+  );
+  ok(!erros.length, "sem erros no console: " + erros.join(" | "));
+});
 await cenario("Equipe edita os dados do aluno e o Adriano vê quem editou", async () => {
   const Y = new Date().getFullYear();
   const d = Object.assign({}, base, {

@@ -42,6 +42,35 @@ export function confirmar(titulo, texto, { sim = "Sim", nao = "Não", perigo = f
     );
   });
 }
+// várias opções (botões um embaixo do outro): resolve com o valor escolhido; fechar = null
+export function escolher(titulo, texto, opcoes) {
+  return new Promise(res => {
+    let decidiu = false;
+    const fim = v => {
+      if (decidiu) return;
+      decidiu = true;
+      res(v);
+    };
+    sheet(
+      titulo,
+      (p, close) => {
+        if (texto) p.append(el("p", null, texto));
+        const a = el("div", "opcoes");
+        opcoes.forEach(o => {
+          const b = el("button", "btn " + (o.cls || ""), o.txt);
+          b.type = "button";
+          b.onclick = () => {
+            fim(o.v);
+            close();
+          };
+          a.append(b);
+        });
+        p.append(a);
+      },
+      { div: true, onClose: () => fim(null) }
+    );
+  });
+}
 // "Mudar de X para Y?"
 export const confirmarStatus = (de, para) => confirmar("Mudar o status?", `Mudar de “${de}” para “${para}”?`);
 

@@ -1,5 +1,5 @@
 // PR: o cartão de cada contato (para quem mandar, a mensagem pronta, os botões de cada etapa)
-import { excluir, faixaExclusao, pedirTexto, confirmar } from "./confirmar.js";
+import { excluir, faixaExclusao, pedirTexto, escolher } from "./confirmar.js";
 import { openMockup, textoEscolha } from "./mockup.js";
 import { el, title, sheet as sheetUi } from "./ui.js";
 import * as U from "./util.js";
@@ -445,15 +445,22 @@ function acoesDoCartao(it, li, e) {
             atalhos: MOTIVOS_CAIDO
           });
           if (!motivo) return;
-          // achou caro (no PR): antes de deixar cair, oferecer o Paspatur, que é mais em conta
-          if (colNome() === "repasse" && motivoPreco(motivo)) {
-            const ofereceu = await confirmar(
-              "Já ofereceu o Paspatur?",
-              `Antes de marcar ${U.first(title(it.nome))} como caído por preço, ofereça o Paspatur: é a opção mais em conta e muita família que acha o kit caro aceita.`,
-              { sim: "Já ofereci, não quis", nao: "Vou oferecer agora" }
+          // achou caro: antes de deixar cair, oferecer a opção mais em conta
+          // (PR → Paspatur; Formatura → PR ou as fotos digitais)
+          const ofertas = colNome() === "repasse" ? ["o Paspatur"] : ehFormatura() ? ["o PR", "as fotos digitais"] : [];
+          if (ofertas.length && motivoPreco(motivo)) {
+            const txt = ofertas.join(" ou ");
+            const r = await escolher(
+              `Já ofereceu ${txt}?`,
+              `Antes de marcar ${U.first(title(it.nome))} como caído por preço, ofereça ${txt}: é a opção mais em conta e muita família que acha caro aceita.`,
+              [
+                ...ofertas.map(o => ({ v: o, txt: ofertas.length > 1 ? "Vou oferecer " + o : "Vou oferecer agora", cls: "btn-primary" })),
+                { v: "nao", txt: "Já ofereci, não quis" }
+              ]
             );
-            if (!ofereceu) return U.toast("Ofereça o Paspatur e volte aqui se não quiser");
-            motivo += " (ofereceu o Paspatur e não quis)";
+            if (!r) return;
+            if (r !== "nao") return U.toast(`Ofereça ${r} e volte aqui se não quiser`);
+            motivo += ` (ofereceu ${txt} e não quis)`;
           }
           save(
             it,

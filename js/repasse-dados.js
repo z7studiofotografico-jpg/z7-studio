@@ -235,7 +235,14 @@ export function enderecoTxt(it) {
   if (it.etapa !== "PAGO" || !(it.entregaTipo || "").startsWith("Entrega")) return "";
   const a = it.endereco || {},
     t = title;
-  return [a.rua && t(a.rua) + (a.numero ? ", " + a.numero : ""), a.complemento && t(a.complemento), t(a.bairro), t(a.cidade)]
+  const cep = String(a.cep || "").replace(/\D/g, "");
+  return [
+    a.rua && t(a.rua) + (a.numero ? ", " + a.numero : ""),
+    a.complemento && t(a.complemento),
+    t(a.bairro),
+    t(a.cidade),
+    cep.length === 8 ? "CEP " + cep.slice(0, 5) + "-" + cep.slice(5) : ""
+  ]
     .filter(Boolean)
     .join(" · ");
 }
