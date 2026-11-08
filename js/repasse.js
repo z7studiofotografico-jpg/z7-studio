@@ -651,8 +651,6 @@ function renderList(loading, emptyMsg) {
         ? "0 Falta combinar com o cliente"
         : it.entregaTipo.startsWith("Retirada")
           ? "1 Retirada no estúdio"
-          : it.entregaTipo.startsWith("Entrega no colégio")
-            ? "1 No colégio · " + title(it.escola || "Sem colégio")
           : "2 " + [title(it.endereco?.cidade || "Sem cidade"), title(it.endereco?.bairro || "Sem bairro")].join(" · ");
     arr.sort((a, b) => grpOf(a).localeCompare(grpOf(b)) || (a.entregaData || "9").localeCompare(b.entregaData || "9"));
     let last = null;

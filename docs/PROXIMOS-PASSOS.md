@@ -13,7 +13,8 @@ botão "Mudar ano" nas importações de Formatura/Paspatur, aba Vendidos (admin)
    que gera a prévia e grava na pasta do colégio no Drive com a conta Google do admin (precisa ser Editor da pasta).
 3. **Telas novas do PR/Paspatur**. Já feitos (07-08/11): total do mês em Minhas vendas; prazo de entrega em cores;
    caído por preço (PR oferece o Paspatur; Formatura escolhe entre oferecer o PR ou as fotos digitais, em janela);
-   endereço completo obrigatório com CEP; "Quem paga o PR" no colégio. Falta o resto abaixo (aprovadas pela Luciana):
+   endereço completo obrigatório com CEP. ("Quem paga" saiu do PR em 08/11: vai para o Contrato do colégio,
+   em Aluguel de Becas → Alunos dos colégios.) Falta o resto abaixo (aprovadas pela Luciana):
    - lista única; filtro Todos / Só PR / Só Paspatur; filtro por pessoa da equipe com contagem;
    - no aluno, chave PR / Paspatur com confirmação ("Deseja vender como …?"); qualquer pessoa pode trocar; o valor troca junto;
    - abas na ordem: Caídos · Incompletos · Para hoje · Interessados · Buscar · Conferir pagamento | Vendido · Entregar · Entregue (+ Vendidos/Minhas vendas);
@@ -23,7 +24,6 @@ botão "Mudar ano" nas importações de Formatura/Paspatur, aba Vendidos (admin)
    - prazo: pagamento + 20 dias, em cores (verde / amarelo faltando 3 dias / vermelho); entrega própria marca dia e turno;
    - endereço completo obrigatório em toda venda (CEP preenche rua e bairro);
    - caído por "achou caro": oferecer Paspatur antes;
-   - colégio: "Quem paga: cada aluno / o colégio" (colégio paga = entra direto em Vendido);
    - tabela de preços organizada na ⚙️ (só admin), por grupo; limites de desconto em R$ sem pedir, iguais para toda a
      equipe, cadastrados pelo admin na ⚙️ (valores fora deste arquivo); acima do limite, pedido de autorização;
    - total do mês (quantidade e valor) no topo de "Minhas vendas";

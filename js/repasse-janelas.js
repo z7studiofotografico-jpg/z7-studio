@@ -127,7 +127,7 @@ export function openEntrega(it) {
 function entregaCampos(p, it, { venda = false } = {}) {
   const box = el("div", "imp");
   const en = el("select");
-  ["A combinar com o cliente", "Entrega em casa", "Retirada no estúdio (agendada)", "Entrega no colégio"].forEach(x => {
+  ["A combinar com o cliente", "Entrega em casa", "Retirada no estúdio (agendada)"].forEach(x => {
     const o = el("option", null, x);
     o.value = x;
     en.append(o);
@@ -137,9 +137,7 @@ function entregaCampos(p, it, { venda = false } = {}) {
       ? "Retirada no estúdio (agendada)"
       : it.entregaTipo.startsWith("A combinar")
         ? "A combinar com o cliente"
-        : it.entregaTipo.startsWith("Entrega no colégio")
-          ? "Entrega no colégio"
-          : "Entrega em casa";
+        : "Entrega em casa";
   const dt = el("input");
   dt.type = "date";
   dt.value = it.entregaData || "";

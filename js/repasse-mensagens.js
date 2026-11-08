@@ -62,8 +62,6 @@ export function passo(it, c) {
       return encerra;
     }
     case "PAGO":
-      // pago pelo colégio / entrega no colégio: não há o que combinar com a família
-      if (it.colegioPaga || (it.entregaTipo || "").startsWith("Entrega no colégio")) return null;
       if (!it.entregaTipo || it.entregaTipo.startsWith("A combinar"))
         return {
           title: "Perguntar como prefere receber",

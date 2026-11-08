@@ -189,8 +189,6 @@ export function situacaoTxt(it, s) {
           ? "Contato para hoje"
           : "Próximo contato: " + dia(it.followup)
       : "Sem data de contato";
-  if (it.etapa === "PAGO" && (it.colegioPaga || (it.entregaTipo || "").startsWith("Entrega no colégio")))
-    return (it.colegioPaga ? "Pago pelo colégio" : "Pago" + (it.pagoEm ? " em " + dia(it.pagoEm) : "")) + " · entrega no colégio";
   if (it.etapa === "PAGO") {
     const ret = (it.entregaTipo || "").startsWith("Retirada"),
       comb = !it.entregaTipo || it.entregaTipo.startsWith("A combinar"),
@@ -234,7 +232,7 @@ export function prazoEntrega(it, hoje) {
 }
 // Endereço de entrega numa linha (só quando pagou e vai receber em casa)
 export function enderecoTxt(it) {
-  if (it.etapa !== "PAGO" || !(it.entregaTipo || "").startsWith("Entrega em casa")) return "";
+  if (it.etapa !== "PAGO" || !(it.entregaTipo || "").startsWith("Entrega")) return "";
   const a = it.endereco || {},
     t = title;
   const cep = String(a.cep || "").replace(/\D/g, "");

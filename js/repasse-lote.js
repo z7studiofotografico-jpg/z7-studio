@@ -60,8 +60,7 @@ export async function refreshStats() {
     const docs = s0 => s0.docs.map(d => d.data()).filter(noSeg);
     set("rsHoje", docs(h).filter(x => ABERTAS.includes(x.etapa) && x.followup && x.followup <= today).length);
     set("rsInt", docs(i).length);
-    // (aluno pago pelo colégio não é venda da equipe: não entra na conta do mês)
-    const doMes = docs(m).filter(x => (x.pagoEm || "") >= mes && !x.colegioPaga);
+    const doMes = docs(m).filter(x => (x.pagoEm || "") >= mes);
     Object.assign(vendasMes, { n: doMes.length, v: doMes.reduce((a, x) => a + (Number(x.valor) || 0), 0), pronto: true });
     set("rsMes", U.money(vendasMes.v));
     set("rVendMes", textoVendasMes());

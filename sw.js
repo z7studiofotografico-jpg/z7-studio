@@ -23,8 +23,6 @@ const SHELL = [
   "./js/drive-fotos.js",
   "./js/fotos-aluno.js",
   "./js/cep.js",
-  "./js/colegio-paga.js",
-  "./js/colegio-paga-tela.js",
   "./js/enviar-foto.js",
   "./js/conferir-fotos.js",
   "./js/backup.js",
