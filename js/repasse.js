@@ -445,7 +445,8 @@ function openTab(k) {
         );
   if (k === "vendidos")
     q = C.isAdmin
-      ? FS.query(col, FS.where("etapa", "==", "ENTREGUE"), ...(ehFormatura() ? baseSeg() : seg === "lf" ? baseLF() : []), FS.limit(1000))
+      ? // só consulta: o PR já passa de 1.000 entregues; até 5.000 sem o aviso de lista incompleta
+        FS.query(col, FS.where("etapa", "==", "ENTREGUE"), ...(ehFormatura() ? baseSeg() : seg === "lf" ? baseLF() : []), FS.limit(5000))
       : FS.query(
           col,
           ...(seg === "lf" ? baseLF() : []),
@@ -579,6 +580,15 @@ function naTela() {
   }
   return arr;
 }
+// total geral de vendidos (pagos + entregues) da lista aberta: contagem no servidor, sem baixar os alunos
+async function totalVendidos() {
+  const conta = (...f) => FS.getCountFromServer(FS.query(col, FS.where("etapa", "in", ["PAGO", "ENTREGUE"]), ...f)).then(c => c.data().count);
+  if (ehFormatura()) return conta(...baseSeg());
+  if (seg === "lf") return conta(...baseLF());
+  // Repasse (PR/Paspatur): todos menos os do ano atual (Linha de Frente)
+  const [todos, lf] = await Promise.all([conta(), conta(...baseLF())]);
+  return todos - lf;
+}
 function renderList(loading, emptyMsg) {
   const list = $("rList");
   if (!list) return; // (Formaturas: a tela saiu do ar)
@@ -592,11 +602,24 @@ function renderList(loading, emptyMsg) {
   }
   const arr = naTela();
   if (tab === "vendidos") {
-    // total do mês (quantidade e valor pagos no mês, entregues ou não) no topo de Vendidos / Minhas vendas
+    // total do mês (quantidade e valor pagos no mês, entregues ou não) no topo de Vendidos / Minhas vendas;
+    // o admin vê ao lado o total geral de vendidos (pagos e entregues, de todos os anos desta lista)
+    const box = el("div", "vend-topo");
+    box.style.gridColumn = "1/-1";
     const t = el("div", "notes vend-mes", textoVendasMes());
     t.id = "rVendMes";
-    t.style.gridColumn = "1/-1";
-    list.append(t);
+    box.append(t);
+    if (C.isAdmin) {
+      const g = el("div", "notes vend-mes", "Total vendido: contando…");
+      box.append(g);
+      totalVendidos()
+        .then(n => (g.textContent = `Total vendido: ${n.toLocaleString("pt-BR")}`))
+        .catch(e => {
+          console.warn("[Z7] total vendidos", e);
+          g.remove();
+        });
+    }
+    list.append(box);
   }
   if (!arr.length) {
     const e = el("div", "empty");

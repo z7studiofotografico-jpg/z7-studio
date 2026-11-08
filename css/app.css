@@ -368,7 +368,8 @@ details.tamtipo{border:1px solid var(--line,#ddd);border-radius:10px;padding:6px
 .prazo.verde { background: var(--ok-soft); color: var(--ok); }
 .prazo.amarelo { background: var(--warn-soft); color: var(--warn); }
 .prazo.vermelho { background: var(--late-soft); color: var(--late); }
-.vend-mes { font-weight: 700; font-size: 1rem; }
+.vend-topo { display: flex; flex-wrap: wrap; gap: 10px; }
+.vend-mes { font-weight: 700; font-size: 1.25rem; margin: 0; }
 
 /* escolher: opções uma embaixo da outra */
 .opcoes { display: flex; flex-direction: column; gap: 8px; margin-top: 8px; }

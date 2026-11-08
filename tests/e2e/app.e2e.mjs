@@ -638,7 +638,13 @@ await cenario("Adriano (admin), com os dados já atualizados no servidor", async
     );
     // contrato: Kit 04 antecipado preenche valor e parcelas pela tabela
     const novoFormando = async () => {
+      // espera a janela do aluno anterior fechar (senão o nome vai para a janela que está saindo)
+      await pg
+        .waitForFunction(() => ![...document.querySelectorAll(".sheet")].some(x => !x.querySelector(".panel.wide") && x.querySelector("button[type=submit]")), null, { timeout: 5000 })
+        .catch(() => {});
+      const antes = await pg.locator(".sheet").count();
       await pg.locator(".panel.wide").getByRole("button", { name: "+ Aluno" }).click();
+      await pg.waitForFunction(n => document.querySelectorAll(".sheet").length > n, antes, { timeout: 5000 }).catch(() => {});
       await calmo(pg);
       return pg.locator(".sheet").last();
     };
@@ -998,6 +1004,8 @@ await cenario("Adriano (admin), com os dados já atualizados no servidor", async
     await pg.locator("#rChips").getByText("Vendidos").click();
     await calmo(pg);
     ok(/Este mês: \d+ vendas? · R\$\s?[\d.]+,\d\d/.test(await pg.textContent("#rVendMes")), "Vendidos mostra o total do mês (quantidade e valor)");
+    await pg.waitForFunction(() => /Total vendido: \d/.test(document.querySelector(".vend-topo")?.textContent || ""), null, { timeout: 5000 }).catch(() => {});
+    ok(/Total vendido: \d+/.test(await pg.textContent(".vend-topo")), "admin vê ao lado o total geral de vendidos");
     await pg.locator("#rChips").getByText("A conferir").click();
     await calmo(pg);
     // pedido de aluno repetido: o admin decide
