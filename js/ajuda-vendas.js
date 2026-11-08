@@ -60,15 +60,15 @@ export const CARDS = {
     ]
   },
   paspatur: {
-    nome: "PR · Paspatur",
-    vende: "o Paspatur com as fotos do ensaio do aluno no colégio",
+    nome: "Paspatur",
+    vende: "o Kit Paspatur de fotos, com as fotos do ensaio do aluno no colégio",
     grupos: ["Paspatur", "Foto avulsa"],
     situacoes: [
       S.preco,
       S.caro,
       S.pensar,
       S.pagamento,
-      ["previa", "Prévia", "{oi} Vou te mandar a prévia do paspatur de {aluno} 📸"],
+      ["previa", "Prévia", "{oi} Vou te mandar a prévia do Kit Paspatur de fotos de {aluno} 📸"],
       S.prazo
     ]
   },

@@ -3811,6 +3811,7 @@ await cenario("PR lista única: filtro PR/Paspatur, pessoa da equipe e chave na 
     // + Aluno: escolhe como vender
     await pg.getByRole("button", { name: "+ Aluno" }).click();
     const f = pg.locator(".sheet").last();
+    ok((await pg.locator(".sheet").last().getByLabel("Vender como").inputValue()) === "pr", "+ Aluno começa marcado como PR");
     await f.getByLabel("Nome do aluno").fill("Pedro Novo Paspatur");
     await f.getByLabel("Colégio").fill("Colegio Alfa");
     await f.getByLabel("Vender como").selectOption("paspatur");

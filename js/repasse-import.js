@@ -1,5 +1,5 @@
 // PR: importar a planilha de alunos (só admin). Os dados puros ficam em repasse-dados.js.
-import { colNome, metaNome, ehFormatura, filtroVenda } from "./repasse-estado.js";
+import { colNome, metaNome, ehFormatura } from "./repasse-estado.js";
 import { el, carregarLib } from "./ui.js";
 import { MAPA, hkey, linhaParaDoc, docId, faltando, norm, semTelefone } from "./repasse-dados.js";
 import * as U from "./util.js";
@@ -96,7 +96,7 @@ export function openImport(ctx, ui, aoTerminar) {
       o.value = v;
       como.append(o);
     });
-    como.value = filtroVenda === "paspatur" ? "paspatur" : "pr";
+    como.value = "pr"; // sempre começa como PR (pedido da Luciana, 08/11); troca aqui ou depois na chave do aluno
     const fComo = field("Vender estes alunos como", como);
     fComo.hidden = ehFormatura();
     p.append(fComo);
@@ -128,8 +128,6 @@ export function openImport(ctx, ui, aoTerminar) {
       porArquivo = [];
       const fs = [...inp.files];
       if (!fs.length) return;
-      // planilha com PASPATUR no nome: os alunos entram como Paspatur (dá para mudar antes de importar)
-      if (!ehFormatura() && fs.some(f => /PASPATUR/.test(norm(f.name)))) como.value = "paspatur";
       out.append(el("p", "hint", "Lendo as planilhas…"));
       try {
         X = await loadXLSX();

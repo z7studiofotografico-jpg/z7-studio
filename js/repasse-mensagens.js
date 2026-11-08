@@ -2,7 +2,7 @@
 import { title } from "./ui.js";
 import { ESTUDIO } from "./mensagens.js";
 import * as U from "./util.js";
-import { C, segDe, eu, ofertaTxt, entregaTxt, sextaTxt, ehFormatura, precos } from "./repasse-estado.js";
+import { C, segDe, eu, ofertaTxt, entregaTxt, sextaTxt, ehFormatura, precos, vendaDe } from "./repasse-estado.js";
 import { passoFormatura } from "./formatura-mensagens.js";
 import { ehRespCadastro } from "./repasse-dados.js";
 
@@ -17,23 +17,27 @@ export function passo(it, c) {
   const quem = c && c.tipo === "Formando" ? "o seu ensaio de formatura" : `o ensaio de formatura de ${F}`;
   const onde = segDe(it) === "lf" ? title(it.escola) + ", este ano" : [title(it.escola), it.ano].filter(Boolean).join(", ");
   const t = it.tentativas || 0;
+  // lista única: quem está sendo vendido como Paspatur recebe o texto do Kit Paspatur de fotos
+  const pas = vendaDe(it) === "paspatur";
+  const KIT = pas ? "Kit Paspatur de fotos" : "Kit Recordação";
+  const PECA = pas ? "kit" : "quadro";
   const encerra = {
     title: "Encerrar com elegância",
-    msg: `${cn || "Tudo bem"}, vou entender que agora não é o momento e não vou mais te incomodar. Se um dia quiser o quadro ${c && c.tipo === "Formando" ? "da sua formatura" : "de " + F}, é só me chamar aqui! 💛`,
+    msg: `${cn || "Tudo bem"}, vou entender que agora não é o momento e não vou mais te incomodar. Se um dia quiser o ${PECA} ${c && c.tipo === "Formando" ? "da sua formatura" : "de " + F}, é só me chamar aqui! 💛`,
     then: { etapa: "NÃO QUER", days: -1 }
   };
   switch (it.etapa) {
     case "SEPARADO":
       return {
         title: "1º contato: pedir para mandar a prévia",
-        msg: `${oi} Tudo bem? ${souEu}\nNós fizemos ${quem} no colégio${onde ? " (" + onde + ")" : ""}, e as fotos ficaram lindas!\nO Kit Recordação ${c && c.tipo === "Formando" ? "com as suas fotos" : "de " + F} já está pronto aqui no estúdio: quadro 30x40 com moldura preta, 2 porta-retratos e as fotos digitais. Posso te mandar uma foto de como ficou? 😊`,
+        msg: `${oi} Tudo bem? ${souEu}\nNós fizemos ${quem} no colégio${onde ? " (" + onde + ")" : ""}, e as fotos ficaram lindas!\nO ${KIT} ${c && c.tipo === "Formando" ? "com as suas fotos" : "de " + F} já está pronto aqui no estúdio${pas ? "" : ": quadro 30x40 com moldura preta, 2 porta-retratos e as fotos digitais"}. Posso te mandar uma foto de como ficou? 😊`,
         then: { etapa: "CONTATADO", days: 2, count: true }
       };
     case "CONTATADO":
       if (t <= 1)
         return {
           title: "2º contato: lembrar com carinho",
-          msg: `Oi${cn ? ", " + cn : ""}! Passando só para saber se você viu minha mensagem sobre as fotos do ensaio de formatura${c && c.tipo === "Formando" ? "" : " de " + F} 😊 Posso te mandar a prévia do quadro?`,
+          msg: `Oi${cn ? ", " + cn : ""}! Passando só para saber se você viu minha mensagem sobre as fotos do ensaio de formatura${c && c.tipo === "Formando" ? "" : " de " + F} 😊 Posso te mandar a prévia do ${PECA}?`,
           then: { etapa: "CONTATADO", days: 3, count: true }
         };
       return encerra;
@@ -43,7 +47,7 @@ export function passo(it, c) {
         return {
           title: "Mandar a prévia e o preço",
           mockup: true,
-          msg: `Olha como fica o Kit Recordação ${c && c.tipo === "Formando" ? "do seu ensaio" : "de " + F}! 😍\n• Quadro 30x40 com moldura preta\n• 2 porta-retratos 15x10\n• As fotos digitais do ensaio\nJá está pronto, é só combinar a entrega! ${ofertaTxt(it)}.\nEntregamos ${entregaTxt()}. Quer que eu separe o seu?`,
+          msg: `Olha como fica o ${KIT} ${c && c.tipo === "Formando" ? "do seu ensaio" : "de " + F}! 😍\n${pas ? "" : "• Quadro 30x40 com moldura preta\n• 2 porta-retratos 15x10\n• As fotos digitais do ensaio\n"}Já está pronto, é só combinar a entrega! ${ofertaTxt(it)}.\nEntregamos ${entregaTxt()}. Quer que eu separe o seu?`,
           then: { etapa: "INTERESSADO", days: 2, countI: true }
         };
       }
@@ -56,7 +60,7 @@ export function passo(it, c) {
             }
           : {
               title: "Follow-up da prévia",
-              msg: `Oi${cn ? ", " + cn : ""}! Conseguiu ver a prévia do quadro? Se quiser, separo o seu hoje e já combinamos a entrega 😊`,
+              msg: `Oi${cn ? ", " + cn : ""}! Conseguiu ver a prévia do ${PECA}? Se quiser, separo o seu hoje e já combinamos a entrega 😊`,
               then: { etapa: "INTERESSADO", days: 3, countI: true }
             };
       return encerra;
@@ -85,7 +89,7 @@ export function passo(it, c) {
     case "ENTREGUE":
       return {
         title: "Pós-venda: foto na parede e indicação",
-        msg: `${cn || "Oi"}, o kit ${c && c.tipo === "Formando" ? "" : "de " + F + " "}chegou direitinho? 💛 Se puder, manda uma foto do quadro na parede, vamos amar ver! E se alguém da família ou algum amigo também se formou, me indica?`,
+        msg: `${cn || "Oi"}, o kit ${c && c.tipo === "Formando" ? "" : "de " + F + " "}chegou direitinho? 💛 Se puder, manda uma foto ${pas ? "do kit" : "do quadro na parede"}, vamos amar ver! E se alguém da família ou algum amigo também se formou, me indica?`,
         then: null
       };
     default:

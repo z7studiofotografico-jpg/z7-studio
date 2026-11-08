@@ -4,7 +4,7 @@ import * as U from "./util.js";
 import { norm, faltando, docId, semTelefone } from "./repasse-dados.js";
 import { codigoBusca, comAno, avisoTel } from "./aluno-id.js";
 import { procurarRepetido, pedirAluno, indexarFones, gerarCodigoPR } from "./pedidos.js";
-import { C, FS, db, tab, seg, meta, ANO, segDe, save, tela, colNome, ehFormatura, filtroVenda } from "./repasse-estado.js";
+import { C, FS, db, tab, seg, meta, ANO, segDe, save, tela, colNome, ehFormatura } from "./repasse-estado.js";
 import { sheet, field, actions } from "./repasse-janelas.js";
 import { refreshStats, refreshLote } from "./repasse-lote.js";
 // ID do aluno novo (26CEPNCP-01): ver gerarCodigoPR em pedidos.js
@@ -45,7 +45,7 @@ export function openDados(it) {
         o.value = v;
         como.append(o);
       });
-      como.value = filtroVenda === "paspatur" ? "paspatur" : "pr";
+      como.value = "pr"; // sempre começa como PR
       p.append(field("Vender como", como));
     }
     // colégios que já existem no PR (para escrever igual)
