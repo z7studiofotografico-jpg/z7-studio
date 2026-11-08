@@ -602,3 +602,31 @@ test("PR: Caído só com motivo e só o admin resgata", async () => {
   await assertFails(updateDoc(doc(db, "repasse", "r3"), { etapa: "NA FILA" }));
   await assertSucceeds(updateDoc(doc(como(ADRIANO), "repasse", "r3"), { etapa: "NA FILA", resgateObs: "ok" }));
 });
+
+// Contrato do colégio (Aluguel de becas): quem fechou mexe; dinheiro com o representante só o admin confirma
+test("contrato do colégio: o representante cria o dele e não muda o valor depois", async () => {
+  const ana = como(ANA);
+  await assertSucceeds(setDoc(doc(ana, "contratosColegio", "i3_2026"), { instId: "i3", ano: 2026, respEmail: ANA, valor: 150, quemPaga: "alunos" }));
+  await assertFails(setDoc(doc(ana, "contratosColegio", "i1_2026"), { instId: "i1", ano: 2026, respEmail: PEDRO, valor: 150 }));
+  await assertSucceeds(updateDoc(doc(ana, "contratosColegio", "i3_2026"), { entrega: { data: "2026-12-12", com: "Márcia" } }));
+  await assertFails(updateDoc(doc(ana, "contratosColegio", "i3_2026"), { valor: 99 }));
+  await assertSucceeds(updateDoc(doc(como(ADRIANO), "contratosColegio", "i3_2026"), { valor: 99 }));
+  await assertFails(updateDoc(doc(como(PEDRO), "contratosColegio", "i3_2026"), { obs: "x" }));
+});
+test("contrato do colégio: pagamentos e repasse", async () => {
+  await semRegra(db => setDoc(doc(db, "contratosColegio", "i3_2026"), { instId: "i3", ano: 2026, respEmail: ANA }));
+  const ana = como(ANA);
+  const pag = id => doc(ana, "contratosColegio", "i3_2026", "pagamentos", id);
+  await assertSucceeds(setDoc(pag("p1"), { valor: 120, recebidoPor: "colegio", repassadoEm: "", conferido: false, porEmail: ANA }));
+  await assertSucceeds(updateDoc(pag("p1"), { repassadoEm: "2026-11-05" }));
+  await assertFails(updateDoc(pag("p1"), { conferido: true }));
+  await assertSucceeds(setDoc(pag("p2"), { valor: 50, recebidoPor: "representante", repassadoEm: "", conferido: false, porEmail: ANA }));
+  await assertSucceeds(updateDoc(pag("p2"), { repasseAvisadoEm: "2026-11-07" }));
+  await assertFails(updateDoc(pag("p2"), { repassadoEm: "2026-11-07" }));
+  await assertFails(updateDoc(pag("p2"), { recebidoPor: "estudio" }));
+  await assertFails(setDoc(pag("p3"), { valor: 50, recebidoPor: "representante", repassadoEm: "2026-11-07", conferido: false, porEmail: ANA }));
+  const adm = doc(como(ADRIANO), "contratosColegio", "i3_2026", "pagamentos", "p2");
+  await assertSucceeds(updateDoc(adm, { repassadoEm: "2026-11-08", conferido: true }));
+  await assertFails(updateDoc(pag("p2"), { comprovante: "x" }));
+  await assertFails(deleteDoc(pag("p1")));
+});

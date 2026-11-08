@@ -4,6 +4,7 @@ import { el, field, sel, title } from "./ui.js";
 import * as U from "./util.js";
 import { abrirImportador, ultimasImportacoes } from "./importador.js";
 import { BECAS, FAIXAS, CAPELOS, TAMANHOS } from "./becas-estoque.js";
+import { lerPacote } from "./contrato-colegio-regras.js";
 
 const achar = (lista, v) => {
   const k = U.chave(v);
@@ -20,6 +21,8 @@ export const CAMPOS_ALUGUEL = [
   { k: "faixa", nome: "Faixa", sinonimos: ["Cor da faixa"] },
   { k: "capelo", nome: "Capelo", sinonimos: ["Cor do capelo"] },
   { k: "valor", nome: "Valor", sinonimos: ["Valor do aluguel", "Preço"] },
+  { k: "pacote", nome: "Pacote", sinonimos: ["Itens", "Kit", "Produtos"] },
+  { k: "unidade", nome: "Unidade", sinonimos: ["Unidade do colégio", "Filial"] },
   { k: "obs", nome: "Observação", sinonimos: ["Obs", "Observações"] }
 ];
 // "P1" = P menos longa; "M" = M
@@ -35,6 +38,7 @@ export function paraDocAluguel(o, ext) {
   const falta = [];
   if (!ext.instId) falta.push("instituição (escolha acima)");
   if (String(o.tamanho || "").trim() && !t.tamanho) falta.push(`tamanho “${o.tamanho}” não reconhecido`);
+  if (String(o.pacote || "").trim() && !lerPacote(o.pacote).length) falta.push(`pacote “${o.pacote}” não reconhecido`);
   return {
     __falta: falta,
     instId: ext.instId || "",
@@ -61,6 +65,9 @@ export function paraDocAluguel(o, ext) {
     ),
     contratoZerado: !Number(String(o.valor || "0").replace(/\D/g, "")),
     obs: String(o.obs || "").trim(),
+    // célula vazia = pacote padrão do contrato do colégio
+    pacote: lerPacote(o.pacote),
+    unidade: String(o.unidade || "").trim(),
     status: "Cadastrado",
     produtos: [],
     historico: [],

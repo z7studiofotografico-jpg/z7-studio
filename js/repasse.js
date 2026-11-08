@@ -9,7 +9,8 @@
 import { openMockup } from "./mockup.js";
 import { el, title, emPartes, clicavel } from "./ui.js";
 import * as U from "./util.js";
-import { norm } from "./repasse-dados.js";
+import { norm, situacaoTxt } from "./repasse-dados.js";
+import { linhaCompacta } from "./lista-compacta.js";
 import { openImport } from "./repasse-import.js";
 import { botaoRelatorio, contar } from "./relatorio.js";
 import { codigoBusca, pareceCodigo, codigosDaBusca, ordemCodigo, telRelatorio } from "./aluno-id.js";
@@ -49,6 +50,8 @@ import {
 // Caídos: o admin vê todos; a equipe, os que ela mesma marcou
 const soMinhaCaidos = () => (C.isAdmin ? [] : [FS.where("respEmail", "==", C.email || "")]);
 import { card } from "./repasse-cartao.js";
+// lista compacta: uma linha por aluno; tocar abre o cartão completo embaixo
+const linha = it => linhaCompacta(it, { card, status, situacao: situacaoTxt });
 import { sheet, field, actions } from "./repasse-janelas.js";
 import { openDados } from "./repasse-form.js";
 import { refreshStats, refreshLote, separarLote, loadMeta, pintarEscolas, escolaEscolhida, gruposPR } from "./repasse-lote.js";
@@ -233,7 +236,7 @@ function mount() {
     <select class="search" id="rEscola" aria-label="Filtrar por escola"><option value="">Ou escolha uma escola…</option></select>`;
   v.append(busca);
 
-  const list = el("section", "grid");
+  const list = el("section", "grid lc-lista");
   list.id = "rList";
   list.setAttribute("aria-live", "polite");
   v.append(list);
@@ -582,7 +585,8 @@ function naTela() {
 }
 // total geral de vendidos (pagos + entregues) da lista aberta: contagem no servidor, sem baixar os alunos
 async function totalVendidos() {
-  const conta = (...f) => FS.getCountFromServer(FS.query(col, FS.where("etapa", "in", ["PAGO", "ENTREGUE"]), ...f)).then(c => c.data().count);
+  const conta = (...f) =>
+    FS.getCountFromServer(FS.query(col, FS.where("etapa", "in", ["PAGO", "ENTREGUE"]), ...f)).then(c => c.data().count);
   if (ehFormatura()) return conta(...baseSeg());
   if (seg === "lf") return conta(...baseLF());
   // Repasse (PR/Paspatur): todos menos os do ano atual (Linha de Frente)
@@ -662,11 +666,11 @@ function renderList(loading, emptyMsg) {
         list.append(h);
         last = grp;
       }
-      list.append(card(it));
+      list.append(linha(it));
     });
     return;
   }
-  emPartes(list, arr, card);
+  emPartes(list, arr, linha);
 }
 
 // ---------- relatório para imprimir (a aba aberta, com os números do topo) ----------

@@ -1,7 +1,8 @@
 // Aluguel de becas → Alunos dos colégios (Etapa 3). Coleção "alugueis", um documento por aluno:
 // { instId, instNome, ano, serie, nome, nomeBusca, tel, responsavel, status, becaTipo, tamanho, menosLonga, faixa, capelo,
 //   produtos: [{ produto, nome, qtd, valor, estado: "reservado" | "baixado" | "estornado" }], valor, contratoZerado,
-//   retirada, devolucao, historico: [{ de, para, em, por }], obs, importacao }
+//   retirada, devolucao, historico: [{ de, para, em, por }], obs, importacao, pacote: ["beca", "paspatur", …], unidade }
+// O pacote de cada aluno e o Contrato do colégio (quem paga, pagamentos, produção) ficam em contrato-colegio.js.
 // Status: Cadastrado → Beca medida (reserva beca, faixa e capelo) → Produtos em produção (se comprou algum) →
 // Pronto para retirada → Retirou a beca (baixa o estoque dos produtos) → Devolvida (beca volta ao estoque).
 // "Atrasado na devolução": retirou e passou da data de devolução (destaque para o Adriano).
@@ -27,6 +28,7 @@ import { DO_ALUGUEL } from "./catalogo.js";
 import { ESTUDIO, ENDERECO } from "./mensagens.js";
 import { botaoRelatorio } from "./relatorio.js";
 import { contatoRel } from "./aluno-id.js";
+import { ITENS_PACOTE, nomeItem, lerPacote } from "./contrato-colegio-regras.js";
 
 export const STATUS_ALUGUEL = ["Cadastrado", "Beca medida", "Produtos em produção", "Pronto para retirada", "Retirou a beca", "Devolvida"];
 const SERIES = ["Pré", "5º ano", "9º ano", "Ensino médio", "Faculdade", "Curso", "Outra"];
@@ -250,6 +252,16 @@ function render() {
       Object.entries(st)
         .map(([s0, n]) => `${n} ${s0.toLowerCase()}`)
         .join(", ");
+    r.append(
+      " ",
+      U.mkBtn("📄 Contrato do colégio", "btn-primary btn-sm", () =>
+        import("./contrato-colegio.js")
+          .then(m =>
+            m.abrirContrato(C, Object.assign({ id: filtro.inst, nome: (doCol[0] || {}).instNome || "" }, inst), filtro.ano || String(ANO()))
+          )
+          .catch(e => C.handleErr(e))
+      )
+    );
     // admin: excluir os alunos desse colégio e ano (importou errado, turma duplicada…)
     if (C.isAdmin)
       r.append(
@@ -367,7 +379,8 @@ function card(a) {
     ],
     [a.faixa ? "Faixa " + nomeFaixa(a.faixa).toLowerCase() : "", ""],
     [a.capelo ? nomeCapelo(a.capelo) : "", ""],
-    [a.contratoZerado ? "Contrato zerado (R$ 0,00)" : a.valor ? brl(a.valor) : "", ""]
+    [a.contratoZerado ? "Contrato zerado (R$ 0,00)" : a.valor ? brl(a.valor) : "", ""],
+    ...lerPacote(a.pacote || []).map(x => ["📦 " + nomeItem(x), x === "paspatur" ? "warn" : "ok"])
   ].forEach(([t, c]) => t && meta.append(el("span", "tag " + c, t)));
   e.append(meta);
   const prods = (a.produtos || []).filter(p => p.estado !== "estornado");
@@ -632,6 +645,17 @@ export function form(a, pre = {}) {
     obs.rows = 2;
     obs.maxLength = 600;
     obs.value = x.obs || "";
+    // pacote do contrato do colégio (nenhum marcado = pacote padrão do contrato)
+    const pac = el("div", "chips");
+    const pacCx = ITENS_PACOTE.map(([k, n]) => {
+      const l = el("label", "chk");
+      const cb = el("input");
+      cb.type = "checkbox";
+      cb.checked = lerPacote(x.pacote || []).includes(k);
+      l.append(cb, document.createTextNode(" " + n));
+      pac.append(l);
+      return [k, cb];
+    });
     // o admin muda o valor; a equipe só cadastra
     if (a && !C.isAdmin) {
       valor.disabled = true;
@@ -639,7 +663,18 @@ export function form(a, pre = {}) {
     }
     const err = el("p", "err");
     err.hidden = true;
-    p.append(r0, r1, r2, r3, r4, r5, field("Observação", obs), err, botoes(close, a ? "Salvar" : "Cadastrar"));
+    p.append(
+      r0,
+      r1,
+      r2,
+      r3,
+      r4,
+      r5,
+      field("Pacote (vazio = padrão do contrato)", pac),
+      field("Observação", obs),
+      err,
+      botoes(close, a ? "Salvar" : "Cadastrar")
+    );
     p.addEventListener("submit", async ev => {
       ev.preventDefault();
       const inst = insts.find(i => i.id === sInst.value);
@@ -667,6 +702,7 @@ export function form(a, pre = {}) {
         retirada: ret.value,
         devolucao: dev.value,
         obs: obs.value.trim(),
+        pacote: pacCx.filter(([, cb]) => cb.checked).map(([k]) => k),
         atualizadoEm: new Date().toISOString()
       };
       if (!a || C.isAdmin) Object.assign(body, { valor: zer.checked ? 0 : lerReais(valor.value), contratoZerado: zer.checked });

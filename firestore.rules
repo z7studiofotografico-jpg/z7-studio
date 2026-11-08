@@ -269,6 +269,31 @@ service cloud.firestore {
       allow update: if admin() || (pode('becas') && exclusaoOk() && !mudou(['valor', 'contratoZerado']));
       allow delete: if admin();
     }
+    // Contrato do colégio (Aluguel de becas): o admin e o representante que fechou. Depois de criado, valor, parcelas,
+    // quem paga e quem fechou só o admin muda. Pagamentos na subcoleção: o representante lança e marca o repasse do
+    // colégio; o dinheiro que está com ele mesmo só o admin confirma; conferir (comissão) só o admin.
+    function meuContrato(cid) {
+      return get(/databases/$(database)/documents/contratosColegio/$(cid)).data.get('respEmail', '') == email();
+    }
+    match /contratosColegio/{cid} {
+      allow read: if pode('becas');
+      allow create: if admin() || (pode('becas') && request.resource.data.get('respEmail', '') == email());
+      allow update: if admin() || (pode('becas') && resource.data.get('respEmail', '') == email()
+        && !mudou(['valor', 'parcelas', 'respEmail', 'respNome', 'quemPaga', 'instId', 'ano']));
+      allow delete: if admin();
+      match /pagamentos/{pid} {
+        allow read: if pode('becas');
+        allow create: if admin() || (pode('becas') && meuContrato(cid)
+          && request.resource.data.get('conferido', false) == false
+          && request.resource.data.get('porEmail', '') == email()
+          && request.resource.data.get('repassadoEm', '') == '');
+        allow update: if admin() || (pode('becas') && meuContrato(cid)
+          && resource.data.get('conferido', false) == false && !mudou(['conferido', 'porEmail'])
+          && !(resource.data.get('recebidoPor', '') == 'representante' && mudou(['recebidoPor', 'repassadoEm', 'valor']))
+          && !(request.resource.data.get('recebidoPor', '') == 'representante' && request.resource.data.get('repassadoEm', '') != ''));
+        allow delete: if admin();
+      }
+    }
     // Produtos e estoque (Etapa 6): todos leem o catálogo; a equipe só mexe nas quantidades (reserva/baixa das vendas)
     function estoqueOk() {
       return request.resource.data.get('fisico', 0) >= 0 && request.resource.data.get('reservado', 0) >= 0

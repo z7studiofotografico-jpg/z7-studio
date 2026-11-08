@@ -387,7 +387,7 @@ async function abrir(email, dados, opc = {}) {
     })
   );
   await pg.addInitScript(
-    ([em, d]) => {
+    ([em, d, compacta]) => {
       window.__EMAIL = em;
       window.__store = new Map(Object.entries(d));
       // Formaturas abre na Venda Antecipada nos testes antigos (o cenário das abas troca de aba)
@@ -398,8 +398,14 @@ async function abrir(email, dados, opc = {}) {
         window.__aberto = u;
         return null;
       };
+      // Lista compacta do PR: os testes antigos usam o cartão completo, então as linhas abrem sozinhas
+      // (o cenário da lista compacta desliga isso e testa abrir e fechar)
+      if (!compacta) {
+        const abrirTudo = () => document.querySelectorAll('.lc-lista button.lc-linha[aria-expanded="false"]').forEach(b => b.click());
+        new MutationObserver(abrirTudo).observe(document, { childList: true, subtree: true });
+      }
     },
-    [email, dados]
+    [email, dados, !!opc.compacta]
   );
   await pg.goto(URLAPP);
   try {
@@ -640,7 +646,12 @@ await cenario("Adriano (admin), com os dados já atualizados no servidor", async
     const novoFormando = async () => {
       // espera a janela do aluno anterior fechar (senão o nome vai para a janela que está saindo)
       await pg
-        .waitForFunction(() => ![...document.querySelectorAll(".sheet")].some(x => !x.querySelector(".panel.wide") && x.querySelector("button[type=submit]")), null, { timeout: 5000 })
+        .waitForFunction(
+          () =>
+            ![...document.querySelectorAll(".sheet")].some(x => !x.querySelector(".panel.wide") && x.querySelector("button[type=submit]")),
+          null,
+          { timeout: 5000 }
+        )
         .catch(() => {});
       const antes = await pg.locator(".sheet").count();
       await pg.locator(".panel.wide").getByRole("button", { name: "+ Aluno" }).click();
@@ -984,8 +995,15 @@ await cenario("Adriano (admin), com os dados já atualizados no servidor", async
     ok(s["repasse/r2"].conferido === true && s["repasse/r2"].conferidoPor === ADRIANO, "admin conferiu a venda do PR");
     // venda que a equipe já entregou antes da conferência continua em "A conferir" (senão a comissão nunca é confirmada)
     await pg.evaluate(() => {
-      window.__store.set("repasse/r2e", { nome: "ENZO ENTREGUE", ano: new Date().getFullYear(), etapa: "ENTREGUE", valor: 200,
-        formaPag: "Pix", respEmail: "pedro@vendas.com", conferido: false });
+      window.__store.set("repasse/r2e", {
+        nome: "ENZO ENTREGUE",
+        ano: new Date().getFullYear(),
+        etapa: "ENTREGUE",
+        valor: 200,
+        formaPag: "Pix",
+        respEmail: "pedro@vendas.com",
+        conferido: false
+      });
       window.__fire();
     });
     await calmo(pg);
@@ -999,12 +1017,22 @@ await cenario("Adriano (admin), com os dados já atualizados no servidor", async
     await pg.locator("#rChips").getByText("Entregas").click();
     await calmo(pg);
     const pz = pg.locator(".card", { hasText: "Bruno" }).locator(".prazo");
-    ok((await pz.count()) === 1 && /Entregar até .* faltam 20 dias/.test(await pz.textContent()) && /verde/.test(await pz.getAttribute("class")), "venda paga mostra o prazo de entrega em verde (20 dias)");
+    ok(
+      (await pz.count()) === 1 &&
+        /Entregar até .* faltam 20 dias/.test(await pz.textContent()) &&
+        /verde/.test(await pz.getAttribute("class")),
+      "venda paga mostra o prazo de entrega em verde (20 dias)"
+    );
     // total do mês (quantidade e valor) no topo de Vendidos
     await pg.locator("#rChips").getByText("Vendidos").click();
     await calmo(pg);
-    ok(/Este mês: \d+ vendas? · R\$\s?[\d.]+,\d\d/.test(await pg.textContent("#rVendMes")), "Vendidos mostra o total do mês (quantidade e valor)");
-    await pg.waitForFunction(() => /Total vendido: \d/.test(document.querySelector(".vend-topo")?.textContent || ""), null, { timeout: 5000 }).catch(() => {});
+    ok(
+      /Este mês: \d+ vendas? · R\$\s?[\d.]+,\d\d/.test(await pg.textContent("#rVendMes")),
+      "Vendidos mostra o total do mês (quantidade e valor)"
+    );
+    await pg
+      .waitForFunction(() => /Total vendido: \d/.test(document.querySelector(".vend-topo")?.textContent || ""), null, { timeout: 5000 })
+      .catch(() => {});
     ok(/Total vendido: \d+/.test(await pg.textContent(".vend-topo")), "admin vê ao lado o total geral de vendidos");
     await pg.locator("#rChips").getByText("A conferir").click();
     await calmo(pg);
@@ -2999,7 +3027,9 @@ await cenario("Conferir fotos e 📤 Enviar foto (admin grava a prévia no Drive
         oauth2: {
           hasGrantedAllScopes: () => true,
           initTokenClient: o => ({
-            requestAccessToken: () => (window.__escopos.push(o.scope), setTimeout(() => o.callback({ access_token: "TOK", expires_in: 3600 }), 0))
+            requestAccessToken: () => (
+              window.__escopos.push(o.scope), setTimeout(() => o.callback({ access_token: "TOK", expires_in: 3600 }), 0)
+            )
           })
         }
       }
@@ -3032,9 +3062,21 @@ await cenario("Conferir fotos e 📤 Enviar foto (admin grava a prévia no Drive
     /4 alunos · 1 com foto/.test(t) && /já comprou: 1/.test(t) && /sem telefone: 1/.test(t) && /não comprou: 1 → falta gerar/.test(t),
     "Conferir fotos separa: com foto, já comprou, sem telefone e falta gerar"
   );
-  ok(/Fabiana Falta/i.test(t) && !/Bruna Paga/i.test(await pg.locator(".conf-aluno").allTextContents().then(x => x.join())), "só quem falta gerar tem a linha com o botão");
+  ok(
+    /Fabiana Falta/i.test(t) &&
+      !/Bruna Paga/i.test(
+        await pg
+          .locator(".conf-aluno")
+          .allTextContents()
+          .then(x => x.join())
+      ),
+    "só quem falta gerar tem a linha com o botão"
+  );
   // envia a foto de quem falta
-  await pg.locator(".conf-aluno", { hasText: /Fabiana/i }).getByRole("button", { name: "📤 Enviar foto" }).click();
+  await pg
+    .locator(".conf-aluno", { hasText: /Fabiana/i })
+    .getByRole("button", { name: "📤 Enviar foto" })
+    .click();
   const [fc] = await Promise.all([pg.waitForEvent("filechooser"), pg.getByRole("button", { name: "Escolher as fotos" }).click()]);
   await fc.setFiles([AQUI + "../../icons/icon-512.png", AQUI + "../../icons/icon-192.png"]);
   await pg.getByRole("button", { name: "📤 Gravar no Drive" }).waitFor({ timeout: 8000 });
@@ -3164,6 +3206,143 @@ await cenario("Aluguel de becas · alunos dos colégios (status, estoque e produ
     "movimentos do estoque registrados"
   );
   ok(!erros.length, "sem erros" + (erros.length ? ": " + erros.join(" | ") : ""));
+});
+await cenario("Lista compacta do PR (uma linha por aluno; tocar abre e fecha o cartão)", async () => {
+  const { pg, erros } = await abrir(ADRIANO, migrar(base), { compacta: true });
+  await ir(pg, "#pr");
+  await pg.waitForSelector("#rList .lc-linha", { timeout: 8000 });
+  const linhas = pg.locator("#rList button.lc-linha");
+  ok((await linhas.count()) > 0 && (await pg.locator("#rList .card").count()) === 0, "a lista abre só com as linhas, sem cartões");
+  const l1 = linhas.first();
+  ok(/lc-(verde|azul|amarelo|cinza|vermelho|fim)/.test(await l1.getAttribute("class")), "linha com a cor da situação");
+  await l1.click();
+  ok(
+    (await pg.locator("#rList .card").count()) === 1 && (await l1.getAttribute("aria-expanded")) === "true",
+    "tocar abre o cartão embaixo"
+  );
+  await l1.click();
+  ok((await pg.locator("#rList .card").count()) === 0, "tocar de novo fecha");
+  ok(!erros.length, "sem erros" + (erros.length ? ": " + erros.join(" | ") : ""));
+});
+await cenario("Contrato do colégio (pacote por aluno, quem recebeu, repasse e produção)", async () => {
+  const Y = new Date().getFullYear();
+  const al = (nome, extra) =>
+    Object.assign(
+      { instId: "i1", instNome: "COLEGIO ALFA", ano: Y, nome, serie: "3001", status: "Cadastrado", produtos: [], historico: [] },
+      extra
+    );
+  const d = Object.assign({}, migrar(base), {
+    "alugueis/c1": al("Joao Lucas", { pacote: ["certificado", "canudo"] }),
+    "alugueis/c2": al("Miguel Augusto", { tel: "21988887777" }),
+    "alugueis/c3": al("Pedro Henrique", { serie: "3002" })
+  });
+  // admin cria o contrato em nome da Ana (representante)
+  {
+    const { pg, erros, store } = await abrir(ADRIANO, d);
+    await ir(pg, "#becas");
+    await pg.waitForFunction(() => /Joao Lucas/i.test(document.getElementById("viewBecas").textContent), null, { timeout: 8000 });
+    await pg.locator("#alFiltros select").nth(1).selectOption("i1");
+    await pg.getByRole("button", { name: "📄 Contrato do colégio" }).click();
+    await pg.getByRole("button", { name: "+ Criar contrato" }).click();
+    const f = pg.locator(".sheet").last();
+    await f.getByLabel("Quem fechou").selectOption(ANA);
+    await f.getByLabel("Valor por aluno").fill("150");
+    await f.getByLabel("Contato do colégio").fill("Márcia");
+    await f.getByLabel("Cargo").selectOption("Coordenador(a)");
+    await f.getByLabel("Entrega combinada (dia/mês/ano)").fill(`${Y}-12-12`);
+    await f.getByLabel("Combinada com").fill("Márcia (coordenadora)");
+    await f.locator("button[type=submit]").click();
+    await calmo(pg);
+    let st = await store();
+    const c = st[`contratosColegio/i1_${Y}`];
+    ok(
+      c &&
+        c.respEmail === ANA &&
+        c.respNome === "Ana Vendedora" &&
+        c.quemPaga === "alunos" &&
+        c.valor === 150 &&
+        c.entrega.data === `${Y}-12-12`,
+      "contrato criado: quem fechou, quem paga, valor e entrega com o ano"
+    );
+    ok(c.pacotePadrao.join() === "paspatur,certificado,canudo", "pacote padrão: paspatur + certificado + canudo");
+    // pagamento em dinheiro com a coordenadora → falta repassar · colégio
+    await pg.getByRole("button", { name: "+ Pagamento" }).click();
+    const fp = pg.locator(".sheet").last();
+    await fp.getByLabel("Aluno").selectOption("c2");
+    await fp.getByLabel("Valor").fill("120");
+    await fp.getByLabel("Quem recebeu").selectOption("colegio");
+    await fp.locator("button[type=submit]").click();
+    await calmo(pg);
+    const painel = pg.locator(".sheet").last();
+    ok(/Falta repassar · colégio\s*R\$\s*120/.test(await painel.textContent()), "pago à coordenadora: aparece em Falta repassar · colégio");
+    ok(/Com o coordenador/.test(await painel.textContent()), "o pagamento mostra com quem está o dinheiro");
+    await painel.getByRole("button", { name: "Colégio repassou" }).click();
+    await pg.locator(".sheet").last().getByRole("button", { name: "Sim" }).click();
+    await calmo(pg);
+    st = await store();
+    const pg1 = Object.entries(st).find(([k]) => k.startsWith(`contratosColegio/i1_${Y}/pagamentos/`));
+    ok(pg1 && pg1[1].repassadoEm && pg1[1].historico.length === 2, "repassado: data e quem fez ficam guardados");
+    // pacote aplicado a vários
+    await painel.getByLabel("Marcar Pedro Henrique").check();
+    await painel.getByRole("button", { name: "Aplicar pacote a 1" }).click();
+    const fpac = pg.locator(".sheet").last();
+    await fpac.getByLabel("Beca").check();
+    await fpac.getByLabel("Paspatur").check();
+    await fpac.locator("button[type=submit]").click();
+    await calmo(pg);
+    st = await store();
+    ok(st["alugueis/c3"].pacote.join() === "beca,paspatur", "aplicar pacote a vários grava o pacote do aluno");
+    // relatório de produção
+    await painel.getByRole("button", { name: "🖨️ Relatório de produção" }).click();
+    const rel = await pg.textContent("#relatorio");
+    ok(
+      /Representante: Ana Vendedora/.test(rel) && /COLEGIO ALFA|Colegio Alfa/i.test(rel),
+      "relatório traz o colégio e o representante no topo"
+    );
+    ok(/PRECISA DE FOTO/.test(rel) && /Precisam de foto \(paspatur\): 2/.test(rel), "quem tem paspatur sai como precisa de foto");
+    ok(!erros.length, "sem erros" + (erros.length ? ": " + erros.join(" | ") : ""));
+  }
+  // a representante: dinheiro com ela só sai do "Falta repassar" quando o admin confirma
+  {
+    const d2 = Object.assign({}, d, {
+      [`contratosColegio/i1_${Y}`]: {
+        instId: "i1",
+        instNome: "COLEGIO ALFA",
+        ano: Y,
+        respEmail: ANA,
+        respNome: "Ana Vendedora",
+        quemPaga: "alunos",
+        recebePadrao: "representante",
+        valor: 150,
+        parcelas: 1,
+        pacotePadrao: ["paspatur"]
+      }
+    });
+    const { pg, erros, store } = await abrir(ANA, d2);
+    await ir(pg, "#becas");
+    await pg.waitForFunction(() => /Joao Lucas/i.test(document.getElementById("viewBecas").textContent), null, { timeout: 8000 });
+    await pg.locator("#alFiltros select").nth(1).selectOption("i1");
+    await pg.getByRole("button", { name: "📄 Contrato do colégio" }).click();
+    await pg.getByRole("button", { name: "+ Pagamento" }).click();
+    const fp = pg.locator(".sheet").last();
+    await fp.getByLabel("Aluno").selectOption("c1");
+    await fp.getByLabel("Valor").fill("50");
+    await fp.locator("button[type=submit]").click();
+    await calmo(pg);
+    const painel = pg.locator(".sheet").last();
+    ok(
+      /Falta repassar · representante\s*R\$\s*50/.test(await painel.textContent()),
+      "recebido pela representante: falta repassar · representante"
+    );
+    ok((await painel.getByRole("button", { name: "Confirmar repasse" }).count()) === 0, "a representante não confirma o próprio repasse");
+    ok((await painel.getByRole("button", { name: "Editar contrato" }).count()) === 1, "quem fechou edita o contrato");
+    await painel.getByRole("button", { name: "Avisar que repassei" }).click();
+    await calmo(pg);
+    const st = await store();
+    const p = Object.entries(st).find(([k]) => k.startsWith(`contratosColegio/i1_${Y}/pagamentos/`))[1];
+    ok(p.repasseAvisadoEm && !p.repassadoEm && p.porEmail === ANA, "avisou o repasse; continua faltando a confirmação do admin");
+    ok(!erros.length, "sem erros" + (erros.length ? ": " + erros.join(" | ") : ""));
+  }
 });
 await cenario("Formaturas · abas Linha de Frente / Repasse / Venda Antecipada, virada e Pix", async () => {
   const Y = new Date().getFullYear();
@@ -3410,7 +3589,10 @@ await cenario("Ajuda de vendas (respostas prontas e texto para o Claude sem tele
   await pg.getByRole("button", { name: "Já ofereci, não quis" }).click();
   await calmo(pg);
   const aj = (await store())["repasse/aj1"];
-  ok(aj.etapa === "CAÍDO" && aj.caidoMotivo === "Achou caro (ofereceu o Paspatur e não quis)", "já ofereceu o Paspatur: cai com o motivo anotado");
+  ok(
+    aj.etapa === "CAÍDO" && aj.caidoMotivo === "Achou caro (ofereceu o Paspatur e não quis)",
+    "já ofereceu o Paspatur: cai com o motivo anotado"
+  );
   await pg.locator("#rChips").getByRole("button", { name: "Caídos" }).click();
   await calmo(pg);
   ok(
@@ -3453,7 +3635,8 @@ await cenario("Registrar venda: endereço completo obrigatório e CEP preenche a
   await sh.getByRole("button", { name: "Salvar venda" }).click();
   await calmo(pg);
   ok(
-    (await store())["repasse/v1"].etapa === "INTERESSADO" && /Falta preencher: CEP, Rua, Número, Bairro, Cidade/.test(await sh.locator("p.wait:visible").textContent()),
+    (await store())["repasse/v1"].etapa === "INTERESSADO" &&
+      /Falta preencher: CEP, Rua, Número, Bairro, Cidade/.test(await sh.locator("p.wait:visible").textContent()),
     "sem endereço completo a venda não salva e o app diz o que falta"
   );
   await sh.getByLabel("CEP").fill("26540-000");

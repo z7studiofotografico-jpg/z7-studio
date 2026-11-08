@@ -23,12 +23,13 @@ const clone = v => (v === undefined ? undefined : JSON.parse(JSON.stringify(v)))
 export const initializeFirestore = () => ({});
 export const persistentLocalCache = () => ({}),
   persistentMultipleTabManager = () => ({});
-export function collection(_db, n) {
-  return { t: "col", n };
+// subcoleções: collection(db, "contratosColegio", id, "pagamentos") e doc(db, "contratosColegio", id, "pagamentos", pid)
+export function collection(_db, ...partes) {
+  return { t: "col", n: partes.join("/") };
 }
-export function doc(a, n, id) {
-  if (a && a.t === "col") return { t: "doc", n: a.n, id: n || "auto" + ++seq + Math.random().toString(36).slice(2, 7) };
-  return { t: "doc", n, id };
+export function doc(a, ...partes) {
+  if (a && a.t === "col") return { t: "doc", n: a.n, id: partes[0] || "auto" + ++seq + Math.random().toString(36).slice(2, 7) };
+  return { t: "doc", n: partes.slice(0, -1).join("/"), id: partes[partes.length - 1] };
 }
 export const query = (c, ...k) => ({ c, k });
 export const where = (f, op, v) => ({ w: 1, f, op, v }),

@@ -31,15 +31,25 @@ botão "Mudar ano" nas importações de Formatura/Paspatur, aba Vendidos (admin)
 4. **Fichas**: ler a ficha de identificação nas fotos dos alunos com prévia e sem planilha e associar a nome e
    telefones; telefone só é acrescentado, nunca substituído.
 
-## Propostas de 08/11 (aguardando a confirmação final da Luciana/Adriano)
+## Feito em 08/11 (aprovado pela Luciana)
 
-- **Lista compacta** (PR, Paspatur e Formatura): uma linha por aluno (barra de cor da situação, nome, ID, colégio · turma ·
-  ano, próximo passo, selo da situação); clicar abre o cartão completo embaixo (contatos, mensagem, botões); clicar de
-  novo fecha. Cores: verde entregue, azul pago/entregar, amarelo interessado, cinza na fila.
-- **Contrato do colégio** (em Aluguel de Becas → Alunos dos colégios; o "Quem paga" saiu do PR):
-  quem fechou (admin ou equipe), quem paga (colégio / cada aluno), valor combinado e parcelas, data de entrega combinada
-  com o diretor (sem prazo de 20 dias). Pacote POR ALUNO (beca, paspatur, canudo, certificado; ex.: João Lucas =
-  certificado + canudo; Miguel Augusto = paspatur + certificado + canudo), lido de uma coluna "Pacote" da planilha ou
-  aplicado a vários alunos de uma vez. Relatório de produção: aluno, turma, colégio, unidade e itens, com totais; quem
-  tem paspatur sai como "precisa de foto" (leva a foto do aluno do ensaio; não precisa mostrar prévia aos pais).
-  Comissão: mesma porcentagem da venda antecipada, sobre o que for recebido, para quem fechou.
+- **Lista compacta** no PR, Paspatur e Formatura: uma linha por aluno (cor da situação, nome, ID, colégio · turma · ano,
+  próximo passo, selo); tocar abre o cartão completo embaixo e tocar de novo fecha. Verde entregue, azul pago,
+  amarelo interessado, cinza na fila, vermelho atrasado.
+- **Contrato do colégio** (Aluguel de becas → Alunos dos colégios → escolher o colégio → "📄 Contrato do colégio"),
+  coleção `contratosColegio` (id = colégio_ano) e pagamentos em `contratosColegio/{id}/pagamentos`:
+  - quem fechou, quem paga (o colégio paga tudo / cada aluno paga), valor e parcelas, quem costuma receber,
+    contato do colégio (nome, cargo: diretor, coordenadora, secretaria, comercial… e WhatsApp), entrega combinada
+    com dia/mês/ano e com quem, pacote padrão, unidade;
+  - pacote por aluno (beca, paspatur, certificado, canudo): coluna PACOTE da planilha (vazia = padrão), no "Editar"
+    do aluno ou "Aplicar pacote a vários";
+  - cada pagamento diz quem recebeu (estúdio, contato do colégio ou representante); "Falta repassar" separado por
+    colégio e representante; o representante marca que o colégio repassou e avisa o próprio repasse, que só o
+    admin confirma; conferir é do admin;
+  - comissão de quem fechou: % do Álbum de formatura (venda antecipada) pela forma de pagamento, sobre o que está no
+    caixa e conferido;
+  - relatório de produção com colégio, unidade, representante, entrega e contato no topo; aluno, turma, itens e
+    "PRECISA DE FOTO" para quem tem paspatur; totais por item;
+  - cada mudança guarda quem fez e quando.
+- **Falta:** colar as regras novas (`firestore.rules`) no Firebase; levar a comissão do contrato para o Dashboard e
+  para "Minhas vendas" da equipe.
