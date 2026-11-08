@@ -1,9 +1,9 @@
 // PR: o cartão de cada contato (para quem mandar, a mensagem pronta, os botões de cada etapa)
-import { excluir, faixaExclusao, pedirTexto } from "./confirmar.js";
+import { excluir, faixaExclusao, pedirTexto, confirmar } from "./confirmar.js";
 import { openMockup, textoEscolha } from "./mockup.js";
 import { el, title, sheet as sheetUi } from "./ui.js";
 import * as U from "./util.js";
-import { faltando, situacaoTxt, enderecoTxt, historicoPlanilha, prazoEntrega } from "./repasse-dados.js";
+import { faltando, situacaoTxt, enderecoTxt, historicoPlanilha, prazoEntrega, MOTIVOS_CAIDO, motivoPreco } from "./repasse-dados.js";
 import { avisoTel } from "./aluno-id.js";
 import { fmtTel } from "./numeros.js";
 import { whatsAtivo } from "./numeros-tela.js";
@@ -440,10 +440,21 @@ function acoesDoCartao(it, li, e) {
     } else if (!["PAGO", "ENTREGUE"].includes(it.etapa))
       act.append(
         U.mkBtn("⬇️ Caído", "", async () => {
-          const motivo = await pedirTexto("Marcar como Caído", `Por que ${U.first(title(it.nome))} não vai querer? (obrigatório)`, {
-            placeholder: "ex.: já comprou com outra empresa; sem condições agora"
+          let motivo = await pedirTexto("Marcar como Caído", `Por que ${U.first(title(it.nome))} não vai querer? (obrigatório)`, {
+            placeholder: "ex.: já comprou com outra empresa; sem condições agora",
+            atalhos: MOTIVOS_CAIDO
           });
           if (!motivo) return;
+          // achou caro (no PR): antes de deixar cair, oferecer o Paspatur, que é mais em conta
+          if (colNome() === "repasse" && motivoPreco(motivo)) {
+            const ofereceu = await confirmar(
+              "Já ofereceu o Paspatur?",
+              `Antes de marcar ${U.first(title(it.nome))} como caído por preço, ofereça o Paspatur: é a opção mais em conta e muita família que acha o kit caro aceita.`,
+              { sim: "Já ofereci, não quis", nao: "Vou oferecer agora" }
+            );
+            if (!ofereceu) return U.toast("Ofereça o Paspatur e volte aqui se não quiser");
+            motivo += " (ofereceu o Paspatur e não quis)";
+          }
           save(
             it,
             { etapa: "CAÍDO", caidoMotivo: motivo, caidoEm: U.todayStr(), caidoPor: C.me || "", followup: null, atendendo: null },

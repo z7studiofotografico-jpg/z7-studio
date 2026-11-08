@@ -176,3 +176,11 @@ test("prazo de entrega: pagamento + 20 dias, verde · amarelo (3 dias) · vermel
   assert.equal(prazoEntrega({ etapa: "ENTREGUE", pagoEm: "2026-11-10" }, "2026-11-12"), null);
   assert.equal(prazoEntrega({ etapa: "PAGO" }, "2026-11-12"), null);
 });
+
+test("motivo de Caído por preço (oferecer o Paspatur antes)", async () => {
+  const { motivoPreco } = await import("../js/repasse-dados.js");
+  ["Achou caro", "ACHOU CARO DEMAIS", "sem condições agora", "o preço não cabe", "está sem dinheiro", "caríssimo"].forEach(m =>
+    assert.equal(motivoPreco(m), true, m)
+  );
+  ["Já comprou com outra empresa", "Carolina não quer", "não responde mais", ""].forEach(m => assert.equal(motivoPreco(m), false, m));
+});

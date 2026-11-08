@@ -206,6 +206,12 @@ export function situacaoTxt(it, s) {
   if (it.etapa === "ENTREGUE") return "Entregue" + (it.entregueEm ? " em " + dia(it.entregueEm) : "");
   return it.etapa === "NA FILA" ? "Ainda na fila" : it.etapa === "INCOMPLETO" ? "Fora da fila até completar" : "Encerrado";
 }
+// motivo de Caído que fala de preço ("achou caro", "sem dinheiro agora"…): antes, oferecer o Paspatur
+export const MOTIVOS_CAIDO = ["Achou caro", "Já comprou com outra empresa", "Não quer as fotos", "Sem condições agora", "Não responde mais"];
+export const motivoPreco = m =>
+  /\b(car[oa]s?|carissim[oa]|pre[cç]o|valor|dinheiro|condi[cç](ao|ões|oes)|grana|apertad[oa])\b/i.test(
+    String(m || "").normalize("NFD").replace(/[\u0300-\u036f]/g, "")
+  );
 // Prazo de entrega do kit: pagamento + 20 dias. Verde; amarelo faltando 3 dias ou menos; vermelho no dia e depois.
 export const PRAZO_DIAS = 20;
 export function prazoEntrega(it, hoje) {

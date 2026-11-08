@@ -172,7 +172,7 @@ export function perguntarSeEnviou(aoConfirmar, texto = "Você enviou a mensagem?
 }
 
 // Pede um texto obrigatório (ex.: o motivo do estorno ou do "Caído"). Devolve o texto ou null (cancelou).
-export function pedirTexto(titulo, rotulo, { placeholder = "", ok = "Salvar" } = {}) {
+export function pedirTexto(titulo, rotulo, { placeholder = "", ok = "Salvar", atalhos = [] } = {}) {
   return new Promise(res => {
     let fim = false;
     const acaba = v => {
@@ -191,6 +191,21 @@ export function pedirTexto(titulo, rotulo, { placeholder = "", ok = "Salvar" } =
         const f = el("div", "field");
         const l = el("label", null, rotulo);
         f.append(l, t);
+        // respostas prontas: um toque preenche (dá para completar o texto depois)
+        if (atalhos.length) {
+          const ch = el("div", "chips");
+          ch.style.flexWrap = "wrap";
+          atalhos.forEach(x => {
+            const b = el("button", "chip", x);
+            b.type = "button";
+            b.onclick = () => {
+              t.value = x;
+              t.focus();
+            };
+            ch.append(b);
+          });
+          f.append(ch);
+        }
         const a = el("div", "panel-actions");
         const bN = el("button", "btn", "Cancelar");
         bN.type = "button";

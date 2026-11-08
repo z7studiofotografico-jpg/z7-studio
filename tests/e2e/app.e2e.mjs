@@ -3387,16 +3387,26 @@ await cenario("Ajuda de vendas (respostas prontas e texto para o Claude sem tele
   ok(/DÚVIDA DO CLIENTE/.test(clip), "também fica copiada (se o Claude abrir vazio, é só colar)");
   // PR também tem Caídos (como na Formatura): motivo obrigatório
   await pg.evaluate(() => document.querySelectorAll(".sheet").forEach(x => (x.id ? (x.hidden = true) : x.remove())));
+  // "achou caro": antes de cair, o app manda oferecer o Paspatur
   await pg.locator("article", { hasText: "Maria" }).first().getByRole("button", { name: "⬇️ Caído" }).click();
-  const shC = pg.locator(".sheet").last();
-  await shC.locator("textarea").fill("Já comprou com outra empresa");
+  let shC = pg.locator(".sheet").last();
+  await shC.getByRole("button", { name: "Achou caro" }).click();
   await shC.locator("button[type=submit]").click();
+  await pg.getByRole("button", { name: "Vou oferecer agora" }).click();
   await calmo(pg);
-  ok((await store())["repasse/aj1"].etapa === "CAÍDO", "PR: marcar Caído com o motivo");
+  ok((await store())["repasse/aj1"].etapa !== "CAÍDO", "achou caro: pede para oferecer o Paspatur e não marca caído");
+  await pg.locator("article", { hasText: "Maria" }).first().getByRole("button", { name: "⬇️ Caído" }).click();
+  shC = pg.locator(".sheet").last();
+  await shC.getByRole("button", { name: "Achou caro" }).click();
+  await shC.locator("button[type=submit]").click();
+  await pg.getByRole("button", { name: "Já ofereci, não quis" }).click();
+  await calmo(pg);
+  const aj = (await store())["repasse/aj1"];
+  ok(aj.etapa === "CAÍDO" && aj.caidoMotivo === "Achou caro (ofereceu o Paspatur e não quis)", "já ofereceu o Paspatur: cai com o motivo anotado");
   await pg.locator("#rChips").getByRole("button", { name: "Caídos" }).click();
   await calmo(pg);
   ok(
-    /Maria/.test(await pg.textContent("#rList")) && /Já comprou/.test(await pg.textContent("#rList")),
+    /Maria/.test(await pg.textContent("#rList")) && /Achou caro/.test(await pg.textContent("#rList")),
     "PR: aba Caídos mostra o aluno e o motivo"
   );
   ok(!erros.length, "sem erros no console: " + erros.join(" | "));
