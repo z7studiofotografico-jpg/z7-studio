@@ -40,7 +40,10 @@ export function abrirConferirFotos(C, colNome = "repasse") {
         )
       );
       if (!raiz) {
-        p.append(el("p", "wait", "A pasta das prévias no Google Drive ainda não foi ligada ao app (Ajustes)."), U.mkBtn("Fechar", "", close));
+        p.append(
+          el("p", "wait", "A pasta das prévias no Google Drive ainda não foi ligada ao app (Ajustes)."),
+          U.mkBtn("Fechar", "", close)
+        );
         return;
       }
       const info = el("p", "hint", "Carregando os colégios…");
@@ -144,7 +147,10 @@ export function abrirConferirFotos(C, colNome = "repasse") {
           barra.hidden = true;
         }
         if (!blocos.length) return;
-        if (info.className === "hint") info.textContent = (cancelar ? "Parado. " : "") + `${blocos.length} colégio${blocos.length > 1 ? "s" : ""} de ${ano} conferido${blocos.length > 1 ? "s" : ""}.`;
+        if (info.className === "hint")
+          info.textContent =
+            (cancelar ? "Parado. " : "") +
+            `${blocos.length} colégio${blocos.length > 1 ? "s" : ""} de ${ano} conferido${blocos.length > 1 ? "s" : ""}.`;
         total.hidden = false;
         total.textContent = "";
         total.append(
@@ -161,7 +167,11 @@ export function abrirConferirFotos(C, colNome = "repasse") {
                 .writeText(
                   blocos
                     .filter(b => b.r.faltam.length)
-                    .map(b => `${b.g.nome} (${b.g.ano})\n` + b.r.faltam.map(it => `  - ${title(it.nome || "")}${it.codigo ? " · " + it.codigo : ""}`).join("\n"))
+                    .map(
+                      b =>
+                        `${b.g.nome} (${b.g.ano})\n` +
+                        b.r.faltam.map(it => `  - ${title(it.nome || "")}${it.codigo ? " · " + it.codigo : ""}`).join("\n")
+                    )
                     .join("\n\n")
                 )
                 .then(() => U.toast("Lista copiada"))
@@ -186,7 +196,11 @@ export function abrirConferirFotos(C, colNome = "repasse") {
         if (!pasta) box.append(el("small", "wait", "Este colégio ainda não tem pasta de prévias no Drive (o primeiro envio cria)."));
         r.faltam.forEach(it => {
           const lin = el("div", "conf-aluno");
-          const txt = el("span", null, `${title(it.nome || "")}${it.codigo ? " · " + it.codigo : ""}${it.etapa ? " · " + it.etapa.toLowerCase() : ""}`);
+          const txt = el(
+            "span",
+            null,
+            `${title(it.nome || "")}${it.codigo ? " · " + it.codigo : ""}${it.etapa ? " · " + it.etapa.toLowerCase() : ""}`
+          );
           const b = U.mkBtn("📤 Enviar foto", "", () =>
             import("./enviar-foto.js")
               .then(m =>

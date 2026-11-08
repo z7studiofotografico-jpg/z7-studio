@@ -238,7 +238,7 @@ function entregaCampos(p, it, { venda = false } = {}) {
     aviso.hidden = !falta.length;
     if (!falta.length) return true;
     aviso.textContent = "Falta preencher: " + falta.join(", ") + ".";
-    ({ CEP: cep, Rua: rua, "Número": num, Bairro: bai, Cidade: cid })[falta[0]].focus();
+    ({ CEP: cep, Rua: rua, Número: num, Bairro: bai, Cidade: cid })[falta[0]].focus();
     return false;
   };
   p._entrega = () => {

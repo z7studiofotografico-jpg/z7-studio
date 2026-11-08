@@ -49,12 +49,7 @@ export function prPorAno(corpo, C, caixa, tabela) {
             fila: soma("fila")
           })
         );
-      tabela(
-        box,
-        ["Ano das fotos", "Fotografados", "Compraram", "Conversão", "Na fila do Repasse"],
-        todas,
-        "Nenhum ano importado ainda."
-      );
+      tabela(box, ["Ano das fotos", "Fotografados", "Compraram", "Conversão", "Na fila do Repasse"], todas, "Nenhum ano importado ainda.");
     } catch (e) {
       console.warn("[Z7] PR por ano", e);
       espera.textContent = "Não foi possível contar agora.";

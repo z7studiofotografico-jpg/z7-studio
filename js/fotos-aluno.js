@@ -34,7 +34,11 @@ export function tokenGoogle(cliente, email, escopo = LEITURA) {
           hint: email || "",
           callback: r => {
             if (r.error || !r.access_token) return rej(new Error("Entrada no Google cancelada ou recusada."));
-            if (escopo === ESCRITA && window.google.accounts.oauth2.hasGrantedAllScopes && !window.google.accounts.oauth2.hasGrantedAllScopes(r, ESCRITA))
+            if (
+              escopo === ESCRITA &&
+              window.google.accounts.oauth2.hasGrantedAllScopes &&
+              !window.google.accounts.oauth2.hasGrantedAllScopes(r, ESCRITA)
+            )
               return rej(new Error("Para enviar fotos, marque a opção do Google Drive na tela do Google (ver, editar e criar arquivos)."));
             tokens[escopo] = { v: r.access_token, ate: Date.now() + (Number(r.expires_in) || 3600) * 1000 };
             res(tokens[escopo].v);
@@ -61,7 +65,10 @@ export function abrirDriveEscrita(C) {
   const cliente = C.P.driveCliente || "";
   if (!cliente) return null;
   if (!driveEscrita || chaveEscrita !== cliente) {
-    driveEscrita = criarDrive(() => tokenGoogle(cliente, C.email, ESCRITA), (u, o) => fetch(u, o));
+    driveEscrita = criarDrive(
+      () => tokenGoogle(cliente, C.email, ESCRITA),
+      (u, o) => fetch(u, o)
+    );
     chaveEscrita = cliente;
   }
   return driveEscrita;

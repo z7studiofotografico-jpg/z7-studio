@@ -311,7 +311,12 @@ export const idComAno = (id, ano) => String(9999 - Number(ano)).padStart(4, "0")
 export function docComAno(v, ano, agora = new Date()) {
   const x = lerCodigo(v.codigo);
   const codigo = x ? fmtCodigo(ano, x.sigla, x.n) : v.codigo || "";
-  const out = Object.assign({}, v, { ano: Number(ano), codigo, codigoBusca: codigo ? codigoBusca(codigo) : "", atualizadoEm: agora.toISOString() });
+  const out = Object.assign({}, v, {
+    ano: Number(ano),
+    codigo,
+    codigoBusca: codigo ? codigoBusca(codigo) : "",
+    atualizadoEm: agora.toISOString()
+  });
   if (v.seg) out.seg = Number(ano) >= agora.getFullYear() ? "lf" : "rep";
   return out;
 }
@@ -358,9 +363,17 @@ export async function mudarAno(C, id) {
       });
       return r;
     };
-    await FS.setDoc(FS.doc(db, "config", META), Object.assign({}, m, { anos: aplica(m.anos, delta.anos), escolasAno: aplica(m.escolasAno, delta.escolasAno) }));
+    await FS.setDoc(
+      FS.doc(db, "config", META),
+      Object.assign({}, m, { anos: aplica(m.anos, delta.anos), escolasAno: aplica(m.escolasAno, delta.escolasAno) })
+    );
   }
-  await FS.updateDoc(FS.doc(db, "importacoes", id), { ids: novos, n: novos.length, anoMudadoPara: novo, anoMudadoEm: new Date().toISOString() });
+  await FS.updateDoc(FS.doc(db, "importacoes", id), {
+    ids: novos,
+    n: novos.length,
+    anoMudadoPara: novo,
+    anoMudadoEm: new Date().toISOString()
+  });
   U.toast(`Ano mudado para ${novo}`);
   return true;
 }

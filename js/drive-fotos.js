@@ -48,7 +48,10 @@ export function lerNomeAluno(nome) {
   // "01 - CIEP 225 - LORENA", "26 -CIEP336- 01 - DAVI", "01 - CIEP 460-2022- JAMILLE", "01-CEPD2025- GRACIELLY":
   // o nome é o último pedaço e o número do aluno é o último número curto antes dele
   if (/-/.test(r.nome)) {
-    const partes = s.replace(/-\d{1,2}$/, "").split(/\s*-\s*/).filter(Boolean);
+    const partes = s
+      .replace(/-\d{1,2}$/, "")
+      .split(/\s*-\s*/)
+      .filter(Boolean);
     const nome = partes.pop();
     let nums = partes.filter(x => /^\d{1,3}$/.test(x));
     // "2024 - CEPD 08 - NOME": o número vem colado na sigla
@@ -91,14 +94,17 @@ export function parecidoColegio(a, b) {
       .replace(/([BCDFGJKLMNPQRSTVWXZ])H/g, "$1")
       .split(" ")
       .filter(Boolean);
-  const A = norm(a), B = norm(b);
+  const A = norm(a),
+    B = norm(b);
   if (!A.length || !B.length) return 0;
-  const numA = A.filter(w => /\d/.test(w)).join(), numB = B.filter(w => /\d/.test(w)).join();
+  const numA = A.filter(w => /\d/.test(w)).join(),
+    numB = B.filter(w => /\d/.test(w)).join();
   if (numA !== numB) return 0;
   const bate = (w, v) => w === v || (w.length === 1 && v.startsWith(w)) || (v.length === 1 && w.startsWith(v));
   const [cur, lon] = A.length <= B.length ? [A, B] : [B, A];
   const usados = new Set();
-  let n = 0, inteiras = 0;
+  let n = 0,
+    inteiras = 0;
   cur.forEach(w => {
     const j = lon.findIndex((v, i) => !usados.has(i) && bate(w, v));
     if (j >= 0) usados.add(j), n++, w.length > 1 && lon[j].length > 1 && inteiras++;
@@ -110,11 +116,12 @@ export const ehPastaAno = nome => /^pr[ée]vias(\s+20\d\d)?$/i.test(String(nome 
 // nome do arquivo/pasta do aluno no Drive, no formato do gerador de prévias: "CEPNCP 01 - MARIA SILVA"
 // (o "acharAluno" acha de volta pelo nome e pelo número do ID)
 export function nomeArquivoAluno(it) {
-  const nome = chave((it && it.nome) || "")
-    .replace(/[\\/:*?"<>|]+/g, " ")
-    .replace(/-/g, " ")
-    .replace(/\s+/g, " ")
-    .trim() || "ALUNO";
+  const nome =
+    chave((it && it.nome) || "")
+      .replace(/[\\/:*?"<>|]+/g, " ")
+      .replace(/-/g, " ")
+      .replace(/\s+/g, " ")
+      .trim() || "ALUNO";
   const c = lerCodigo((it && (it.codigo || it.codigoOrig)) || "");
   return (c ? `${c.sigla} ${String(c.n).padStart(2, "0")} - ` : "") + nome;
 }
@@ -145,7 +152,16 @@ export function pastaDoColegio(colegios, it) {
 }
 // o aluno tem prévia nessa lista (itens da pasta do colégio): a pasta das fotos separadas ou a folha
 export function temFoto(itens, it) {
-  return !!(acharAluno(itens.filter(f => f.mimeType === PASTA), it) || acharAluno(itens.filter(f => f.mimeType !== PASTA), it));
+  return !!(
+    acharAluno(
+      itens.filter(f => f.mimeType === PASTA),
+      it
+    ) ||
+    acharAluno(
+      itens.filter(f => f.mimeType !== PASTA),
+      it
+    )
+  );
 }
 // corpo do envio de um arquivo ao Drive (metadados + conteúdo, "multipart/related")
 export function corpoEnvio(meta, blob, tipo, b) {
@@ -215,7 +231,8 @@ export function criarDrive(acesso, buscar = fetch) {
     let colegios = await pastasColegios(raiz);
     if (!colegios.length) colegios = [{ id: raiz, name: await nomeDe(raiz) }];
     const col2 = pastaDoColegio(colegios, it);
-    if (!col2) return { erro: `As prévias de ${it.escola || "este colégio"}${it.ano ? " (" + it.ano + ")" : ""} ainda não estão no Drive.` };
+    if (!col2)
+      return { erro: `As prévias de ${it.escola || "este colégio"}${it.ano ? " (" + it.ano + ")" : ""} ainda não estão no Drive.` };
     const itens = await listar(col2.id);
     const pasta = acharAluno(
       itens.filter(f => f.mimeType === PASTA),

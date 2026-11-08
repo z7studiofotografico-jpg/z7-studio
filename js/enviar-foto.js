@@ -195,8 +195,7 @@ export function enviarFotoAluno(C, it, o = {}) {
         for (const id of gravados.splice(0)) await D.lixeira(id).catch(() => {});
         esquecerListas();
         info.className = "wait";
-        info.textContent =
-          (e && e.message) || "Não consegui gravar no Drive agora. Verifique a internet e tente de novo.";
+        info.textContent = (e && e.message) || "Não consegui gravar no Drive agora. Verifique a internet e tente de novo.";
         bGravar.disabled = bFotos.disabled = bPasta.disabled = false;
       }
     }
