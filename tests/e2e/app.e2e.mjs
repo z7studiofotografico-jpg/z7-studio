@@ -3472,6 +3472,62 @@ await cenario("Registrar venda: endereço completo obrigatório e CEP preenche a
   );
   ok(!erros.length, "sem erros no console: " + erros.join(" | "));
 });
+await cenario("Colégio paga o PR: alunos entram direto como vendidos", async () => {
+  const Y = new Date().getFullYear();
+  const d = Object.assign({}, base, {
+    "instituicoes/ip": { nome: "COLEGIO PAGANTE", tipo: "publico", etapa: "A VISITAR", contatos: [], visitas: [], resp: "", respEmail: "" },
+    "config/repasse_meta": { escolasAno: { ["COLEGIO PAGANTE|" + Y]: 1 }, anos: { [Y]: 1 } },
+    "repasse/cp1": {
+      nome: "PEDRO PAGANTE",
+      nomeBusca: "PEDRO PAGANTE",
+      escola: "COLEGIO PAGANTE",
+      ano: Y,
+      etapa: "NA FILA",
+      resp: "",
+      respEmail: "",
+      contatos: [{ tipo: "Mãe", nome: "Rosa", tel: "21988882222" }],
+      telefones: ["21988882222"]
+    }
+  });
+  const { pg, erros, store } = await abrir(ADRIANO, migrar(d));
+  // no cadastro do colégio: "Quem paga o PR" = o colégio → oferece passar os alunos que já estão no app
+  await ir(pg, "#inst-publico");
+  await calmo(pg);
+  await pg.locator("button.chip", { hasText: /^A visitar/i }).first().click();
+  await calmo(pg);
+  await pg.locator(".card", { hasText: /Colegio Pagante/i }).first().getByRole("button", { name: "Editar" }).click();
+  const sh = pg.locator(".sheet:visible").last();
+  await sh.getByLabel("Quem paga o PR").selectOption("colegio");
+  await sh.locator("button[type=submit]").click();
+  await pg.getByRole("button", { name: "Passar para vendido" }).click();
+  await calmo(pg);
+  let s = await store();
+  ok(s["instituicoes/ip"].quemPaga === "colegio", "cadastro do colégio grava: o colégio paga");
+  ok(
+    s["repasse/cp1"].etapa === "PAGO" && s["repasse/cp1"].colegioPaga === true && s["repasse/cp1"].valor === 0 && s["repasse/cp1"].entregaTipo === "Entrega no colégio",
+    "aluno que já estava no app passa para vendido (pago pelo colégio, entrega no colégio)"
+  );
+  // importar planilha: aluno novo do colégio que paga entra direto como vendido
+  await ir(pg, "#pr");
+  await calmo(pg);
+  await pg.getByRole("button", { name: "Importar planilha" }).click();
+  await calmo(pg);
+  const csv = `ESCOLA;FORMANDO;DATA;STATUS;CEL 2 (MÃE)\nColegio Pagante;Lia Nova;10/03/${Y};;21944445555 (Sonia)\n`;
+  await pg.locator(".sheet:visible input[type=file]").setInputFiles({ name: "pr.csv", mimeType: "text/csv", buffer: Buffer.from(csv) });
+  await pg.waitForFunction(() => /1 alunos? encontrad/.test(document.body.textContent), null, { timeout: 8000 }).catch(() => {});
+  await pg.locator(".sheet:visible button[type=submit]").click();
+  await pg.waitForFunction(() => /Pronto!/.test(document.body.textContent), null, { timeout: 8000 }).catch(() => {});
+  s = await store();
+  const lia = Object.values(s).find(x => x.nome === "Lia Nova");
+  ok(lia && lia.etapa === "PAGO" && lia.colegioPaga === true && /1 vendidos pelo colégio/.test(await pg.textContent("body")), "importar: aluno do colégio que paga entra como vendido");
+  await pg.locator(".sheet:visible").getByRole("button", { name: "Fechar" }).click();
+  await calmo(pg);
+  await pg.locator("#rChips").getByText("Entregas").click();
+  await calmo(pg);
+  const t = await pg.textContent("#rList");
+  ok(/No colégio · Colegio Pagante/i.test(t) && /Pago pelo colégio · entrega no colégio/.test(t), "Entregas: agrupado no colégio, sem pedir endereço de casa");
+  ok(!erros.length, "sem erros no console: " + erros.join(" | "));
+});
 await cenario("Equipe edita os dados do aluno e o Adriano vê quem editou", async () => {
   const Y = new Date().getFullYear();
   const d = Object.assign({}, base, {

@@ -2,6 +2,7 @@
 import { colNome, metaNome, ehFormatura } from "./repasse-estado.js";
 import { el, carregarLib } from "./ui.js";
 import { MAPA, hkey, linhaParaDoc, docId, faltando, norm, semTelefone } from "./repasse-dados.js";
+import { colegiosQuePagam, colegioPaga, vendidoPeloColegio } from "./colegio-paga.js";
 import * as U from "./util.js";
 import { indexarFones } from "./pedidos.js";
 let C, FS, db;
@@ -302,11 +303,14 @@ export function openImport(ctx, ui, aoTerminar) {
         prog.textContent = "Conferindo quem já está no app…";
         const exist = await jaExistem(FS, col, idDe, (f, t) => (prog.textContent = `Conferindo quem já está no app… ${f} de ${t}`));
         const agora = new Date().toISOString();
+        // PR: colégio que paga (cadastro do colégio) → aluno do ano atual em diante entra direto como vendido
+        const pagam = colNome() === "repasse" ? await colegiosQuePagam(FS, db).catch(() => new Set()) : new Set();
         let novos = 0,
           atual = 0,
           historico = 0,
           semTel = 0,
-          voltou = 0;
+          voltou = 0,
+          peloColegio = 0;
         const escolas = Object.assign({}, meta.escolas || {}),
           anos = Object.assign({}, meta.anos || {}),
           escolasAno = Object.assign({}, meta.escolasAno || {});
@@ -338,6 +342,18 @@ export function openImport(ctx, ui, aoTerminar) {
                 valor: 0,
                 resp: "",
                 respEmail: "",
+                importadoEm: agora,
+                atualizadoEm: agora
+              }),
+              false
+            ];
+          }
+          if (pagam.size && Number(d.ano) >= new Date().getFullYear() && colegioPaga(pagam, d.escola)) {
+            peloColegio++;
+            return [
+              id,
+              Object.assign({}, d, vendidoPeloColegio(agora.slice(0, 10), C.email), {
+                semTelefone: semTelefone(d),
                 importadoEm: agora,
                 atualizadoEm: agora
               }),
@@ -430,7 +446,7 @@ export function openImport(ctx, ui, aoTerminar) {
             status: "ativa"
           });
         const nInc = ops.filter(([, d, m]) => !m && d.etapa === "INCOMPLETO").length;
-        prog.textContent = `Pronto! ${novos - nInc - historico - semTel} novos na fila${nInc ? `, ${nInc} na aba Incompletos` : ""}${semTel ? `, ${semTel} sem telefone (fora das filas e do Dashboard)` : ""}${historico ? `, ${historico} que já compraram (só histórico, para o Dashboard)` : ""}${fora ? `, ${fora} de turma desmarcada ficaram fora do app` : ""}${atual ? ` e ${atual} atualizados` : ""}${voltou ? ` (${voltou} que estavam sem telefone agora têm número e foram para a fila)` : ""}.`;
+        prog.textContent = `Pronto! ${novos - nInc - historico - semTel - peloColegio} novos na fila${peloColegio ? `, ${peloColegio} vendidos pelo colégio (o colégio paga)` : ""}${nInc ? `, ${nInc} na aba Incompletos` : ""}${semTel ? `, ${semTel} sem telefone (fora das filas e do Dashboard)` : ""}${historico ? `, ${historico} que já compraram (só histórico, para o Dashboard)` : ""}${fora ? `, ${fora} de turma desmarcada ficaram fora do app` : ""}${atual ? ` e ${atual} atualizados` : ""}${voltou ? ` (${voltou} que estavam sem telefone agora têm número e foram para a fila)` : ""}.`;
         U.toast("Planilha importada ✅");
         aoTerminar();
         const fechar = U.mkBtn("Fechar", "btn-primary", close);

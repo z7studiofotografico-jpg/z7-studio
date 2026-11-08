@@ -7,6 +7,7 @@ import { TIPOS, CARTOES, CARGOS, FOTOGRAFO, RESULTADOS, PASSOS, SEGMENTOS, semSe
 import { C, FS, db, col, tipo, items } from "./instituicoes-estado.js";
 import { cadastroFalta, cadastroPendente } from "./instituicao-cadastro.js";
 import { abrirExcluirInst } from "./inst-excluir.js";
+import { QUEM_PAGA } from "./colegio-paga.js";
 // Atalhos de data do próximo passo
 function quandoBtns(target) {
   const q = el("div", "quick");
@@ -75,6 +76,17 @@ export function openForm(it) {
     p.append(r1, r2);
     const fot = sel(FOTOGRAFO, it && it.fotografoHoje, "—");
     p.append(field("Fotógrafo hoje", fot));
+    // Quem paga o PR (só admin): o colégio paga → os alunos entram direto como vendidos
+    let quemPaga = null;
+    if (C.isAdmin) {
+      quemPaga = el("select");
+      QUEM_PAGA.forEach(([v, t]) => quemPaga.append(new Option(t, v)));
+      quemPaga.value = (it && it.quemPaga) || "aluno";
+      p.append(
+        field("Quem paga o PR", quemPaga),
+        el("p", "hint", "O colégio paga: os alunos do PR deste colégio entram direto como vendidos, para produzir e entregar no colégio.")
+      );
+    }
     // Alunos por série (as séries que formam) e total
     const porSerie = (it && it.alunosPorSerie) || {};
     const segBox = el("div", "series");
@@ -193,6 +205,7 @@ export function openForm(it) {
         notas: nota.value.trim(),
         atualizadoEm: new Date().toISOString()
       };
+      if (quemPaga) body.quemPaga = quemPaga.value;
       // colégio da planilha: completou contato, alunos e endereço → sai da lista de pendências (o Adriano vê às 19h)
       let completou = false;
       if (it && it.cadastroPendente && !cadastroFalta(Object.assign({}, it, body)).length) {
@@ -216,6 +229,9 @@ export function openForm(it) {
           );
         U.toast(completou ? "Cadastro completo ✅ Obrigado!" : "Salvo");
         close();
+        // passou a "o colégio paga": oferece passar os alunos que já estão no app para vendido
+        if (quemPaga && quemPaga.value === "colegio" && (!it || it.quemPaga !== "colegio"))
+          import("./colegio-paga-tela.js").then(m => m.oferecerVendido(C, body.nome)).catch(e => C.handleErr(e));
       } catch (e) {
         C.handleErr(e);
       }
