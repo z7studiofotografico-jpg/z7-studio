@@ -80,3 +80,26 @@ test("permissões: só o admin ou quem fechou; o representante não confirma o p
   assert.equal(R.repPodeMexer({ recebidoPor: "colegio", repassadoEm: "2026-11-05" }), true);
   assert.equal(R.repPodeMexer({ recebidoPor: "estudio", conferido: true }), false);
 });
+
+test("dashboard: pagamento no caixa entra como venda; comissão só do conferido, para quem fechou", async () => {
+  const { resumir } = await import("../js/calc.js");
+  const r = resumir(
+    {
+      contratos: [
+        {
+          respEmail: "ana@x.com",
+          pagamentos: [
+            { valor: 100, data: "2026-11-02", recebidoPor: "estudio", forma: "Pix", conferido: true },
+            { valor: 50, data: "2026-11-03", recebidoPor: "colegio", forma: "Dinheiro", repassadoEm: "2026-11-05", conferido: false },
+            { valor: 70, data: "2026-11-03", recebidoPor: "representante", forma: "Dinheiro" }
+          ]
+        }
+      ]
+    },
+    "2026-11-08"
+  );
+  const m = r.meses["2026-11"];
+  assert.equal(m.produto["Contrato do colégio"].v, 15000);
+  assert.equal(m.pessoas["ana@x.com"].vend, 15000);
+  assert.deepEqual(m.pessoas["ana@x.com"].com, { "form|Pix": 10000 });
+});

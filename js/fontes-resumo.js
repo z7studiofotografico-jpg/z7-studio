@@ -2,6 +2,7 @@
 // O Dashboard guarda 24 meses: lê só o que pode mudar esses meses (e o que ainda está em aberto),
 // em vez de coleções inteiras que só crescem.
 // ler(colecao, filtros) → lista de { id, ...dados }; filtros = [[campo, operador, valor], ...]
+// Contrato do colégio: os contratos dos últimos 2 anos e os pagamentos de cada um (subcoleção; são poucos por ano).
 // versaoDados < 7 (a atualização que grava "ultimoPag" ainda não rodou): lê todos os formandos, como antes.
 import { somaDias } from "./regras.js";
 
@@ -25,7 +26,11 @@ export async function lerFontes(ler, hoje, versaoDados = 99) {
       ler("becas", desde("criadoEm")),
       ler("repasse", desde("separadoEm"))
     ]);
+  const anoCorte = Number(corte.slice(0, 4));
+  const contratos = (await ler("contratosColegio", []).catch(() => [])).filter(c => Number(c.ano) >= anoCorte);
+  for (const c of contratos) c.pagamentos = await ler(`contratosColegio/${c.id}/pagamentos`, []).catch(() => []);
   return {
+    contratos,
     leads: juntar(leadsNovos, leadsFechados),
     prs: prsPagos.filter(r => ["PAGO", "ENTREGUE"].includes(r.etapa)),
     forms: juntar(fAbertos, fVendidos, fPagos, fDevolvidos),

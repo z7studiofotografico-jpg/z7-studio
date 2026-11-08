@@ -51,5 +51,6 @@ botão "Mudar ano" nas importações de Formatura/Paspatur, aba Vendidos (admin)
   - relatório de produção com colégio, unidade, representante, entrega e contato no topo; aluno, turma, itens e
     "PRECISA DE FOTO" para quem tem paspatur; totais por item;
   - cada mudança guarda quem fez e quando.
-- **Falta:** colar as regras novas (`firestore.rules`) no Firebase; levar a comissão do contrato para o Dashboard e
-  para "Minhas vendas" da equipe.
+- Dashboard (08/11): pagamento do contrato que chega ao estúdio entra como venda "Contrato do colégio" (origem Becas)
+  no mês em que entrou; a comissão de quem fechou entra no Desempenho da pessoa depois de conferida.
+- **Falta:** colar as regras novas (`firestore.rules`) no Firebase.

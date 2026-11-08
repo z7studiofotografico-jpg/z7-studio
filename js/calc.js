@@ -2,6 +2,7 @@
 // script noturno do GitHub, que grava o resumo pronto em resumos/dashboard.
 // Assim o Dashboard abre lendo 1 documento em vez de milhares.
 import { centavos, reais, pagamentosDe, formaDe, ehKit01, emAberto, atrasado, ativo, LEAD, PR, INST, BECA, ENSAIO } from "./regras.js";
+import { ondeEsta } from "./contrato-colegio-regras.js";
 
 const mes = d => {
   const m = String(d || "").slice(0, 7);
@@ -28,13 +29,14 @@ const novoForm = () => ({
   pessoas: {}
 });
 const novoFunil = () => ({ criados: 0, fechados: 0, perdidos: 0, v: 0, origem: {}, servico: {}, pessoas: {} });
-// fontes = { leads, prs, forms, insts, ens, becas } (listas de documentos); hoje = "AAAA-MM-DD"
+// fontes = { leads, prs, forms, insts, ens, becas, contratos } (listas de documentos); hoje = "AAAA-MM-DD"
+// contratos = Contrato do colégio, cada um com os seus pagamentos ({ ..., pagamentos: [...] })
 // emailPorNome: { "Pedro Vendedor": "pedro@..." } para juntar registros antigos (só com o nome) na mesma pessoa
 export function resumir(fontes, hoje, emailPorNome) {
   const mapa = emailPorNome || {};
   // Quem é a pessoa: e-mail quando tiver (não muda), senão o e-mail achado pelo nome, senão o nome
   const quem = (email, nome) => String(email || "").toLowerCase() || mapa[nome] || String(nome || "");
-  const { leads = [], prs = [], forms = [], insts = [], ens = [], becas = [] } = fontes;
+  const { leads = [], prs = [], forms = [], insts = [], ens = [], becas = [], contratos = [] } = fontes;
   const meses = {};
   const M = m =>
     (meses[m] = meses[m] || { total: 0, n: 0, origem: {}, produto: {}, pessoas: {}, pr: novoPR(), form: novoForm(), funil: novoFunil() });
@@ -214,6 +216,19 @@ export function resumir(fontes, hoje, emailPorNome) {
     .forEach(b =>
       venda(b.retirada || String(b.criadoEm || "").slice(0, 10), b.valor, "Aluguel de becas", "Becas", quem(b.porEmail, b.por))
     );
+
+  // Contrato do colégio: entra como venda quando o dinheiro chega ao estúdio (pago direto ou repassado);
+  // a comissão de quem fechou usa a taxa do Álbum de formatura (venda antecipada) e só conta depois de conferido
+  contratos.forEach(c => {
+    const pessoa = quem(c.respEmail, c.respNome);
+    (c.pagamentos || [])
+      .filter(p => p && ondeEsta(p) === "caixa")
+      .forEach(p => {
+        const d = p.repassadoEm || p.data;
+        venda(d, p.valor, "Contrato do colégio", "Becas", pessoa);
+        if (p.conferido) comissao(d, p.valor, "form", formaDe(p.forma) || "Dinheiro", pessoa);
+      });
+  });
 
   const marcadas = [];
   insts.forEach(i => {
