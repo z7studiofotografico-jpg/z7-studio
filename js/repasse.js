@@ -193,7 +193,7 @@ function mount() {
     <li><b>Separe o seu lote do dia</b> no quadro abaixo: toque em <b>Separar alunos</b> e diga quantos quer. Nunca vem o mesmo aluno duas vezes. Vá com calma nas mensagens novas para o WhatsApp não bloquear o número.</li>
     <li>Cada cartão mostra <b>para quem mandar</b> (mãe, pai ou aluno) e a mensagem pronta. O 1º contato só pede permissão para mandar a prévia.</li>
     <li>Respondeu que quer ver? Toque em <b>Quer ver a prévia</b>, depois em <b>🖼️ Prévia</b>: arraste a foto do aluno e o app monta o kit pronto para enviar.</li>
-    <li><b>Pagou?</b> Toque em <b>Pagou</b>. O cartão pede para <b>confirmar o endereço</b> (ou agendar a retirada no estúdio) e vai para <b>Entregas</b>, separado por cidade e bairro para montar a rota.</li>
+    <li><b>Pagou?</b> Toque em <b>Pagou</b>. O cartão pede para <b>confirmar o endereço</b> (ou agendar a retirada no estúdio) e vai para <b>Entregar</b>, separado por cidade e bairro para montar a rota.</li>
     <li>Use o <b>WhatsApp mostrado no quadro do lote (📱)</b>: a equipe usa os próprios números de trabalho; o seletor troca por outro já liberado (ex.: o cliente bloqueou). O aviso de contatos por dia muda em ⚙️ Ajustes.</li></ol>`;
   v.append(g);
 
@@ -380,18 +380,18 @@ function renderSegs() {
 function renderChips() {
   const c = $("rChips");
   c.innerHTML = "";
+  // ordem combinada com a Luciana (08/11): Caídos · Incompletos · Para hoje · Interessados · Buscar · A conferir |
+  // Entregar · Entregue (Vendidos / Minhas vendas). Quem não vai querer (Caído), com o motivo; só o Adriano resgata.
+  // Vendidos (entregues): só para consulta; não aparecem na busca nem nas outras abas. A equipe vê só as vendas dela.
   const tabs = [
+    ["caidos", "Caídos"],
+    ["incompletos", C.isAdmin ? "Incompletos" : "Meus incompletos"],
     ["hoje", "Para hoje"],
     ["interessados", "Interessados"],
-    ["entregas", "Entregas"],
     ["buscar", "Buscar"]
   ];
-  if (C.isAdmin) tabs.push(["conferir", "A conferir"], ["incompletos", "Incompletos"]);
-  else tabs.push(["incompletos", "Meus incompletos"]);
-  // PR, Paspatur e Formatura: quem não vai querer (Caído), com o motivo; só o Adriano resgata para nova negociação
-  tabs.push(["caidos", "Caídos"]);
-  // vendidos (entregues): só para consulta; não aparecem na busca nem nas outras abas. A equipe vê só as vendas dela
-  tabs.push(["vendidos", C.isAdmin ? "Vendidos" : "Minhas vendas"]);
+  if (C.isAdmin) tabs.push(["conferir", "A conferir"]);
+  tabs.push(["entregas", "Entregar"], ["vendidos", C.isAdmin ? "Entregues" : "Minhas vendas"]);
   tabs.forEach(([k, t]) => {
     const b = el("button", "chip", t);
     b.type = "button";
@@ -678,11 +678,12 @@ function renderList(loading, emptyMsg) {
 const NOMES_ABA = {
   hoje: "Para hoje",
   interessados: "Interessados",
-  entregas: "Entregas",
+  entregas: "Entregar",
   buscar: "Busca",
   conferir: "A conferir",
   incompletos: "Incompletos",
-  vendidos: "Vendidos"
+  vendidos: "Entregues",
+  caidos: "Caídos"
 };
 // (Formaturas usa o mesmo relatório nas abas Linha de Frente e Repasse)
 export function relatorioPR() {

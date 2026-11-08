@@ -28,6 +28,18 @@ botão "Mudar ano" nas importações de Formatura/Paspatur, aba Vendidos (admin)
      equipe, cadastrados pelo admin na ⚙️ (valores fora deste arquivo); acima do limite, pedido de autorização;
    - total do mês (quantidade e valor) no topo de "Minhas vendas";
    - botão para apagar as fotos de quem já comprou ou de incompleto sem contato.
+   **Feito em 08/11:** abas na ordem Caídos · Incompletos · Para hoje · Interessados · Buscar · A conferir (admin) |
+   Entregar · Entregues (equipe: Minhas vendas). Confirmado pela Luciana: limite de desconto IGUAL para toda a equipe.
+   **Plano para o resto (fazer numa conversa nova, "continuar o Z7"):**
+   - Lista única e chave PR/Paspatur: hoje são duas coleções (repasse e paspatur). Proposta: campo "vendaComo"
+     ("pr" | "paspatur") no aluno; a chave na janela do aluno troca o campo (com a pergunta "Deseja vender como …?")
+     e o preço, as mensagens e a comissão passam a ler o vendaComo; a aba "Todos / Só PR / Só Paspatur" filtra por ele.
+     Os alunos que já estão na coleção paspatur: decidir com a Luciana se migram para repasse (com vendaComo) ou se a
+     lista única lê as duas coleções. Cuidado: save(), colNome() e os preços (C.P) dependem de tipoPR.
+   - Conferir pagamento: o representante confirma com foto do comprovante (obrigatória) e o aluno vai para a
+     produção; admin desfaz. Muda a regra do banco de "conferido" (hoje só admin) e o cálculo da comissão.
+   - Produção (antes do "+ Aluno"), tabela de preços na ⚙️ por grupo, limites de desconto (LF R$ 50 PR / R$ 20
+     Paspatur; Repasse R$ 100 / R$ 40) com pedido de autorização, e apagar fotos de vendidos/incompletos sem contato.
 4. **Fichas**: ler a ficha de identificação nas fotos dos alunos com prévia e sem planilha e associar a nome e
    telefones; telefone só é acrescentado, nunca substituído.
 

@@ -1015,7 +1015,7 @@ await cenario("Adriano (admin), com os dados já atualizados no servidor", async
     });
     await calmo(pg);
     // venda paga: prazo de entrega (pagamento + 20 dias) em cores no cartão
-    await pg.locator("#rChips").getByText("Entregas").click();
+    await pg.locator("#rChips").getByText("Entregar", { exact: true }).click();
     await calmo(pg);
     const pz = pg.locator(".card", { hasText: "Bruno" }).locator(".prazo");
     ok(
@@ -1025,7 +1025,7 @@ await cenario("Adriano (admin), com os dados já atualizados no servidor", async
       "venda paga mostra o prazo de entrega em verde (20 dias)"
     );
     // total do mês (quantidade e valor) no topo de Vendidos
-    await pg.locator("#rChips").getByText("Vendidos").click();
+    await pg.locator("#rChips").getByText("Entregues", { exact: true }).click();
     await calmo(pg);
     ok(
       /Este mês: \d+ vendas? · R\$\s?[\d.]+,\d\d/.test(await pg.textContent("#rVendMes")),
