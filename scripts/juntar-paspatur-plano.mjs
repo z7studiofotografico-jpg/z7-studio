@@ -38,7 +38,10 @@ export function planejarJuncao(fontes) {
   }
   // contagem por colégio e ano: soma a do Paspatur na do PR
   const pm = fontes.pasMeta || {};
-  const temMeta = Object.keys(pm.escolas || {}).length || Object.keys(pm.anos || {}).length || Object.keys(pm.escolasAno || {}).length;
+  // (já juntado uma vez: não soma de novo)
+  const temMeta =
+    !pm.juntadoNoPR &&
+    (Object.keys(pm.escolas || {}).length || Object.keys(pm.anos || {}).length || Object.keys(pm.escolasAno || {}).length);
   if (temMeta) {
     const rm = fontes.repMeta || {};
     ops.push({

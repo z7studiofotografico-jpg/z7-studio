@@ -70,3 +70,12 @@ test("junção: contagens somadas e registros que apontavam para o Paspatur pass
 test("junção: sem nada no Paspatur, não grava nada", () => {
   assert.equal(planejarJuncao({ repasseIds: ["x"], paspatur: [] }).ops.length, 0);
 });
+
+test("junção: rodar de novo não soma as contagens outra vez", () => {
+  const { ops } = planejarJuncao({
+    repasseIds: ["x"],
+    paspatur: [],
+    pasMeta: { escolas: { "COLEGIO X": 2 }, anos: { 2026: 2 }, juntadoNoPR: true }
+  });
+  assert.equal(ops.length, 0);
+});
