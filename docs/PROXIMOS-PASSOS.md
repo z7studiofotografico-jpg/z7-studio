@@ -36,6 +36,10 @@ botão "Mudar ano" nas importações de Formatura/Paspatur, aba Vendidos (admin)
 - **Lista compacta** no PR, Paspatur e Formatura: uma linha por aluno (cor da situação, nome, ID, colégio · turma · ano,
   próximo passo, selo); tocar abre o cartão completo embaixo e tocar de novo fecha. Verde entregue, azul pago,
   amarelo interessado, cinza na fila, vermelho atrasado.
+- **Janela do aluno** (08/11): tocar no aluno da lista compacta (PR, Paspatur, Formatura) abre uma janela com abas
+  Resumo (o cartão completo) · Prévia e fotos · Conversa (mensagem pronta, resposta do cliente guardada em
+  "conversa", "✨ Pedir ao Claude" copia o texto sem telefone e abre o claude.ai) · Venda e entrega · Histórico.
+  No Contrato do colégio, tocar no nome abre Resumo · Pacote e pagamentos · Histórico.
 - **Contrato do colégio** (Aluguel de becas → Alunos dos colégios → escolher o colégio → "📄 Contrato do colégio"),
   coleção `contratosColegio` (id = colégio_ano) e pagamentos em `contratosColegio/{id}/pagamentos`:
   - quem fechou, quem paga (o colégio paga tudo / cada aluno paga), valor e parcelas, quem costuma receber,

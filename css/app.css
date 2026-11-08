@@ -400,3 +400,35 @@ button.lc-linha[aria-expanded="true"]{border-bottom-left-radius:0;border-bottom-
 .lc-pag .lc-nome,.lista-compacta .lc-nome{min-width:150px;flex-basis:150px}
 .lc-pag .lc-nome b,.lc-pag .lc-nome small,.lista-compacta .lc-nome b,.lista-compacta .lc-nome small{white-space:normal}
 .lc-pag > .meta{flex-basis:100%}
+/* Janela do aluno (PR, Paspatur, Formatura): abas Resumo · Prévia e fotos · Conversa · Venda e entrega · Histórico */
+.panel.janela-aluno{max-width:860px;padding-top:10px}
+@media (max-width:600px){.sheet:has(.janela-aluno){padding:0;align-items:stretch}.panel.janela-aluno{max-width:none;min-height:100%;border-radius:0}}
+.ja-topo{display:flex;flex-wrap:wrap;align-items:flex-start;gap:8px 12px;border-bottom:1px solid var(--line);padding-bottom:10px}
+.ja-topo > .btn{flex-basis:100%;align-self:flex-start;width:auto;margin-right:auto}
+.ja-nome{flex:1;min-width:0}
+.ja-nome h2{margin:0;font-size:1.25rem}
+.ja-nome small{color:var(--muted)}
+.ja-abas{display:flex;gap:6px;overflow-x:auto;padding:8px 0;border-bottom:1px solid var(--line);position:sticky;top:0;background:var(--surface);z-index:2}
+.ja-abas .chip{white-space:nowrap}
+.ja-corpo{display:flex;flex-direction:column;gap:10px;padding-top:10px}
+.ja-corpo > .card{border:none;padding:0;border-left:none}
+.ja-corpo > .card .card-top .name{display:none}
+.ja-grade{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:10px}
+.ja-bloco{display:flex;flex-direction:column;gap:4px;align-items:flex-start;text-align:left;font:inherit;color:var(--fg);background:var(--next);border:1px solid var(--line);border-radius:12px;padding:14px;cursor:pointer;min-height:120px}
+.ja-bloco:hover{border-color:var(--muted)}
+.ja-ico{font-size:1.8rem}
+.ja-bloco small{color:var(--muted)}
+.ja-conversa{display:flex;flex-direction:column;gap:6px}
+.ja-msg{max-width:85%;border-radius:12px;padding:8px 10px;background:var(--chip)}
+.ja-msg p{margin:0;white-space:pre-wrap;overflow-wrap:anywhere}
+.ja-msg small{color:var(--muted);font-size:.75rem}
+.ja-msg.nos{align-self:flex-end;background:var(--ok-soft)}
+.ja-dados,.ja-linha-tempo{display:flex;flex-direction:column;gap:6px}
+.ja-dados > div,.ja-linha-tempo > div{display:grid;grid-template-columns:130px 1fr;gap:8px;border-bottom:1px solid var(--line);padding-bottom:6px}
+.ja-dados small,.ja-linha-tempo small{color:var(--muted)}
+.janela-aluno textarea{width:100%;font:inherit;padding:8px;border-radius:8px;border:1px solid var(--line);background:var(--bg);color:var(--fg)}
+.lc-abrir{background:none;border:none;padding:0;font:inherit;color:inherit;text-align:left;cursor:pointer}
+.lc-abrir b{text-decoration:underline;text-decoration-color:var(--line);text-underline-offset:3px}
+.ja-abas{scrollbar-width:none}
+.ja-abas::-webkit-scrollbar{display:none}
+.ja-corpo > .card .card-top .stage{visibility:hidden}

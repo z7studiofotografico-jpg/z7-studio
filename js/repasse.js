@@ -11,6 +11,7 @@ import { el, title, emPartes, clicavel } from "./ui.js";
 import * as U from "./util.js";
 import { norm, situacaoTxt } from "./repasse-dados.js";
 import { linhaCompacta } from "./lista-compacta.js";
+import { abrirJanela } from "./janela-aluno.js";
 import { openImport } from "./repasse-import.js";
 import { botaoRelatorio, contar } from "./relatorio.js";
 import { codigoBusca, pareceCodigo, codigosDaBusca, ordemCodigo, telRelatorio } from "./aluno-id.js";
@@ -51,7 +52,7 @@ import {
 const soMinhaCaidos = () => (C.isAdmin ? [] : [FS.where("respEmail", "==", C.email || "")]);
 import { card } from "./repasse-cartao.js";
 // lista compacta: uma linha por aluno; tocar abre o cartão completo embaixo
-const linha = it => linhaCompacta(it, { card, status, situacao: situacaoTxt });
+const linha = it => linhaCompacta(it, { card, status, situacao: situacaoTxt, abrir: abrirJanela });
 import { sheet, field, actions } from "./repasse-janelas.js";
 import { openDados } from "./repasse-form.js";
 import { refreshStats, refreshLote, separarLote, loadMeta, pintarEscolas, escolaEscolhida, gruposPR } from "./repasse-lote.js";

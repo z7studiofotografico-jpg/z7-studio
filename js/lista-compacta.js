@@ -1,6 +1,6 @@
 // Lista compacta do PR, Paspatur e Formatura: uma linha por aluno (barra de cor da situação, nome, ID,
-// colégio · turma · ano, próximo passo e o selo da situação). Tocar na linha abre o cartão completo logo abaixo
-// (contatos, mensagem, botões); tocar de novo fecha. O que está aberto continua aberto quando a lista atualiza.
+// colégio · turma · ano, próximo passo e o selo da situação). Tocar na linha abre a janela do aluno (o.abrir), com
+// abas e tudo do aluno. Sem o.abrir (ou nos testes antigos, com window.__z7CartaoNaLista), o cartão abre embaixo.
 // Cores: verde entregue · azul pago (entregar) · amarelo interessado · cinza na fila / em contato · vermelho atrasado.
 import { el, title } from "./ui.js";
 
@@ -45,7 +45,9 @@ export function linhaCompacta(it, o) {
       cartao = null;
     }
   };
-  l.onclick = () => abrir(!cartao);
-  abrir(abertos.has(it.id));
+  const naLista = !o.abrir || (typeof window !== "undefined" && window.__z7CartaoNaLista);
+  l.onclick = () => (naLista ? abrir(!cartao) : o.abrir(it));
+  if (naLista) abrir(abertos.has(it.id));
+  else l.setAttribute("aria-haspopup", "dialog");
   return box;
 }

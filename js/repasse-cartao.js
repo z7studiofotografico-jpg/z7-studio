@@ -148,7 +148,7 @@ export function card(it) {
 }
 
 // Próximo passo do contato: a mensagem pronta para quem foi escolhido e os botões de enviar
-function desenharProximo(box, it, escolhido, blocked, li) {
+export function desenharProximo(box, it, escolhido, blocked, li) {
   const F0 = U.first(title(it.nome));
   box.innerHTML = "";
   const ns = passo(it, escolhido);
@@ -269,6 +269,8 @@ function desenharProximo(box, it, escolhido, blocked, li) {
           }
         };
         if (ns.then.count) p.tentativas = (it.tentativas || 0) + 1;
+        // a mensagem enviada fica na conversa do aluno (janela do aluno → Conversa)
+        p.conversa = [...(it.conversa || []), { de: "estudio", txt: ns.msg, em: p.ultimo.em, por: C.me || "" }].slice(-60);
         if (ns.then.countI) p.tentInteresse = (it.tentInteresse || 0) + 1;
         if (!it.resp && !it.respEmail && C.me) Object.assign(p, assumir(it));
         save(it, p, p.etapa === "NÃO QUER" ? "Contato encerrado" : "Próximo contato em " + U.fmtDate(p.followup));

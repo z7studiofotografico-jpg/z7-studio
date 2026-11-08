@@ -34,7 +34,10 @@ export function abrirContrato(ctx, inst, ano) {
       corpo.append(el("div", "empty", "Carregando…"));
       const fechar = U.mkBtn("Fechar", "", close);
       p.append(corpo, fechar);
-      const desenhar = () => render(corpo, st, inst, ano, ref);
+      const desenhar = () => {
+        render(corpo, st, inst, ano, ref);
+        if (st.janela) st.janela();
+      };
       unsubs.push(
         FS.onSnapshot(
           ref,
@@ -207,7 +210,10 @@ function render(corpo, st, inst, ano, ref) {
         };
         l.append(cb);
       }
-      const n = el("div", "lc-nome");
+      // tocar no nome abre a janela do aluno (Resumo · Pacote e pagamentos · Histórico)
+      const n = el("button", "lc-nome lc-abrir");
+      n.type = "button";
+      n.onclick = () => janelaAluno(a.id, st, ref, pode);
       n.append(
         el("b", null, title(a.nome || "")),
         el(
@@ -498,9 +504,9 @@ function linhaPagamento(pg, st, ref, pode) {
 }
 
 // Lançar / editar um pagamento
-function formPagamento(pg, st, ref) {
+function formPagamento(pg, st, ref, pre = {}) {
   const c = st.contrato;
-  const x = pg || {};
+  const x = pg || pre;
   sheet(pg ? "Editar pagamento" : "Novo pagamento", (p, close) => {
     const porAluno = c.quemPaga !== "colegio";
     const sAluno = sel(
@@ -666,5 +672,128 @@ function relProducao(st, inst, ano) {
       ]
     },
     C.me
+  );
+}
+
+// Janela do aluno do contrato: abas Resumo · Pacote e pagamentos · Histórico (atualiza junto com o contrato)
+const ABAS_CT = [
+  ["resumo", "Resumo"],
+  ["pacote", "Pacote e pagamentos"],
+  ["historico", "Histórico"]
+];
+let abaCt = "resumo";
+function janelaAluno(id, st, ref, pode) {
+  sheet(
+    null,
+    (p, close) => {
+      p.classList.add("janela-aluno");
+      const topo = el("div", "ja-topo"),
+        abas = el("div", "ja-abas"),
+        corpo = el("div", "ja-corpo");
+      abas.setAttribute("role", "tablist");
+      p.append(topo, abas, corpo);
+      const desenhar = () => {
+        const a = st.alunos.find(x => x.id === id);
+        if (!a) return close();
+        const c = st.contrato || {};
+        const pags = st.pags.filter(x => x.alunoId === id);
+        topo.innerHTML = "";
+        const nome = el("div", "ja-nome");
+        nome.append(
+          el("h2", null, title(a.nome || "")),
+          el("small", null, [title(a.instNome || ""), a.unidade || c.unidade, a.serie, a.ano].filter(Boolean).join(" · "))
+        );
+        topo.append(U.mkBtn("‹ Voltar ao contrato", "btn-sm", close), nome, el("span", "lc-selo ja-selo", a.status || "Cadastrado"));
+        abas.innerHTML = "";
+        ABAS_CT.forEach(([k, t]) => {
+          const b = el("button", "chip", t);
+          b.type = "button";
+          b.setAttribute("role", "tab");
+          b.setAttribute("aria-selected", String(abaCt === k));
+          b.setAttribute("aria-pressed", String(abaCt === k));
+          b.onclick = () => {
+            abaCt = k;
+            desenhar();
+          };
+          abas.append(b);
+        });
+        corpo.innerHTML = "";
+        const dados = el("div", "ja-dados");
+        const linha = (rot, val) => {
+          if (!val) return;
+          const d = el("div");
+          d.append(el("small", null, rot), el("span", null, val));
+          dados.append(d);
+        };
+        const { itens, padrao } = R.pacoteDoAluno(a, c);
+        if (abaCt === "resumo") {
+          linha("WhatsApp", a.tel ? a.tel.replace(/^(\d{2})(\d{4,5})(\d{4})$/, "($1) $2-$3") : "sem telefone");
+          linha("Responsável", a.responsavel || "");
+          linha("Pacote", (R.textoPacote(itens) || "sem pacote") + (padrao && itens.length ? " (padrão)" : ""));
+          linha(
+            "Beca",
+            [a.tamanho ? "tamanho " + a.tamanho + (a.menosLonga ? "1" : "") : "", a.faixa ? "faixa" : "", a.capelo ? "capelo" : ""]
+              .filter(Boolean)
+              .join(" · ")
+          );
+          linha("Situação do aluguel", a.status || "Cadastrado");
+          linha("Retirada · devolução", [dataBR(a.retirada), dataBR(a.devolucao)].filter(Boolean).join(" · "));
+          linha("Observação", a.obs || "");
+          corpo.append(dados);
+          if (itens.includes("paspatur")) corpo.append(el("p", "wait", "📷 Tem paspatur: precisa de foto do ensaio."));
+          const ac = el("div", "actions");
+          if (a.tel) {
+            const w = el("a", "btn btn-sm btn-primary", "Abrir no WhatsApp");
+            w.href = "https://wa.me/55" + U.digits(a.tel);
+            w.target = "_blank";
+            w.rel = "noopener";
+            ac.append(w);
+          }
+          corpo.append(ac);
+        } else if (abaCt === "pacote") {
+          const r0 = R.precoAluno(a, c);
+          const pago = pags.reduce((t, x) => t + Math.round(Number(x.valor || 0) * 100), 0) / 100;
+          linha("Itens", (R.textoPacote(itens) || "sem pacote") + (padrao && itens.length ? " (padrão do contrato)" : ""));
+          linha("Valor do pacote", r0 ? brl(r0) : "");
+          linha("Já pagou", brl(pago));
+          linha("Falta", r0 ? brl(Math.max(0, r0 - pago)) : "");
+          corpo.append(dados);
+          const ac = el("div", "actions");
+          if (pode) {
+            ac.append(
+              U.mkBtn("✏️ Mudar pacote", "btn-sm", () =>
+                escolherPacote("Pacote de " + U.first(title(a.nome || "")), padrao ? [] : itens, x => gravarPacotes([a.id], x))
+              )
+            );
+            if (c.quemPaga !== "colegio")
+              ac.append(U.mkBtn("+ Pagamento", "btn-primary btn-sm", () => formPagamento(null, st, ref, { alunoId: a.id })));
+          }
+          corpo.append(ac, el("h3", null, "Pagamentos"));
+          if (!pags.length) corpo.append(el("p", "hint", "Nenhum pagamento deste aluno."));
+          pags.forEach(pg => corpo.append(linhaPagamento(pg, st, ref, pode)));
+        } else {
+          const ev = [];
+          (a.historico || []).forEach(h => ev.push([h.em, `${h.de} → ${h.para}${h.por ? " (" + U.first(h.por) + ")" : ""}`]));
+          pags.forEach(pg =>
+            (pg.historico || []).forEach(h =>
+              ev.push([h.em, `Pagamento ${brl(pg.valor)}: ${h.o}${h.por ? " (" + U.first(h.por) + ")" : ""}`])
+            )
+          );
+          if (a.criadoEm) ev.push([a.criadoEm, "Cadastrado"]);
+          ev.sort((x, y) => String(y[0]).localeCompare(String(x[0])));
+          const l = el("div", "ja-linha-tempo");
+          ev.forEach(([d, t]) => {
+            const x = el("div");
+            x.append(el("small", null, dataBR(String(d).slice(0, 10))), el("span", null, t));
+            l.append(x);
+          });
+          if (!ev.length) l.append(el("p", "hint", "Nada registrado ainda."));
+          corpo.append(l);
+        }
+      };
+      st.janela = desenhar;
+      desenhar();
+    },
+    { div: true, wide: true, onClose: () => (st.janela = null) }
   );
 }

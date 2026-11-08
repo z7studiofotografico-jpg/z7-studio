@@ -401,6 +401,7 @@ async function abrir(email, dados, opc = {}) {
       // Lista compacta do PR: os testes antigos usam o cartão completo, então as linhas abrem sozinhas
       // (o cenário da lista compacta desliga isso e testa abrir e fechar)
       if (!compacta) {
+        window.__z7CartaoNaLista = true;
         const abrirTudo = () => document.querySelectorAll('.lc-lista button.lc-linha[aria-expanded="false"]').forEach(b => b.click());
         new MutationObserver(abrirTudo).observe(document, { childList: true, subtree: true });
       }
@@ -3207,21 +3208,43 @@ await cenario("Aluguel de becas · alunos dos colégios (status, estoque e produ
   );
   ok(!erros.length, "sem erros" + (erros.length ? ": " + erros.join(" | ") : ""));
 });
-await cenario("Lista compacta do PR (uma linha por aluno; tocar abre e fecha o cartão)", async () => {
-  const { pg, erros } = await abrir(ADRIANO, migrar(base), { compacta: true });
+await cenario("Lista compacta do PR e janela do aluno (abas, conversa e Claude)", async () => {
+  const { pg, erros, store } = await abrir(ADRIANO, migrar(base), { compacta: true });
   await ir(pg, "#pr");
   await pg.waitForSelector("#rList .lc-linha", { timeout: 8000 });
   const linhas = pg.locator("#rList button.lc-linha");
   ok((await linhas.count()) > 0 && (await pg.locator("#rList .card").count()) === 0, "a lista abre só com as linhas, sem cartões");
   const l1 = linhas.first();
   ok(/lc-(verde|azul|amarelo|cinza|vermelho|fim)/.test(await l1.getAttribute("class")), "linha com a cor da situação");
+  const nome = (await l1.locator(".lc-nome b").textContent()).trim();
   await l1.click();
-  ok(
-    (await pg.locator("#rList .card").count()) === 1 && (await l1.getAttribute("aria-expanded")) === "true",
-    "tocar abre o cartão embaixo"
-  );
-  await l1.click();
-  ok((await pg.locator("#rList .card").count()) === 0, "tocar de novo fecha");
+  const j = pg.locator(".panel.janela-aluno");
+  await j.waitFor({ timeout: 4000 });
+  ok(new RegExp(nome, "i").test(await j.locator(".ja-topo").textContent()), "tocar no aluno abre a janela dele");
+  ok((await j.locator(".ja-abas [role=tab]").count()) === 5, "janela com as 5 abas");
+  ok((await j.locator(".ja-corpo .card .actions").count()) === 1, "Resumo: o cartão completo com todos os botões");
+  await j.getByRole("tab", { name: "Prévia e fotos" }).click();
+  ok(/Prévia do kit/.test(await j.textContent()) && /Fotos para escolher/.test(await j.textContent()), "aba Prévia e fotos");
+  await j.getByRole("tab", { name: "Conversa" }).click();
+  await j.getByLabel("Resposta do cliente").fill("Quanto fica no cartão?");
+  await j.getByRole("button", { name: "Guardar na conversa" }).click();
+  await calmo(pg);
+  const st = await store();
+  const doc = Object.values(st).find(x => x && Array.isArray(x.conversa) && x.conversa.some(c => /no cartão/.test(c.txt)));
+  ok(doc && doc.conversa.slice(-1)[0].de === "cliente", "a resposta do cliente fica guardada na conversa do aluno");
+  await pg.waitForFunction(() => document.querySelectorAll(".ja-msg.cli").length === 1, null, { timeout: 4000 });
+  ok(true, "a conversa aparece na janela");
+  await j.getByLabel("Resposta do cliente").fill("E no Pix? Meu número é 21 99999-8888");
+  await j.getByRole("button", { name: "✨ Pedir ao Claude" }).click();
+  await pg.waitForFunction(() => /claude\.ai/.test(window.__aberto || ""), null, { timeout: 4000 });
+  const url = decodeURIComponent(await pg.evaluate(() => window.__aberto));
+  ok(/Quanto fica no cartão/.test(url) && /E no Pix/.test(url) && !/99999/.test(url), "Pedir ao Claude leva a conversa, sem telefone");
+  for (const aba of ["Venda e entrega", "Histórico"]) {
+    await j.getByRole("tab", { name: aba }).click();
+    ok((await j.locator(".ja-corpo").textContent()).trim().length > 0, "aba " + aba + " abre");
+  }
+  await j.getByRole("button", { name: "‹ Voltar para a lista" }).click();
+  ok((await pg.locator(".panel.janela-aluno").count()) === 0, "Voltar fecha a janela");
   ok(!erros.length, "sem erros" + (erros.length ? ": " + erros.join(" | ") : ""));
 });
 await cenario("Contrato do colégio (pacote por aluno, quem recebeu, repasse e produção)", async () => {
@@ -3296,6 +3319,22 @@ await cenario("Contrato do colégio (pacote por aluno, quem recebeu, repasse e p
     await calmo(pg);
     st = await store();
     ok(st["alugueis/c3"].pacote.join() === "beca,paspatur", "aplicar pacote a vários grava o pacote do aluno");
+    // janela do aluno do contrato
+    await painel.locator("button.lc-abrir", { hasText: "Miguel Augusto" }).click();
+    const ja = pg.locator(".panel.janela-aluno");
+    await ja.waitFor({ timeout: 4000 });
+    ok(
+      (await ja.locator(".ja-abas [role=tab]").count()) === 3 && /21\) 98888-7777/.test(await ja.textContent()),
+      "janela do aluno do contrato: 3 abas e o WhatsApp"
+    );
+    await ja.getByRole("tab", { name: "Pacote e pagamentos" }).click();
+    ok(
+      /Paspatur \+ Certificado \+ Canudo/.test(await ja.textContent()) && /Já pagou\s*R\$\s*120/.test(await ja.textContent()),
+      "aba Pacote e pagamentos: itens e o que já pagou"
+    );
+    await ja.getByRole("tab", { name: "Histórico" }).click();
+    ok(/lançou/.test(await ja.textContent()), "aba Histórico: o pagamento e quem lançou");
+    await ja.getByRole("button", { name: "‹ Voltar ao contrato" }).click();
     // relatório de produção
     await painel.getByRole("button", { name: "🖨️ Relatório de produção" }).click();
     const rel = await pg.textContent("#relatorio");
