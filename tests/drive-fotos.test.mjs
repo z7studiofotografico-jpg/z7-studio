@@ -132,3 +132,40 @@ test("colégio com nome parecido na pasta do Drive", () => {
   assert.equal(_par("CIEP 156 DR. ALBERT SABIN", "CIEP 155 MARIA JOAQUINA"), 0);
   assert.ok(_par("C.E SANTO ANTONIO", "SANTO ANTONIO DE PADUA") < 0.75);
 });
+
+test("trocar as fotos: a escolha feita à mão vale antes da busca pelo nome", async () => {
+  const P = "application/vnd.google-apps.folder";
+  const arvore = {
+    raiz: [{ id: "c1", name: "Prévias - 2026 - C.E. NUTA BARTLET", mimeType: P }],
+    c1: [
+      { id: "f1", name: "CNB 01 - ANA LIMA.jpg", mimeType: "image/jpeg" },
+      { id: "p1", name: "CNB 01 - ANA LIMA", mimeType: P },
+      { id: "f2", name: "CNB 02 - SUELLEN PEREIRA.jpg", mimeType: "image/jpeg" },
+      { id: "p2", name: "CNB 02 - SUELLEN PEREIRA", mimeType: P }
+    ],
+    p1: [{ id: "a1", name: "1.jpg", mimeType: "image/jpeg" }],
+    p2: [
+      { id: "s1", name: "1.jpg", mimeType: "image/jpeg" },
+      { id: "s2", name: "2.jpg", mimeType: "image/jpeg" }
+    ]
+  };
+  const buscar = async url => {
+    const pai = (decodeURIComponent(url).match(/'([\w-]+)' in parents/) || [])[1];
+    return { ok: true, json: async () => ({ files: arvore[pai] || [] }) };
+  };
+  const d = criarDrive("K", buscar);
+  const it = { nome: "Ana Lima", escola: "C.E. Nuta Bartlet", ano: 2026, codigo: "26CNB-01" };
+  const auto = await d.fotosDoAluno("raiz", it);
+  assert.deepEqual([auto.folhas.map(f => f.id), auto.fotos.map(f => f.id)], [["f1"], ["a1"]]);
+  const lista = await d.alunosDaPasta("c1");
+  assert.deepEqual(
+    lista.map(a => [a.cod, a.nome, a.folhaId, a.pastaId]),
+    [
+      ["CNB 01", "ANA LIMA", "f1", "p1"],
+      ["CNB 02", "SUELLEN PEREIRA", "f2", "p2"]
+    ]
+  );
+  const trocado = await d.fotosDoAluno("raiz", Object.assign({}, it, { fotosDrive: { colegioId: "c1", folhaId: "f2", pastaId: "p2" } }));
+  assert.equal(trocado.escolhida, true);
+  assert.deepEqual([trocado.folhas.map(f => f.id), trocado.fotos.map(f => f.id)], [["f2"], ["s1", "s2"]]);
+});

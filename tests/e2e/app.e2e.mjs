@@ -2982,6 +2982,50 @@ await cenario("Fotos do aluno direto do Google Drive", async () => {
     urls.every(u => /key=/.test(u)),
     "lê o Drive com a chave do app"
   );
+  // janela do aluno → Prévia e fotos: miniaturas direto na aba e "Trocar as fotos"
+  arvore.col1.push(
+    { id: "folha9", name: "CEYMS 09 - OUTRO ALUNO.jpg", mimeType: "image/jpeg" },
+    { id: "pasta9", name: "CEYMS 09 - OUTRO ALUNO", mimeType: F }
+  );
+  arvore.pasta9 = [{ id: "foto91", name: "x.jpg", mimeType: "image/jpeg" }];
+  const j2 = await abrir(ADRIANO, d, { compacta: true });
+  await j2.ctx.route(/googleapis\.com\/drive\/v3\/files/, rt => {
+    const u = decodeURIComponent(rt.request().url());
+    if (/alt=media/.test(u))
+      return rt.fulfill({
+        path: AQUI + "../../icons/icon-192.png",
+        contentType: "image/png",
+        headers: { "access-control-allow-origin": "*" }
+      });
+    const pai = (u.match(/'([^']+)' in parents/) || [])[1];
+    return rt.fulfill({
+      contentType: "application/json",
+      headers: { "access-control-allow-origin": "*" },
+      body: JSON.stringify({ files: arvore[pai] || [] })
+    });
+  });
+  await ir(j2.pg, "#pr");
+  await j2.pg
+    .locator("#rList button.lc-linha", { hasText: /Domingos/i })
+    .first()
+    .click();
+  const jan = j2.pg.locator(".panel.janela-aluno");
+  await jan.getByRole("tab", { name: "Prévia e fotos" }).click();
+  await j2.pg.waitForFunction(() => document.querySelectorAll(".ja-fotos .foto-item img").length === 5, null, { timeout: 8000 });
+  ok(true, "janela do aluno: a folha e as 4 fotos em miniatura na aba");
+  await jan.locator(".ja-fotos .foto-item").nth(1).click();
+  ok((await j2.pg.locator(".panel.foto-grande img").count()) === 1, "tocar na miniatura amplia a foto");
+  await j2.pg.locator(".panel.foto-grande").getByRole("button", { name: "Fechar" }).click();
+  await jan.getByRole("button", { name: "🔄 Trocar as fotos" }).click();
+  const tr = j2.pg.locator(".sheet").last();
+  await tr.getByText(/CEYMS 09 - OUTRO ALUNO/).click();
+  await tr.getByRole("button", { name: "Usar estas fotos" }).click();
+  await calmo(j2.pg);
+  const st2 = await j2.store();
+  ok(st2["repasse/dj"].fotosDrive && st2["repasse/dj"].fotosDrive.pastaId === "pasta9", "Trocar as fotos grava a escolha no aluno");
+  await j2.pg.waitForFunction(() => document.querySelectorAll(".ja-fotos .foto-item img").length === 2, null, { timeout: 8000 });
+  ok(/escolhidas à mão/.test(await jan.locator(".ja-fotos").textContent()), "a aba mostra as fotos trocadas (escolhidas à mão)");
+  ok(!j2.erros.length, "janela sem erros" + (j2.erros.length ? ": " + j2.erros.join(" | ") : ""));
   ok(!erros.length, "sem erros" + (erros.length ? ": " + erros.join(" | ") : ""));
 });
 await cenario("Conferir fotos e 📤 Enviar foto (admin grava a prévia no Drive)", async () => {

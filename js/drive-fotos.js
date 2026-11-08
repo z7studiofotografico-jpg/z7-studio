@@ -225,8 +225,43 @@ export function criarDrive(acesso, buscar = fetch) {
     const dentro = (await Promise.all(anos.map(a => listar(a.id)))).flat().filter(f => f.mimeType === PASTA);
     return itens.concat(dentro).filter(f => /^Pr[ée]vias\s*-/i.test(f.name));
   }
+  // folha (e as páginas dela) e fotos de uma pasta de colégio, a partir da folha e da pasta escolhidas
+  async function montarFotos(itens, folha, pasta) {
+    const base = folha && lerNomeAluno(folha.name);
+    const folhas = base
+      ? itens.filter(f => f.mimeType !== PASTA && lerNomeAluno(f.name).nome === base.nome && lerNomeAluno(f.name).cod === base.cod)
+      : [];
+    const fotos = pasta ? (await listar(pasta.id)).filter(f => /image\//.test(f.mimeType) || /\.(jpe?g|png)$/i.test(f.name)) : [];
+    return { folhas, fotos };
+  }
+  // os alunos com prévia numa pasta de colégio: [{ nome, cod, folhaId, pastaId }] (para "Trocar as fotos")
+  async function alunosDaPasta(colegioId) {
+    const itens = await listar(colegioId);
+    const m = new Map();
+    itens.forEach(f => {
+      const a = lerNomeAluno(f.name);
+      const k = a.cod + "|" + chave(a.nome);
+      const x = m.get(k) || { nome: a.nome, cod: a.cod, folhaId: "", pastaId: "" };
+      if (f.mimeType === PASTA) x.pastaId = x.pastaId || f.id;
+      else x.folhaId = x.folhaId || f.id;
+      m.set(k, x);
+    });
+    return [...m.values()].sort((a, b) => (a.cod + a.nome).localeCompare(b.cod + b.nome, "pt-BR", { numeric: true }));
+  }
   // { folhas: [arquivo], fotos: [arquivo] } do aluno, ou { erro }
+  // it.fotosDrive = { colegioId, colegio, folhaId, pastaId }: fotos escolhidas à mão ("Trocar as fotos"); vale antes da busca
   async function fotosDoAluno(raiz, it) {
+    const fx = it && it.fotosDrive;
+    if (fx && fx.colegioId && (fx.folhaId || fx.pastaId)) {
+      const itens = await listar(fx.colegioId);
+      const r = await montarFotos(
+        itens,
+        itens.find(f => f.id === fx.folhaId),
+        itens.find(f => f.id === fx.pastaId)
+      );
+      if (r.folhas.length || r.fotos.length)
+        return Object.assign({ colegio: fx.colegio || "", colegioId: fx.colegioId, escolhida: true }, r);
+    }
     // a pasta do link pode ser a geral ("Z7 – Prévias PR", com uma pasta por colégio) ou já a de um colégio
     let colegios = await pastasColegios(raiz);
     if (!colegios.length) colegios = [{ id: raiz, name: await nomeDe(raiz) }];
@@ -242,14 +277,14 @@ export function criarDrive(acesso, buscar = fetch) {
       itens.filter(f => f.mimeType !== PASTA),
       it
     );
-    const base = folha && lerNomeAluno(folha.name);
-    const folhas = base
-      ? itens.filter(f => f.mimeType !== PASTA && lerNomeAluno(f.name).nome === base.nome && lerNomeAluno(f.name).cod === base.cod)
-      : [];
-    const fotos = pasta ? (await listar(pasta.id)).filter(f => /image\//.test(f.mimeType) || /\.(jpe?g|png)$/i.test(f.name)) : [];
+    const { folhas, fotos } = await montarFotos(itens, folha, pasta);
     if (!folhas.length && !fotos.length)
-      return { erro: `Não achei as fotos de ${it.nome} nas prévias de ${col2.name.replace(/^Pr[ée]vias\s*-\s*/i, "")}.` };
-    return { colegio: col2.name, folhas, fotos };
+      return {
+        erro: `Não achei as fotos de ${it.nome} nas prévias de ${col2.name.replace(/^Pr[ée]vias\s*-\s*/i, "")}.`,
+        colegioId: col2.id,
+        colegio: col2.name
+      };
+    return { colegio: col2.name, colegioId: col2.id, folhas, fotos };
   }
   // ---------- gravação (só admin, com a conta Google que pode editar a pasta) ----------
   async function respostaGravacao(r) {
@@ -301,5 +336,5 @@ export function criarDrive(acesso, buscar = fetch) {
     );
   }
   const esquecer = id => (id ? delete cache[id] : Object.keys(cache).forEach(k => delete cache[k]));
-  return { listar, baixar, fotosDoAluno, pastasColegios, nomeDe, criarPasta, enviar, lixeira, esquecer };
+  return { listar, baixar, fotosDoAluno, alunosDaPasta, pastasColegios, nomeDe, criarPasta, enviar, lixeira, esquecer };
 }

@@ -432,3 +432,11 @@ button.lc-linha[aria-expanded="true"]{border-bottom-left-radius:0;border-bottom-
 .ja-abas{scrollbar-width:none}
 .ja-abas::-webkit-scrollbar{display:none}
 .ja-corpo > .card .card-top .stage{visibility:hidden}
+.panel.foto-grande{max-width:900px;display:flex;flex-direction:column;gap:10px;align-items:center}
+.panel.foto-grande img{max-width:100%;max-height:80vh;object-fit:contain;border-radius:8px}
+.troca-lista{display:flex;flex-direction:column;gap:4px;max-height:50vh;overflow:auto;margin:8px 0}
+.troca-item{justify-content:flex-start}
+.panel.foto-grande{max-width:900px;display:flex;flex-direction:column;gap:10px;align-items:center}
+.panel.foto-grande img{max-width:100%;max-height:80vh;object-fit:contain;border-radius:8px}
+.troca-lista{display:flex;flex-direction:column;gap:4px;max-height:50vh;overflow:auto;margin:8px 0}
+.troca-item{justify-content:flex-start}

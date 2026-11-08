@@ -1,8 +1,8 @@
 // "🖼️ Fotos do aluno" (cartão do PR): busca no Google Drive a folha numerada e as fotos separadas do aluno,
 // para mandar a folha pelo WhatsApp e, com as fotos que a família escolher, montar o quadro e os porta-retratos.
-import { el, sheet, title } from "./ui.js";
+import { el, sheet, title, field } from "./ui.js";
 import * as U from "./util.js";
-import { criarDrive, idDaPasta } from "./drive-fotos.js";
+import { criarDrive, idDaPasta, pastaDoColegio } from "./drive-fotos.js";
 import { openMockup } from "./mockup.js";
 
 let drive = null,
@@ -203,5 +203,224 @@ export function abrirFotosDoAluno(C, it, precoTxt) {
         grade.children[i].append(el("small", "wait", "não abriu"));
       }
     }
+  });
+}
+
+// ---------- Janela do aluno → Prévia e fotos ----------
+const jaBaixadas = new Map();
+// Já dá para ler o Drive sem abrir a tela do Google? (chave do Google, ou entrada feita há menos de 1 hora)
+export function driveLiberado(C) {
+  if (!C.P.driveCliente) return true;
+  const t = tokens[LEITURA];
+  return !!(t && t.ate > Date.now() + 60000);
+}
+// foto grande, por cima da janela
+function verGrande(url, nome) {
+  sheet(
+    null,
+    (p, close) => {
+      p.classList.add("foto-grande");
+      const img = el("img");
+      img.src = url;
+      img.alt = nome || "Foto";
+      p.append(img, U.mkBtn("Fechar", "", close));
+    },
+    { div: true, wide: true }
+  );
+}
+// Miniaturas da folha e das fotos do aluno direto na aba; tocar amplia.
+// o = { precoTxt, salvar(patch, msg) } (salvar grava no aluno: usado pelo "🔄 Trocar as fotos")
+export async function miniaturasDoAluno(C, it, box, o = {}) {
+  box.innerHTML = "";
+  const raiz = idDaPasta(C.P.drivePrevias);
+  if (!raiz) {
+    box.append(el("p", "hint", "Para ver as fotos do Drive aqui, o administrador liga a pasta das prévias em ⚙️ Ajustes."));
+    return;
+  }
+  const info = el("p", "hint", "Procurando as fotos no Google Drive…");
+  box.append(info);
+  const acoes = el("div", "actions");
+  const trocar = U.mkBtn("🔄 Trocar as fotos", "", () => trocarFotos(C, it, o.salvar));
+  let r;
+  try {
+    r = await abrirDrive(C).fotosDoAluno(raiz, it);
+  } catch (e) {
+    info.className = "wait";
+    info.textContent = e.message || "Não consegui ler o Google Drive agora.";
+    return;
+  }
+  if (r.erro) {
+    info.className = "wait";
+    info.textContent = r.erro + " Se as fotos estão com outro nome, toque em “🔄 Trocar as fotos” e escolha.";
+    acoes.append(trocar);
+    if (C.isAdmin) acoes.append(botaoEnviarNovas(C, it, o));
+    box.append(acoes);
+    return;
+  }
+  info.textContent =
+    `${r.folhas.length ? r.folhas.length + " folha" + (r.folhas.length > 1 ? "s" : "") + " · " : ""}${r.fotos.length} foto${r.fotos.length === 1 ? "" : "s"} · ` +
+    r.colegio.replace(/^Pr[ée]vias\s*-\s*/i, "") +
+    (r.escolhida ? " · escolhidas à mão" : "");
+  const grade = el("div", "fotos-grade");
+  box.append(grade);
+  const itens = [
+    ...r.folhas.map((f, i) => [f, r.folhas.length > 1 ? "Folha " + (i + 1) : "Folha"]),
+    ...r.fotos.map((f, i) => [f, String(i + 1)])
+  ];
+  itens.forEach(([f, rot]) => {
+    const b = el("button", "foto-item");
+    b.type = "button";
+    b.disabled = true;
+    b.append(el("span", "num", rot));
+    b.setAttribute("aria-label", rot === String(Number(rot)) ? "Foto " + rot : rot);
+    grade.append(b);
+  });
+  acoes.append(
+    U.mkBtn("🖼️ Enviar a folha / montar o quadro", "btn-primary", () => abrirFotosDoAluno(C, it, o.precoTxt || "")),
+    trocar
+  );
+  if (C.isAdmin) acoes.append(botaoEnviarNovas(C, it, o));
+  box.append(acoes);
+  // baixa uma a uma (prévias pequenas, com marca d'água); a janela redesenha quando o aluno muda: guarda o que já baixou
+  const D = abrirDrive(C);
+  for (const [i, [f, rot]] of itens.entries()) {
+    if (!box.isConnected) return;
+    const b = grade.children[i];
+    try {
+      const url = jaBaixadas.get(f.id) || URL.createObjectURL(await D.baixar(f.id));
+      jaBaixadas.set(f.id, url);
+      const img = el("img");
+      img.alt = rot;
+      img.src = url;
+      b.prepend(img);
+      b.disabled = false;
+      b.onclick = () => verGrande(url, rot);
+    } catch (_) {
+      b.append(el("small", "wait", "não abriu"));
+    }
+  }
+}
+function botaoEnviarNovas(C, it, o) {
+  return U.mkBtn("📤 Enviar fotos novas", "", () =>
+    import("./enviar-foto.js")
+      .then(m => m.enviarFotoAluno(C, it, { verFotos: () => abrirFotosDoAluno(C, it, o.precoTxt || "") }))
+      .catch(e => C.handleErr(e))
+  );
+}
+// "🔄 Trocar as fotos": importação errada ou nome diferente no Drive. Escolhe o colégio e o aluno certo na pasta
+// das prévias; a escolha fica gravada no aluno (fotosDrive) e vale antes da busca automática. Nada muda no Drive.
+export function trocarFotos(C, it, salvar) {
+  sheet("🔄 Trocar as fotos de " + U.first(title(it.nome || "")), async (p, close) => {
+    const raiz = idDaPasta(C.P.drivePrevias);
+    const D = abrirDrive(C);
+    p.append(
+      el(
+        "p",
+        "hint",
+        "Escolha de quem são as fotos certas na pasta das prévias. A troca fica guardada só neste aluno; as pastas do Drive não mudam."
+      )
+    );
+    const info = el("p", "hint", "Lendo as pastas do Drive…");
+    p.append(info);
+    let colegios = [];
+    try {
+      colegios = await D.pastasColegios(raiz);
+      if (!colegios.length) colegios = [{ id: raiz, name: await D.nomeDe(raiz) }];
+    } catch (e) {
+      info.className = "wait";
+      info.textContent = e.message || "Não consegui ler o Google Drive agora.";
+      p.append(U.mkBtn("Fechar", "", close));
+      return;
+    }
+    info.remove();
+    const atual = it.fotosDrive || {};
+    const achado = atual.colegioId ? colegios.find(c => c.id === atual.colegioId) : pastaDoColegio(colegios, it);
+    const sCol = el("select");
+    colegios
+      .slice()
+      .sort((a, b) => a.name.localeCompare(b.name, "pt-BR"))
+      .forEach(c => {
+        const op = el("option", null, c.name.replace(/^Pr[ée]vias\s*-\s*/i, ""));
+        op.value = c.id;
+        sCol.append(op);
+      });
+    if (achado) sCol.value = achado.id;
+    const busca = el("input", "search");
+    busca.type = "search";
+    busca.placeholder = "Procurar pelo nome ou número";
+    busca.setAttribute("aria-label", "Procurar aluno nas prévias");
+    const lista = el("div", "troca-lista");
+    const err = el("p", "err");
+    err.hidden = true;
+    let alunos = [],
+      escolhido = null;
+    const pintar = () => {
+      lista.innerHTML = "";
+      const q = U.chave(busca.value);
+      const vis = alunos.filter(a => !q || U.chave(a.cod + " " + a.nome).includes(q));
+      if (!vis.length) lista.append(el("p", "hint", "Nenhum aluno com prévia aqui."));
+      vis.slice(0, 300).forEach(a => {
+        const l = el("label", "chk troca-item");
+        const rb = el("input");
+        rb.type = "radio";
+        rb.name = "trocaAluno";
+        rb.checked =
+          escolhido === a || (!escolhido && (a.folhaId === atual.folhaId || a.pastaId === atual.pastaId) && !!(a.folhaId || a.pastaId));
+        rb.onchange = () => (escolhido = a);
+        l.append(rb, document.createTextNode(` ${a.cod ? a.cod + " - " : ""}${a.nome}${a.pastaId ? "" : " (só a folha)"}`));
+        lista.append(l);
+      });
+    };
+    const carregar = async () => {
+      lista.innerHTML = "";
+      lista.append(el("p", "hint", "Carregando…"));
+      escolhido = null;
+      try {
+        alunos = await D.alunosDaPasta(sCol.value);
+      } catch (e) {
+        alunos = [];
+      }
+      pintar();
+    };
+    sCol.onchange = carregar;
+    busca.oninput = pintar;
+    p.append(field("Colégio no Drive", sCol), busca, lista, err);
+    const acoes = el("div", "panel-actions");
+    acoes.append(
+      U.mkBtn("Cancelar", "", close),
+      ...(atual.colegioId
+        ? [
+            U.mkBtn("Voltar para a busca automática", "", async () => {
+              await salvar({ fotosDrive: null }, "As fotos voltam a ser achadas pelo nome");
+              close();
+            })
+          ]
+        : []),
+      U.mkBtn("Usar estas fotos", "btn-primary", async () => {
+        if (!escolhido) {
+          err.textContent = "Escolha o aluno na lista.";
+          err.hidden = false;
+          return;
+        }
+        const col = colegios.find(c => c.id === sCol.value) || {};
+        await salvar(
+          {
+            fotosDrive: {
+              colegioId: col.id || "",
+              colegio: col.name || "",
+              folhaId: escolhido.folhaId || "",
+              pastaId: escolhido.pastaId || "",
+              nome: escolhido.nome,
+              por: C.me || "",
+              em: new Date().toISOString()
+            }
+          },
+          "Fotos trocadas ✅"
+        );
+        close();
+      })
+    );
+    p.append(acoes);
+    carregar();
   });
 }

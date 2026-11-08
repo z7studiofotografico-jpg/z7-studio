@@ -6,7 +6,7 @@
 import { el, title, sheet } from "./ui.js";
 import * as U from "./util.js";
 import { openMockup } from "./mockup.js";
-import { abrirFotosDoAluno } from "./fotos-aluno.js";
+import { miniaturasDoAluno, driveLiberado } from "./fotos-aluno.js";
 import { linhasRetorno } from "./retorno.js";
 import { situacaoTxt, enderecoTxt, historicoPlanilha, prazoEntrega } from "./repasse-dados.js";
 import { C, ABERTAS, status, contatoPadrao, tipoPR, precoTxt, ehFormatura, colNome, save, segDe, segNome } from "./repasse-estado.js";
@@ -113,13 +113,17 @@ function previa(box, it) {
   bloco("📷", "Fotos para escolher", "folha com as fotos numeradas para a família escolher", () =>
     openMockup({ nome: title(it.nome), escola: title(it.escola), preco: precoTxt(it), modo: "escolha", maxFotos: max })
   );
-  if (C.P.drivePrevias)
-    bloco("📁", "Fotos do aluno no Drive", "a folha numerada e as fotos separadas deste aluno", () =>
-      abrirFotosDoAluno(C, it, precoTxt(it))
-    );
   box.append(g);
-  if (!C.P.drivePrevias)
-    box.append(el("p", "hint", "Para ver as fotos do Drive aqui, o administrador liga a pasta das prévias em ⚙️ Ajustes."));
+  // as fotos do aluno no Drive, em miniatura (tocar amplia), com "🔄 Trocar as fotos"
+  const fotos = el("div", "ja-fotos");
+  box.append(el("h3", null, "Fotos do aluno no Drive"), fotos);
+  const o = { precoTxt: precoTxt(it), salvar: (patch, msg) => save(it, patch, msg) };
+  if (!C.P.drivePrevias || driveLiberado(C)) miniaturasDoAluno(C, it, fotos, o);
+  else
+    fotos.append(
+      el("p", "hint", "Entre com a sua conta Google para ver as fotos aqui (vale por 1 hora)."),
+      U.mkBtn("📁 Mostrar as fotos", "btn-primary", () => miniaturasDoAluno(C, it, fotos, o))
+    );
 }
 
 // Conversa: mensagem pronta, resposta do cliente e ajuda do Claude

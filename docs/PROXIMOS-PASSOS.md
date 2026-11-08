@@ -40,6 +40,8 @@ botão "Mudar ano" nas importações de Formatura/Paspatur, aba Vendidos (admin)
   Resumo (o cartão completo) · Prévia e fotos · Conversa (mensagem pronta, resposta do cliente guardada em
   "conversa", "✨ Pedir ao Claude" copia o texto sem telefone e abre o claude.ai) · Venda e entrega · Histórico.
   No Contrato do colégio, tocar no nome abre Resumo · Pacote e pagamentos · Histórico.
+  Prévia e fotos: a folha e as fotos do Drive em miniatura (tocar amplia) e "🔄 Trocar as fotos" (escolher o colégio
+  e o aluno certo na pasta das prévias; grava "fotosDrive" no aluno e vale antes da busca pelo nome; o Drive não muda).
 - **Contrato do colégio** (Aluguel de becas → Alunos dos colégios → escolher o colégio → "📄 Contrato do colégio"),
   coleção `contratosColegio` (id = colégio_ano) e pagamentos em `contratosColegio/{id}/pagamentos`:
   - quem fechou, quem paga (o colégio paga tudo / cada aluno paga), valor e parcelas, quem costuma receber,
