@@ -11,7 +11,9 @@ botão "Mudar ano" nas importações de Formatura/Paspatur, aba Vendidos (admin)
 2. ~~Alunos sem foto~~ (07/11): "🔎 Conferir fotos" (admin) no PR, Paspatur e Formatura separa por colégio e ano em
    com foto · já comprou · sem telefone · falta gerar; quem falta tem "📤 Enviar foto" (também em "🖼️ Fotos do aluno"),
    que gera a prévia e grava na pasta do colégio no Drive com a conta Google do admin (precisa ser Editor da pasta).
-3. **Telas novas do PR/Paspatur** (aprovadas pela Luciana):
+3. **Telas novas do PR/Paspatur**. Já feitos (07-08/11): total do mês em Minhas vendas; prazo de entrega em cores;
+   caído por preço (PR oferece o Paspatur; Formatura escolhe entre oferecer o PR ou as fotos digitais, em janela);
+   endereço completo obrigatório com CEP; "Quem paga o PR" no colégio. Falta o resto abaixo (aprovadas pela Luciana):
    - lista única; filtro Todos / Só PR / Só Paspatur; filtro por pessoa da equipe com contagem;
    - no aluno, chave PR / Paspatur com confirmação ("Deseja vender como …?"); qualquer pessoa pode trocar; o valor troca junto;
    - abas na ordem: Caídos · Incompletos · Para hoje · Interessados · Buscar · Conferir pagamento | Vendido · Entregar · Entregue (+ Vendidos/Minhas vendas);
