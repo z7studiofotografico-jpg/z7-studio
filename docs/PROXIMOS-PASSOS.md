@@ -108,7 +108,7 @@ botão "Mudar ano" nas importações de Formatura/Paspatur, aba Vendidos (admin)
 6. ~~Venda antecipada~~ (10/11): aba "🏫 Colégios fechados" (antes "Turmas") em lista compacta
    (js/formaturas-fechados.js), com o resumo do total; tocar abre a janela Resumo (cartão da turma) · Alunos (cada
    formando com kit, parcelas e em aberto; atalho para "Alunos e parcelas") · Datas (fotos e todas as formaturas).
-7. Fotos do aluno: botão para excluir foto (ex.: a da ficha) — sai do Drive e não vai para o aluno; equipe pode.
+7. ~~Excluir foto~~ (10/11): feito (ver abaixo, em 10/11).
 8. Preços mínimos: organizar os vários valores (conversar com Adriano/Luciana antes).
 9. "Erros do app (5)" em Ajustes: ver o que são e corrigir (pedir o print aberto).
 
