@@ -141,3 +141,31 @@ test("WhatsApp de trabalho: cada um com o seu, nunca o da empresa", async () => 
     /No máximo 3/
   );
 });
+
+test("sigla: o E de C.E. e de E.M. não some (09/11/2026, lista da Luciana)", () => {
+  const casos = {
+    "C.E YONNE MARIA SIQUEIRA ANDRADE": "CEYMSA",
+    "C.E. Yonne Maria Siqueira de Andrade": "CEYMSA",
+    "C.E. Nuta Bartlet James": "CENBJ",
+    "E. M. Antenor Nascente": "EMAN",
+    "EM. Antenor Nascente": "EMAN",
+    "E.M. Alexandre Farah": "EMAF",
+    "GET E.M Alexandre Farah": "EMAF",
+    "EM. Alexandre Farah - GET": "EMAF",
+    "E.E.M. Zenobio da Costa": "CEMZC",
+    "E.E. Nuta Bartlet James": "CENBJ",
+    "E.E. José do Patrocinio": "CEJP",
+    "C.M Cyro Monteiro": "EMCM",
+    "E.M Cyro Monteiro": "EMCM",
+    "C.E Rubens Farrula": "CERF",
+    "C.E Profª Diuma Madeira Sales": "CEPDMS",
+    "C.E. Diuma Madeira Salles de Souza": "CEDMSS",
+    "C.E Servulo Mello": "CESM",
+    "E. M. Mario Piragibe": "EMMP",
+    "C.E João Cardoso": "CEJC",
+    "C. E PRESIDENTE DUTRA": "CEPD",
+    "Escola Legacy School": "ELS",
+    "Colégio Santa Maria da Glória": "CSMG"
+  };
+  for (const [nome, sig] of Object.entries(casos)) assert.equal(siglaDe(nome), sig, nome);
+});

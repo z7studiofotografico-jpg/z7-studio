@@ -177,9 +177,20 @@ export function openImport(ctx, ui, aoTerminar) {
       }
     };
     anoIn.oninput = () => brutos.length && montar();
+    // o cadastro de Instituições: o colégio da planilha ganha o nome certo e a sigla certa (09/11/2026)
+    let insts = [];
+    FS.getDocs(FS.collection(db, "instituicoes"))
+      .then(q => {
+        insts = q.docs.map(d => ({ nome: d.data().nome, sigla: d.data().sigla }));
+        if (brutos.length) montar();
+      })
+      .catch(e => console.warn("[Z7] cadastro de instituições", e));
     function montar() {
-      rows = brutos.map(o => linhaParaDoc(o, X, anoIn.value));
+      rows = brutos.map(o => linhaParaDoc(o, X, anoIn.value, insts));
       out.innerHTML = "";
+      // colégios que vieram com outro nome na planilha
+      const trocas = [...new Set(rows.filter(r => r.escolaOrig).map(r => `${r.escolaOrig} → ${r.escola}`))];
+      if (trocas.length) out.append(el("p", "hint", "Nome do colégio corrigido pelo cadastro: " + trocas.join(" · ")));
       if (porArquivo.length > 1) out.append(el("p", "hint", `${porArquivo.length} arquivos · ` + porArquivo.join(" · ")));
       const incompletos = rows.filter(r => faltando(r).length);
       out.append(

@@ -2,7 +2,8 @@
 // e o que falta para um aluno entrar na fila. Testado em tests/repasse-dados.test.mjs.
 import * as U from "./util.js";
 import { title } from "./ui.js";
-import { codigoBusca, comAno, fmtCodigo, siglaDe } from "./aluno-id.js";
+import { codigoBusca, comAno, fmtCodigo } from "./aluno-id.js";
+import { nomeDoColegio, siglaDoColegio } from "./colegio-nome.js";
 
 export const norm = U.chave,
   slug = U.slug;
@@ -108,7 +109,8 @@ export function parseData(v, X) {
 export const respCadastro = nome => `Responsável do aluno ${title(String(nome || "").trim())} (cadastrado)`;
 export const ehRespCadastro = n => /^Responsável do aluno .*\(cadastrado\)$/.test(String(n || ""));
 // anoFixo: o ano das fotos escolhido na importação (nas planilhas antigas a DATA é a da venda, não a do ensaio)
-export function linhaParaDoc(r, X, anoFixo) {
+// insts: o cadastro de Instituições ([{ nome, sigla }]); o colégio ganha o nome do cadastro e a sigla certa
+export function linhaParaDoc(r, X, anoFixo, insts) {
   const dataEnsaio = parseData(r.data, X);
   const ano = Number(anoFixo) || (dataEnsaio ? Number(dataEnsaio.slice(0, 4)) : null);
   const contatos = [parseTel(r.c2, "Mãe"), parseTel(r.c3, "Pai"), parseTel(r.c1, "Formando"), parseTel(r.c4, "Telefone")].filter(Boolean);
@@ -122,17 +124,23 @@ export function linhaParaDoc(r, X, anoFixo) {
   if (!ehStatus(r.status) && ehStatus(r.curso) && s(r.curso) !== "-") r = Object.assign({}, r, { status: r.curso, curso: "" });
   // o ano no fim do nome do colégio ("C. E PRESIDENTE DUTRA 2021") não faz parte do nome
   r = Object.assign({}, r, { escola: s(r.escola).replace(/\s+20\d\d$/, ""), curso: s(r.curso) === "-" ? "" : r.curso });
-  // ID só com número (1, 2, 3…): vira o ID do app com a sigla do colégio (21CIEP384-01)
+  // nome do colégio como veio (identifica a linha ao importar de novo) e o nome certo, do cadastro (09/11/2026)
+  const escolaOrig = s(r.escola);
+  const escola = nomeDoColegio(escolaOrig, insts);
+  // ID: o número da planilha com a sigla certa do colégio (21CIEP384-01, 26CENBJ-02). Vale para "2", "CNB-02",
+  // "EMCM 73"…: o número fica, a sigla é sempre a do colégio (a da planilha às vezes vinha sem o E de C.E./E.M.)
   const cod = s(r.codigo);
-  const codigo =
-    /^\d{1,4}$/.test(cod) && siglaDe(s(r.escola)) ? fmtCodigo(ano, siglaDe(s(r.escola)), Number(cod)) : cod ? comAno(cod, ano) : "";
+  const sig = siglaDoColegio(escolaOrig, insts);
+  const num = (cod.match(/^(?:\d{2})?[A-Za-z][A-Za-z0-9]*\s*-?\s*(\d{1,4})$/) || cod.match(/^(\d{1,4})$/) || [])[1];
+  const codigo = num && sig ? fmtCodigo(ano, sig, Number(num)) : cod ? comAno(cod, ano) : "";
   const vazio = v => !s(v) || /^[-–.]+$/.test(s(v));
   // (o código do FotoZoom não entra: a venda pelo FotoZoom é outro caminho)
   const obs = [vazio(r.obs) ? "" : s(r.obs), vazio(r.motivo) ? "" : "Motivo: " + s(r.motivo)].filter(Boolean).join(" · ");
   return {
     nome: s(r.nome),
     nomeBusca: norm(r.nome),
-    escola: s(r.escola),
+    escola,
+    ...(escola !== escolaOrig ? { escolaOrig } : {}),
     curso: s(r.curso),
     turma: s(r.turma),
     statusOrig: s(r.status),
@@ -157,7 +165,8 @@ export function linhaParaDoc(r, X, anoFixo) {
 export function docId(d, i) {
   return [
     String(9999 - (d.ano || 0)).padStart(4, "0"),
-    slug(d.escola).slice(0, 24) || "sem-escola",
+    // o nome como veio da planilha (o do cadastro pode ser outro): importar de novo acha o mesmo aluno
+    slug(d.escolaOrig || d.escola).slice(0, 24) || "sem-escola",
     slug(d.codigoOrig != null ? d.codigoOrig : d.codigo).slice(0, 24) || "x",
     slug(d.nome).slice(0, 32) || "r" + i
   ].join("_");

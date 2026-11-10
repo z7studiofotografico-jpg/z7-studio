@@ -1,0 +1,30 @@
+name: Acertar IDs dos colégios
+
+# Roda só quando alguém manda (Actions → Acertar IDs dos colégios → Run workflow).
+# Deixe "simular" marcado para ver antes o que vai mudar. A cópia de segurança fica no banco (coleção copiaIds).
+on:
+  workflow_dispatch:
+    inputs:
+      simular:
+        description: "Só mostrar o que mudaria (não grava)"
+        type: boolean
+        default: true
+
+jobs:
+  acertar:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - name: Instalar
+        working-directory: scripts
+        run: npm install --no-audit --no-fund
+      - name: Acertar
+        working-directory: scripts
+        run: node acertar-ids.mjs
+        env:
+          FIREBASE_SERVICE_ACCOUNT: ${{ secrets.FIREBASE_SERVICE_ACCOUNT }}
+          SIMULAR: ${{ inputs.simular }}

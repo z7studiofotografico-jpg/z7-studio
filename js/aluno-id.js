@@ -14,24 +14,44 @@ const palavras = nome =>
     .split(/[^A-Z0-9]+/)
     .filter(Boolean);
 
+// Abreviação do tipo de colégio no começo do nome ("C.E.", "E.M.", "E.E.M.", "C.M", "GET E.M"): as letras ficam
+// todas (o "E" de "C.E." não é o "e" de ligação) e viram o padrão do estúdio: estadual = CE, municipal = EM
+// (09/11/2026: "C.E. Nuta Bartlet James" = CENBJ, "E.M. Antenor Nascente" = EMAN, "E.E.M. Zenobio da Costa" = CEMZC)
+const PREFIXO = { CE: "CE", EE: "CE", EEM: "CEM", CEM: "CEM", EM: "EM", CM: "EM", E: "E", C: "C" };
+function prefixo(p) {
+  let i = 0;
+  let letras = "";
+  while (i < p.length && (p[i].length === 1 || /^(CE|EE|EM|CM|EEM|CEM)$/.test(p[i])) && letras.length < 3 && /^[A-Z]+$/.test(p[i])) {
+    letras += p[i];
+    i++;
+  }
+  // só vale como abreviação se for um dos jeitos conhecidos e ainda sobrar nome depois
+  if (!letras || !PREFIXO[letras] || PREFIXO[letras].length < 2 || i >= p.length) return { pre: "", resto: p };
+  return { pre: PREFIXO[letras], resto: p.slice(i) };
+}
 export function siglaDe(nome, ocupadas) {
-  const p = palavras(nome);
-  if (!p.length) return "";
+  const p0 = palavras(nome);
+  if (!p0.length) return "";
+  // "GET" (Ginásio Experimental Tecnológico) não entra na sigla: "GET E.M Alexandre Farah" = EMAF
+  const p = p0.filter(w => w !== "GET");
   // CIEP: "CIEP 225 ...", "CIEP225 ..." ou "CIEP Nº 225"
   const i = p.findIndex(w => /^CIEP\d*$/.test(w));
   if (i >= 0) {
     const n = p[i].slice(4) || (p.slice(i + 1).find(w => /^\d+$/.test(w)) || "").replace(/^0+(?=\d)/, "");
     return "CIEP" + n;
   }
-  const q = p.filter(w => !LIGA.has(w));
-  const sig = q.map(w => (/^\d+$/.test(w) ? w : w[0])).join("");
+  const { pre, resto } = prefixo(p);
+  const q = resto.filter(w => !LIGA.has(w));
+  const sig = pre + q.map(w => (/^\d+$/.test(w) ? w : w[0])).join("");
   if (!(ocupadas || []).includes(sig) || q.length < 2) return sig;
   // mesmas iniciais de outro colégio: iniciais + o último nome inteiro
   return (
+    pre +
     q
       .slice(0, -1)
       .map(w => (/^\d+$/.test(w) ? w : w[0]))
-      .join("") + q[q.length - 1]
+      .join("") +
+    q[q.length - 1]
   );
 }
 
