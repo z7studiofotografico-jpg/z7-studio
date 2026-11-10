@@ -3178,6 +3178,91 @@ await cenario("Conferir fotos e 📤 Enviar foto (admin grava a prévia no Drive
   ok(/não comprou: 0 ✓/.test(await pg.locator(".sheet:visible").textContent()), "depois do envio, ninguém falta gerar");
   ok(!erros.length, "sem erros" + (erros.length ? ": " + erros.join(" | ") : ""));
 });
+await cenario("Equipe exclui uma foto do aluno (vai para a lixeira do Drive)", async () => {
+  const Y = new Date().getFullYear();
+  const F = "application/vnd.google-apps.folder";
+  const arvore = {
+    RAIZ123456789: [{ id: "col1", name: `Prévias - ${Y - 1} - C.E. YONNE MARIA SIQUEIRA`, mimeType: F }],
+    col1: [
+      { id: "folha1", name: "CEYMS 02 - DOMINGOS JOSE.jpg", mimeType: "image/jpeg" },
+      { id: "pasta1", name: "CEYMS 02 - DOMINGOS JOSE", mimeType: F }
+    ],
+    pasta1: [1, 2, 3].map(n => ({ id: "foto" + n, name: `CEYMS 02 - DOMINGOS JOSE - foto 0${n}.jpg`, mimeType: "image/jpeg" }))
+  };
+  const d = Object.assign({}, base, {
+    "config/app": Object.assign({}, base["config/app"] || {}, {
+      drivePrevias: "https://drive.google.com/drive/folders/RAIZ123456789?usp=sharing",
+      driveCliente: "123-teste.apps.googleusercontent.com"
+    }),
+    "repasse/dj": {
+      nome: "DOMINGOS JOSE",
+      nomeBusca: "DOMINGOS JOSE",
+      escola: "C.E YONNE MARIA SIQUEIRA DE ANDRADE",
+      ano: Y - 1,
+      codigoOrig: "02",
+      etapa: "SEPARADO",
+      resp: "Ana Vendedora",
+      respEmail: ANA,
+      separadoEm: dia(0),
+      separadoSeg: "rep",
+      followup: dia(0),
+      contatos: [{ tipo: "Mãe", nome: "Mãe", tel: "21999990000" }],
+      telefones: ["21999990000"]
+    }
+  });
+  const { pg, erros, ctx, store } = await abrir(ANA, migrar(d), { compacta: true });
+  await pg.evaluate(() => {
+    window.__escopos = [];
+    window.google = {
+      accounts: {
+        oauth2: {
+          hasGrantedAllScopes: () => true,
+          initTokenClient: o => ({
+            requestAccessToken: () => (window.__escopos.push(o.scope), setTimeout(() => o.callback({ access_token: "TOK", expires_in: 3600 }), 0))
+          })
+        }
+      }
+    };
+  });
+  const lixo = [];
+  await ctx.route(/googleapis\.com\/drive\/v3\/files/, rt => {
+    const q = rt.request();
+    const u = decodeURIComponent(q.url());
+    const h = { "access-control-allow-origin": "*", "access-control-allow-methods": "GET,PATCH,POST", "access-control-allow-headers": "*" };
+    if (q.method() === "OPTIONS") return rt.fulfill({ status: 204, headers: h });
+    if (q.method() === "PATCH") {
+      const id = (u.match(/files\/([\w-]+)\?/) || [])[1];
+      if (JSON.parse(q.postData() || "{}").trashed) {
+        lixo.push(id);
+        Object.keys(arvore).forEach(k => (arvore[k] = arvore[k].filter(f => f.id !== id)));
+      }
+      return rt.fulfill({ contentType: "application/json", headers: h, body: JSON.stringify({ id }) });
+    }
+    if (/alt=media/.test(u)) return rt.fulfill({ path: AQUI + "../../icons/icon-192.png", contentType: "image/png", headers: h });
+    const pai = (u.match(/'([^']+)' in parents/) || [])[1];
+    return rt.fulfill({ contentType: "application/json", headers: h, body: JSON.stringify({ files: arvore[pai] || [] }) });
+  });
+  await ir(pg, "#pr");
+  await calmo(pg);
+  await pg.locator("#rList button.lc-linha", { hasText: /Domingos/i }).first().click();
+  const jan = pg.locator(".panel.janela-aluno");
+  await jan.getByRole("tab", { name: "Prévia e fotos" }).click();
+  const mostrar = jan.getByRole("button", { name: "📁 Mostrar as fotos" });
+  if (await mostrar.isVisible({ timeout: 1500 }).catch(() => false)) await mostrar.click();
+  await pg.waitForFunction(() => document.querySelectorAll(".ja-fotos .foto-item img").length === 4, null, { timeout: 8000 });
+  await jan.locator(".ja-fotos .foto-item").nth(3).click();
+  await pg.locator(".panel.foto-grande").getByRole("button", { name: "🗑️ Excluir esta foto" }).click();
+  await pg.locator(".sheet").last().getByRole("button", { name: "Sim, excluir" }).click();
+  await pg.waitForFunction(() => document.querySelectorAll(".ja-fotos .foto-item img").length === 3, null, { timeout: 8000 });
+  const st = await store();
+  ok(lixo.join() === "foto3", "a foto vai para a lixeira do Drive (só ela)");
+  ok(
+    (st["repasse/dj"].fotosExcluidas || []).length === 1 && st["repasse/dj"].fotosExcluidas[0].porEmail === ANA,
+    "fica anotado no aluno quem excluiu"
+  );
+  ok((await pg.evaluate(() => window.__escopos)).includes("https://www.googleapis.com/auth/drive"), "pede a permissão de gravar só na hora de excluir");
+  ok(!erros.length, "sem erros" + (erros.length ? ": " + erros.join(" | ") : ""));
+});
 await cenario("Aluguel de becas · alunos dos colégios (status, estoque e produtos)", async () => {
   const Y = new Date().getFullYear();
   const d = Object.assign({}, base, {

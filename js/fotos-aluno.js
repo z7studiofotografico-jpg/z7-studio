@@ -243,8 +243,8 @@ export function driveLiberado(C) {
   const t = tokens[LEITURA];
   return !!(t && t.ate > Date.now() + 60000);
 }
-// foto grande, por cima da janela
-function verGrande(url, nome) {
+// foto grande, por cima da janela; excluir (opcional): o botão "🗑️ Excluir esta foto"
+function verGrande(url, nome, excluir) {
   sheet(
     null,
     (p, close) => {
@@ -252,10 +252,55 @@ function verGrande(url, nome) {
       const img = el("img");
       img.src = url;
       img.alt = nome || "Foto";
-      p.append(img, U.mkBtn("Fechar", "", close));
+      const acoes = el("div", "actions");
+      acoes.append(U.mkBtn("Fechar", "", close));
+      if (excluir) acoes.append(U.mkBtn("🗑️ Excluir esta foto", "btn-danger", () => excluir(close)));
+      p.append(img, acoes);
     },
     { div: true, wide: true }
   );
+}
+// Excluir uma foto do aluno (ex.: a foto da ficha): vai para a lixeira do Drive (dá para recuperar por 30 dias) e
+// some da lista do aluno. Admin e equipe podem; a conta Google da pessoa precisa ser Editor da pasta das prévias.
+// Fica anotado no aluno quem excluiu e quando (fotosExcluidas).
+export async function excluirFoto(C, it, f, rot, o = {}) {
+  const { confirmar } = await import("./confirmar.js");
+  const sim = await confirmar(
+    `Excluir ${/^\d+$/.test(rot) ? "a foto " + rot : "a " + rot.toLowerCase()} de ${U.first(title(it.nome || ""))}?`,
+    "A foto vai para a lixeira do Google Drive (dá para recuperar por 30 dias) e não aparece mais para o aluno.",
+    { sim: "Sim, excluir", nao: "Cancelar", perigo: true }
+  );
+  if (!sim) return false;
+  const D = abrirDriveEscrita(C);
+  if (!D) {
+    U.toast("Para excluir fotos, o administrador liga a conta Google em ⚙️ Ajustes (ID do cliente Google).");
+    return false;
+  }
+  try {
+    await D.lixeira(f.id);
+  } catch (e) {
+    U.toast(
+      /gravar|Editor|permissão/i.test(e.message || "")
+        ? "Sua conta Google não pode excluir fotos na pasta das prévias. Peça ao Adriano para deixar o seu e-mail como Editor da pasta no Drive."
+        : e.message || "Não consegui excluir a foto agora."
+    );
+    return false;
+  }
+  // a próxima leitura procura de novo no Drive
+  abrirDrive(C).esquecer();
+  D.esquecer();
+  jaBaixadas.delete(f.id);
+  if (o.salvar)
+    await o.salvar(
+      {
+        fotosExcluidas: (it.fotosExcluidas || [])
+          .concat([{ nome: f.name || rot, por: C.me || "", porEmail: C.email || "", em: new Date().toISOString() }])
+          .slice(-50)
+      },
+      "Foto excluída (está na lixeira do Drive por 30 dias) ✅"
+    );
+  else U.toast("Foto excluída (está na lixeira do Drive por 30 dias) ✅");
+  return true;
 }
 // Miniaturas da folha e das fotos do aluno direto na aba; tocar amplia.
 // o = { precoTxt, salvar(patch, msg) } (salvar grava no aluno: usado pelo "🔄 Trocar as fotos")
@@ -320,7 +365,13 @@ export async function miniaturasDoAluno(C, it, box, o = {}) {
       img.src = url;
       b.prepend(img);
       b.disabled = false;
-      b.onclick = () => verGrande(url, rot);
+      b.onclick = () =>
+        verGrande(url, rot, async fechar => {
+          if (await excluirFoto(C, it, f, rot, o)) {
+            fechar();
+            miniaturasDoAluno(C, it, box, o);
+          }
+        });
     } catch (_) {
       b.append(el("small", "wait", "não abriu"));
     }

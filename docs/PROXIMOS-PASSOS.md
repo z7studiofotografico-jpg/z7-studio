@@ -116,3 +116,6 @@ botão "Mudar ano" nas importações de Formatura/Paspatur, aba Vendidos (admin)
 - Aluguel de becas: o 🖨️ Relatório pergunta antes ano, colégio, turma (acompanha o colégio), situação e "separar por
   colégio e turma / colégio" (js/aluguel-relatorio.js). pedirFiltros() em relatorio.js serve para os outros relatórios
   que precisarem de filtro (a Luciana pediu: relatório deve ter filtro por colégio e por turma).
+
+- 10/11: "🗑️ Excluir esta foto" na foto ampliada (admin e equipe) → lixeira do Drive; anotado em fotosExcluidas.
+  A conta Google de quem exclui precisa ser Editor da pasta das prévias.
