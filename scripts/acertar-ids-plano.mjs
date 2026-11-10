@@ -16,15 +16,17 @@ export const numeroDoId = c => {
 };
 
 // alunos = [{ id, escola, ano, codigo, escolaOrig? }]; insts = [{ nome, sigla }]; contadores = { "26CENBJ": ultimo }
-export function planejarIds(alunos, insts, contadores = {}) {
+// apelidos = { "nome antigo": "nome do cadastro" } (o que a Luciana disse que é o mesmo colégio)
+export function planejarIds(alunos, insts, contadores = {}, apelidos = {}) {
   const ops = [];
   const grupos = {}; // "escola antiga|nova|ano" → { de, para, ano, siglaDe, siglaPara, n }
   const maior = {}; // "26CENBJ" → maior número
   const meta = { escolas: {}, anos: {}, escolasAno: {} };
   for (const a of alunos) {
     const escola = String(a.escola || "").trim();
-    const nova = nomeDoColegio(escola, insts);
-    const sig = siglaDoColegio(escola, insts);
+    const base = apelidos[escola] || escola;
+    const nova = nomeDoColegio(base, insts);
+    const sig = siglaDoColegio(base, insts);
     const n = numeroDoId(a.codigo);
     const ano = Number(a.ano) || 0;
     const codigo = n != null && sig && ano ? fmtCodigo(ano, sig, n) : a.codigo || "";

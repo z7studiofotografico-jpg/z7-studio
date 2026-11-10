@@ -58,3 +58,26 @@ test("acertar IDs: rodar de novo não muda nada", () => {
   );
   assert.equal(ops.length, 0);
 });
+
+test("acertar IDs: apelido (mesmo colégio com outro nome) e sigla do cadastro", () => {
+  const ins = [
+    { nome: "C.E. Professora Diuma Madeira Salles de Souza", sigla: "CEPDMS" },
+    { nome: "C.E. Zenóbio da Costa", sigla: "CEMZC" }
+  ];
+  const { ops } = planejarIds(
+    [
+      { id: "a", escola: "C.E PROFª DIUMA MADEIRA SALES", ano: 2023, codigo: "CEPDMS 08" },
+      { id: "b", escola: "C.E. DIUMA MADEIRA SALLES DE SOUZA", ano: 2025, codigo: "25CDMSS-01" },
+      { id: "c", escola: "E.E.M. ZENOBIO DA COSTA", ano: 2021, codigo: "21EEMZC-01" }
+    ],
+    ins,
+    {},
+    { "C.E PROFª DIUMA MADEIRA SALES": "C.E. Professora Diuma Madeira Salles de Souza" }
+  );
+  const p = id => ops.find(o => o.col === "repasse" && o.id === id).dados;
+  assert.equal(p("a").codigo, "23CEPDMS-08");
+  assert.equal(p("a").escola, "C.E. Professora Diuma Madeira Salles de Souza");
+  assert.equal(p("a").escolaOrig, "C.E PROFª DIUMA MADEIRA SALES");
+  assert.equal(p("b").codigo, "25CEPDMS-01");
+  assert.equal(p("c").codigo, "21CEMZC-01");
+});
