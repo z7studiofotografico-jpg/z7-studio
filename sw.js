@@ -99,6 +99,7 @@ const SHELL = [
   "./js/inst-janela.js",
   "./js/janela.js",
   "./js/aluguel-janela.js",
+  "./js/formaturas-fechados.js",
   "./js/mockup-paspatur.js",
   "./js/encarte.js",
   "./icons/paspatur-capa.jpg",

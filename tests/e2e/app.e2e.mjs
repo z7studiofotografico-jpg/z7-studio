@@ -612,7 +612,7 @@ await cenario("Adriano (admin), com os dados já atualizados no servidor", async
     );
 
     // Turma: novo formando com 400 em 3x
-    await pg.locator("#fmChips").getByText("Turmas").click();
+    await pg.locator("#fmChips").getByText("Colégios fechados").click();
     await calmo(pg);
     await pg.getByText("👥 Alunos e parcelas").click();
     await calmo(pg);
@@ -1727,7 +1727,7 @@ await cenario("Pedro (vendedor: Linha de Frente, Agendamento, Instituições)", 
   await etapa(pg, "Formaturas", async () => {
     await ir(pg, "#formaturas");
     await calmo(pg);
-    await pg.locator("#fmChips").getByText("Turmas").click();
+    await pg.locator("#fmChips").getByText("Colégios fechados").click();
     await calmo(pg);
     await pg.locator("#fmCorpo .card").filter({ hasText: "Alfa" }).getByRole("button", { name: "📸 Dia de fotos" }).click();
     await calmo(pg);
@@ -1935,7 +1935,7 @@ await cenario("Relatórios para imprimir (um por card)", async () => {
       await ir(pg, "#formaturas");
       await pg
         .locator("#fmChips")
-        .getByText(/^Turmas/)
+        .getByText(/Colégios fechados/)
         .first()
         .click();
       await calmo(pg);
@@ -4076,6 +4076,19 @@ await cenario("Várias formaturas no mesmo colégio e alunos confirmados depois"
     s["instituicoes/i2"].diaFotos.status === "confirmado" && s["instituicoes/i2"].mediaAlunos === 60,
     "o dia de fotos já aprovado e a média do colégio não mudam"
   );
+  // Formaturas → Venda Antecipada → Colégios fechados: lista compacta; a janela mostra alunos e datas
+  await pg.locator(".sheet").evaluateAll(xs => xs.forEach(x => x.remove()));
+  await ir(pg, "#formaturas");
+  await pg.locator("#fmChips").getByText("Colégios fechados").click();
+  await calmo(pg);
+  await pg.evaluate(() => (window.__z7CartaoNaLista = false));
+  await pg.fill("input[aria-label='Buscar colégio fechado']", "beta");
+  await pg.locator("#fmCorpo button.lc-linha", { hasText: "Colegio Beta" }).click();
+  const jf = pg.locator(".janela-aluno");
+  await jf.locator(".ja-abas").getByText("Alunos").click();
+  ok((await jf.getByRole("button", { name: /Abrir alunos e parcelas/ }).count()) === 1, "colégio fechado: aba Alunos com o atalho da turma");
+  await jf.locator(".ja-abas").getByText("Datas").click();
+  ok(/Formatura 2 do Colegio Beta/.test(await jf.locator(".ja-corpo").textContent()), "colégio fechado: aba Datas com todas as formaturas");
   ok(!erros.length, "sem erros" + (erros.length ? ": " + erros.join(" | ") : ""));
 });
 await browser.close();

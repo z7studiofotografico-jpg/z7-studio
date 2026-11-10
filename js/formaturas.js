@@ -40,6 +40,7 @@ import * as U from "./util.js";
 import { botaoRelatorio } from "./relatorio.js";
 import { siglaDe, contatoRel } from "./aluno-id.js";
 import { pintarSeletor } from "./numeros-tela.js";
+import { renderFechados } from "./formaturas-fechados.js";
 // Leitura sob demanda: ao abrir, só as parcelas que vencem até o fim do mês (campo proxVenc);
 // a lista completa de formandos só é lida quando alguém abre as abas Adesão, Kits ou Turmas.
 let C,
@@ -411,7 +412,7 @@ function render() {
       seg === "rep" ? "🔁 Oferecer no repasse" : "📸 Depois das fotos",
       tudoCarregado || (seg === "lf" && ofertas.length) ? semKit().length : ""
     ],
-    ["turmas", "Turmas", minhasInsts().length]
+    ["turmas", "🏫 Colégios fechados", minhasInsts().length]
   ].forEach(([kk, t, n]) => {
     const b = el("button", "chip", t);
     b.type = "button";
@@ -579,48 +580,50 @@ function renderTurmas(corpo) {
     corpo.append(e);
     return;
   }
-  const g = el("div", "grid");
-  lst
-    .slice()
-    .sort((a, b) => (a.nome || "").localeCompare(b.nome || "", "pt-BR"))
-    .forEach(i => {
-      const fs = meusForms().filter(f => f.instId === i.id),
-        r = resumoInst(i, fs);
-      const e = el("article", "card" + (r.atr ? " late" : ""));
-      const top = el("div", "card-top");
-      top.append(el("h3", "name", title(i.nome)), el("span", "stage", `${r.n} aluno${r.n !== 1 ? "s" : ""}`));
-      e.append(top);
-      const meta = el("div", "meta");
-      [
-        `🎓 ${fs.filter(ehKit01).length} adesão`,
-        `📘 ${fs.filter(f => !ehKit01(f)).length} kits`,
-        C.nomeDe(i) ? "👤 " + U.first(C.nomeDe(i)) : "",
-        i.fechadoEm ? "Fechado em " + U.fmtDate(i.fechadoEm) : ""
-      ]
-        .filter(Boolean)
-        .forEach(t => meta.append(el("span", "tag", t)));
-      e.append(meta);
-      e.append(
-        el("div", "fu" + (r.atr ? " late" : ""), `Vendido ${moeda(r.vend)} · recebido ${moeda(r.rec)} · em aberto ${moeda(r.aberto)}`)
-      );
-      // datas da formatura e do dia de fotos (antes ficavam no cartão da instituição)
-      ["fotos", ...Ev.KINDS_FORMATURA].forEach(kk => {
-        const l = Ev.linhaEvento(i, kk);
-        if (l) e.append(l);
-      });
-      const act = el("div", "actions");
-      act.append(
-        U.mkBtn("👥 Alunos e parcelas", "btn-primary", () => abrirTurma(i)),
-        U.mkBtn("🎓 Formatura", "", () => Ev.openEvento(i, "formatura")),
-        U.mkBtn("📸 Dia de fotos", "", () => Ev.openEvento(i, "fotos"))
-      );
-      // mais de uma formatura no colégio (outra turma, dia ou local)
-      const outra = Ev.formaturasDe(i).length ? Ev.proxFormatura(i) : null;
-      if (outra) act.append(U.mkBtn("🎓 + Outra formatura", "", () => Ev.openEvento(i, outra)));
-      e.append(act);
-      g.append(e);
-    });
-  corpo.append(g);
+  // lista compacta dos colégios fechados; tocar abre a janela (Resumo · Alunos · Datas)
+  renderFechados(corpo, {
+    C,
+    insts: lst,
+    formsDe: i => meusForms().filter(f => f.instId === i.id),
+    resumo: resumoInst,
+    card: cartaoTurma,
+    abrirTurma
+  });
+}
+// cartão da turma (Resumo da janela do colégio fechado)
+function cartaoTurma(i, fs) {
+  const r = resumoInst(i, fs);
+  const e = el("article", "card" + (r.atr ? " late" : ""));
+  const top = el("div", "card-top");
+  top.append(el("h3", "name", title(i.nome)), el("span", "stage", `${r.n} aluno${r.n !== 1 ? "s" : ""}`));
+  e.append(top);
+  const meta = el("div", "meta");
+  [
+    `🎓 ${fs.filter(ehKit01).length} adesão`,
+    `📘 ${fs.filter(f => !ehKit01(f)).length} kits`,
+    C.nomeDe(i) ? "👤 " + U.first(C.nomeDe(i)) : "",
+    i.fechadoEm ? "Fechado em " + U.fmtDate(i.fechadoEm) : ""
+  ]
+    .filter(Boolean)
+    .forEach(t => meta.append(el("span", "tag", t)));
+  e.append(meta);
+  e.append(el("div", "fu" + (r.atr ? " late" : ""), `Vendido ${moeda(r.vend)} · recebido ${moeda(r.rec)} · em aberto ${moeda(r.aberto)}`));
+  // datas da formatura e do dia de fotos (antes ficavam no cartão da instituição)
+  ["fotos", ...Ev.KINDS_FORMATURA].forEach(kk => {
+    const l = Ev.linhaEvento(i, kk);
+    if (l) e.append(l);
+  });
+  const act = el("div", "actions");
+  act.append(
+    U.mkBtn("👥 Alunos e parcelas", "btn-primary", () => abrirTurma(i)),
+    U.mkBtn("🎓 Formatura", "", () => Ev.openEvento(i, "formatura")),
+    U.mkBtn("📸 Dia de fotos", "", () => Ev.openEvento(i, "fotos"))
+  );
+  // mais de uma formatura no colégio (outra turma, dia ou local)
+  const outra = Ev.formaturasDe(i).length ? Ev.proxFormatura(i) : null;
+  if (outra) act.append(U.mkBtn("🎓 + Outra formatura", "", () => Ev.openEvento(i, outra)));
+  e.append(act);
+  return e;
 }
 
 // ---------- venda depois das fotos ----------

@@ -105,7 +105,9 @@ botão "Mudar ano" nas importações de Formatura/Paspatur, aba Vendidos (admin)
 5. ~~Aluguel de becas~~ (10/11): lista compacta (linhaGenerica em lista-compacta.js) e janela com abas
    (janela.js, genérica para as próximas listas): Resumo · Colégio e contrato (informações do colégio e
    "📄 Abrir o Contrato do colégio") · Histórico. Falta organizar o resto do Aluguel de becas com a Luciana.
-6. Venda antecipada (Formaturas): mostrar os alunos e colégios fechados.
+6. ~~Venda antecipada~~ (10/11): aba "🏫 Colégios fechados" (antes "Turmas") em lista compacta
+   (js/formaturas-fechados.js), com o resumo do total; tocar abre a janela Resumo (cartão da turma) · Alunos (cada
+   formando com kit, parcelas e em aberto; atalho para "Alunos e parcelas") · Datas (fotos e todas as formaturas).
 7. Fotos do aluno: botão para excluir foto (ex.: a da ficha) — sai do Drive e não vai para o aluno; equipe pode.
 8. Preços mínimos: organizar os vários valores (conversar com Adriano/Luciana antes).
 9. "Erros do app (5)" em Ajustes: ver o que são e corrigir (pedir o print aberto).
