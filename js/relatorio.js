@@ -1,7 +1,7 @@
 // Relatório para imprimir (ou salvar em PDF) de cada card, para levar a uma reunião.
 // Cada tela monta o conteúdo com os dados que já estão na tela (a equipe só vê o que é dela) e chama abrirRelatorio.
 // conteudo = { titulo, subtitulo, secoes: [{ titulo, nota, kpis: [[rótulo, valor]], tabela: { cols: [...], linhas: [[...]] } }] }
-import { el } from "./ui.js";
+import { el, sheet, field, sel } from "./ui.js";
 import * as U from "./util.js";
 
 export function abrirRelatorio(conteudo, quem) {
@@ -117,7 +117,9 @@ export function copiaDaTela(orig) {
 export function botaoRelatorio(montar, quem) {
   return U.mkBtn("🖨️ Relatório", "btn-sm", async () => {
     try {
-      abrirRelatorio(await montar(), quem && quem());
+      const conteudo = await montar();
+      if (!conteudo) return; // a pessoa fechou a escolha dos filtros
+      abrirRelatorio(conteudo, quem && quem());
     } catch (e) {
       console.warn("[Z7] relatório", e);
       U.toast("Não foi possível montar o relatório agora.");
@@ -132,4 +134,49 @@ export function contar(lista, fn) {
     m[k] = (m[k] || 0) + 1;
   });
   return Object.entries(m).sort((a, b) => b[1] - a[1]);
+}
+
+// Antes de gerar: escolher os filtros do relatório (ex.: ano, colégio, turma, situação, separar por).
+// campos = [{ k, rotulo, opcoes(valores) → [[valor, texto]], padrao, vazio }]: as opções são montadas de novo a cada
+// mudança, então a lista de turmas acompanha o colégio escolhido. Devolve os valores, ou null se a pessoa fechou.
+export function pedirFiltros(titulo, campos) {
+  return new Promise(resolve => {
+    let feito = false;
+    const close = sheet(
+      titulo,
+      (p, fechar) => {
+        const v = {};
+        campos.forEach(c => (v[c.k] = c.padrao || ""));
+        const caixas = el("div");
+        const pintar = () => {
+          caixas.innerHTML = "";
+          campos.forEach(c => {
+            const ops = c.opcoes(v);
+            if (v[c.k] && !ops.some(o => String(o[0]) === String(v[c.k])))
+              v[c.k] = c.padrao && ops.some(o => o[0] === c.padrao) ? c.padrao : "";
+            const s = sel(ops, v[c.k], c.vazio == null ? undefined : c.vazio);
+            s.onchange = () => {
+              v[c.k] = s.value;
+              pintar();
+            };
+            caixas.append(field(c.rotulo, s));
+          });
+        };
+        pintar();
+        const ok = el("button", "btn-primary", "🖨️ Gerar relatório");
+        ok.type = "submit";
+        const acoes = el("div", "actions");
+        acoes.append(ok, U.mkBtn("Cancelar", "", fechar));
+        p.append(caixas, acoes);
+        p.onsubmit = e => {
+          e.preventDefault();
+          feito = true;
+          fechar();
+          resolve(Object.assign({}, v));
+        };
+      },
+      { onClose: () => !feito && resolve(null) }
+    );
+    return close;
+  });
 }

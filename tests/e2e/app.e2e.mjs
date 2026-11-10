@@ -1851,6 +1851,9 @@ await cenario("Relatórios para imprimir (um por card)", async () => {
   const confere = async (pg, hash, tit, quem) => {
     await ir(pg, hash);
     await pg.getByRole("button", { name: "🖨️ Relatório" }).first().click();
+    // relatórios com filtros (ex.: Aluguel de becas): gera com o que vier marcado
+    const gerar = pg.locator(".sheet").last().getByRole("button", { name: "🖨️ Gerar relatório" });
+    if (await gerar.isVisible({ timeout: 800 }).catch(() => false)) await gerar.click();
     await pg.waitForSelector("#relatorio .rel-folha h1", { timeout: 5000 });
     const r = await pg.evaluate(() => ({
       h1: document.querySelector("#relatorio h1").textContent,
@@ -1974,6 +1977,8 @@ await cenario("Relatórios para imprimir (um por card)", async () => {
     await pg.locator('.tile[data-mod="becas"]').click();
     await calmo(pg);
     await pg.getByRole("button", { name: "🖨️ Relatório" }).first().click();
+    const gerarB = pg.locator(".sheet").last().getByRole("button", { name: "🖨️ Gerar relatório" });
+    if (await gerarB.isVisible({ timeout: 800 }).catch(() => false)) await gerarB.click();
     await pg.waitForSelector("#relatorio", { timeout: 5000 });
     await pg.evaluate(() => history.back());
     await pg.waitForFunction(() => !document.getElementById("relatorio"), null, { timeout: 4000 }).catch(() => {});
@@ -2046,6 +2051,9 @@ for (const [quem, email] of [
         const rel = pg.locator("section:not([hidden])").getByRole("button", { name: "🖨️ Relatório" }).first();
         if (await rel.isVisible().catch(() => false)) {
           await rel.click();
+          // relatórios com filtros (ex.: Aluguel de becas): gera com o que vier marcado
+          const gerar = pg.locator(".sheet").last().getByRole("button", { name: "🖨️ Gerar relatório" });
+          if (await gerar.isVisible({ timeout: 800 }).catch(() => false)) await gerar.click();
           await pg.waitForSelector("#relatorio", { timeout: 5000 }).catch(() => ruins.push(h + ": relatório não abriu"));
           await pg
             .locator("#relatorio")
@@ -3272,6 +3280,15 @@ await cenario("Aluguel de becas · alunos dos colégios (status, estoque e produ
     Object.keys(st).some(k => k.startsWith("movEstoque/")),
     "movimentos do estoque registrados"
   );
+  // relatório: escolhe colégio, turma e situação antes de gerar
+  await pg.getByRole("button", { name: "🖨️ Relatório" }).first().click();
+  const fr = pg.locator(".sheet").last();
+  await fr.getByLabel("Situação").selectOption("atrasados");
+  await fr.getByRole("button", { name: "🖨️ Gerar relatório" }).click();
+  await pg.waitForSelector("#relatorio", { timeout: 5000 });
+  const txRel = await pg.textContent("#relatorio");
+  ok(/Caio Atrasado/.test(txRel) && !/Bia Aluguel/.test(txRel) && /situação: atrasados/.test(txRel), "relatório do aluguel com filtro de situação");
+  await pg.locator("#relatorio").getByRole("button", { name: "Fechar" }).click();
   // lista compacta (como no PR, Formatura e Instituições): tocar na linha abre a janela com abas
   await pg.evaluate(() => (window.__z7CartaoNaLista = false));
   await pg.fill("#alLista ~ input, input[aria-label='Buscar aluno']", "Caio");
@@ -3845,8 +3862,12 @@ await cenario("PR lista única: filtro PR/Paspatur, pessoa da equipe e chave na 
     await calmo(pg);
     const f = pg.locator(".sheet").last();
     ok((await pg.locator(".sheet").last().getByLabel("Vender como").inputValue()) === "pr", "+ Aluno começa marcado como PR");
-    await f.getByLabel("Nome do aluno").fill("Pedro Novo Paspatur");
-    await f.getByLabel("Colégio").fill("Colegio Alfa");
+    // (às vezes o texto do colégio caía no campo do nome: confere e escreve de novo)
+    for (let t = 0; t < 3; t++) {
+      await f.getByLabel("Nome do aluno").fill("Pedro Novo Paspatur");
+      await f.getByLabel("Colégio", { exact: true }).fill("Colegio Alfa");
+      if ((await f.getByLabel("Nome do aluno").inputValue()) === "Pedro Novo Paspatur") break;
+    }
     await f.getByLabel("Vender como").selectOption("paspatur");
     await f.locator("button[type=submit]").click();
     await calmo(pg);

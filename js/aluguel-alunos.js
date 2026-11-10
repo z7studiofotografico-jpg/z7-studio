@@ -27,7 +27,7 @@ import { carregarCatalogo, reservar, desfazerReserva, baixar, estornar } from ".
 import { DO_ALUGUEL } from "./catalogo.js";
 import { ESTUDIO, ENDERECO } from "./mensagens.js";
 import { botaoRelatorio } from "./relatorio.js";
-import { contatoRel } from "./aluno-id.js";
+import { relatorioAluguel, atrasadoAluguel } from "./aluguel-relatorio.js";
 import { ITENS_PACOTE, nomeItem, lerPacote } from "./contrato-colegio-regras.js";
 import { linhaGenerica } from "./lista-compacta.js";
 import { abrirJanela } from "./janela.js";
@@ -36,7 +36,8 @@ import { abaColegio, abaHistorico } from "./aluguel-janela.js";
 export const STATUS_ALUGUEL = ["Cadastrado", "Beca medida", "Produtos em produção", "Pronto para retirada", "Retirou a beca", "Devolvida"];
 const SERIES = ["Pré", "5º ano", "9º ano", "Ensino médio", "Faculdade", "Curso", "Outra"];
 const ANO = () => new Date().getFullYear();
-export const atrasadoAluguel = (a, hoje = U.todayStr()) => a.status === "Retirou a beca" && !!a.devolucao && a.devolucao < hoje;
+// atrasadoAluguel fica em aluguel-relatorio.js (o relatório também usa); continua exportado daqui
+export { atrasadoAluguel };
 // próximo e anterior (Produtos em produção só para quem comprou produto)
 export function proximoStatus(a) {
   const i = STATUS_ALUGUEL.indexOf(a.status || "Cadastrado");
@@ -72,7 +73,10 @@ export function mostrarAlunos(ctx, v, o) {
     U.mkBtn("Importar planilha", "btn-sm", () =>
       import("./aluguel-importar.js").then(m => m.importarAlugueis(C, insts)).catch(e => C.handleErr(e))
     ),
-    botaoRelatorio(relatorio, () => C.me)
+    botaoRelatorio(
+      () => relatorioAluguel(C, lista, filtro),
+      () => C.me
+    )
   );
   head.append(hb);
   v.append(head);
@@ -383,46 +387,6 @@ function janela(a0) {
       ["historico", "Histórico", abaHistorico]
     ]
   });
-}
-// Relatório: os alunos do filtro, por colégio, com o status e o atraso
-function relatorio() {
-  const hoje = U.todayStr();
-  const arr = lista.filter(
-    a => !ocultoParaMim(C, a) && (!filtro.ano || String(a.ano) === filtro.ano) && (!filtro.inst || a.instId === filtro.inst)
-  );
-  const cols = ["Aluno", "Contato", "Série", "Beca", "Faixa / capelo", "Status", "Devolução"];
-  const linha = a => [
-    title(a.nome || ""),
-    contatoRel(a.tel, ""),
-    a.serie || "",
-    a.tamanho ? a.tamanho + (a.menosLonga ? "1" : "") : "—",
-    [a.faixa && nomeFaixa(a.faixa), a.capelo && nomeCapelo(a.capelo)].filter(Boolean).join(" · "),
-    atrasadoAluguel(a, hoje) ? "ATRASADO" : a.status || "Cadastrado",
-    a.devolucao ? U.fmtDate(a.devolucao) : ""
-  ];
-  const porCol = {};
-  arr.forEach(a => (porCol[a.instNome || "?"] = porCol[a.instNome || "?"] || []).push(a));
-  const u = usoDosAlunos(arr);
-  return {
-    titulo: "Aluguel de becas · alunos" + (filtro.ano ? " · " + filtro.ano : ""),
-    secoes: [
-      {
-        titulo: "Resumo",
-        kpis: [
-          ["Alunos", arr.length],
-          ["Becas reservadas", u.reservado],
-          ["Becas fora", u.fora],
-          ["Atrasados", arr.filter(a => atrasadoAluguel(a, hoje)).length]
-        ]
-      },
-      ...Object.entries(porCol)
-        .sort((a, b) => a[0].localeCompare(b[0], "pt-BR"))
-        .map(([c, l]) => ({
-          titulo: title(c),
-          tabela: { cols, linhas: l.sort((a, b) => (a.nome || "").localeCompare(b.nome || "", "pt-BR")).map(linha) }
-        }))
-    ]
-  };
 }
 function card(a) {
   const hoje = U.todayStr();

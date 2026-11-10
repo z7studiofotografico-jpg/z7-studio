@@ -111,3 +111,8 @@ botão "Mudar ano" nas importações de Formatura/Paspatur, aba Vendidos (admin)
 7. Fotos do aluno: botão para excluir foto (ex.: a da ficha) — sai do Drive e não vai para o aluno; equipe pode.
 8. Preços mínimos: organizar os vários valores (conversar com Adriano/Luciana antes).
 9. "Erros do app (5)" em Ajustes: ver o que são e corrigir (pedir o print aberto).
+
+## 10/11 — Relatórios com filtros
+- Aluguel de becas: o 🖨️ Relatório pergunta antes ano, colégio, turma (acompanha o colégio), situação e "separar por
+  colégio e turma / colégio" (js/aluguel-relatorio.js). pedirFiltros() em relatorio.js serve para os outros relatórios
+  que precisarem de filtro (a Luciana pediu: relatório deve ter filtro por colégio e por turma).
