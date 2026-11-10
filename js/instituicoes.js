@@ -2,7 +2,7 @@
 // Partes: instituicoes-dados.js (tipos e regras), instituicoes-estado.js (estado e gravação),
 // instituicoes-form.js (cadastro e visita), instituicoes-agendar.js (agendar pelo Agendamento), instituicoes-import.js.
 import { el, title, emPartes, clicavel } from "./ui.js";
-import { linhaEvento } from "./eventos.js";
+import { linhaEvento, KINDS_FORMATURA } from "./eventos.js";
 import * as U from "./util.js";
 import { openImport } from "./instituicoes-import.js";
 import { botaoRelatorio, contar } from "./relatorio.js";
@@ -279,7 +279,7 @@ function card(it) {
   const fu = el("div", "fu " + (s === "late" ? "late" : s === "today" ? "today" : it.followup ? "" : "none"));
   fu.textContent = passoTxt(it, s);
   e.append(fu);
-  ["fotos", "formatura"].forEach(k => {
+  ["fotos", ...KINDS_FORMATURA].forEach(k => {
     const l = linhaEvento(it, k);
     if (l) e.append(l);
   });

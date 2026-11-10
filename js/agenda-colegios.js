@@ -161,7 +161,7 @@ export function recusar(arg) {
             b.update(FS.doc(db, "instituicoes", y.instId), {
               [k + ".status"]: "recusado",
               [k + ".motivoRecusa"]: mot.value.trim(),
-              [k + ".sugestao"]: y.kind === "formatura" || gr.length === 1 ? sug.value || "" : "",
+              [k + ".sugestao"]: /^formatura\d?$/.test(y.kind || "") || gr.length === 1 ? sug.value || "" : "",
               atualizadoEm: new Date().toISOString()
             });
           }

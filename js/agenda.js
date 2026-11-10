@@ -487,7 +487,7 @@ const tipoDe = it =>
       ? "retirada"
       : "devolucao"
     : it.t === "c"
-      ? it.x.kind === "formatura"
+      ? /^formatura\d?$/.test(it.x.kind || "")
         ? "formatura"
         : it.x.kind === "fotos"
           ? "fotos"

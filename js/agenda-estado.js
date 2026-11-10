@@ -40,6 +40,11 @@ export const ETAPAS_ENTREGA = ["Ensaio feito", "Fotos escolhidas", "Em edição"
 export const $ = id => document.getElementById(id);
 export const CAMPO = { formatura: "formatura", fotos: "diaFotos", paspatur: "diaPaspatur", becas: "diaBecas" };
 export const ICO = { formatura: "🎓", fotos: "📸", paspatur: "🎞️", becas: "👘" };
+// várias formaturas no mesmo colégio: formatura2 … formatura6 (cada uma no seu campo do colégio)
+for (let n = 2; n <= 6; n++) {
+  CAMPO["formatura" + n] = "formatura" + n;
+  ICO["formatura" + n] = "🎓";
+}
 export const MESES = [
   "janeiro",
   "fevereiro",

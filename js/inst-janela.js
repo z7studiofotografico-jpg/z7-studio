@@ -4,7 +4,7 @@
 // A janela ouve o próprio colégio no banco: o que mudar (aqui ou em outro aparelho) aparece na hora.
 import { el, title, sheet } from "./ui.js";
 import * as U from "./util.js";
-import { KINDS, linhaEvento, openEvento } from "./eventos.js";
+import { KINDS, linhaEvento, openEvento, ehFormaturaKind, formaturasDe, proxFormatura, confirmarAlunosFormatura } from "./eventos.js";
 import { chaveColegio } from "./historico-dados.js";
 import { gruposEscolas } from "./escolas-pr.js";
 
@@ -198,14 +198,28 @@ async function irParaAlunos(C, pedido, fechar) {
 // Agendamentos: as datas do colégio (cada uma com aprovação da Luciana) e o botão para marcar ou mudar
 function agenda(box, it, C) {
   box.append(el("p", "hint", "As datas deste colégio. A data fica segurada na agenda até a Luciana aprovar."));
-  Object.keys(KINDS).forEach(k => {
+  const hoje = U.todayStr();
+  // formaturas: todas as marcadas (uma por turma, dia ou local) ou a vazia; as recusadas aparecem para remarcar
+  const fms = Object.keys(KINDS).filter(k => ehFormaturaKind(k) && it[KINDS[k].campo] && it[KINDS[k].campo].data);
+  const kinds = ["fotos", ...(fms.length ? fms : ["formatura"]), "paspatur", "becas"];
+  kinds.forEach(k => {
     const K = KINDS[k];
     const ev = it[K.campo];
     const linha = el("div", "ja-ev");
     linha.append(linhaEvento(it, k) || el("div", "fu none", `${K.ico} ${K.nome}: sem data marcada`));
     linha.append(U.mkBtn(ev && ev.data ? "Ver / mudar" : "Marcar data", "btn-sm", () => openEvento(it, k)));
+    // a quantidade certa de alunos só é confirmada depois que a formatura acontece
+    if (ehFormaturaKind(k) && ev && ev.data && ev.status === "confirmado" && ev.data <= hoje)
+      linha.append(
+        U.mkBtn(ev.alunosConfirmados ? "✏️ Alunos" : "👥 Confirmar alunos", ev.alunosConfirmados ? "btn-sm" : "btn-sm btn-primary", () =>
+          confirmarAlunosFormatura(it, k)
+        )
+      );
     box.append(linha);
   });
+  // mais de uma formatura no mesmo colégio: o botão fica sempre aberto
+  const prox = formaturasDe(it).length ? proxFormatura(it) : null;
+  if (prox) box.append(U.mkBtn("🎓 + Outra formatura (outra turma, dia ou local)", "", () => openEvento(it, prox)));
   if (C.pode("agenda")) box.append(U.mkBtn("📅 Abrir a Agenda", "", () => C.ir("#agenda")));
 }
 

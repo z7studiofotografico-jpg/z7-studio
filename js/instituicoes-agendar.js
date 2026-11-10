@@ -1,6 +1,7 @@
 // Agendamento → "+ Agendar colégio": escolhe o colégio e abre o formulário da data (dia de fotos ou formatura).
 import { el, title, field, inp, sel, sheet, botoes as actions, parseTel } from "./ui.js";
-import { openEvento } from "./eventos.js";
+import { openEvento, formaturasDe, proxFormatura, nomeEvento } from "./eventos.js";
+import { confirmar } from "./confirmar.js";
 import * as U from "./util.js";
 import { TIPOS, CARTOES, CARGOS, norm } from "./instituicoes-dados.js";
 import { C, FS, col, tipo, iniciar } from "./instituicoes-estado.js";
@@ -212,7 +213,24 @@ export async function agendarColegio(ctx, dia) {
         }
       }
       close();
-      openEvento(it, tipoEv.value, dia);
+      let kind = tipoEv.value;
+      // já tem formatura marcada: pode ser outra turma (outro dia ou local) ou mudar a que existe
+      const fms = kind === "formatura" ? formaturasDe(it) : [];
+      if (fms.length && proxFormatura(it)) {
+        const lista = fms
+          .map(k => `${nomeEvento(k, it.nome)}: ${U.fmtDate(it[k].data)}${it[k].turmas ? " (" + it[k].turmas + ")" : ""}`)
+          .join("; ");
+        const outra = await confirmar(
+          "Marcar outra formatura?",
+          `Este colégio já tem: ${lista}. É outra formatura (outra turma, dia ou local)?`,
+          {
+            sim: "Sim, outra formatura",
+            nao: "Não, mudar a que existe"
+          }
+        );
+        kind = outra ? proxFormatura(it) : fms[0];
+      }
+      openEvento(it, kind, dia);
     });
     setTimeout(() => grupos.querySelector("button").focus(), 30);
   });

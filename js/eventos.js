@@ -46,13 +46,28 @@ export const KINDS = {
   paspatur: { campo: "diaPaspatur", nome: "Paspatur", ico: "🎞️" },
   becas: { campo: "diaBecas", nome: "Aluguel de becas", ico: "👘" }
 };
+// Várias formaturas no mesmo colégio (turmas, dias e locais diferentes): "formatura2" … "formatura6", cada uma
+// no seu campo do colégio e no seu dia da agenda, com a mesma aprovação da Luciana. O dia de fotos é o mesmo.
+export const MAX_FORMATURAS = 6;
+for (let n = 2; n <= MAX_FORMATURAS; n++) KINDS["formatura" + n] = { campo: "formatura" + n, nome: "Formatura " + n, ico: "🎓" };
+export const ehFormaturaKind = k => k === "formatura" || /^formatura[2-9]$/.test(k || "");
+export const KINDS_FORMATURA = Object.keys(KINDS).filter(ehFormaturaKind);
+// as formaturas marcadas do colégio (com data e não recusadas), na ordem do dia
+export const formaturasDe = it =>
+  KINDS_FORMATURA.filter(k => it && it[k] && it[k].data && it[k].status !== "recusado").sort((a, b) =>
+    it[a].data.localeCompare(it[b].data)
+  );
+// a próxima formatura livre do colégio ("+ Outra formatura"); null se já tem todas
+export const proxFormatura = it => KINDS_FORMATURA.find(k => !(it && it[k] && it[k].data && it[k].status !== "recusado")) || null;
 // Nome do compromisso com o nome da instituição: "Dia de fotos no Colégio Alfa", "Formatura do Colégio Alfa"
 export function nomeEvento(kind, instNome) {
   const n = title(instNome || "");
   if (!n) return KINDS[kind] ? KINDS[kind].nome : "Compromisso";
   if (kind === "paspatur") return `Paspatur no ${n}`;
   if (kind === "becas") return `Aluguel de becas no ${n}`;
-  return kind === "fotos" ? `Dia de fotos no ${n}` : `Formatura do ${n}`;
+  if (kind === "fotos") return `Dia de fotos no ${n}`;
+  const nf = /^formatura(\d)$/.exec(kind || "");
+  return nf ? `Formatura ${nf[1]} do ${n}` : `Formatura do ${n}`;
 }
 const STATUS_TXT = { pendente: "⏳ aguardando a Luciana", confirmado: "✅ confirmado", recusado: "❌ recusado" };
 // Reserva um ou mais dias de uma vez (ex.: dia de fotos + formatura). Tudo ou nada.
@@ -111,6 +126,7 @@ export async function reservarVarios(it, pares) {
         grupo,
         contato: x.f.contato || null,
         alunos: x.f.alunos || null,
+        turmas: x.f.turmas || "",
         instId: it.id,
         instNome: it.nome,
         instTipo: it.tipo,
@@ -153,13 +169,14 @@ export function camposEvento(kind, f, instNome, dia) {
   const data = el("input");
   data.type = "date";
   data.value = dia || (f && f.status !== "recusado" && f.data) || "";
-  data.min = U.todayStr();
+  // dia já marcado que passou (ex.: o dia de fotos, ao marcar outra formatura): não trava o formulário
+  data.min = data.value && data.value < U.todayStr() ? data.value : U.todayStr();
   const hora = el("input");
   hora.type = "time";
   hora.value = (f && f.hora) || "";
   const r1 = el("div", "row2");
-  const rotDia = { formatura: "Dia da formatura", paspatur: "Dia das fotos do Paspatur", becas: "Dia de medir / entregar as becas" };
-  r1.append(field(rotDia[kind] || "Dia das fotos", data), field("Horário", hora));
+  const rotDia = { paspatur: "Dia das fotos do Paspatur", becas: "Dia de medir / entregar as becas" };
+  r1.append(field(ehFormaturaKind(kind) ? "Dia da formatura" : rotDia[kind] || "Dia das fotos", data), field("Horário", hora));
   // feriado só avisa (pode marcar)
   const avFer = el("p", "wait");
   const verFer = () => {
@@ -182,13 +199,16 @@ export function camposEvento(kind, f, instNome, dia) {
   );
   let onde = null,
     local = null,
-    obs = null;
-  if (kind === "formatura") {
+    obs = null,
+    turmas = null;
+  if (ehFormaturaKind(kind)) {
     onde = sel(["Colégio", "Salão"], (f && f.onde) || "Colégio");
     local = inp(f && f.local, "nome do salão ou endereço");
     const r2 = el("div", "row2");
     r2.append(field("Onde", onde), field("Local", local));
-    box.append(r2);
+    // com mais de uma formatura no colégio, cada uma diz quais turmas são dela
+    turmas = inp(f && f.turmas, "ex.: 9º ano A e B (deixe vazio se for a turma toda)", 120);
+    box.append(r2, field("Turmas desta formatura", turmas));
   } else {
     const padrao = {
       paspatur: "Fotos do Paspatur no colégio",
@@ -213,7 +233,8 @@ export function camposEvento(kind, f, instNome, dia) {
     hora: hora.value,
     onde: onde ? onde.value : "",
     local: local ? local.value.trim() : "",
-    obs: obs ? obs.value.trim() : ""
+    obs: obs ? obs.value.trim() : "",
+    turmas: turmas ? turmas.value.trim() : ""
   });
   box.erro = t => {
     err.textContent = t;
@@ -253,10 +274,14 @@ export async function avisarColegioPorEmail(instId, ctx) {
     lin.push(
       `📸 Medição de beca e ensaio de estúdio no ${title(it.nome)}: ${dia(it.diaFotos.data)}${it.diaFotos.hora ? " às " + it.diaFotos.hora : ""}`
     );
-  if (it.formatura && it.formatura.status === "confirmado")
+  // todas as formaturas confirmadas do colégio (uma por turma, quando há mais de uma)
+  const fms = formaturasDe(it).filter(k => it[k].status === "confirmado");
+  fms.forEach(k => {
+    const f = it[k];
     lin.push(
-      `🎓 Formatura do ${title(it.nome)}: ${dia(it.formatura.data)}${it.formatura.hora ? " às " + it.formatura.hora : ""}${it.formatura.onde ? " · " + (it.formatura.onde === "Salão" ? "no salão" : "no colégio") : ""}${it.formatura.local ? " (" + it.formatura.local + ")" : ""}`
+      `🎓 Formatura do ${title(it.nome)}${f.turmas ? " (" + f.turmas + ")" : ""}: ${dia(f.data)}${f.hora ? " às " + f.hora : ""}${f.onde ? " · " + (f.onde === "Salão" ? "no salão" : "no colégio") : ""}${f.local ? " (" + f.local + ")" : ""}`
     );
+  });
   if (!lin.length) return 0;
   const nome = title(it.nome);
   await F.addDoc(F.collection(c.db, "emails"), {
@@ -266,10 +291,7 @@ export async function avisarColegioPorEmail(instId, ctx) {
     status: "pendente",
     criadoEm: new Date().toISOString(),
     por: c.me || "",
-    datas: [
-      it.diaFotos && it.diaFotos.status === "confirmado" ? it.diaFotos.data : "",
-      it.formatura && it.formatura.status === "confirmado" ? it.formatura.data : ""
-    ].filter(Boolean),
+    datas: [it.diaFotos && it.diaFotos.status === "confirmado" ? it.diaFotos.data : "", ...fms.map(k => it[k].data)].filter(Boolean),
     assunto: assuntoDatas(nome),
     texto: `Olá!\n\nConfirmamos com o ${nome} as datas das fotos de formatura:\n\n${lin.join("\n")}${it.mediaAlunos ? `\n\nPrevisão de ${it.alunosConfirmados || it.mediaAlunos} alunos${it.alunosConfirmados ? "" : " (depois das fotos informamos a quantidade certa)"}.` : ""}\n\nQualquer dúvida, é só responder este e-mail.\n\n${ASSINATURA_EMAIL}`
   });
@@ -289,7 +311,7 @@ export function msgWhatsColegio(instNome, eventos, contato, alunos, quem) {
   const conf = eventos.every(e => e.status === "confirmado");
   const lin = eventos.map(
     e =>
-      `${KINDS[e.kind].ico} ${nomeEvento(e.kind, instNome)}: ${diaLongo(e.data)}${e.hora ? " às " + e.hora : ""}${e.kind === "formatura" && e.onde ? " · " + (e.onde === "Salão" ? "no salão" + (e.local ? " (" + e.local + ")" : "") : "no colégio") : ""}`
+      `${KINDS[e.kind].ico} ${nomeEvento(e.kind, instNome)}: ${diaLongo(e.data)}${e.hora ? " às " + e.hora : ""}${e.turmas ? " (" + e.turmas + ")" : ""}${ehFormaturaKind(e.kind) && e.onde ? " · " + (e.onde === "Salão" ? "no salão" + (e.local ? " (" + e.local + ")" : "") : "no colégio") : ""}`
   );
   return (
     `Olá${nome ? ", " + nome : ""}! Aqui é ${quem ? quem + ", do" : "do"} ${ESTUDIO.nome} 📸\n` +
@@ -356,8 +378,38 @@ export function linhaEvento(it, kind) {
   const t =
     ev.status === "recusado"
       ? `${K.ico} ${nomeEvento(kind, it.nome)}: ${STATUS_TXT.recusado} o dia ${U.fmtDate(ev.data)}${ev.motivoRecusa ? " (" + ev.motivoRecusa + ")" : ""}${ev.sugestao ? " · sugeriu " + U.fmtDate(ev.sugestao) : ""}`
-      : `${K.ico} ${nomeEvento(kind, it.nome)}: ${U.fmtDate(ev.data)}/${ev.data.slice(0, 4)}${ev.hora ? " às " + ev.hora : ""}${ev.onde ? " · " + ev.onde : ""}${ev.local ? " (" + ev.local + ")" : ""} · ${STATUS_TXT[ev.status] || STATUS_TXT.pendente}`;
+      : `${K.ico} ${nomeEvento(kind, it.nome)}${ev.turmas ? " (" + ev.turmas + ")" : ""}: ${U.fmtDate(ev.data)}/${ev.data.slice(0, 4)}${ev.hora ? " às " + ev.hora : ""}${ev.onde ? " · " + ev.onde : ""}${ev.local ? " (" + ev.local + ")" : ""} · ${STATUS_TXT[ev.status] || STATUS_TXT.pendente}` +
+        (ehFormaturaKind(kind) && ev.alunosConfirmados
+          ? ` · 👥 ${ev.alunosConfirmados} alunos confirmados`
+          : ehFormaturaKind(kind) && ev.alunos
+            ? ` · ~${ev.alunos} alunos (previsão)`
+            : "");
   return el("div", "fu " + (ev.status === "confirmado" ? "ok" : ev.status === "recusado" ? "late" : "today"), t);
+}
+
+// Depois que a formatura acontece: quantos alunos vieram de verdade (fica na própria formatura)
+export async function confirmarAlunosFormatura(it, kind) {
+  const f = it[KINDS[kind].campo];
+  if (!f || !f.data) return;
+  const { pedirTexto } = await import("./confirmar.js");
+  const t = await pedirTexto(`${nomeEvento(kind, it.nome)}${f.turmas ? " (" + f.turmas + ")" : ""}`, "Quantos alunos participaram?", {
+    placeholder: f.alunos ? "previsão: " + f.alunos : "ex.: 45",
+    ok: "Confirmar"
+  });
+  if (t == null) return;
+  const n = Number(String(t).replace(/\D/g, "")) || 0;
+  if (!n) return U.toast("Escreva só o número de alunos.");
+  try {
+    await FS.updateDoc(FS.doc(db, "instituicoes", it.id), {
+      [KINDS[kind].campo + ".alunosConfirmados"]: n,
+      [KINDS[kind].campo + ".alunosConfirmadosPor"]: C.me || "",
+      [KINDS[kind].campo + ".alunosConfirmadosEm"]: new Date().toISOString(),
+      atualizadoEm: new Date().toISOString()
+    });
+    U.toast(`${n} alunos confirmados ✅`);
+  } catch (e) {
+    C.handleErr(e);
+  }
 }
 
 // dia (opcional): data já escolhida na agenda; entra no campo da data quando ele ainda está vazio
@@ -365,7 +417,9 @@ export function openEvento(it, kind, dia) {
   const K = KINDS[kind],
     ev = it[K.campo],
     fot = it.diaFotos;
-  const comFotos = kind === "formatura"; // formatura sempre leva junto o dia de medir beca + ensaio
+  const comFotos = ehFormaturaKind(kind); // formatura sempre leva junto o dia de medir beca + ensaio
+  // formatura extra (outra turma): o dia de fotos é o mesmo do colégio; desmarcar não mexe nele nem na média
+  const extra = comFotos && kind !== "formatura";
   sheet(nomeEvento(kind, it.nome), (p, close) => {
     const travado = !C.aprovador && ev && ev.status === "confirmado" && (!comFotos || (fot && fot.status === "confirmado"));
     if (travado) {
@@ -406,7 +460,7 @@ export function openEvento(it, kind, dia) {
     const box = camposEvento(kind, ev, it.nome, dia);
     // colégio que faz só as fotos (ex.: só o Paspatur no particular), sem formatura e sem aluguel de beca
     let soFotos = null;
-    if (dBox) {
+    if (dBox && !extra) {
       soFotos = el("input");
       soFotos.type = "checkbox";
       soFotos.checked = !!it.semFormatura && !(ev && ev.data);
@@ -455,14 +509,27 @@ export function openEvento(it, kind, dia) {
     };
     escolha.onchange = sync;
     sync();
-    const alunos = inp(it.alunosConfirmados || it.mediaAlunos || "", "ex.: 120", 6);
+    const alunos = inp(extra ? (ev && ev.alunos) || "" : it.alunosConfirmados || it.mediaAlunos || "", "ex.: 120", 6);
     alunos.inputMode = "numeric";
     resp.append(
       field("Combinado com", escolha),
       novoC,
       el("p", "hint", "WhatsApp ou e-mail de quem combinou (não é obrigatório). A mensagem sai do WhatsApp de quem agendou."),
-      field(it.alunosConfirmados ? "Alunos (quantidade confirmada)" : "Média de alunos (obrigatório)", alunos),
-      el("p", "hint", "Começamos com a média. Depois das fotos, a quantidade certa é confirmada na lista de alunos.")
+      field(
+        extra
+          ? "Alunos desta formatura (previsão)"
+          : it.alunosConfirmados
+            ? "Alunos (quantidade confirmada)"
+            : "Média de alunos (obrigatório)",
+        alunos
+      ),
+      el(
+        "p",
+        "hint",
+        comFotos
+          ? "Começamos com a previsão. A quantidade certa de cada formatura é confirmada depois que ela acontece (em Instituições → Agendamentos)."
+          : "Começamos com a média. Depois das fotos, a quantidade certa é confirmada na lista de alunos."
+      )
     );
     const errR = el("p", "err");
     errR.hidden = true;
@@ -482,16 +549,16 @@ export function openEvento(it, kind, dia) {
       const lib = el(
         "button",
         "btn btn-danger btn-sm",
-        comFotos ? "Desmarcar formatura e dia de fotos (libera os dias)" : "Desmarcar (libera o dia)"
+        comFotos && !extra ? "Desmarcar formatura e dia de fotos (libera os dias)" : "Desmarcar (libera o dia)"
       );
       lib.type = "button";
       lib.onclick = async () => {
         try {
           await liberar(it, kind);
-          if (comFotos) await liberar(it, "fotos");
+          if (comFotos && !extra) await liberar(it, "fotos");
           await FS.updateDoc(
             FS.doc(db, "instituicoes", it.id),
-            Object.assign({ [K.campo]: null, atualizadoEm: new Date().toISOString() }, comFotos ? { diaFotos: null } : {})
+            Object.assign({ [K.campo]: null, atualizadoEm: new Date().toISOString() }, comFotos && !extra ? { diaFotos: null } : {})
           );
           U.toast("Desmarcado");
           close();
@@ -582,6 +649,8 @@ export function openEvento(it, kind, dia) {
       }
       try {
         if (fd && fd.data && fd.data >= f.data) throw erroAgenda("ordem");
+        // formatura extra com o mesmo dia de fotos do colégio: não mexe nele (nem na aprovação que ele já tem)
+        if (extra && fd && fot && fot.data === fd.data && fot.status !== "recusado") fd.data = "";
         const pares =
           fd && fd.data
             ? [
@@ -595,8 +664,8 @@ export function openEvento(it, kind, dia) {
           atualizadoEm: new Date().toISOString()
         };
         if (fd && fd.data) patch.diaFotos = Object.assign(fd, { status: r.status, grupo: r.grupo, pedidoPor: C.me || "" });
-        // alunos: guarda a média (a quantidade certa vem depois, pela lista de alunos)
-        if (!it.alunosConfirmados) {
+        // alunos: guarda a média (a quantidade certa vem depois, pela lista de alunos); a formatura extra só guarda a dela
+        if (!it.alunosConfirmados && !extra) {
           patch.mediaAlunos = nAl;
           patch.alunosEstimado = true;
         }

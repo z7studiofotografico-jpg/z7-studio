@@ -91,8 +91,11 @@ botão "Mudar ano" nas importações de Formatura/Paspatur, aba Vendidos (admin)
 ## Falta (pedidos de 08 e 09/11 — fazer numa conversa nova, "continuar o Z7")
 1. ~~Drive~~: combinado em 09/11 deixar como está (o app acha as fotos pelo nome do aluno e pelo número do ID;
    daqui para frente os nomes já saem com o ID novo).
-2. Agenda: várias formaturas para o mesmo colégio (dias, locais e turmas diferentes; o botão fica aberto) e a
-   quantidade de alunos de cada formatura só é confirmada depois que a formatura acontece.
+2. ~~Várias formaturas~~ (10/11): kinds formatura2…formatura6 (eventos.js: KINDS_FORMATURA, formaturasDe,
+   proxFormatura), cada uma com dia, local, turmas e previsão de alunos, no seu dia da agenda e com a aprovação da
+   Luciana; o dia de fotos é o mesmo do colégio. "+ Outra formatura" em Instituições → Agendamentos e em Formaturas;
+   o Agendar colégio pergunta se é outra formatura. Depois do dia, "👥 Confirmar alunos" (alunosConfirmados da
+   formatura). O e-mail ao colégio leva todas as formaturas confirmadas. Data que já passou não trava o formulário.
 3. ~~Agendar colégio~~ (10/11): pergunta primeiro Particular / Público / Faculdade-curso; a lista de colégios mostra
    só os do grupo; colégio digitado no grupo errado avisa onde está cadastrado.
 4. ~~Instituições~~ (10/11): lista compacta (uma linha por colégio: cor, responsável, bairro · cidade, próximo

@@ -2,6 +2,7 @@
 import * as U from "./util.js";
 const SEMANA = ["dom", "seg", "ter", "qua", "qui", "sex", "sáb"];
 const ICO = { formatura: "🎓", fotos: "📸", paspatur: "🎞️", becas: "👘" };
+for (let n = 2; n <= 6; n++) ICO["formatura" + n] = "🎓"; // várias formaturas no mesmo colégio
 export const TIPOS_ENSAIO = [
   "Formatura individual",
   "Formatura em grupo",

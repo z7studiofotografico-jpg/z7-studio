@@ -6,7 +6,7 @@ import * as U from "./util.js";
 import { anoDaTurma } from "./contrato.js";
 import { chaveColegio } from "./historico-dados.js";
 import { gruposEscolas } from "./escolas-pr.js";
-import { liberar } from "./eventos.js";
+import { liberar, KINDS_FORMATURA } from "./eventos.js";
 import { confirmar, decidir } from "./confirmar.js";
 
 // tudo o que é deste colégio, por módulo e ano: { formandos: [refs], pr: { ano: [refs] }, alugueis: [refs] }
@@ -60,7 +60,7 @@ export async function apagarInstituicao(C, it, escopo) {
   const s = oQueSai(L, ano);
   const refs = [...s.form, ...s.pr, ...s.alu].map(d => d.ref);
   if (!ano) {
-    await liberar(it, "formatura");
+    for (const k of KINDS_FORMATURA) await liberar(it, k);
     await liberar(it, "fotos");
     refs.push(FS.doc(db, "instituicoes", it.id));
   }

@@ -604,7 +604,7 @@ function renderTurmas(corpo) {
         el("div", "fu" + (r.atr ? " late" : ""), `Vendido ${moeda(r.vend)} · recebido ${moeda(r.rec)} · em aberto ${moeda(r.aberto)}`)
       );
       // datas da formatura e do dia de fotos (antes ficavam no cartão da instituição)
-      ["fotos", "formatura"].forEach(kk => {
+      ["fotos", ...Ev.KINDS_FORMATURA].forEach(kk => {
         const l = Ev.linhaEvento(i, kk);
         if (l) e.append(l);
       });
@@ -614,6 +614,9 @@ function renderTurmas(corpo) {
         U.mkBtn("🎓 Formatura", "", () => Ev.openEvento(i, "formatura")),
         U.mkBtn("📸 Dia de fotos", "", () => Ev.openEvento(i, "fotos"))
       );
+      // mais de uma formatura no colégio (outra turma, dia ou local)
+      const outra = Ev.formaturasDe(i).length ? Ev.proxFormatura(i) : null;
+      if (outra) act.append(U.mkBtn("🎓 + Outra formatura", "", () => Ev.openEvento(i, outra)));
       e.append(act);
       g.append(e);
     });

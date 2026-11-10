@@ -3946,7 +3946,9 @@ await cenario("Equipe edita os dados do aluno e o Adriano vê quem editou", asyn
   await ir(eq.pg, "#pr");
   await calmo(eq.pg);
   await eq.pg.locator("article", { hasText: "Bianca" }).first().getByRole("button", { name: "Editar dados" }).click();
+  await calmo(eq.pg);
   const sh = eq.pg.locator(".sheet:visible").last();
+  await sh.getByLabel("WhatsApp").first().waitFor();
   await sh.getByLabel("WhatsApp").first().fill("21977776666");
   await sh.locator("button[type=submit]").click();
   await calmo(eq.pg);
@@ -4017,6 +4019,64 @@ await cenario("Convite: criar a senha dentro do app", async () => {
   });
   ok(true, "link vencido: avisa e oferece voltar ao login");
   ok(!erros.length, "sem erros na página do convite" + (erros.length ? ": " + erros.join(" | ") : ""));
+});
+await cenario("Várias formaturas no mesmo colégio e alunos confirmados depois", async () => {
+  const { pg, erros, store } = await abrir(
+    ADRIANO,
+    Object.assign({}, base, {
+      "instituicoes/i2": {
+        nome: "COLEGIO BETA",
+        tipo: "particular",
+        etapa: "FECHADO",
+        resp: "",
+        respEmail: "",
+        contatos: [{ nome: "Marta", cargo: "Direção", tel: "21988881111" }],
+        visitas: [],
+        mediaAlunos: 60,
+        diaFotos: { data: dia(-10), status: "confirmado", agendaId: dia(-10) },
+        formatura: { data: dia(-3), status: "confirmado", agendaId: dia(-3), onde: "Colégio", alunos: 40, turmas: "9º ano A" }
+      }
+    })
+  );
+  await ir(pg, "#inst-particular");
+  await pg.locator("#iChips").getByText("Todas").click();
+  await pg.locator("#iList button.lc-linha").filter({ hasText: "Beta" }).click();
+  const jan = pg.locator(".janela-aluno");
+  await jan.locator(".ja-abas").getByText("Agendamentos").click();
+  // a formatura já aconteceu: confirma quantos alunos vieram
+  await jan.getByRole("button", { name: "👥 Confirmar alunos" }).click();
+  let sh = pg.locator(".sheet").last();
+  await sh.locator("textarea").fill("38");
+  await sh.getByRole("button", { name: "Confirmar" }).click();
+  await calmo(pg);
+  let s = await store();
+  ok(s["instituicoes/i2"].formatura.alunosConfirmados === 38, "alunos da formatura confirmados depois que ela aconteceu");
+  // outra formatura no mesmo colégio (outra turma, outro dia e local)
+  await jan.getByRole("button", { name: /Outra formatura/ }).click();
+  await calmo(pg);
+  sh = pg.locator(".sheet").last();
+  await sh.locator("input[type=date]").nth(1).fill(dia(30));
+  await sh.getByLabel("Onde").selectOption("Salão");
+  await sh.getByLabel("Local").fill("Salão Fantasy");
+  await sh.getByLabel("Turmas desta formatura").fill("9º ano B");
+  await sh.getByLabel("Alunos desta formatura (previsão)").fill("25");
+  await sh.locator("button[type=submit]").click();
+  await calmo(pg);
+  s = await store();
+  const f2 = s["instituicoes/i2"].formatura2 || {};
+  ok(
+    f2.data === dia(30) && f2.turmas === "9º ano B" && f2.alunos === 25 && f2.status === "pendente" && f2.local === "Salão Fantasy",
+    "Formatura 2 gravada com turmas, local e previsão de alunos: " + JSON.stringify(f2)
+  );
+  ok(
+    (s["agenda/" + dia(30)] || {}).kind === "formatura2" && s["instituicoes/i2"].formatura.data === dia(-3),
+    "a Formatura 2 segura o próprio dia na agenda e a primeira continua"
+  );
+  ok(
+    s["instituicoes/i2"].diaFotos.status === "confirmado" && s["instituicoes/i2"].mediaAlunos === 60,
+    "o dia de fotos já aprovado e a média do colégio não mudam"
+  );
+  ok(!erros.length, "sem erros" + (erros.length ? ": " + erros.join(" | ") : ""));
 });
 await browser.close();
 srv.close();
