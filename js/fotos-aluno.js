@@ -82,6 +82,7 @@ export function esquecerListas() {
   if (driveEscrita) driveEscrita.esquecer();
 }
 const NOMES = ["Quadro", "Porta-retratos 1", "Porta-retratos 2"];
+const NOMES_PAS = ["Direita", "Esquerda", "Pequenas", "Tirinha", "Calendário"];
 // admin: aluno sem foto no Drive ganha o botão de enviar (gera a prévia e grava na pasta do colégio)
 function botaoEnviar(C, it, p, close, precoTxt) {
   if (!C.isAdmin) return;
@@ -126,6 +127,10 @@ export function abrirFotosDoAluno(C, it, precoTxt) {
       return;
     }
     info.textContent = `${r.fotos.length} foto${r.fotos.length === 1 ? "" : "s"} · ${r.colegio.replace(/^Pr[ée]vias\s*-\s*/i, "")}`;
+    // Kit Paspatur (aluno vendido como Paspatur): 4 lugares em vez de quadro e 2 porta-retratos
+    const pas = it.vendaComo === "paspatur";
+    const nomes = pas ? NOMES_PAS : NOMES,
+      maxEsc = nomes.length;
     // 1) a folha numerada: para a família escolher
     const folhas = [];
     if (r.folhas.length) {
@@ -133,7 +138,9 @@ export function abrirFotosDoAluno(C, it, precoTxt) {
         try {
           bFolha.disabled = true;
           if (!folhas.length) for (const f of r.folhas) folhas.push(new File([await D.baixar(f.id)], f.name, { type: "image/jpeg" }));
-          const texto = `Olá! Aqui estão as fotos de ${U.first(title(it.nome))} 📸 Escolha 1 foto para o quadro e 2 para os porta-retratos e me responda com os números 😊`;
+          const texto = pas
+            ? `Olá! Aqui estão as fotos de ${U.first(title(it.nome))} 📸 Escolha as fotos do Kit Paspatur (a grande da direita, a grande da esquerda, as 3 pequenas, a tirinha e a do calendário) e me responda com os números 😊`
+            : `Olá! Aqui estão as fotos de ${U.first(title(it.nome))} 📸 Escolha 1 foto para o quadro e 2 para os porta-retratos e me responda com os números 😊`;
           if (navigator.canShare && navigator.canShare({ files: folhas })) await navigator.share({ files: folhas, text: texto });
           else
             folhas.forEach(f => {
@@ -153,27 +160,41 @@ export function abrirFotosDoAluno(C, it, precoTxt) {
     }
     // 2) as fotos separadas: toque na ordem quadro → porta-retratos
     if (!r.fotos.length) return p.append(U.mkBtn("Fechar", "", close));
-    p.append(el("p", "hint", "Toque nas fotos que a família escolheu, na ordem: primeiro a do quadro, depois as 2 dos porta-retratos."));
+    p.append(
+      el(
+        "p",
+        "hint",
+        pas
+          ? "Toque nas fotos que a família escolheu, na ordem: página da direita, foto grande da esquerda, as 3 pequenas, a tirinha e a do calendário (no particular, a foto da turma)."
+          : "Toque nas fotos que a família escolheu, na ordem: primeiro a do quadro, depois as 2 dos porta-retratos."
+      )
+    );
     const grade = el("div", "fotos-grade");
     p.append(grade);
     const escolha = []; // índices
     const blobs = [];
-    const montar = U.mkBtn("🖼️ Montar o quadro com estas fotos", "btn-primary", () => {
-      close();
-      openMockup({
-        nome: title(it.nome || ""),
-        escola: title(it.escola || ""),
-        preco: precoTxt,
-        toast: U.toast,
-        fotos: escolha.map(i => blobs[i])
-      });
-    });
+    const montar = U.mkBtn(
+      pas ? "🖼️ Montar o Kit Paspatur com estas fotos" : "🖼️ Montar o quadro com estas fotos",
+      "btn-primary",
+      async () => {
+        close();
+        openMockup({
+          nome: title(it.nome || ""),
+          escola: title(it.escola || ""),
+          preco: precoTxt,
+          toast: U.toast,
+          fotos: escolha.map(i => blobs[i]),
+          kit: pas ? "paspatur" : "pr",
+          encarte: pas ? await (await import("./encarte.js")).encarteDoColegio(it.escola) : undefined
+        });
+      }
+    );
     montar.disabled = true;
     const pintar = () => {
       [...grade.children].forEach((b, i) => {
         const k = escolha.indexOf(i);
         b.classList.toggle("on", k >= 0);
-        b.querySelector(".tag").textContent = k >= 0 ? NOMES[k] : "";
+        b.querySelector(".tag").textContent = k >= 0 ? nomes[k] : "";
       });
       montar.disabled = !escolha.length;
     };
@@ -185,8 +206,13 @@ export function abrirFotosDoAluno(C, it, precoTxt) {
       b.onclick = () => {
         const k = escolha.indexOf(i);
         if (k >= 0) escolha.splice(k, 1);
-        else if (escolha.length < 3) escolha.push(i);
-        else U.toast("Já escolheu as 3 (quadro e 2 porta-retratos). Toque numa para tirar.");
+        else if (escolha.length < maxEsc) escolha.push(i);
+        else
+          U.toast(
+            pas
+              ? "Já escolheu as 5 do Kit Paspatur. Toque numa para tirar."
+              : "Já escolheu as 3 (quadro e 2 porta-retratos). Toque numa para tirar."
+          );
         pintar();
       };
       grade.append(b);

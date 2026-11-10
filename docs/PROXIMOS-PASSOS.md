@@ -76,3 +76,28 @@ botão "Mudar ano" nas importações de Formatura/Paspatur, aba Vendidos (admin)
 - Dashboard (08/11): pagamento do contrato que chega ao estúdio entra como venda "Contrato do colégio" (origem Becas)
   no mês em que entrou; a comissão de quem fechou (item por item) entra no Desempenho da pessoa depois de conferida.
 - **Falta:** colar as regras novas (`firestore.rules`) no Firebase.
+
+## 09/11 — feito
+- IDs dos colégios: a sigla não perde mais o E de C.E./E.M. (CENBJ, EMAN, CEYMSA…); E.E. = CE, C.M = EM, GET não
+  entra; Zenóbio = CEMZC e Diuma (2023 e 2025, mesmo colégio) = CEPDMS (gravadas no cadastro). 4.275 alunos do PR
+  acertados pelo script do GitHub "Acertar IDs dos colégios" (cópia em copiaIds); nomes dos colégios = os do cadastro.
+- Importação: o nome do colégio da planilha vira o do cadastro de Instituições e a sigla vem do cadastro
+  (js/colegio-nome.js); o aluno continua sendo reconhecido pelo nome que veio da planilha (escolaOrig).
+- Kit Paspatur: prévia em livro A4 (imagem + vídeo do livro abrindo), encarte calendário (público) ou foto da turma
+  em mosaico (particular) — o app sempre pergunta, com a sugestão pelo tipo do colégio.
+- Agenda: WhatsApp/e-mail de quem combinou não são mais obrigatórios; telefone com 0 na frente (021…) é aceito.
+- PR e Formatura: botão "📤 Passar o colégio para a equipe" (colégio e ano do "Seu lote de hoje").
+
+## Falta (pedidos de 08 e 09/11 — fazer numa conversa nova, "continuar o Z7")
+1. Drive: trocar também os nomes das pastas/arquivos para o ID e o nome certo do colégio (a Luciana abre o Drive).
+2. Agenda: várias formaturas para o mesmo colégio (dias, locais e turmas diferentes; o botão fica aberto) e a
+   quantidade de alunos de cada formatura só é confirmada depois que a formatura acontece.
+3. Agendar colégio: perguntar primeiro se é particular ou público e mostrar a lista separada.
+4. Instituições: lista no mesmo formato do PR e Formatura (linha compacta); dentro de cada colégio, atalhos para
+   os alunos dele e os agendamentos.
+5. Aluguel de becas: lista no mesmo formato do PR e Formatura (depois organizar o que falta). Mostrar onde fica o
+   contrato do aluguel de becas e as informações do colégio.
+6. Venda antecipada (Formaturas): mostrar os alunos e colégios fechados.
+7. Fotos do aluno: botão para excluir foto (ex.: a da ficha) — sai do Drive e não vai para o aluno; equipe pode.
+8. Preços mínimos: organizar os vários valores (conversar com Adriano/Luciana antes).
+9. "Erros do app (5)" em Ajustes: ver o que são e corrigir (pedir o print aberto).

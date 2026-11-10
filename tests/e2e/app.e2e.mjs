@@ -1537,11 +1537,9 @@ await cenario("Pedro (vendedor: Linha de Frente, Agendamento, Instituições)", 
     await calmo(pg);
     ok(/média de alunos/i.test(await sa.locator(".err").last().textContent()), "sem a média de alunos não agenda");
     await sa.getByLabel("Média de alunos (obrigatório)").fill("120");
-    await sa.locator("button[type=submit]").click();
-    await calmo(pg);
-    ok(/WhatsApp/.test(await sa.locator(".err").last().textContent()), "sem o WhatsApp do responsável não agenda");
+    // WhatsApp e e-mail não são obrigatórios (09/11/2026); o 0 na frente do DDD é aceito
     await sa.getByLabel("Nome", { exact: true }).fill("Marta Diretora");
-    await sa.getByLabel("WhatsApp", { exact: true }).fill("21 98888-1111");
+    await sa.getByLabel("WhatsApp", { exact: true }).fill("021 98888-1111");
     await sa.getByLabel("E-mail", { exact: true }).fill("marta@beta.com");
     await sa.locator("button[type=submit]").click();
     await calmo(pg);

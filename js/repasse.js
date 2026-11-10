@@ -156,7 +156,12 @@ function mount() {
   head.append(el("h2", null, "PR"));
   const hb = el("div", "quick");
   hb.append(U.mkBtn("+ Aluno", "btn-primary", () => openDados(null)));
-  hb.append(U.mkBtn("🖼️ Prévia e fotos", "", () => openMockup({ preco: precoTxt(), toast: U.toast })));
+  // "Só Paspatur" aberto: a prévia já sai como o livro do Kit Paspatur
+  hb.append(
+    U.mkBtn("🖼️ Prévia e fotos", "", () =>
+      openMockup({ preco: precoTxt(), toast: U.toast, kit: !ehFormatura() && filtroVenda === "paspatur" ? "paspatur" : "pr" })
+    )
+  );
   // admin, no computador: prévias leves com marca d'água de um colégio inteiro (para o representante)
   if (C.isAdmin)
     hb.append(
@@ -217,6 +222,7 @@ function mount() {
     <button class="btn btn-primary btn-sm" id="rLoteBtn" type="button">Separar contatos</button></div>
     <input id="rLoteBusca" type="search" placeholder="🔎 Procurar colégio (ex.: yonne)" aria-label="Procurar colégio na lista">
     <div class="quick" id="rFerColegio" hidden>
+      <button class="btn btn-sm" id="rPassarCol" type="button">📤 Passar o colégio para a equipe</button>
       <button class="btn btn-sm" id="rJuntar" type="button">🔀 Juntar com outro colégio</button>
       <button class="btn btn-sm" id="rVerAlunos" type="button">👥 Ver / excluir alunos</button>
       <button class="btn btn-sm btn-danger" id="rExcluirCol" type="button">🗑️ Excluir colégio inteiro</button>
@@ -275,6 +281,14 @@ function mount() {
     if (de)
       import("./juntar-colegio.js")
         .then(m => m.excluirColegio(C, { de, colNome: colNome(), aoTerminar: depoisDaLista }))
+        .catch(e => C.handleErr(e));
+  };
+  // passar o colégio e ano inteiro para alguém da equipe (PR e Formatura)
+  $("rPassarCol").onclick = () => {
+    const de = grupoDoLote();
+    if (de)
+      import("./passar-pr.js")
+        .then(m => m.passarGrupo(C, { de, colNome: colNome(), formatura: ehFormatura(), aoTerminar: depoisDaLista }))
         .catch(e => C.handleErr(e));
   };
   // ver os alunos desse colégio (na Busca) para excluir um por um no 🗑️ do cartão

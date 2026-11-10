@@ -236,7 +236,8 @@ export function ligarCamposReais() {
 export function parseTel(v) {
   const d = String(v || "")
     .replace(/\D/g, "")
-    .replace(/^55(?=\d{10,11}$)/, "");
+    .replace(/^55(?=\d{10,11}$)/, "")
+    .replace(/^0(?=\d{10,11}$)/, ""); // "021 99944-1635": o 0 da ligação interurbana não conta
   return d.length >= 10 && d.length <= 11 ? d : "";
 }
 

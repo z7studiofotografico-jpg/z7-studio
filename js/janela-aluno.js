@@ -123,11 +123,24 @@ function previa(box, it) {
     g.append(b);
   };
   const max = ehFormatura() ? 70 : 15;
-  bloco("🖼️", "Prévia do kit", "quadro na parede e porta-retratos, com a marca d'água", () =>
-    openMockup({ nome: title(it.nome), escola: title(it.escola), preco: precoTxt(it), toast: U.toast, maxFotos: max })
+  const kit = vendaDe(it) === "paspatur" ? "paspatur" : "pr";
+  bloco(
+    "🖼️",
+    "Prévia do kit",
+    kit === "paspatur" ? "o livro do Kit Paspatur aberto, com a marca d'água" : "quadro na parede e porta-retratos, com a marca d'água",
+    async () =>
+      openMockup({
+        nome: title(it.nome),
+        escola: title(it.escola),
+        preco: precoTxt(it),
+        toast: U.toast,
+        maxFotos: max,
+        kit,
+        encarte: kit === "paspatur" ? await (await import("./encarte.js")).encarteDoColegio(it.escola) : undefined
+      })
   );
   bloco("📷", "Fotos para escolher", "folha com as fotos numeradas para a família escolher", () =>
-    openMockup({ nome: title(it.nome), escola: title(it.escola), preco: precoTxt(it), modo: "escolha", maxFotos: max })
+    openMockup({ nome: title(it.nome), escola: title(it.escola), preco: precoTxt(it), modo: "escolha", maxFotos: max, kit })
   );
   box.append(g);
   // as fotos do aluno no Drive, em miniatura (tocar amplia), com "🔄 Trocar as fotos"

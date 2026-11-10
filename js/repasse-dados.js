@@ -85,7 +85,10 @@ export const hkey = h =>
 export function parseTel(v, tipo) {
   if (v == null || v === "") return null;
   const raw = String(v);
-  let d = raw.replace(/\D/g, "").replace(/^55(?=\d{10,11}$)/, "");
+  let d = raw
+    .replace(/\D/g, "")
+    .replace(/^55(?=\d{10,11}$)/, "")
+    .replace(/^0(?=\d{10,11}$)/, "");
   if (d.length < 10 || d.length > 11) return null;
   const nm = (raw.match(/\(([^)]+)\)/) || [])[1] || raw.replace(/[\d()+\-./]/g, "").trim();
   return { tipo, nome: nm && /\p{L}/u.test(nm) ? nm.trim() : "", tel: d };

@@ -7,9 +7,9 @@ import { gruposEscolas } from "./escolas-pr.js";
 
 const ANO = () => new Date().getFullYear();
 // quem trabalha o PR (Linha de Frente ou Repasse), ativo
-export function pessoasPR(C) {
+export function pessoasPR(C, mods = ["rep", "lf"]) {
   return Object.entries(C.usuarios || {})
-    .filter(([, u]) => u && u.ativo !== false && u.papel !== "admin" && (u.modulos || []).some(m => m === "rep" || m === "lf"))
+    .filter(([, u]) => u && u.ativo !== false && u.papel !== "admin" && (u.modulos || []).some(m => mods.includes(m)))
     .map(([email, u]) => ({ email, nome: u.nome || email }))
     .sort((a, b) => a.nome.localeCompare(b.nome, "pt-BR"));
 }
@@ -22,10 +22,10 @@ const separarPara = (p, ano) => ({
   followup: U.todayStr(),
   atualizadoEm: new Date().toISOString()
 });
-function escolherPessoa(C, p) {
-  const ps = pessoasPR(C);
+function escolherPessoa(C, p, mods) {
+  const ps = pessoasPR(C, mods);
   if (!ps.length) {
-    p.append(el("p", "wait", "Ninguém da equipe tem o PR (Linha de Frente ou Repasse). Libere em Equipe primeiro."));
+    p.append(el("p", "wait", "Ninguém da equipe tem este módulo. Libere em Equipe primeiro."));
     return null;
   }
   const s = sel(
@@ -130,6 +130,64 @@ export function passarAluno(C, it, salvar) {
         : { resp: quem.nome, respEmail: quem.email, atualizadoEm: new Date().toISOString() };
       salvar(patch, "Passado para " + U.first(quem.nome));
       close();
+    });
+  });
+}
+
+// Tela do PR (e da Formatura): passa o colégio e ano escolhido no "Seu lote de hoje" inteiro para alguém da equipe
+// (09/11/2026). Na fila: já separado para a pessoa. Em andamento (interessado, prévia, sem resposta…): troca o
+// responsável. Pago, entregue, caído, não quer, incompleto e histórico ficam como estão (a venda e a comissão de quem vendeu não mudam).
+export function passarGrupo(C, { de, colNome, formatura, aoTerminar }) {
+  sheet("📤 Passar o colégio para a equipe", async (p, close) => {
+    p.append(el("p", "hint", de.rotulo));
+    const pessoa = escolherPessoa(C, p, formatura ? ["formaturas"] : ["rep", "lf"]);
+    const info = el("p", "hint", "Contando os alunos…");
+    p.append(info, botoes(close, "Passar"));
+    const ok = p.querySelector("button[type=submit]");
+    ok.disabled = true;
+    const { FS, db } = C;
+    const col = FS.collection(db, colNome);
+    const docs = [];
+    try {
+      for (let i = 0; i < de.nomes.length; i += 30) {
+        const q = await FS.getDocs(FS.query(col, FS.where("escola", "in", de.nomes.slice(i, i + 30)), FS.where("ano", "==", de.ano)));
+        q.forEach(d => docs.push(d));
+      }
+    } catch (e) {
+      info.textContent = "Não foi possível ler os alunos agora.";
+      return C.handleErr(e);
+    }
+    const fila = docs.filter(d => !d.data().historico && d.data().etapa === "NA FILA");
+    const andando = docs.filter(d => !d.data().historico && ["SEPARADO", "CONTATADO", "INTERESSADO"].includes(d.data().etapa));
+    const fora = docs.length - fila.length - andando.length;
+    info.textContent =
+      `${fila.length} na fila (vão para "Para hoje" da pessoa) e ${andando.length} em andamento (troca o responsável).` +
+      (fora ? ` ${fora} pagos, entregues, caídos ou incompletos ficam como estão.` : "");
+    ok.disabled = !(fila.length + andando.length) || !pessoa;
+    p.addEventListener("submit", async ev => {
+      ev.preventDefault();
+      const quem = pessoa && pessoa();
+      if (!quem) return;
+      ok.disabled = true;
+      try {
+        const agora = new Date().toISOString();
+        const tudo = [
+          ...fila.map(d => [d, separarPara(quem, de.ano)]),
+          ...andando.map(d => [d, { resp: quem.nome, respEmail: quem.email, atualizadoEm: agora }])
+        ];
+        if (formatura) tudo.forEach(([, patch]) => delete patch.separadoSeg); // a Formatura não usa o ano para a frente
+        for (let i = 0; i < tudo.length; i += 400) {
+          const b = FS.writeBatch(db);
+          tudo.slice(i, i + 400).forEach(([d, patch]) => b.update(d.ref, patch));
+          await b.commit();
+        }
+        U.toast(`${tudo.length} aluno${tudo.length > 1 ? "s" : ""} de ${de.rotulo} passados para ${U.first(quem.nome)} ✅`);
+        close();
+        if (aoTerminar) aoTerminar();
+      } catch (e) {
+        ok.disabled = false;
+        C.handleErr(e);
+      }
     });
   });
 }

@@ -460,7 +460,7 @@ export function openEvento(it, kind, dia) {
     resp.append(
       field("Combinado com", escolha),
       novoC,
-      el("p", "hint", "Preencha o WhatsApp ou o e-mail (de preferência o WhatsApp). A mensagem sai do WhatsApp de quem agendou."),
+      el("p", "hint", "WhatsApp ou e-mail de quem combinou (não é obrigatório). A mensagem sai do WhatsApp de quem agendou."),
       field(it.alunosConfirmados ? "Alunos (quantidade confirmada)" : "Média de alunos (obrigatório)", alunos),
       el("p", "hint", "Começamos com a média. Depois das fotos, a quantidade certa é confirmada na lista de alunos.")
     );
@@ -531,12 +531,8 @@ export function openEvento(it, kind, dia) {
         errR.hidden = false;
         return;
       }
-      if (!parseTel(ct.tel) && !emailOk) {
-        errR.textContent = "Coloque o WhatsApp (de preferência) ou o e-mail de quem combinou a data.";
-        errR.hidden = false;
-        (escolha.value === "novo" ? nTel : escolha).focus();
-        return;
-      }
+      // WhatsApp e e-mail não são obrigatórios (09/11/2026): o colégio já tem o contato no cadastro.
+      // Sem nenhum dos dois, a data é gravada do mesmo jeito; só não sai a mensagem de confirmação.
       const contato = { nome: ct.nome || "", cargo: ct.cargo || "", tel: parseTel(ct.tel), email: ct.email || "" };
       f.contato = contato;
       f.alunos = nAl;

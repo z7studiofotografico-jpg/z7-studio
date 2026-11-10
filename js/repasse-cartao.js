@@ -194,13 +194,15 @@ export function desenharProximo(box, it, escolhido, blocked, li) {
   if (C.P.drivePrevias) row.append(U.mkBtn("🖼️ Fotos do aluno", "", () => abrirFotosDoAluno(C, it, precoTxt(it))));
   // a prévia fica sempre à mão (desde o 1º contato), não só depois do "Quer ver a prévia"
   row.append(
-    U.mkBtn("🖼️ Prévia", "", () =>
+    U.mkBtn("🖼️ Prévia", "", async () =>
       openMockup({
+        encarte: vendaDe(it) === "paspatur" ? await (await import("./encarte.js")).encarteDoColegio(it.escola) : undefined,
         nome: title(it.nome),
         escola: title(it.escola),
         preco: precoTxt(it),
         toast: U.toast,
-        maxFotos: ehFormatura() ? 70 : 15
+        maxFotos: ehFormatura() ? 70 : 15,
+        kit: vendaDe(it) === "paspatur" ? "paspatur" : "pr"
       })
     )
   );
@@ -212,13 +214,14 @@ export function desenharProximo(box, it, escolhido, blocked, li) {
           escola: title(it.escola),
           preco: precoTxt(it),
           modo: "escolha",
-          maxFotos: ehFormatura() ? 70 : 15
+          maxFotos: ehFormatura() ? 70 : 15,
+          kit: vendaDe(it) === "paspatur" ? "paspatur" : "pr"
         })
       )
     );
   if (it.etapa === "INTERESSADO" && d) {
     const a3 = el("a", "btn btn-sm", "✍️ Pedir a escolha");
-    a3.href = "https://wa.me/" + d + "?text=" + encodeURIComponent(textoEscolha(F0));
+    a3.href = "https://wa.me/" + d + "?text=" + encodeURIComponent(textoEscolha(F0, vendaDe(it)));
     a3.target = "_blank";
     a3.rel = "noopener";
     row.append(a3);

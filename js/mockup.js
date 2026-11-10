@@ -281,7 +281,7 @@ async function desenharKit(cv, st) {
   rodape(ctx, "rgba(255,255,255,.6)");
 }
 
-async function desenharEscolha(cv, st) {
+async function desenharEscolha(cv, st, kit = "pr") {
   await prep();
   const ctx = cv.getContext("2d");
   const n = Math.max(1, st.fotos.length),
@@ -301,7 +301,13 @@ async function desenharEscolha(cv, st) {
   ctx.fillText(((st.nome || "").trim().split(/\s+/).slice(0, 2).join(" ") || "Ensaio de formatura").toUpperCase(), 60, 138);
   ctx.fillStyle = "#a39fa6";
   ctx.font = "400 24px 'Source Sans 3', sans-serif";
-  ctx.fillText("Responda com o número: qual vai no quadro e quais vão nos 2 porta-retratos.", 60, 178);
+  ctx.fillText(
+    kit === "paspatur"
+      ? "Responda com o número: qual vai em cada lugar do Kit Paspatur."
+      : "Responda com o número: qual vai no quadro e quais vão nos 2 porta-retratos.",
+    60,
+    178
+  );
   if (logoImg) {
     ctx.save();
     ctx.beginPath();
@@ -350,13 +356,37 @@ async function desenharEscolha(cv, st) {
   rodape(ctx, "#a39fa6");
 }
 
-export const textoEscolha = F =>
-  `Aqui estão as fotos do ensaio${F ? " de " + F : ""}! 📸 Escolhe qual vai no quadro e quais vão nos 2 porta-retratos. É só responder com os números, por exemplo: Quadro 2, porta-retratos 1 e 4 😊`;
+export const textoEscolha = (F, kit) =>
+  kit === "paspatur"
+    ? `Aqui estão as fotos do ensaio${F ? " de " + F : ""}! 📸 Escolhe as fotos do Kit Paspatur: a grande da direita, a grande da esquerda, as 3 pequenas, a tirinha e a do calendário. É só responder com os números, por exemplo: Direita 2, esquerda 1, pequenas 4, tirinha 3, calendário 5 😊`
+    : `Aqui estão as fotos do ensaio${F ? " de " + F : ""}! 📸 Escolhe qual vai no quadro e quais vão nos 2 porta-retratos. É só responder com os números, por exemplo: Quadro 2, porta-retratos 1 e 4 😊`;
 
 // fotos: já entram na prévia (as escolhidas pela família, vindas do Drive), na ordem quadro, porta-retratos
 // maxFotos: PR até 15 fotos por aluno (Formatura usa o envio próprio, com até ~70)
-export function openMockup({ nome = "", escola = "", preco = "", modo = "kit", toast = null, fotos = [], maxFotos = 15 } = {}) {
-  const st = { fotos: [], slots: [0, 1, 2], nome, escola: escola || "", preco: /\[/.test(preco) ? "" : preco, modo };
+// kit: "pr" (quadro e porta-retratos) ou "paspatur" (o livro A4 aberto, em mockup-paspatur.js)
+// encarte (só Paspatur): "calendario" (colégio público) ou "turma" (colégio particular: a foto da turma)
+export function openMockup({
+  nome = "",
+  escola = "",
+  preco = "",
+  modo = "kit",
+  toast = null,
+  fotos = [],
+  maxFotos = 15,
+  kit = "pr",
+  encarte = "calendario"
+} = {}) {
+  const pas = kit === "paspatur";
+  const st = {
+    fotos: [],
+    slots: pas ? [0, 1, 2, 3, 4] : [0, 1, 2],
+    nome,
+    escola: escola || "",
+    preco: /\[/.test(preco) ? "" : preco,
+    modo,
+    encarte: encarte === "turma" ? "turma" : "calendario"
+  };
+  let pasMod = null; // o desenho do Paspatur (carregado só quando precisa)
   const sh = el("div", "sheet");
   const p = el("div", "panel mock");
   sh.append(p);
@@ -397,9 +427,11 @@ export function openMockup({ nome = "", escola = "", preco = "", modo = "kit", t
   const thumbs = el("div", "thumbs");
   p.append(thumbs);
 
-  const slotsBox = el("div", "row3");
+  const slotsBox = el("div", pas ? "row2" : "row3");
   p.append(slotsBox);
-  const slotSel = ["Quadro 30x40", "Porta-retrato 1", "Porta-retrato 2"].map((lbl, i) => {
+  const LUG_PAS = ["Página da direita", "Foto grande da esquerda", "3 fotos pequenas", "Tira de 7 fotos", "Foto do calendário"];
+  const rotulos = [];
+  const slotSel = (pas ? LUG_PAS : ["Quadro 30x40", "Porta-retrato 1", "Porta-retrato 2"]).map((lbl, i) => {
     const s = el("select");
     s.id = "mkSlot" + i;
     s.onchange = () => {
@@ -410,6 +442,7 @@ export function openMockup({ nome = "", escola = "", preco = "", modo = "kit", t
     const f = el("div", "field");
     const l = el("label", null, lbl);
     l.htmlFor = s.id;
+    rotulos.push(l);
     f.append(l, s);
     slotsBox.append(f);
     return s;
@@ -427,6 +460,51 @@ export function openMockup({ nome = "", escola = "", preco = "", modo = "kit", t
   const fPreco = fieldOf("Preço no Pix", iPreco);
   f1.append(fieldOf("Nome", iNome), fPreco);
   p.append(f1);
+  // Kit Paspatur: o ano do calendário (a partir de agosto, o do ano que vem)
+  const iAno = el("input");
+  iAno.id = "mkAnoCal";
+  iAno.type = "number";
+  iAno.min = "2024";
+  iAno.max = "2100";
+  iAno.value = String(new Date().getFullYear() + (new Date().getMonth() >= 7 ? 1 : 0));
+  st.anoCal = Number(iAno.value);
+  const fAno = fieldOf("Ano do calendário", iAno);
+  iAno.oninput = () => {
+    st.anoCal = Number(iAno.value) || st.anoCal;
+    redraw();
+  };
+  // Kit Paspatur: o encarte. Colégio público: calendário; particular: foto da turma (adicione a montagem da turma
+  // junto com as fotos do aluno e escolha em "Foto da turma")
+  const encBox = el("div", "chips");
+  encBox.setAttribute("role", "group");
+  encBox.setAttribute("aria-label", "Encarte do Kit Paspatur");
+  const encBtns = [
+    ["calendario", "📅 Calendário"],
+    ["turma", "👥 Foto da turma"]
+  ].map(([k, t]) => {
+    const b = el("button", "chip", t);
+    b.type = "button";
+    b.onclick = () => {
+      if (st.encarte === k) return;
+      st.encarte = k;
+      // a foto da turma é a mais deitada; o calendário usa uma foto do aluno
+      if (!st.escolheu && st.fotos.length && pasMod) st.slots = pasMod.sugerirPaspatur(st.fotos, k);
+      paintEncarte();
+      paintSlots();
+      redraw();
+    };
+    encBox.append(b);
+    return [k, b];
+  });
+  const fEnc = el("div", "field");
+  fEnc.append(el("label", null, "Encarte do kit"), encBox);
+  function paintEncarte() {
+    encBtns.forEach(([k, b]) => b.setAttribute("aria-pressed", String(st.encarte === k)));
+    if (rotulos[4]) rotulos[4].textContent = st.encarte === "turma" ? "Foto da turma" : "Foto do calendário";
+    fAno.hidden = !pas || st.modo !== "kit" || st.encarte === "turma";
+    fEnc.hidden = !pas || st.modo !== "kit";
+  }
+  p.append(fEnc, fAno);
   const dica = el("p", "hint");
   p.append(dica);
 
@@ -446,16 +524,37 @@ export function openMockup({ nome = "", escola = "", preco = "", modo = "kit", t
   bClose.onclick = close;
   const sp = el("span");
   sp.style.flex = "1";
-  acts.append(bClose, sp, bCopy, bDown, bShare);
+  // Kit Paspatur: o livro abrindo (vídeo de ~11 s)
+  const bVer = el("button", "btn", "▶️ Ver abrindo");
+  bVer.type = "button";
+  const bVideo = el("button", "btn", "🎬 Enviar vídeo");
+  bVideo.type = "button";
+  acts.append(bClose, sp, bCopy, bVer, bVideo, bDown, bShare);
   p.append(acts);
 
   let t;
   const redraw = () => {
+    if (pararVideo) {
+      pararVideo();
+      pararVideo = null;
+    }
     clearTimeout(t);
-    t = setTimeout(() => (st.modo === "kit" ? desenharKit : desenharEscolha)(cv, st), 60);
+    t = setTimeout(async () => {
+      if (st.modo !== "kit") return desenharEscolha(cv, st, kit);
+      if (!pas) return desenharKit(cv, st);
+      try {
+        pasMod = pasMod || (await import("./mockup-paspatur.js"));
+        await pasMod.desenharPaspatur(cv, st);
+      } catch (e) {
+        avisoErro(e, "montar a prévia do Paspatur", toast);
+      }
+    }, 60);
   };
+  let pararVideo = null;
   function setModo(m) {
     st.modo = m;
+    bVer.hidden = bVideo.hidden = !pas || m !== "kit";
+    paintEncarte();
     bKit.setAttribute("aria-pressed", String(m === "kit"));
     bEsc.setAttribute("aria-pressed", String(m !== "kit"));
     slotsBox.hidden = m !== "kit";
@@ -523,8 +622,13 @@ export function openMockup({ nome = "", escola = "", preco = "", modo = "kit", t
       prog.append(`${falhas.length} foto${falhas.length > 1 ? "s" : ""} não abriu (use JPG ou PNG). `, de);
       avisoErro(new Error("foto"), `abrir ${falhas.length} foto${falhas.length > 1 ? "s" : ""} (use JPG ou PNG)`, toast);
     }
-    // sugestão de qual foto vai no quadro e nos porta-retratos (até a pessoa escolher outra)
-    if (!st.escolheu && st.fotos.length) st.slots = sugerirSlots(st.fotos);
+    // sugestão de qual foto vai em cada lugar (até a pessoa escolher outra)
+    if (!st.escolheu && st.fotos.length) {
+      if (pas) {
+        pasMod = pasMod || (await import("./mockup-paspatur.js"));
+        st.slots = pasMod.sugerirPaspatur(st.fotos, st.encarte);
+      } else st.slots = sugerirSlots(st.fotos);
+    }
     paintThumbs();
     paintSlots();
     redraw();
@@ -577,7 +681,7 @@ export function openMockup({ nome = "", escola = "", preco = "", modo = "kit", t
   document.addEventListener("paste", onPaste);
 
   const fileName = () =>
-    (st.modo === "kit" ? "kit-" : "fotos-") +
+    (st.modo === "kit" ? (pas ? "paspatur-" : "kit-") : "fotos-") +
     ((st.nome || "previa")
       .normalize("NFD")
       .replace(/[̀-ͯ]/g, "")
@@ -586,7 +690,7 @@ export function openMockup({ nome = "", escola = "", preco = "", modo = "kit", t
       .replace(/^-|-$/g, "") || "previa") +
     ".jpg";
   const blob = () => new Promise(res => cv.toBlob(res, "image/jpeg", 0.85));
-  const msgEscolha = () => textoEscolha((st.nome || "").trim().split(/\s+/)[0]);
+  const msgEscolha = () => textoEscolha((st.nome || "").trim().split(/\s+/)[0], kit);
   bCopy.onclick = async () => {
     try {
       await navigator.clipboard.writeText(msgEscolha());
@@ -627,10 +731,90 @@ export function openMockup({ nome = "", escola = "", preco = "", modo = "kit", t
     bDown.onclick();
     alertMsg(p, "Imagem baixada. No WhatsApp Web, clique no clipe 📎 e escolha a imagem (ou arraste o arquivo para a conversa).");
   };
+  bVer.onclick = async () => {
+    try {
+      pasMod = pasMod || (await import("./mockup-paspatur.js"));
+      if (pararVideo) pararVideo();
+      pararVideo = await pasMod.tocar(cv, st, () => {
+        pararVideo = null;
+        redraw();
+      });
+    } catch (e) {
+      avisoErro(e, "mostrar o livro abrindo", toast);
+    }
+  };
+  bVideo.onclick = async () => {
+    if (!st.fotos.length) {
+      drop.classList.add("on");
+      setTimeout(() => drop.classList.remove("on"), 900);
+      return;
+    }
+    try {
+      pasMod = pasMod || (await import("./mockup-paspatur.js"));
+      if (!pasMod.tipoVideo()) return alertMsg(p, "Este aparelho não grava vídeo. Mande a imagem (Enviar pelo WhatsApp).");
+      if (pararVideo) pararVideo();
+      bVideo.disabled = true;
+      bVideo.textContent = "🎬 Gravando… (11 s)";
+      const r = await pasMod.gravarVideo(cv, st);
+      redraw();
+      if (!r || !r.blob.size) return alertMsg(p, "Não deu para gravar o vídeo. Mande a imagem (Enviar pelo WhatsApp).");
+      const ext = r.tipo === "video/mp4" ? ".mp4" : ".webm";
+      const file = new File([r.blob], fileName().replace(/\.jpg$/, ext), { type: r.tipo });
+      // o WhatsApp aceita MP4; WebM (alguns Android antigos) é baixado para mandar como arquivo
+      if (ext === ".mp4" && navigator.canShare && navigator.canShare({ files: [file] })) {
+        try {
+          await navigator.share({ files: [file] });
+          return;
+        } catch (e) {
+          if (e && e.name === "AbortError") return;
+        }
+      }
+      const u = URL.createObjectURL(file);
+      const a = document.createElement("a");
+      a.href = u;
+      a.download = file.name;
+      document.body.append(a);
+      a.click();
+      a.remove();
+      setTimeout(() => URL.revokeObjectURL(u), 8000);
+      alertMsg(p, "Vídeo baixado. No WhatsApp, clique no clipe 📎 e escolha o vídeo.");
+    } catch (e) {
+      avisoErro(e, "gravar o vídeo do Paspatur", toast);
+    } finally {
+      bVideo.disabled = false;
+      bVideo.textContent = "🎬 Enviar vídeo";
+    }
+  };
   if (!navigator.canShare) bShare.textContent = "Baixar para o WhatsApp";
   paintSlots();
   setModo(modo);
+  // fotos já escolhidas pela família, na ordem dos lugares: ficam onde vieram (sem a sugestão automática)
+  if (fotos.length) st.escolheu = true;
   if (fotos.length) addFiles(fotos.map(b => (b instanceof File ? b : new File([b], "foto.jpg", { type: b.type || "image/jpeg" }))));
+  // Kit Paspatur: sempre pergunta o encarte antes (a regra costuma ser público = calendário e particular = turma,
+  // e a sugestão do colégio vem marcada, mas quem decide é quem está vendendo — pedido da Luciana, 09/11/2026)
+  if (pas && modo === "kit")
+    import("./confirmar.js")
+      .then(m =>
+        m.escolher("Kit Paspatur: qual encarte?", "Colégio público costuma levar o calendário; particular, a foto da turma em mosaico.", [
+          {
+            v: "calendario",
+            txt: "📅 Com calendário" + (st.encarte === "calendario" ? " (sugerido)" : ""),
+            cls: st.encarte === "calendario" ? "btn-primary" : ""
+          },
+          {
+            v: "turma",
+            txt: "👥 Com a foto da turma (mosaico)" + (st.encarte === "turma" ? " (sugerido)" : ""),
+            cls: st.encarte === "turma" ? "btn-primary" : ""
+          }
+        ])
+      )
+      .then(v => {
+        if (!v || v === st.encarte) return;
+        const b = encBtns.find(([k]) => k === v);
+        if (b) b[1].click();
+      })
+      .catch(e => console.warn("[Z7] encarte", e));
 }
 
 function fieldOf(lbl, inp) {
