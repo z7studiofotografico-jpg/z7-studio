@@ -1785,6 +1785,21 @@ await cenario("Erro no app (não é falta de internet)", async () => {
   await pg.click("#btnPrices");
   await calmo(pg);
   ok(/Erros do app \(1\)/.test(await pg.textContent("#pErros")), "Ajustes mostra os erros registrados");
+  await pg.click("#pErros summary");
+  await pg.click("#pErrosLimpar");
+  await calmo(pg);
+  ok(!Object.keys(await store()).some(k => k.startsWith("erros/")), "Limpar a lista apaga os erros já vistos");
+  // telas com versões misturadas do app (arquivo antigo guardado): abre de novo sozinho, sem registrar erro
+  // só a primeira vez vem o arquivo "antigo"; ao abrir de novo, vem o certo (como depois de uma atualização)
+  let antigo = true;
+  await ctx.route(/\/js\/agenda\.js/, rt => {
+    if (!antigo) return rt.continue();
+    antigo = false;
+    return rt.fulfill({ contentType: "text/javascript", body: "import { naoExiste } from './ui.js'; export function init() {} export function show() {}" });
+  });
+  await pg.evaluate(() => sessionStorage.removeItem("z7recarregou"));
+  const [nav] = await Promise.all([pg.waitForEvent("load", { timeout: 8000 }).then(() => true, () => false), ir(pg, "#agenda").catch(() => {})]);
+  ok(nav && !Object.keys(await store()).some(k => k.startsWith("erros/")), "versão misturada: o app abre de novo sozinho e não vira erro");
 });
 
 await cenario("Ver o app como a equipe (admin, só visualização)", async () => {

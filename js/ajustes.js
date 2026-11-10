@@ -79,6 +79,17 @@ export function ligarAjustes(ctx, o) {
           .replace("T", " ")} · ${x.email} · ${x.tela || x.onde}: ${x.msg}`;
         box.append(p);
       });
+      $("pErrosLimpar").onclick = async () => {
+        $("pErrosLimpar").disabled = true;
+        try {
+          await Promise.all(s.docs.map(d => FS.deleteDoc(d.ref)));
+          mostrarErros();
+        } catch (e) {
+          console.warn("[Z7] limpar erros", e);
+        } finally {
+          $("pErrosLimpar").disabled = false;
+        }
+      };
     } catch (e) {
       console.warn("[Z7] erros", e);
     }

@@ -110,7 +110,13 @@ botão "Mudar ano" nas importações de Formatura/Paspatur, aba Vendidos (admin)
    formando com kit, parcelas e em aberto; atalho para "Alunos e parcelas") · Datas (fotos e todas as formaturas).
 7. ~~Excluir foto~~ (10/11): feito (ver abaixo, em 10/11).
 8. Preços mínimos: organizar os vários valores (conversar com Adriano/Luciana antes).
-9. "Erros do app (5)" em Ajustes: ver o que são e corrigir (pedir o print aberto).
+9. ~~Erros do app~~ (10/11): 4 eram "versão misturada" (ui.js antigo guardado + arquivo novo, em 04/11 durante uma
+   atualização): agora o app apaga a cópia e abre de novo sozinho (erros.js: ehVersaoMisturada/recarregarNovo). 1 era
+   "Quota exceeded" (limite gratuito diário do Firestore): a tela agora explica que volta de madrugada. Botão
+   "🧹 Limpar a lista" nos Erros do app.
+8. **PRÓXIMO PASSO: Preços** — a Luciana está confusa com os preços; sentar junto e mapear todos os valores
+   (PR, Paspatur, Formatura, Linha de Frente/Repasse, Pix/cartão, promo, última oferta, mínimos/descontos)
+   antes de mexer em qualquer coisa.
 
 ## 10/11 — Relatórios com filtros
 - Aluguel de becas: o 🖨️ Relatório pergunta antes ano, colégio, turma (acompanha o colégio), situação e "separar por

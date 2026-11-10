@@ -8,10 +8,44 @@ const MAX_POR_SESSAO = 5;
 
 export function ligarErros(c) {
   ctx = c;
-  addEventListener("error", ev => reportarErro("janela", ev.error || ev.message));
+  addEventListener("error", ev => {
+    const e = ev.error || ev.message;
+    if (ehVersaoMisturada(e)) return recarregarNovo();
+    reportarErro("janela", e);
+  });
   addEventListener("unhandledrejection", ev => {
+    if (ehVersaoMisturada(ev.reason)) return recarregarNovo();
     if (!ehDeRede(ev.reason)) reportarErro("promessa", ev.reason);
   });
+}
+
+// Partes do app de versões diferentes (ex.: com sinal fraco, um arquivo veio da cópia guardada e outro, já
+// atualizado, da internet): "does not provide an export named …". Não é defeito: basta abrir tudo de novo.
+export function ehVersaoMisturada(e) {
+  const t = String((e && e.message) || e || "");
+  return /does not provide an export named|doesn't provide an export named|import not found|Importing binding name/i.test(t);
+}
+// Limite gratuito do banco (Firebase) do dia acabou: volta sozinho no dia seguinte
+export function ehCota(e) {
+  const t = String((e && (e.code || "")) || "") + " " + String((e && e.message) || e || "");
+  return /resource-exhausted|quota exceeded/i.test(t);
+}
+// Apaga a cópia guardada do app e abre de novo, uma vez por sessão (se não resolver, o erro aparece normal)
+export function recarregarNovo() {
+  try {
+    if (sessionStorage.getItem("z7recarregou")) return false;
+    sessionStorage.setItem("z7recarregou", "1");
+  } catch (_) {
+    return false;
+  }
+  const abrir = () => location.reload();
+  if (typeof caches !== "undefined")
+    caches
+      .keys()
+      .then(ks => Promise.all(ks.filter(k => k === "z7-app").map(k => caches.delete(k))))
+      .then(abrir, abrir);
+  else abrir();
+  return true;
 }
 
 // Falta de internet (ou o Firebase fora do ar) × defeito no app
@@ -56,6 +90,26 @@ export async function reportarErro(onde, e) {
 // Tela que não abriu: sem internet → pede para tentar de novo; defeito → mostra o erro e avisa que foi registrado
 export function telaFalhou(view, onde, e) {
   console.warn(e);
+  if (ehVersaoMisturada(e) && recarregarNovo()) {
+    view.innerHTML = "";
+    view.append(el("div", "empty", "Atualizando o app…"));
+    return;
+  }
+  if (ehCota(e)) {
+    view.innerHTML = "";
+    const b = el("div", "empty");
+    b.append(
+      el("strong", null, "Limite do dia do banco de dados"),
+      el(
+        "span",
+        null,
+        "O app usou todo o limite gratuito de hoje do banco de dados (Firebase). Volta a funcionar sozinho de madrugada. Avise o Adriano."
+      )
+    );
+    view.append(b);
+    reportarErro(onde, e);
+    return;
+  }
   const rede = ehDeRede(e);
   if (!rede) reportarErro(onde, e);
   view.innerHTML = "";

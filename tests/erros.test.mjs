@@ -15,3 +15,12 @@ test("o registro do erro é curto (cabe nas regras: mensagem até 300, pilha at�
   assert.ok(r.msg.length <= 300 && r.pilha.length <= 800);
   assert.equal(r.onde, "viewAgenda");
 });
+
+test("versão misturada do app e limite do banco", async () => {
+  const { ehVersaoMisturada, ehCota } = await import("../js/erros.js");
+  assert.ok(ehVersaoMisturada(new SyntaxError("The requested module './ui.js' does not provide an export named 'clicavel'")));
+  assert.ok(!ehVersaoMisturada(new TypeError("x is not a function")));
+  assert.ok(ehCota({ code: "resource-exhausted", message: "Quota exceeded." }));
+  assert.ok(ehCota(new Error("Quota exceeded.")));
+  assert.ok(!ehCota(new Error("Missing or insufficient permissions.")));
+});
