@@ -1528,6 +1528,13 @@ await cenario("Pedro (vendedor: Linha de Frente, Agendamento, Instituições)", 
     await pg.getByRole("button", { name: "+ Agendar colégio" }).click();
     await calmo(pg);
     let sa = pg.locator(".sheet").last();
+    // primeiro pergunta se é particular ou público; colégio do outro grupo: avisa onde está cadastrado
+    ok(await sa.getByLabel("Colégio").isDisabled(), "Agendar colégio: pergunta particular ou público antes do nome");
+    await sa.getByRole("button", { name: "🏛️ Público" }).click();
+    await sa.getByLabel("Colégio").fill("Colegio Beta");
+    await sa.locator("button[type=submit]").click();
+    ok(/cadastrado como Colégio particular/.test(await sa.locator(".err").textContent()), "colégio do outro grupo: avisa o grupo certo");
+    await sa.getByRole("button", { name: "🏫 Particular" }).click();
     await sa.getByLabel("Colégio").fill("Colegio Beta");
     await sa.locator("button[type=submit]").click();
     await calmo(pg);
@@ -1573,6 +1580,7 @@ await cenario("Pedro (vendedor: Linha de Frente, Agendamento, Instituições)", 
     await calmo(pg);
     sa = pg.locator(".sheet").last();
     await sa.getByLabel("O que vai marcar").selectOption("formatura");
+    await sa.getByRole("button", { name: "🏛️ Público" }).click();
     await sa.getByLabel("Colégio").fill("Colégio Delta Novo");
     await sa.getByLabel("Colégio").dispatchEvent("change");
     await sa.getByLabel("Tipo").selectOption("publico");
@@ -2319,6 +2327,7 @@ await cenario("Agenda: agendar colégio no dia tocado", async () => {
       await calmo(pg);
       let sa = pg.locator(".sheet").last();
       const dataTxt = ((await sa.textContent()).match(/Dia (\d\d)\/(\d\d)\/(\d{4})/) || []).slice(1);
+      await sa.getByRole("button", { name: "🏫 Particular" }).click();
       await sa.getByLabel("Colégio").fill("Colegio Beta");
       await sa.locator("button[type=submit]").click();
       await calmo(pg);
@@ -2360,6 +2369,7 @@ await cenario("Agenda: agendar colégio no dia tocado", async () => {
     await pg.getByRole("button", { name: "+ Agendar colégio" }).click();
     await calmo(pg);
     sh = pg.locator(".sheet").last();
+    await sh.getByRole("button", { name: "🏫 Particular" }).click();
     await sh.getByLabel("Colégio").fill("Colegio Beta");
     await sh.locator("button[type=submit]").click();
     await calmo(pg);
@@ -2391,6 +2401,7 @@ await cenario("Agenda: Paspatur, aluguel de becas e colégio só com fotos (sem 
     await calmo(pg);
     let sh = pg.locator(".sheet").last();
     await sh.getByLabel("O que vai marcar").selectOption(tipo);
+    await sh.getByRole("button", { name: "🏫 Particular" }).click();
     await sh.getByLabel("Colégio").fill("Colegio Beta");
     await sh.locator("button[type=submit]").click();
     await calmo(pg);
@@ -3261,6 +3272,16 @@ await cenario("Aluguel de becas · alunos dos colégios (status, estoque e produ
     Object.keys(st).some(k => k.startsWith("movEstoque/")),
     "movimentos do estoque registrados"
   );
+  // lista compacta (como no PR, Formatura e Instituições): tocar na linha abre a janela com abas
+  await pg.evaluate(() => (window.__z7CartaoNaLista = false));
+  await pg.fill("#alLista ~ input, input[aria-label='Buscar aluno']", "Caio");
+  await pg.locator("#alLista button.lc-linha", { hasText: "Caio Atrasado" }).click();
+  const jan = pg.locator(".janela-aluno");
+  ok(/ATRASADO/.test(await jan.locator(".ja-topo").textContent()), "aluguel: linha abre a janela do aluno");
+  await jan.locator(".ja-abas").getByText("Colégio e contrato").click();
+  ok((await jan.getByRole("button", { name: "📄 Abrir o Contrato do colégio" }).count()) === 1, "aluguel: aba do colégio com o Contrato");
+  await jan.locator(".ja-abas").getByText("Histórico").click();
+  await jan.getByText("‹ Voltar para a lista").click();
   ok(!erros.length, "sem erros" + (erros.length ? ": " + erros.join(" | ") : ""));
 });
 await cenario("Lista compacta do PR e janela do aluno (abas, conversa e Claude)", async () => {
@@ -3821,6 +3842,7 @@ await cenario("PR lista única: filtro PR/Paspatur, pessoa da equipe e chave na 
     await ja.getByRole("button", { name: /Voltar para a lista/ }).click();
     // + Aluno: escolhe como vender
     await pg.getByRole("button", { name: "+ Aluno" }).click();
+    await calmo(pg);
     const f = pg.locator(".sheet").last();
     ok((await pg.locator(".sheet").last().getByLabel("Vender como").inputValue()) === "pr", "+ Aluno começa marcado como PR");
     await f.getByLabel("Nome do aluno").fill("Pedro Novo Paspatur");

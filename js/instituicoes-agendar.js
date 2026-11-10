@@ -2,7 +2,7 @@
 import { el, title, field, inp, sel, sheet, botoes as actions, parseTel } from "./ui.js";
 import { openEvento } from "./eventos.js";
 import * as U from "./util.js";
-import { TIPOS, CARGOS, norm } from "./instituicoes-dados.js";
+import { TIPOS, CARTOES, CARGOS, norm } from "./instituicoes-dados.js";
 import { C, FS, col, tipo, iniciar } from "./instituicoes-estado.js";
 // Agenda → "+ Agendar colégio": escolhe o colégio e o tipo (dia de fotos do PR ou formatura)
 // e abre o mesmo formulário do cartão da instituição (com aprovação da Luciana).
@@ -36,20 +36,49 @@ export async function agendarColegio(ctx, dia) {
       ],
       "fotos"
     );
-    const nome = inp("", "comece a digitar o nome do colégio");
+    // primeiro: particular, público ou faculdade/curso; a lista de colégios mostra só os desse grupo
+    let grupo = "";
+    const doGrupo = () => (grupo ? lista.filter(i => CARTOES[grupo].tipos.includes(i.tipo)) : []);
+    const nome = inp("", "escolha acima: particular ou público");
     nome.required = true;
+    nome.disabled = true;
     const dl = el("datalist");
     dl.id = "agInst" + Date.now();
     nome.setAttribute("list", dl.id);
-    lista.forEach(i => {
-      const o = el("option");
-      o.value = title(i.nome);
-      o.label = [TIPOS[i.tipo] && TIPOS[i.tipo].nome, i.etapa].filter(Boolean).join(" · ");
-      dl.append(o);
-    });
     const err = el("p", "err");
     err.hidden = true;
-    p.append(field("O que vai marcar", tipoEv), field("Colégio", nome), dl);
+    const grupos = el("div", "chips");
+    grupos.setAttribute("role", "radiogroup");
+    grupos.setAttribute("aria-label", "Particular ou público");
+    const escolherGrupo = k => {
+      grupo = k;
+      grupos.querySelectorAll("button").forEach(b => b.setAttribute("aria-pressed", String(b.dataset.k === k)));
+      dl.innerHTML = "";
+      doGrupo().forEach(i => {
+        const o = el("option");
+        o.value = title(i.nome);
+        o.label = i.etapa || "";
+        dl.append(o);
+      });
+      nome.disabled = false;
+      nome.placeholder = `comece a digitar (${doGrupo().length} ${k === "superior" ? "cadastrados" : "colégios"})`;
+      tipoN.value = CARTOES[k].tipos[0];
+      err.hidden = true;
+      nome.focus();
+    };
+    [
+      ["particular", "🏫 Particular"],
+      ["publico", "🏛️ Público"],
+      ["superior", "🎓 Faculdade / curso"]
+    ].forEach(([k, t]) => {
+      const b = el("button", "chip", t);
+      b.type = "button";
+      b.dataset.k = k;
+      b.setAttribute("aria-pressed", "false");
+      b.onclick = () => escolherGrupo(k);
+      grupos.append(b);
+    });
+    p.append(field("O que vai marcar", tipoEv), field("Particular ou público?", grupos), field("Colégio", nome), dl);
     // Colégio novo: cadastra aqui mesmo, sem sair da agenda
     const novoBox = el("div", "imp");
     novoBox.hidden = true;
@@ -88,24 +117,36 @@ export async function agendarColegio(ctx, dia) {
       btNovo.textContent = novoBox.hidden ? "+ Cadastrar colégio novo" : "Escolher da lista";
       err.hidden = true;
     };
-    const acha = () => {
+    const acha = (de = doGrupo()) => {
       const alvo = norm(nome.value);
       if (!alvo) return null;
-      const exato = lista.find(i => norm(i.nome) === alvo);
+      const exato = de.find(i => norm(i.nome) === alvo);
       if (exato) return exato;
-      const parc = lista.filter(i => norm(i.nome).includes(alvo));
+      const parc = de.filter(i => norm(i.nome).includes(alvo));
       return parc.length === 1 ? parc[0] : null;
     };
     // ao digitar um nome que não existe, já oferece o cadastro
     nome.addEventListener("change", () => {
-      if (nome.value.trim() && !acha() && novoBox.hidden) btNovo.onclick();
+      if (nome.value.trim() && !acha() && !acha(lista) && novoBox.hidden) btNovo.onclick();
     });
     p.append(btNovo, novoBox, err);
     p.append(actions(close, "Continuar"));
     p.addEventListener("submit", async ev => {
       ev.preventDefault();
       err.hidden = true;
+      if (!grupo) {
+        err.textContent = "Escolha primeiro se o colégio é particular ou público.";
+        err.hidden = false;
+        return;
+      }
       let it = novoBox.hidden ? acha() : null;
+      // escreveu um colégio do outro grupo: avisa onde ele está cadastrado
+      const outro = !it && novoBox.hidden ? acha(lista) : null;
+      if (outro) {
+        err.textContent = `${title(outro.nome)} está cadastrado como ${(TIPOS[outro.tipo] || {}).nome || "outro tipo"}. Toque nesse grupo acima.`;
+        err.hidden = false;
+        return;
+      }
       if (!it && novoBox.hidden) {
         err.textContent = "Não achei esse colégio. Escolha um nome da lista ou toque em “+ Cadastrar colégio novo”.";
         err.hidden = false;
@@ -173,6 +214,6 @@ export async function agendarColegio(ctx, dia) {
       close();
       openEvento(it, tipoEv.value, dia);
     });
-    setTimeout(() => nome.focus(), 30);
+    setTimeout(() => grupos.querySelector("button").focus(), 30);
   });
 }

@@ -57,3 +57,42 @@ export function linhaCompacta(it, o) {
   else l.setAttribute("aria-haspopup", "dialog");
   return box;
 }
+
+// Linha compacta de qualquer lista (Aluguel de becas e as próximas): o mesmo desenho e o mesmo jeito de abrir.
+// o = { id, cor, titulo, tags: [texto], sub, passo, passoCls ("late" | "today" | ""), selo, card(), abrir() }
+export function linhaGenerica(o) {
+  const box = el("div", "lc-item");
+  const l = el("button", "lc-linha lc-" + (o.cor || "cinza"));
+  l.type = "button";
+  const nome = el("div", "lc-nome");
+  nome.append(el("b", null, o.titulo || "Sem nome"));
+  const tags = (o.tags || []).filter(Boolean);
+  if (tags.length) {
+    const t = el("span", "lc-tags");
+    tags.forEach(x => t.append(el("span", "tag id", x)));
+    nome.append(t);
+  }
+  if (o.sub) nome.append(el("small", null, o.sub));
+  if (o.passo) nome.append(el("small", "lc-passo" + (o.passoCls ? " " + o.passoCls : ""), o.passo));
+  l.append(nome, el("span", "lc-selo", o.selo || ""));
+  box.append(l);
+  let cartao = null;
+  const abrir = sim => {
+    l.setAttribute("aria-expanded", String(sim));
+    if (sim) {
+      abertos.add(o.id);
+      cartao = o.card();
+      cartao.classList.add("lc-cartao");
+      box.append(cartao);
+    } else {
+      abertos.delete(o.id);
+      if (cartao) cartao.remove();
+      cartao = null;
+    }
+  };
+  const naLista = !o.abrir || (typeof window !== "undefined" && window.__z7CartaoNaLista);
+  l.onclick = () => (naLista ? abrir(!cartao) : o.abrir());
+  if (naLista) abrir(abertos.has(o.id));
+  else l.setAttribute("aria-haspopup", "dialog");
+  return box;
+}

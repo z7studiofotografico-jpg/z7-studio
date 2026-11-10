@@ -93,13 +93,15 @@ botão "Mudar ano" nas importações de Formatura/Paspatur, aba Vendidos (admin)
    daqui para frente os nomes já saem com o ID novo).
 2. Agenda: várias formaturas para o mesmo colégio (dias, locais e turmas diferentes; o botão fica aberto) e a
    quantidade de alunos de cada formatura só é confirmada depois que a formatura acontece.
-3. Agendar colégio: perguntar primeiro se é particular ou público e mostrar a lista separada.
+3. ~~Agendar colégio~~ (10/11): pergunta primeiro Particular / Público / Faculdade-curso; a lista de colégios mostra
+   só os do grupo; colégio digitado no grupo errado avisa onde está cadastrado.
 4. ~~Instituições~~ (10/11): lista compacta (uma linha por colégio: cor, responsável, bairro · cidade, próximo
    passo, etapa); tocar abre a janela do colégio (js/inst-janela.js) com Resumo (o cartão completo) · Alunos (por ano,
    no PR e na Formatura, com "Ver alunos" que abre a Busca já com o colégio e o ano) · Agendamentos (fotos,
    formatura, Paspatur, becas: marcar ou mudar) · Visitas. A Busca do PR ignora resposta atrasada de busca antiga.
-5. Aluguel de becas: lista no mesmo formato do PR e Formatura (depois organizar o que falta). Mostrar onde fica o
-   contrato do aluguel de becas e as informações do colégio.
+5. ~~Aluguel de becas~~ (10/11): lista compacta (linhaGenerica em lista-compacta.js) e janela com abas
+   (janela.js, genérica para as próximas listas): Resumo · Colégio e contrato (informações do colégio e
+   "📄 Abrir o Contrato do colégio") · Histórico. Falta organizar o resto do Aluguel de becas com a Luciana.
 6. Venda antecipada (Formaturas): mostrar os alunos e colégios fechados.
 7. Fotos do aluno: botão para excluir foto (ex.: a da ficha) — sai do Drive e não vai para o aluno; equipe pode.
 8. Preços mínimos: organizar os vários valores (conversar com Adriano/Luciana antes).

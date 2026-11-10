@@ -29,6 +29,9 @@ import { ESTUDIO, ENDERECO } from "./mensagens.js";
 import { botaoRelatorio } from "./relatorio.js";
 import { contatoRel } from "./aluno-id.js";
 import { ITENS_PACOTE, nomeItem, lerPacote } from "./contrato-colegio-regras.js";
+import { linhaGenerica } from "./lista-compacta.js";
+import { abrirJanela } from "./janela.js";
+import { abaColegio, abaHistorico } from "./aluguel-janela.js";
 
 export const STATUS_ALUGUEL = ["Cadastrado", "Beca medida", "Produtos em produção", "Pronto para retirada", "Retirou a beca", "Devolvida"];
 const SERIES = ["Pré", "5º ano", "9º ano", "Ensino médio", "Faculdade", "Curso", "Outra"];
@@ -98,7 +101,7 @@ export function mostrarAlunos(ctx, v, o) {
     filtro.q = q.value;
     render();
   };
-  const corpo = el("div", "grid");
+  const corpo = el("div", "grid lc-lista");
   corpo.id = "alLista";
   corpo.append(el("div", "empty", "Carregando…"));
   v.append(k, filtros, resumo, chips, q, corpo);
@@ -307,10 +310,80 @@ function render() {
     corpo.append(e);
     return;
   }
-  arr.slice(0, 400).forEach(a => corpo.append(card(a)));
+  arr.slice(0, 400).forEach(a => corpo.append(linha(a)));
   if (arr.length > 400) corpo.append(el("p", "hint", `Mostrando 400 de ${arr.length}. Escolha um colégio para ver os outros.`));
 }
 
+// Lista compacta (o mesmo formato do PR, Formatura e Instituições): uma linha por aluno; tocar abre a janela
+// Cores: vermelho atrasado na devolução · amarelo pronto para retirada · azul com a beca · verde devolvida · cinza o resto
+export function corAluguel(a, hoje = U.todayStr()) {
+  if (atrasadoAluguel(a, hoje)) return "vermelho";
+  const st = a.status || "Cadastrado";
+  if (st === "Devolvida") return "verde";
+  if (st === "Retirou a beca") return "azul";
+  if (st === "Pronto para retirada") return "amarelo";
+  return "cinza";
+}
+const becaTxt = a =>
+  a.becaTipo
+    ? `👘 ${nomeBeca(a.becaTipo).replace("Beca ", "")}${a.tamanho ? " " + a.tamanho + (a.menosLonga ? "1" : "") : " · sem tamanho"}`
+    : "";
+function passoAluguel(a, hoje) {
+  if (atrasadoAluguel(a, hoje)) return "⚠️ Devolução atrasada desde " + U.fmtDate(a.devolucao);
+  const st = a.status || "Cadastrado";
+  if (st === "Retirou a beca" && a.devolucao) return "Devolver até " + U.fmtDate(a.devolucao);
+  if (st === "Pronto para retirada") return "Retirar" + (a.retirada ? " dia " + U.fmtDate(a.retirada) : "");
+  const prox = proximoStatus(a);
+  return prox ? "Próximo: " + prox : "";
+}
+function linha(a) {
+  const hoje = U.todayStr();
+  const at = atrasadoAluguel(a, hoje);
+  return linhaGenerica({
+    id: a.id,
+    cor: corAluguel(a, hoje),
+    titulo: title(a.nome || ""),
+    sub: [title(a.instNome || ""), [a.ano, a.serie].filter(Boolean).join(" · "), becaTxt(a)].filter(Boolean).join(" · "),
+    passo: passoAluguel(a, hoje),
+    passoCls: at ? "late" : (a.status || "") === "Pronto para retirada" ? "today" : "",
+    selo: at ? "ATRASADO" : (a.status || "Cadastrado").toUpperCase(),
+    card: () => card(a),
+    abrir: () => janela(a)
+  });
+}
+// janela do aluno do aluguel: Resumo (o cartão completo) · Colégio (informações e o Contrato do colégio) · Histórico
+function janela(a0) {
+  abrirJanela({
+    C,
+    colecao: "alugueis",
+    item: a0,
+    topo: a => ({
+      titulo: title(a.nome || ""),
+      sub: [title(a.instNome || ""), [a.ano, a.serie].filter(Boolean).join(" · ")].filter(Boolean).join(" · "),
+      selo: atrasadoAluguel(a) ? "ATRASADO" : (a.status || "Cadastrado").toUpperCase()
+    }),
+    abas: [
+      ["resumo", "Resumo", (box, a) => box.append(card(a))],
+      [
+        "colegio",
+        "Colégio e contrato",
+        (box, a, fechar) =>
+          abaColegio(box, a, {
+            C,
+            inst: insts.find(i => i.id === a.instId),
+            doCol: lista.filter(x => x.instId === a.instId && String(x.ano) === String(a.ano)),
+            verColegio: () => {
+              filtro.inst = a.instId || "";
+              filtro.ano = String(a.ano || "");
+              fechar();
+              render();
+            }
+          })
+      ],
+      ["historico", "Histórico", abaHistorico]
+    ]
+  });
+}
 // Relatório: os alunos do filtro, por colégio, com o status e o atraso
 function relatorio() {
   const hoje = U.todayStr();
