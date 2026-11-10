@@ -447,3 +447,7 @@ button.lc-linha[aria-expanded="true"]{border-bottom-left-radius:0;border-bottom-
 .panel.foto-grande img{max-width:100%;max-height:80vh;object-fit:contain;border-radius:8px}
 .troca-lista{display:flex;flex-direction:column;gap:4px;max-height:50vh;overflow:auto;margin:8px 0}
 .troca-item{justify-content:flex-start}
+/* janela do colégio (Instituições → Agendamentos): a data e o botão lado a lado */
+.ja-ev{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.ja-ev > .fu{flex:1;min-width:200px;margin:0}
+.ja-corpo .lc-linha .btn{flex:none}

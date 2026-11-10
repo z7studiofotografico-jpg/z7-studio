@@ -15,6 +15,7 @@ import { passarColegio } from "./passar-pr.js";
 import { abrirNaoFechou, listaNaoFecharam } from "./nao-fechou.js";
 import { abrirExcluirInst, faixaExclusaoInst } from "./inst-excluir.js";
 import { ocultoParaMim } from "./confirmar.js";
+import { linhaInst, abrirJanelaInst } from "./inst-janela.js";
 export { TIPOS, CARTOES, CARGOS, cartaoDoTipo } from "./instituicoes-dados.js";
 export { agendarColegio } from "./instituicoes-agendar.js";
 // (o Agendamento importa estas daqui; continuam disponíveis)
@@ -79,7 +80,7 @@ export function show(t) {
   q.setAttribute("aria-label", "Buscar");
   v.append(q);
   q.addEventListener("input", renderList);
-  const list = el("section", "grid");
+  const list = el("section", "grid lc-lista");
   list.id = "iList";
   v.append(list);
   renderChips();
@@ -212,7 +213,30 @@ function renderList() {
     list.append(e);
     return;
   }
-  emPartes(list, arr, card);
+  emPartes(list, arr, linha);
+}
+
+// próximo passo do colégio (no cartão e na linha da lista)
+function passoTxt(it, s) {
+  if (it.etapa === "FECHADO") return "Fechado" + (it.fechadoEm ? " em " + U.fmtDate(it.fechadoEm) : "");
+  if (!it.followup) return "Sem data de retorno";
+  return (
+    (s === "late"
+      ? "Atrasado desde " + U.fmtDate(it.followup)
+      : s === "today"
+        ? "Retorno hoje"
+        : "Retorno em " +
+          U.fmtDate(it.followup) +
+          (it.followup.slice(0, 4) !== U.todayStr().slice(0, 4) ? "/" + it.followup.slice(0, 4) : "")) +
+    (it.proximoPasso ? " · " + it.proximoPasso : "")
+  );
+}
+// lista compacta: uma linha por colégio; tocar abre a janela do colégio (Resumo · Alunos · Agendamentos · Visitas)
+// (com pendência de fotos, a linha avisa no lugar do retorno)
+const passoLinha = (it, s) => (pendFotos(it) && s !== "late" ? "⚠️ Marcar o dia de medir beca e o ensaio" : passoTxt(it, s));
+const linha = it => linhaInst(it, { C, status, passo: passoLinha, abrir: abrirInst });
+function abrirInst(it) {
+  abrirJanelaInst(it, { C, card, status, passo: passoTxt, visita: openVisita });
 }
 
 function card(it) {
@@ -253,19 +277,7 @@ function card(it) {
   if (cs.length)
     e.append(el("div", "phone", cs.map(c => [c.nome && title(c.nome), c.cargo, c.tel].filter(Boolean).join(" · ")).join("  |  ")));
   const fu = el("div", "fu " + (s === "late" ? "late" : s === "today" ? "today" : it.followup ? "" : "none"));
-  fu.textContent =
-    it.etapa === "FECHADO"
-      ? "Fechado" + (it.fechadoEm ? " em " + U.fmtDate(it.fechadoEm) : "")
-      : it.followup
-        ? (s === "late"
-            ? "Atrasado desde " + U.fmtDate(it.followup)
-            : s === "today"
-              ? "Retorno hoje"
-              : "Retorno em " +
-                U.fmtDate(it.followup) +
-                (it.followup.slice(0, 4) !== U.todayStr().slice(0, 4) ? "/" + it.followup.slice(0, 4) : "")) +
-          (it.proximoPasso ? " · " + it.proximoPasso : "")
-        : "Sem data de retorno";
+  fu.textContent = passoTxt(it, s);
   e.append(fu);
   ["fotos", "formatura"].forEach(k => {
     const l = linhaEvento(it, k);

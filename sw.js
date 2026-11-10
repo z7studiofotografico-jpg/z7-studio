@@ -96,6 +96,7 @@ const SHELL = [
   "./js/contrato-colegio-regras.js",
   "./js/lista-compacta.js",
   "./js/janela-aluno.js",
+  "./js/inst-janela.js",
   "./js/mockup-paspatur.js",
   "./js/encarte.js",
   "./icons/paspatur-capa.jpg",

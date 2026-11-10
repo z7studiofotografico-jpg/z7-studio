@@ -76,6 +76,14 @@ let parte = "lf";
 try {
   parte = localStorage.getItem("z7fmparte") || "lf";
 } catch (_) {}
+// Instituições → "Ver alunos" da Formatura: abre na Linha de Frente/Repasse (a Busca vê os dois), não na Venda Antecipada
+export function irParte(k) {
+  if (parte !== "va") return;
+  parte = k;
+  try {
+    localStorage.setItem("z7fmparte", k);
+  } catch (_) {}
+}
 export function show() {
   const v = $("viewFormaturas");
   v.innerHTML = "";

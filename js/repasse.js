@@ -110,10 +110,36 @@ function mostrar(container) {
   const ok = segsPermitidas();
   if (!ok.includes(seg)) mudarSeg(ok[0] || "lf");
   renderSegs();
-  loadMeta().then(refreshStats);
+  loadMeta().then(() => {
+    refreshStats();
+    abrirEscolaPedida();
+  });
   avisoEdicoes();
   refreshLote();
   openTab(tab);
+}
+
+// Instituições → janela do colégio → "Ver alunos": abre a Busca já com o colégio e o ano escolhidos.
+// pedido = { formatura, seg ("lf" | "rep"), valor ("ano|chave"), rotulo }
+let escolaPedida = null;
+export function pedirEscola(pedido) {
+  escolaPedida = pedido;
+  if (!pedido.formatura)
+    try {
+      localStorage.setItem("z7seg", pedido.seg);
+    } catch (_) {}
+}
+function abrirEscolaPedida() {
+  const p = escolaPedida;
+  if (!p || !!p.formatura !== ehFormatura()) return;
+  escolaPedida = null;
+  openTab("buscar");
+  const sel = $("rEscola");
+  if (!sel || ![...sel.options].some(o => o.value === p.valor))
+    return U.toast("Não achei esse colégio na lista. Procure pelo nome na Busca.");
+  sel.value = p.valor;
+  if ($("rQ")) $("rQ").value = "";
+  buscar();
 }
 
 function importarAqui() {
@@ -536,8 +562,11 @@ let cacheLF = { at: 0, docs: [] };
 const porNome = (a, b) => (a.nome || "").localeCompare(b.nome || "", "pt-BR");
 const ordemBusca = porEscola => (porEscola ? (a, b) => (a.ano || 0) - (b.ano || 0) || ordemCodigo(a, b) : porNome);
 
+// cada busca tem um número: a resposta de uma busca antiga (que chegou atrasada) não substitui a da mais nova
+let buscaN = 0;
 async function buscar() {
   if (tab !== "buscar") return;
+  const minha = ++buscaN;
   const txt = $("rQ").value.trim(),
     esc = $("rEscola").value,
     escE = escolaEscolhida(esc); // { ano, nomes } do colégio escolhido (uma linha por colégio e ano)
@@ -554,6 +583,7 @@ async function buscar() {
         const s0 = await FS.getDocs(FS.query(col, ...baseLF(), FS.limit(3000)));
         cacheLF = { at: Date.now(), docs: s0.docs.map(d => Object.assign({ id: d.id }, d.data())) };
       }
+      if (minha !== buscaN) return;
       const n = norm(txt),
         dg = txt.replace(/\D/g, ""),
         cods = pareceCodigo(txt) ? codigosDaBusca(txt, [ANO()]) : [];
@@ -609,6 +639,7 @@ async function buscar() {
   }
   try {
     const s = await FS.getDocs(q);
+    if (minha !== buscaN) return;
     mudarItems(s.docs.map(d => Object.assign({ id: d.id }, d.data())).sort(ordemBusca(esc && !txt)));
     renderList();
   } catch (e) {

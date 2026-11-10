@@ -1691,7 +1691,12 @@ await cenario("Pedro (vendedor: Linha de Frente, Agendamento, Instituições)", 
     await pg.locator("#iChips").getByText("Todas").click();
     await calmo(pg);
     // visita num colégio sem responsável: ele assume (por e-mail) e a visita guarda quem foi
-    await pg.locator("#iList .card").filter({ hasText: "Beta" }).getByText("📝 Registrar visita / contato").click();
+    // lista compacta: uma linha por colégio; tocar abre a janela do colégio (Resumo · Alunos · Agendamentos · Visitas)
+    await pg.locator("#iList button.lc-linha").filter({ hasText: "Beta" }).click();
+    await calmo(pg);
+    const jan = pg.locator(".janela-aluno");
+    ok(/Resumo/.test(await jan.locator(".ja-abas").textContent()), "colégio abre na janela com abas");
+    await jan.locator(".card").getByText("📝 Registrar visita / contato").click();
     await calmo(pg);
     let sh = pg.locator(".sheet").last();
     await sh.getByLabel("Resultado").selectOption("Vai decidir em reunião");
@@ -1704,10 +1709,11 @@ await cenario("Pedro (vendedor: Linha de Frente, Agendamento, Instituições)", 
         s["instituicoes/i2"].etapa === "VISITADO",
       "visita registrada em transação; Pedro vira responsável pelo e-mail"
     );
-    ok(
-      (await pg.locator("#iList .card").filter({ hasText: "Beta" }).getByRole("button", { name: "📸 Dia de fotos" }).count()) === 0,
-      "cartão da instituição não marca mais datas (só cadastro e visitas)"
-    );
+    await jan.locator(".ja-abas").getByText("Visitas").click();
+    ok(/Vai decidir em reunião/.test(await jan.locator(".ja-corpo").textContent()), "aba Visitas mostra a visita nova (a janela acompanha o banco)");
+    await jan.locator(".ja-abas").getByText("Agendamentos").click();
+    ok((await jan.locator(".ja-ev").count()) === 4, "aba Agendamentos: dia de fotos, formatura, Paspatur e becas");
+    await jan.getByText("‹ Voltar para a lista").click();
     // datas e turma agora ficam no card Formaturas
   });
   await etapa(pg, "Formaturas", async () => {
@@ -2503,7 +2509,8 @@ await cenario("PR por colégio e ano · passar para a equipe", async () => {
   await pg.fill("#rLoteBusca", "");
   await ir(pg, "#inst-publico");
   await pg.locator("#iChips .chip", { hasText: "Todas" }).click();
-  await pg.locator("article", { hasText: "C.E. João Cardoso" }).getByRole("button", { name: "📤 Passar o PR para a equipe" }).click();
+  await pg.locator("#iList button.lc-linha").filter({ hasText: "C.E. João Cardoso" }).click();
+  await pg.locator(".janela-aluno .card").getByRole("button", { name: "📤 Passar o PR para a equipe" }).click();
   await pg.waitForFunction(
     () => /vão para a pessoa escolhida/.test(document.querySelector(".sheet:last-of-type")?.textContent || ""),
     null,
@@ -2518,11 +2525,17 @@ await cenario("PR por colégio e ano · passar para a equipe", async () => {
       s["repasse/jc3"].etapa === "NA FILA",
     "colégio: passa os alunos do ano escolhido para a pessoa (os outros anos ficam na fila)"
   );
-  await ir(pg, "#pr");
-  await pg.locator("section:not([hidden]) .chip", { hasText: "Buscar" }).first().click();
+  // janela do colégio → Alunos → "Ver alunos": abre o PR na Busca, já com o colégio e o ano escolhidos
+  await pg.locator(".janela-aluno .ja-abas").getByText("Alunos").click();
+  const linhaAno = pg.locator(".janela-aluno .lc-linha").filter({ hasText: `${Y - 2} · PR` });
+  await linhaAno.waitFor({ timeout: 6000 });
+  await linhaAno.getByRole("button", { name: "Ver alunos" }).click();
+  await pg.waitForFunction(() => /#pr$/.test(location.hash) && document.querySelector("#rEscola")?.value, null, { timeout: 8000 });
   await calmo(pg);
-  await pg.selectOption("#rEscola", { label: `${Y - 2} - C.E. João Cardoso (1)` });
-  await calmo(pg);
+  ok(
+    (await pg.locator(".janela-aluno").count()) === 0 && /João Cardoso/.test(await pg.$eval("#rEscola", x => x.selectedOptions[0].textContent)),
+    "Ver alunos abre o PR com o colégio e o ano escolhidos"
+  );
   await pg.locator("article", { hasText: "Aluno Tres" }).getByRole("button", { name: "📤 Passar para a equipe" }).click();
   await pg.locator(".sheet:visible select").selectOption(PEDRO);
   await pg.locator(".sheet:visible button[type=submit]").click();

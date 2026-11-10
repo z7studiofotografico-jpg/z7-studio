@@ -89,12 +89,15 @@ botão "Mudar ano" nas importações de Formatura/Paspatur, aba Vendidos (admin)
 - PR e Formatura: botão "📤 Passar o colégio para a equipe" (colégio e ano do "Seu lote de hoje").
 
 ## Falta (pedidos de 08 e 09/11 — fazer numa conversa nova, "continuar o Z7")
-1. Drive: trocar também os nomes das pastas/arquivos para o ID e o nome certo do colégio (a Luciana abre o Drive).
+1. ~~Drive~~: combinado em 09/11 deixar como está (o app acha as fotos pelo nome do aluno e pelo número do ID;
+   daqui para frente os nomes já saem com o ID novo).
 2. Agenda: várias formaturas para o mesmo colégio (dias, locais e turmas diferentes; o botão fica aberto) e a
    quantidade de alunos de cada formatura só é confirmada depois que a formatura acontece.
 3. Agendar colégio: perguntar primeiro se é particular ou público e mostrar a lista separada.
-4. Instituições: lista no mesmo formato do PR e Formatura (linha compacta); dentro de cada colégio, atalhos para
-   os alunos dele e os agendamentos.
+4. ~~Instituições~~ (10/11): lista compacta (uma linha por colégio: cor, responsável, bairro · cidade, próximo
+   passo, etapa); tocar abre a janela do colégio (js/inst-janela.js) com Resumo (o cartão completo) · Alunos (por ano,
+   no PR e na Formatura, com "Ver alunos" que abre a Busca já com o colégio e o ano) · Agendamentos (fotos,
+   formatura, Paspatur, becas: marcar ou mudar) · Visitas. A Busca do PR ignora resposta atrasada de busca antiga.
 5. Aluguel de becas: lista no mesmo formato do PR e Formatura (depois organizar o que falta). Mostrar onde fica o
    contrato do aluguel de becas e as informações do colégio.
 6. Venda antecipada (Formaturas): mostrar os alunos e colégios fechados.

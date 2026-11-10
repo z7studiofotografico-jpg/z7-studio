@@ -109,7 +109,8 @@ export function onSnapshot(q, cb) {
       cb({ exists: () => !!v, data: () => clone(v), id: q.id });
     };
     listeners.push([{ c: { n: "__none" } }, f]);
-    setTimeout(f, 5);
+    // como no Firebase de verdade: depois de desligar, não avisa mais (nem a primeira leitura atrasada)
+    setTimeout(() => listeners.some(x => x[1] === f) && f(), 5);
     return () => {
       const i = listeners.findIndex(x => x[1] === f);
       if (i >= 0) listeners.splice(i, 1);
@@ -120,7 +121,7 @@ export function onSnapshot(q, cb) {
   window.__ultimo = Date.now();
   setTimeout(() => {
     window.__ultimo = Date.now();
-    cb(run(q));
+    if (listeners.includes(L)) cb(run(q));
   }, 5);
   return () => {
     const i = listeners.indexOf(L);
