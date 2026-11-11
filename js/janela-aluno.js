@@ -130,6 +130,7 @@ function previa(box, it) {
     kit === "paspatur" ? "o livro do Kit Paspatur aberto, com a marca d'água" : "quadro na parede e porta-retratos, com a marca d'água",
     async () =>
       openMockup({
+        tel: (contatoPadrao(it) || {}).tel,
         nome: title(it.nome),
         escola: title(it.escola),
         preco: precoTxt(it),
@@ -140,7 +141,15 @@ function previa(box, it) {
       })
   );
   bloco("📷", "Fotos para escolher", "folha com as fotos numeradas para a família escolher", () =>
-    openMockup({ nome: title(it.nome), escola: title(it.escola), preco: precoTxt(it), modo: "escolha", maxFotos: max, kit })
+    openMockup({
+      tel: (contatoPadrao(it) || {}).tel,
+      nome: title(it.nome),
+      escola: title(it.escola),
+      preco: precoTxt(it),
+      modo: "escolha",
+      maxFotos: max,
+      kit
+    })
   );
   box.append(g);
   // as fotos do aluno no Drive, em miniatura (tocar amplia), com "🔄 Trocar as fotos"

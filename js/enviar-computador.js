@@ -1,6 +1,6 @@
 // Enviar a prévia pelo computador (10/11/2026): no Windows, o "compartilhar" do navegador abre a janela do sistema
 // (Vincular ao Celular, Galaxy…), que falha ou manda para o celular em vez do WhatsApp. No computador o app não usa
-// essa janela: copia a imagem (Ctrl+V na conversa do WhatsApp Web) e baixa o arquivo também.
+// essa janela: copia a imagem e abre a conversa no WhatsApp Web (Ctrl+V cola a imagem).
 export const noComputador = () => {
   try {
     return !matchMedia("(pointer: coarse)").matches;
@@ -28,6 +28,12 @@ export async function copiarImagem(blob) {
     return false;
   }
 }
-export const msgComputador = copiou =>
-  (copiou ? "Imagem copiada e baixada. No WhatsApp Web, abra a conversa e aperte Ctrl+V." : "Imagem baixada.") +
-  (copiou ? "" : " No WhatsApp Web, clique no clipe 📎 e escolha a imagem (ou arraste o arquivo para a conversa).");
+// abre a conversa no WhatsApp Web (sempre na mesma aba "z7whatsapp", sem abrir uma nova a cada envio)
+export function abrirWhatsAppWeb(tel, texto) {
+  const d = String(tel || "").replace(/\D/g, "");
+  const n = d && d.length <= 11 ? "55" + d : d;
+  const url = n
+    ? `https://web.whatsapp.com/send?phone=${n}${texto ? "&text=" + encodeURIComponent(texto) : ""}`
+    : "https://web.whatsapp.com/";
+  window.open(url, "z7whatsapp");
+}

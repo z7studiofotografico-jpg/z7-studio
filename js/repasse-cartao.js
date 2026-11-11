@@ -196,6 +196,7 @@ export function desenharProximo(box, it, escolhido, blocked, li) {
   row.append(
     U.mkBtn("🖼️ Prévia", "", async () =>
       openMockup({
+        tel: (contatoPadrao(it) || {}).tel,
         encarte: vendaDe(it) === "paspatur" ? await (await import("./encarte.js")).encarteDoColegio(it.escola) : undefined,
         nome: title(it.nome),
         escola: title(it.escola),
@@ -210,6 +211,7 @@ export function desenharProximo(box, it, escolhido, blocked, li) {
     row.append(
       U.mkBtn("📷 Fotos para escolher", "", () =>
         openMockup({
+          tel: (contatoPadrao(it) || {}).tel,
           nome: title(it.nome),
           escola: title(it.escola),
           preco: precoTxt(it),

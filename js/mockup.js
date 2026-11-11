@@ -3,7 +3,7 @@
 // - "Fotos para escolher": todas as fotos do ensaio numeradas, para o formando escolher o que vai em cada lugar.
 // Toda imagem sai com marca d'água repetida (um print não serve como foto final).
 import { el, avisoErro } from "./ui.js";
-import { noComputador, copiarImagem, msgComputador } from "./enviar-computador.js";
+import { noComputador, copiarImagem, abrirWhatsAppWeb } from "./enviar-computador.js";
 const W = 1080,
   H = 1350;
 let logoImg = null;
@@ -375,7 +375,8 @@ export function openMockup({
   fotos = [],
   maxFotos = 15,
   kit = "pr",
-  encarte = "calendario"
+  encarte = "calendario",
+  tel = ""
 } = {}) {
   const pas = kit === "paspatur";
   const st = {
@@ -718,10 +719,11 @@ export function openMockup({
       return;
     }
     const b = await blob();
+    // computador: copia a imagem e abre a conversa no WhatsApp Web (Ctrl+V cola a imagem)
     if (noComputador()) {
-      const copiou = await copiarImagem(b);
-      bDown.onclick();
-      return alertMsg(p, msgComputador(copiou));
+      if (!(await copiarImagem(b))) bDown.onclick();
+      abrirWhatsAppWeb(tel, st.modo !== "kit" ? msgEscolha() : "");
+      return alertMsg(p, "Imagem copiada. Na conversa do WhatsApp Web, aperte Ctrl+V e envie.");
     }
     const file = new File([b], fileName(), { type: "image/jpeg" });
     const data = { files: [file] };
@@ -791,8 +793,7 @@ export function openMockup({
       bVideo.textContent = "🎬 Enviar vídeo";
     }
   };
-  if (noComputador()) bShare.textContent = "Copiar para o WhatsApp Web";
-  else if (!navigator.canShare) bShare.textContent = "Baixar para o WhatsApp";
+  if (!noComputador() && !navigator.canShare) bShare.textContent = "Baixar para o WhatsApp";
   paintSlots();
   setModo(modo);
   // fotos já escolhidas pela família, na ordem dos lugares: ficam onde vieram (sem a sugestão automática)
