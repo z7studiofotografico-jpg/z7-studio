@@ -122,8 +122,8 @@ botão "Mudar ano" nas importações de Formatura/Paspatur, aba Vendidos (admin)
 11. Revisão 11/11: contratos do colégio só de quem fechou (REGRAS A PUBLICAR), Entregues 300 por vez, consultas
    do PR em repasse-consultas.js, fotos do Drive pela miniatura quando o Google recusa. Pendentes por decisão:
    (a) leitura do Drive com a conta Google de cada um (Ajustes → driveLeitura = "conta"): precisa a Luciana e a
-   equipe como usuários de teste no Google Cloud; (b) PR/Formatura "só o dele" também na Busca: muda o fluxo do
-   pedido de aluno repetido e ~70 consultas; (c) alugueis/becas não têm responsável gravado.
+   equipe como usuários de teste no Google Cloud; (b) ~~PR/Formatura "só o dele" na Busca~~: combinado em 11/11 deixar
+   como está (a Busca mostra todos para achar o aluno e pedir a passagem); (c) alugueis/becas não têm responsável gravado.
 8. **PRÓXIMO PASSO: Preços** — a Luciana está confusa com os preços; sentar junto e mapear todos os valores
    (PR, Paspatur, Formatura, Linha de Frente/Repasse, Pix/cartão, promo, última oferta, mínimos/descontos)
    antes de mexer em qualquer coisa.
