@@ -108,7 +108,13 @@ console.log("Pasta no site:", destino);
 
 const indice = JSON.parse((await lerTexto(ftp, "indice.json")) || "{}");
 const novas = fotos.filter(f => indice[f.id] !== f.modifiedTime);
-console.log("Novas ou mudadas:", novas.length, "·", gb(novas.reduce((t, f) => t + (Number(f.size) || 0), 0)), SIMULAR ? "(simulação: nada é copiado)" : "");
+console.log(
+  "Novas ou mudadas:",
+  novas.length,
+  "·",
+  gb(novas.reduce((t, f) => t + (Number(f.size) || 0), 0)),
+  SIMULAR ? "(simulação: nada é copiado)" : ""
+);
 if (!SIMULAR) {
   await ftp.uploadFrom(Readable.from([Buffer.from(HTACCESS)]), ".htaccess");
   let ok = 0,
