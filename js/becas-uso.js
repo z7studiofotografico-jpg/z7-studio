@@ -146,13 +146,20 @@ export function ouvirUso(C, aoMudar, falhou) {
   );
 }
 
-// Dono de cada aluno de aluguel = quem fechou o contrato do colégio naquele ano ("" = sem contrato: a equipe toda vê)
-// devolve [[id, respEmail]] só dos que estão diferentes
-export function donosAlugueis(alunos, contratos) {
+// Dono de cada aluno de aluguel = quem fechou o contrato do colégio naquele ano. Sem contrato: fica o dono que já tem
+// (o admin pode ter passado para alguém); sem nenhum, "" (a equipe toda vê). semContrato = dono para os sem dono.
+// devolve [[id, respEmail]] só dos que precisam mudar
+export function donosAlugueis(alunos, contratos, semContrato = "") {
   const dono = new Map(contratos.map(c => [`${c.instId}|${c.ano}`, String(c.respEmail || "").toLowerCase()]));
-  return alunos
-    .filter(a => (a.respEmail ?? null) !== (dono.get(`${a.instId}|${Number(a.ano)}`) || ""))
-    .map(a => [a.id, dono.get(`${a.instId}|${Number(a.ano)}`) || ""]);
+  const out = [];
+  alunos.forEach(a => {
+    const d = dono.get(`${a.instId}|${Number(a.ano)}`);
+    const atual = a.respEmail ?? null;
+    if (d !== undefined) {
+      if (atual !== d) out.push([a.id, d]);
+    } else if (atual === null || (semContrato && atual === "")) out.push([a.id, semContrato]);
+  });
+  return out;
 }
 // Avulsos ainda sem dono gravado: o dono é quem registrou (porEmail); os antigos sem registro ficam sem dono ("")
 export function donosAvulsos(avulsos) {

@@ -9,6 +9,9 @@ on:
         description: "Só mostrar o que mudaria (não grava)"
         type: boolean
         default: true
+      sem_contrato:
+        description: "E-mail de quem fica com os alunos de colégio sem contrato (vazio = a equipe toda vê)"
+        default: ""
 
 jobs:
   migrar:
@@ -28,3 +31,4 @@ jobs:
         env:
           FIREBASE_SERVICE_ACCOUNT: ${{ secrets.FIREBASE_SERVICE_ACCOUNT }}
           SIMULAR: ${{ inputs.simular }}
+          SEM_CONTRATO: ${{ inputs.sem_contrato }}

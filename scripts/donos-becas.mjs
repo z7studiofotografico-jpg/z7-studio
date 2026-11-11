@@ -11,7 +11,10 @@ initializeApp({ credential: cert(JSON.parse(process.env.FIREBASE_SERVICE_ACCOUNT
 const db = getFirestore();
 const ler = async nome => (await db.collection(nome).get()).docs.map(d => ({ id: d.id, ...d.data() }));
 const [alunos, avulsos, contratos, copias] = await Promise.all([ler("alugueis"), ler("becas"), ler("contratosColegio"), ler(USO)]);
-const dA = donosAlugueis(alunos, contratos),
+const SEM_CONTRATO = String(process.env.SEM_CONTRATO || "")
+  .trim()
+  .toLowerCase(); // dono dos alunos sem contrato
+const dA = donosAlugueis(alunos, contratos, SEM_CONTRATO),
   dV = donosAvulsos(avulsos);
 const { gravar, apagar } = acertoDoUso(alunos, avulsos, copias);
 const conta = {};

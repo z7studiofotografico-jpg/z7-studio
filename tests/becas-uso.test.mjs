@@ -57,11 +57,13 @@ test("donos: aluno com quem fechou o contrato; avulso com quem registrou", () =>
     { id: "a3", instId: "i2", ano: 2026 },
     { id: "a4", instId: "i1", ano: 2025, respEmail: "bia@x.com" }
   ];
+  // sem contrato: fica o dono que já tem (a4); sem nenhum, "" (a3)
   assert.deepEqual(donosAlugueis(alunos, contratos), [
     ["a1", "ana@x.com"],
-    ["a3", ""],
-    ["a4", ""]
+    ["a3", ""]
   ]);
+  // os sem dono e sem contrato passam para quem o admin disser
+  assert.deepEqual(donosAlugueis([{ id: "a5", instId: "i2", ano: 2026, respEmail: "" }], contratos, "lu@x.com"), [["a5", "lu@x.com"]]);
   assert.deepEqual(donosAvulsos([{ id: "v1", porEmail: "Bia@x.com" }, { id: "v2" }, { id: "v3", respEmail: "x" }]), [
     ["v1", "bia@x.com"],
     ["v2", ""]
