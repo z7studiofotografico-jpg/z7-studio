@@ -3,6 +3,7 @@
 // - "Fotos para escolher": todas as fotos do ensaio numeradas, para o formando escolher o que vai em cada lugar.
 // Toda imagem sai com marca d'água repetida (um print não serve como foto final).
 import { el, avisoErro } from "./ui.js";
+import { noComputador, copiarImagem, msgComputador } from "./enviar-computador.js";
 const W = 1080,
   H = 1350;
 let logoImg = null;
@@ -717,6 +718,11 @@ export function openMockup({
       return;
     }
     const b = await blob();
+    if (noComputador()) {
+      const copiou = await copiarImagem(b);
+      bDown.onclick();
+      return alertMsg(p, msgComputador(copiou));
+    }
     const file = new File([b], fileName(), { type: "image/jpeg" });
     const data = { files: [file] };
     if (st.modo !== "kit") data.text = msgEscolha();
@@ -785,7 +791,8 @@ export function openMockup({
       bVideo.textContent = "🎬 Enviar vídeo";
     }
   };
-  if (!navigator.canShare) bShare.textContent = "Baixar para o WhatsApp";
+  if (noComputador()) bShare.textContent = "Copiar para o WhatsApp Web";
+  else if (!navigator.canShare) bShare.textContent = "Baixar para o WhatsApp";
   paintSlots();
   setModo(modo);
   // fotos já escolhidas pela família, na ordem dos lugares: ficam onde vieram (sem a sugestão automática)

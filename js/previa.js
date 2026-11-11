@@ -3,6 +3,7 @@
 // - "Prévia do álbum": capa e duas páginas duplas do álbum, para os Kits 04 e 05.
 // Tudo sai com marca d'água repetida e as fotos reduzidas (um print não serve como foto final).
 import { el, avisoErro } from "./ui.js";
+import { noComputador } from "./enviar-computador.js";
 import { cover, marca, prep, logoAtual } from "./mockup.js";
 import { msgPrevia } from "./mensagens.js";
 
@@ -420,6 +421,20 @@ export function openPrevia({ nome = "", escola = "", kits = "", toast = null } =
     if (!files) return;
     const data = { files, text: msgPrevia(st.nome, st.fotos.length, kits) };
     let motivo = "";
+    // computador: a janela de compartilhar do Windows (Vincular ao Celular) falha; baixa e copia a mensagem
+    if (noComputador()) {
+      const copiou = await navigator.clipboard?.writeText(data.text).then(
+        () => true,
+        () => false
+      );
+      if (await bDown.onclick(files))
+        info.textContent =
+          "Imagens baixadas" +
+          (copiou ? " e mensagem copiada" : "") +
+          ". No WhatsApp Web, clique no clipe 📎, escolha as imagens" +
+          (copiou ? " e cole a mensagem com Ctrl+V." : ".");
+      return;
+    }
     if (navigator.canShare && navigator.canShare(data)) {
       try {
         await navigator.share(data);
@@ -431,6 +446,7 @@ export function openPrevia({ nome = "", escola = "", kits = "", toast = null } =
     }
     if (await bDown.onclick(files)) info.textContent = motivo + "Imagens baixadas. No WhatsApp, clique no clipe 📎 e escolha as imagens.";
   };
-  if (!navigator.canShare) bShare.textContent = "Baixar para o WhatsApp";
+  if (noComputador()) bShare.textContent = "Baixar para o WhatsApp Web";
+  else if (!navigator.canShare) bShare.textContent = "Baixar para o WhatsApp";
   setModo("folha");
 }
