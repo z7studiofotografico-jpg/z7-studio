@@ -123,7 +123,9 @@ export function ouvirJuntas(qs, aoMudar, falhou) {
       q,
       s => {
         partes[i] = s.docs;
-        if (partes.every(Boolean)) aoMudar(partes.flat());
+        if (!partes.every(Boolean)) return;
+        const vistos = new Set();
+        aoMudar(partes.flat().filter(d => !vistos.has(d.id) && vistos.add(d.id)));
       },
       falhou
     )

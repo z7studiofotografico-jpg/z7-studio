@@ -512,20 +512,18 @@ function openTab(k) {
   renderList(true);
   const today = U.todayStr();
   let q = null;
-  // Para hoje (10/11): admin vê os seus e os sem responsável (meuOuLivre); A trabalhar: os seus sem data para hoje;
-  // botão da pessoa: os dela, mais os caídos.
   if (k === "trabalhar") q = emAndamento(C.email || "");
   if (k === "equipe" && C.isAdmin && pessoaAberta.email) q = emAndamento(pessoaAberta.email, [...ABERTAS, "CAÍDO"]);
   // a equipe vê só os contatos dela (soMinha); a busca continua mostrando todos, para achar o aluno
   if (seg === "lf") {
-    if (k === "hoje") q = FS.query(col, ...baseLF(), ...soMinha(), FS.where("etapa", "in", [...ABERTAS, "ENTREGUE"]), FS.limit(300));
+    if (k === "hoje") q = FS.query(col, ...baseLF(), ...soMinha(), FS.where("etapa", "in", ABERTAS), FS.limit(300));
     if (k === "interessados") q = FS.query(col, ...baseLF(), ...soMinha(), FS.where("etapa", "==", "INTERESSADO"), FS.limit(200));
     if (k === "entregas") q = FS.query(col, ...baseLF(), ...soMinha(), FS.where("etapa", "==", "PAGO"), FS.limit(300));
   } else {
     if (k === "hoje")
       q = C.isAdmin
         ? FS.query(col, FS.where("followup", "<=", today), FS.orderBy("followup"), FS.limit(150))
-        : FS.query(col, ...soMinha(), FS.where("etapa", "in", [...ABERTAS, "ENTREGUE"]), FS.limit(500));
+        : FS.query(col, ...soMinha(), FS.where("etapa", "in", ABERTAS), FS.limit(500));
     if (k === "interessados") q = FS.query(col, ...soMinha(), FS.where("etapa", "==", "INTERESSADO"), FS.limit(200));
     if (k === "entregas") q = FS.query(col, ...soMinha(), FS.where("etapa", "==", "PAGO"), FS.limit(300));
   }
@@ -563,9 +561,10 @@ function openTab(k) {
     console.warn(err);
     U.showNotice("Não foi possível carregar o Repasse. Verifique a internet.");
   };
+  // Para hoje do admin (meuOuLivre): os dele sempre inteiros (a consulta geral tem limite); ver repasse-equipe.js
   if (q)
     unsubList = ouvirJuntas(
-      [q],
+      k === "hoje" && C.isAdmin ? [emAndamento(C.email || ""), q] : [q],
       docs => {
         mudarItems(docs.map(d => Object.assign({ id: d.id }, d.data())));
         renderList();
@@ -734,6 +733,7 @@ function renderList(loading, emptyMsg) {
     const e = el("div", "empty");
     e.style.gridColumn = "1/-1";
     const msgs = {
+      caidos: ["Nenhum caído", "Quem não quer mais (com o motivo) aparece aqui."],
       vendidos: ["Nenhuma venda entregue ainda", "Quem comprou e já recebeu o kit aparece aqui, só para consulta."],
       conferir: ["Nenhuma venda para conferir ✓", "As vendas registradas pela equipe aparecem aqui até você conferir o comprovante."],
       hoje: ["Nada para hoje", 'Separe o seu lote do dia no quadro acima, ou toque em "Trabalhar hoje" na aba A trabalhar.'],

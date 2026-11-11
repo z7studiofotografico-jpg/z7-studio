@@ -218,15 +218,20 @@ export function criarDrive(acesso, buscar = fetch) {
   // 11/11/2026: o Google às vezes recusa o download direto (alt=media) feito com a chave (sem conta), e a resposta
   // vem sem permissão de leitura para o navegador ("Failed to fetch"). Nesses casos baixa pela miniatura do Drive no
   // tamanho original (lh3.googleusercontent.com, que deixa o navegador ler).
+  // (depois da primeira recusa, vai direto pela miniatura: cada foto pedia 3 vezes e demorava)
+  let diretoRecusado = false;
   async function baixar(id) {
     let erro = null;
-    try {
-      const r = await pedir(`${API}/${id}?alt=media&supportsAllDrives=true`);
-      if (r.ok) return await r.blob();
-      erro = new Error("Não consegui baixar a foto (" + r.status + ").");
-    } catch (e) {
-      erro = e;
-    }
+    if (!diretoRecusado)
+      try {
+        const r = await pedir(`${API}/${id}?alt=media&supportsAllDrives=true`);
+        if (r.ok) return await r.blob();
+        erro = new Error("Não consegui baixar a foto (" + r.status + ").");
+        if (r.status === 403 || r.status === 429) diretoRecusado = true;
+      } catch (e) {
+        erro = e;
+        diretoRecusado = !comToken; // "Failed to fetch": a recusa veio sem permissão de leitura (CORS)
+      }
     try {
       const m = await pedir(`${API}/${id}?fields=thumbnailLink,imageMediaMetadata(width,height)&supportsAllDrives=true`);
       const j = m.ok ? await m.json() : {};
