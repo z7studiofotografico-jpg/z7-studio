@@ -16,7 +16,8 @@ export function criarInicio(ctx, Funil) {
     const { late, today } = Funil.contagem();
     $("tVendas").textContent = ctx.isAdmin ? "Abrir" : "Meu desempenho";
     document.querySelectorAll(".tile[data-mod]").forEach(t => {
-      t.hidden = !pode(t.dataset.mod);
+      // Produtos e estoque: some enquanto o estoque estiver desligado em Ajustes (11/11/2026: começa no ano que vem)
+      t.hidden = !pode(t.dataset.mod) || (t.dataset.mod === "produtos" && !(ctx.P && ctx.P.estoqueLigado === "ligado"));
     });
     $("tFunil").textContent =
       late + today ? `${late + today} para hoje` + (late ? ` · ${late} atrasado${late > 1 ? "s" : ""}` : "") : "Nada pendente hoje ✓";

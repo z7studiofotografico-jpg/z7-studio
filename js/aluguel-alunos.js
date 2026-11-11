@@ -23,7 +23,7 @@ import {
   faltaParaAluno,
   somarUso
 } from "./becas-estoque.js";
-import { carregarCatalogo, reservar, desfazerReserva, baixar, estornar, estoqueLigado } from "./estoque.js";
+import { carregarCatalogo, reservar, desfazerReserva, baixar, estornar } from "./estoque.js";
 import { DO_ALUGUEL } from "./catalogo.js";
 import { ESTUDIO, ENDERECO } from "./mensagens.js";
 import { botaoRelatorio } from "./relatorio.js";
@@ -496,7 +496,7 @@ export async function mudarStatus(a, para) {
     return form(a);
   }
   // reservar a beca: confere se tem livre (sem contar o próprio aluno)
-  if (iDe < 1 && iPara >= 1 && estoqueLigado(C)) {
+  if (iDe < 1 && iPara >= 1) {
     const uso = somarUso(usoAvulsos, usoDosAlunos(alunosUso.filter(x => x.id !== a.id)));
     const falta = faltaParaAluno(C.P.estoque || {}, uso, a);
     if (falta.length) {
@@ -750,7 +750,7 @@ export function form(a, pre = {}) {
       if (!a || C.isAdmin) Object.assign(body, { valor: zer.checked ? 0 : lerReais(valor.value), contratoZerado: zer.checked });
       try {
         // já reservado: a troca de tamanho/faixa/capelo também precisa ter livre
-        if (estoqueLigado(C) && a && STATUS_ALUGUEL.indexOf(a.status) >= 1 && a.status !== "Devolvida") {
+        if (a && STATUS_ALUGUEL.indexOf(a.status) >= 1 && a.status !== "Devolvida") {
           const uso = somarUso(usoAvulsos, usoDosAlunos(alunosUso.filter(y => y.id !== a.id)));
           const falta = faltaParaAluno(C.P.estoque || {}, uso, body);
           if (falta.length) {
