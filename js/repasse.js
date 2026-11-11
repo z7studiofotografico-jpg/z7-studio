@@ -407,7 +407,8 @@ function renderTipos() {
       x.n++;
       conta.set(k, x);
     });
-    if (filtroPessoa && !conta.has(filtroPessoa)) conta.set(filtroPessoa, { n: 0, nome: U.first(title(filtroPessoa)) });
+    if (filtroPessoa && !conta.has(filtroPessoa))
+      conta.set(filtroPessoa, { n: 0, nome: filtroPessoa === "-" ? "Sem responsável" : U.first(title(filtroPessoa)) });
     const sel = el("select", "search filtro-pessoa");
     sel.setAttribute("aria-label", "Filtrar por pessoa da equipe");
     const op = (v, t) => {
@@ -470,8 +471,7 @@ function renderChips() {
     ["hoje", "Para hoje"],
     ["interessados", "Interessados"]
   ];
-  // (ordem de 10/11: Caídos · Incompletos · Buscar · A trabalhar · Para hoje · Interessados · A conferir ·
-  //  Vendido/Entregar · Entregues · botões da equipe)
+  // (ordem de 10/11; depois vêm A conferir · Vendido/Entregar · Entregues · botões da equipe)
   if (C.isAdmin) tabs.push(["conferir", "A conferir"]);
   tabs.push(["entregas", "Vendido/Entregar"], ["vendidos", C.isAdmin ? "Entregues" : "Minhas vendas"]);
   tabs.forEach(([k, t]) => {
@@ -500,6 +500,7 @@ function avisoPreco() {
 }
 function openTab(k) {
   avisoPreco();
+  if (k !== tab) mudarFiltroPessoa(""); // trocar de aba volta para "Toda a equipe" (filtro esquecido: "Nada encontrado")
   mudarTab(k);
   renderChips();
   $("rBusca").hidden = k !== "buscar";

@@ -169,3 +169,19 @@ test("trocar as fotos: a escolha feita à mão vale antes da busca pelo nome", a
   assert.equal(trocado.escolhida, true);
   assert.deepEqual([trocado.folhas.map(f => f.id), trocado.fotos.map(f => f.id)], [["f2"], ["s1", "s2"]]);
 });
+
+test("foto: se o download direto falhar, baixa pela miniatura no tamanho original", async () => {
+  const { criarDrive, miniaturaGrande } = await import("../js/drive-fotos.js");
+  assert.equal(miniaturaGrande("https://lh3.googleusercontent.com/x/AB=s220", 1080), "https://lh3.googleusercontent.com/x/AB=s1080");
+  const pedidos = [];
+  const buscar = async u => {
+    pedidos.push(u);
+    if (/alt=media/.test(u)) throw new TypeError("Failed to fetch");
+    if (/fields=thumbnailLink/.test(u))
+      return { ok: true, json: async () => ({ thumbnailLink: "https://lh3.googleusercontent.com/x/AB=s220", imageMediaMetadata: { width: 1080, height: 535 } }) };
+    return { ok: true, blob: async () => "FOTO" };
+  };
+  const D = criarDrive("chave", buscar);
+  assert.equal(await D.baixar("f1"), "FOTO");
+  assert.ok(pedidos.some(u => u === "https://lh3.googleusercontent.com/x/AB=s1080"));
+});

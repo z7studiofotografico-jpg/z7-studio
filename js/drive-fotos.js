@@ -172,6 +172,8 @@ export function corpoEnvio(meta, blob, tipo, b) {
   ]);
 }
 // ---------- leitura no Drive ----------
+// link da miniatura do Drive ("…=s220") no tamanho pedido (lado maior em pixels)
+export const miniaturaGrande = (link, lado) => String(link).replace(/=s\d+(-c)?$/, "") + "=s" + Math.round(lado);
 // acesso = a chave do Google (texto) ou uma função que devolve o token da conta Google da pessoa (pasta fechada)
 export function criarDrive(acesso, buscar = fetch) {
   const cache = {};
@@ -213,10 +215,31 @@ export function criarDrive(acesso, buscar = fetch) {
     const r = await pedir(`${API}/${id}?fields=name&supportsAllDrives=true`);
     return r.ok ? (await r.json()).name || "" : "";
   }
+  // 11/11/2026: o Google às vezes recusa o download direto (alt=media) feito com a chave (sem conta), e a resposta
+  // vem sem permissão de leitura para o navegador ("Failed to fetch"). Nesses casos baixa pela miniatura do Drive no
+  // tamanho original (lh3.googleusercontent.com, que deixa o navegador ler).
   async function baixar(id) {
-    const r = await pedir(`${API}/${id}?alt=media&supportsAllDrives=true`);
-    if (!r.ok) throw new Error("Não consegui baixar a foto (" + r.status + ").");
-    return r.blob();
+    let erro = null;
+    try {
+      const r = await pedir(`${API}/${id}?alt=media&supportsAllDrives=true`);
+      if (r.ok) return await r.blob();
+      erro = new Error("Não consegui baixar a foto (" + r.status + ").");
+    } catch (e) {
+      erro = e;
+    }
+    try {
+      const m = await pedir(`${API}/${id}?fields=thumbnailLink,imageMediaMetadata(width,height)&supportsAllDrives=true`);
+      const j = m.ok ? await m.json() : {};
+      if (j.thumbnailLink) {
+        const md = j.imageMediaMetadata || {};
+        const lado = Math.max(Number(md.width) || 0, Number(md.height) || 0) || 2400;
+        const r2 = await buscar(miniaturaGrande(j.thumbnailLink, lado));
+        if (r2.ok) return await r2.blob();
+      }
+    } catch (e) {
+      console.warn("[Z7] foto pela miniatura", e);
+    }
+    throw erro && /baixar a foto/.test(erro.message) ? erro : new Error("Não consegui baixar a foto.");
   }
   // pastas "Prévias - …" de cada colégio: direto na raiz ou dentro das pastas por ano ("Prévias 2026", "PREVIAS")
   async function pastasColegios(raiz) {
