@@ -528,7 +528,7 @@ export function openMockup({
   const sp = el("span");
   sp.style.flex = "1";
   // Kit Paspatur: o livro abrindo (vídeo de ~11 s)
-  const bVer = el("button", "btn", "▶️ Ver abrindo");
+  const bVer = el("button", "btn", pas ? "▶️ Ver abrindo" : "▶️ Ver o vídeo");
   bVer.type = "button";
   const bVideo = el("button", "btn", "🎬 Enviar vídeo");
   bVideo.type = "button";
@@ -556,7 +556,7 @@ export function openMockup({
   let pararVideo = null;
   function setModo(m) {
     st.modo = m;
-    bVer.hidden = bVideo.hidden = !pas || m !== "kit";
+    bVer.hidden = bVideo.hidden = m !== "kit";
     paintEncarte();
     bKit.setAttribute("aria-pressed", String(m === "kit"));
     bEsc.setAttribute("aria-pressed", String(m !== "kit"));
@@ -740,11 +740,13 @@ export function openMockup({
     bDown.onclick();
     alertMsg(p, "Imagem baixada. No WhatsApp Web, clique no clipe 📎 e escolha a imagem (ou arraste o arquivo para a conversa).");
   };
+  // vídeo: o livro abrindo (Paspatur) ou o passeio pelo quadro e porta-retratos (Kit PR, 11/11/2026)
+  const modVideo = async () => (pas ? (pasMod = pasMod || (await import("./mockup-paspatur.js"))) : import("./video-quadro.js"));
   bVer.onclick = async () => {
     try {
-      pasMod = pasMod || (await import("./mockup-paspatur.js"));
+      const vm = await modVideo();
       if (pararVideo) pararVideo();
-      pararVideo = await pasMod.tocar(cv, st, () => {
+      pararVideo = await vm.tocar(cv, st, () => {
         pararVideo = null;
         redraw();
       });
@@ -759,12 +761,12 @@ export function openMockup({
       return;
     }
     try {
-      pasMod = pasMod || (await import("./mockup-paspatur.js"));
-      if (!pasMod.tipoVideo()) return alertMsg(p, "Este aparelho não grava vídeo. Mande a imagem (Enviar pelo WhatsApp).");
+      const vm = await modVideo();
+      if (!vm.tipoVideo()) return alertMsg(p, "Este aparelho não grava vídeo. Mande a imagem (Enviar pelo WhatsApp).");
       if (pararVideo) pararVideo();
       bVideo.disabled = true;
-      bVideo.textContent = "🎬 Gravando… (11 s)";
-      const r = await pasMod.gravarVideo(cv, st);
+      bVideo.textContent = `🎬 Gravando… (${vm.DURACAO} s)`;
+      const r = await vm.gravarVideo(cv, st);
       redraw();
       if (!r || !r.blob.size) return alertMsg(p, "Não deu para gravar o vídeo. Mande a imagem (Enviar pelo WhatsApp).");
       const ext = r.tipo === "video/mp4" ? ".mp4" : ".webm";

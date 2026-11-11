@@ -625,6 +625,13 @@ await cenario("Adriano (admin), com os dados já atualizados no servidor", async
     await f.getByLabel("Valor total").fill("400");
     await f.getByLabel("Parcelas", { exact: true }).fill("3");
     await f.getByLabel("Parcelas", { exact: true }).dispatchEvent("input");
+    // a conta aparece depois do "input" (no GitHub, mais lento, às vezes ainda não tinha aparecido): espera até 3 s
+    await f
+      .locator(".hint")
+      .first()
+      .filter({ hasText: /3x de R\$ 133,33/ })
+      .waitFor({ timeout: 3000 })
+      .catch(() => {});
     ok(
       /3x de R\$ 133,33 \(a 1ª de R\$ 133,34\)/.test(await f.locator(".hint").first().textContent()),
       "divide 400 em 3x sem perder centavo"

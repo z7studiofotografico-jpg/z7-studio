@@ -3,8 +3,8 @@
 // - Imagem: capa fechada e calendário em cima; o livro aberto embaixo, com as fotos nos tamanhos de verdade.
 // - Vídeo (~11 s): a capa abre como um livro, aparecem as fotos, entra o calendário e a capa fecha.
 // Mesmo estilo e marca d'água da prévia do quadro (mockup.js).
-//   página da direita: 1 foto 29x21 · página da esquerda: 1 foto 21x15 e 3 fotos 7x5 · no meio: tira com 7 fotos 4x3
-// Lugares (st.slots): 0 = página da direita, 1 = foto grande da esquerda, 2 = as 3 pequenas, 3 = a tira de 7,
+//   página da direita: 1 foto 29x21 · página da esquerda: 1 foto 21x15 e 3 fotos 7x5 · no meio: tira com 6 fotos 4x3
+// Lugares (st.slots): 0 = página da direita, 1 = foto grande da esquerda, 2 = as 3 pequenas, 3 = a tira de 6,
 // 4 = a foto do calendário ou a foto da turma (A4 deitada, já pronta). st.anoCal = ano do calendário.
 export const ehTurma = st => st.encarte === "turma";
 import { cover, marca, prep, logoAtual, loadImg, exemplo } from "./mockup.js";
@@ -83,7 +83,7 @@ function caixaRedonda(ctx, x, y, w, h, r) {
 }
 
 // ---------- as peças do kit (desenhadas uma vez, na escala de 1 cm = 21 px) ----------
-// lado de dentro da capa: página da esquerda + a tira de 7
+// lado de dentro da capa: página da esquerda + a tira de 6
 function ladoEsquerdo(st, f) {
   const c = tela(PW + TW, PH),
     ctx = c.getContext("2d");
@@ -107,8 +107,8 @@ function ladoEsquerdo(st, f) {
   // a tira (com a dobra dos dois lados)
   const sw = 3 * S,
     sh = 4 * S,
-    sg = (PH - 7 * sh) / 8;
-  for (let i = 0; i < 7; i++) foto(ctx, f(3), PW + (TW - sw) / 2, sg + i * (sh + sg), sw, sh);
+    sg = (PH - 6 * sh) / 7;
+  for (let i = 0; i < 6; i++) foto(ctx, f(3), PW + (TW - sw) / 2, sg + i * (sh + sg), sw, sh);
   [PW, PW + TW].forEach(cx => {
     const d = ctx.createLinearGradient(cx - 12, 0, cx + 12, 0);
     d.addColorStop(0, "rgba(0,0,0,0)");
@@ -231,13 +231,20 @@ async function pecas(st) {
 }
 
 // ---------- fundo e textos (iguais na imagem e no vídeo) ----------
+// parede cinza e mesa grafite embaixo, igual à prévia do quadro (11/11/2026: antes bege)
+const MESA = 900;
 function fundo(ctx) {
-  const bg = ctx.createLinearGradient(0, 0, 0, H);
-  // cinza claro até o cinza grafite clarinho (11/11/2026: antes bege)
+  const bg = ctx.createLinearGradient(0, 0, 0, MESA);
   bg.addColorStop(0, "#ededee");
-  bg.addColorStop(1, "#c8cacd");
+  bg.addColorStop(1, "#d5d7da");
   ctx.fillStyle = bg;
-  ctx.fillRect(0, 0, W, H);
+  ctx.fillRect(0, 0, W, MESA);
+  const tb = ctx.createLinearGradient(0, MESA, 0, H);
+  tb.addColorStop(0, "#55595f");
+  tb.addColorStop(0.08, "#3a3d42");
+  tb.addColorStop(1, "#202225");
+  ctx.fillStyle = tb;
+  ctx.fillRect(0, MESA, W, H - MESA);
 }
 // título, nome, colégio (grande) e preço; maxW = largura da coluna de texto
 function textos(ctx, st, maxW) {
@@ -281,10 +288,10 @@ function rodape(ctx) {
     ctx.drawImage(lg, 60, ly, 64, 64);
     ctx.restore();
   }
-  ctx.fillStyle = TINTA;
+  ctx.fillStyle = "#f0eef0";
   ctx.font = "700 30px 'Barlow Condensed', sans-serif";
   ctx.fillText("Z7 STUDIO", 140, ly + 32);
-  ctx.fillStyle = CINZA;
+  ctx.fillStyle = "#a39fa6";
   ctx.font = "400 20px 'Source Sans 3', sans-serif";
   ctx.fillText("Fotográfico", 140, ly + 58);
   ctx.textAlign = "right";
