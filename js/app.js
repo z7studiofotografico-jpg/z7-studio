@@ -194,6 +194,8 @@ const FSv = Object.assign({}, FS, {
     limites.set(c, n);
     return c;
   },
+  // lista paginada de propósito (a tela já mostra "ver todos"): sem o aviso de lista incompleta
+  limiteSemAviso: n => FS.limit(n),
   query(q, ...cs) {
     const r = FS.query(q, ...cs);
     const n = cs.map(c => limites.get(c)).find(Boolean) || limites.get(q);

@@ -42,7 +42,7 @@ export function consultaDaAba(k, todosEntregues = false) {
           col,
           FS.where("etapa", "==", "ENTREGUE"),
           ...(ehFormatura() ? baseSeg() : seg === "lf" ? baseLF() : []),
-          FS.limit(todosEntregues ? 5000 : LIMITE_ENTREGUES)
+          todosEntregues ? FS.limit(5000) : (FS.limiteSemAviso || FS.limit)(LIMITE_ENTREGUES)
         )
       : FS.query(
           col,
