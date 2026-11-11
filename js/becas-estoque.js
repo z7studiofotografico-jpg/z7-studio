@@ -108,12 +108,15 @@ export function faltaParaAluno(E, uso, a) {
       if (livre(ET[a.tamanho], ((uso.tamanhos || {})[a.becaTipo] || {})[a.tamanho]) < 1) out.push(`${nomeBeca(a.becaTipo)} ${a.tamanho}`);
       if (a.menosLonga) {
         const EM = ((E.menosLonga || {})[a.becaTipo] || {})[a.tamanho];
-        if (livre(EM, ((uso.menosLonga || {})[a.becaTipo] || {})[a.tamanho]) < 1) out.push(`${a.tamanho}1 (menos longa)`);
+        if (n0(EM) && livre(EM, ((uso.menosLonga || {})[a.becaTipo] || {})[a.tamanho]) < 1) out.push(`${a.tamanho}1 (menos longa)`);
       }
     }
   }
-  if (a.faixa && livre((E.faixas || {})[a.faixa], (uso.faixas || {})[a.faixa]) < 1) out.push("Faixa " + nomeFaixa(a.faixa).toLowerCase());
-  if (a.capelo && livre((E.capelos || {})[a.capelo], (uso.capelos || {})[a.capelo]) < 1) out.push(nomeCapelo(a.capelo));
+  // 11/11/2026: só confere o que tem estoque cadastrado (faixa ou capelo sem número cadastrado não trava o aluno)
+  if (a.faixa && n0((E.faixas || {})[a.faixa]) && livre((E.faixas || {})[a.faixa], (uso.faixas || {})[a.faixa]) < 1)
+    out.push("Faixa " + nomeFaixa(a.faixa).toLowerCase());
+  if (a.capelo && n0((E.capelos || {})[a.capelo]) && livre((E.capelos || {})[a.capelo], (uso.capelos || {})[a.capelo]) < 1)
+    out.push(nomeCapelo(a.capelo));
   return out;
 }
 
