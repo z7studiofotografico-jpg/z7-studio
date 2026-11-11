@@ -3130,6 +3130,8 @@ await cenario("Fotos do aluno direto do Google Drive", async () => {
   });
   const { pg, erros, ctx } = await abrir(ADRIANO, d);
   const urls = [];
+  // a cópia no site (z7studio.com.br/previas) ainda não tem estas fotos: o app cai no Drive
+  await ctx.route(/z7studio\.com\.br\/previas\//, rt => rt.fulfill({ status: 404, body: "" }));
   await ctx.route(/googleapis\.com\/drive\/v3\/files/, rt => {
     const u = decodeURIComponent(rt.request().url());
     urls.push(u);
@@ -3171,6 +3173,7 @@ await cenario("Fotos do aluno direto do Google Drive", async () => {
   );
   arvore.pasta9 = [{ id: "foto91", name: "x.jpg", mimeType: "image/jpeg" }];
   const j2 = await abrir(ADRIANO, d, { compacta: true });
+  await j2.ctx.route(/z7studio\.com\.br\/previas\//, rt => rt.fulfill({ status: 404, body: "" }));
   await j2.ctx.route(/googleapis\.com\/drive\/v3\/files/, rt => {
     const u = decodeURIComponent(rt.request().url());
     if (/alt=media/.test(u))
@@ -3379,6 +3382,7 @@ await cenario("Equipe exclui uma foto do aluno (vai para a lixeira do Drive)", a
     };
   });
   const lixo = [];
+  await ctx.route(/z7studio\.com\.br\/previas\//, rt => rt.fulfill({ status: 404, body: "" }));
   await ctx.route(/googleapis\.com\/drive\/v3\/files/, rt => {
     const q = rt.request();
     const u = decodeURIComponent(q.url());
