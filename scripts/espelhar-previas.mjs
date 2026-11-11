@@ -67,16 +67,25 @@ async function listar(raiz) {
   return fotos;
 }
 // a foto inteira; se o Google recusar o download, a miniatura no tamanho original
+// (11/11/2026: a recusa vinha em toda foto, com 2 esperas de 2 e 4 s cada: depois da primeira recusa vai direto
+//  pela miniatura; a cópia levava uns 20 s por foto)
+let diretoRecusado = false;
 async function baixar(f) {
-  const r = await drive(`${API}/${f.id}?alt=media&supportsAllDrives=true&key=${CHAVE}`, 2);
-  if (r.ok) return Buffer.from(await r.arrayBuffer());
+  let status = 0;
+  if (!diretoRecusado) {
+    const r = await drive(`${API}/${f.id}?alt=media&supportsAllDrives=true&key=${CHAVE}`, 0);
+    if (r.ok) return Buffer.from(await r.arrayBuffer());
+    status = r.status;
+    if (r.status === 403) diretoRecusado = true;
+  }
   if (f.thumbnailLink) {
     const md = f.imageMediaMetadata || {};
     const lado = Math.max(Number(md.width) || 0, Number(md.height) || 0) || 2400;
-    const r2 = await fetch(f.thumbnailLink.replace(/=s\d+(-c)?$/, "") + "=s" + lado);
+    const r2 = await drive(f.thumbnailLink.replace(/=s\d+(-c)?$/, "") + "=s" + lado, 3);
     if (r2.ok) return Buffer.from(await r2.arrayBuffer());
+    status = r2.status;
   }
-  throw new Error(`não baixou (${r.status})`);
+  throw new Error(`não baixou (${status})`);
 }
 async function lerTexto(ftp, nome) {
   const partes = [];
@@ -117,23 +126,41 @@ console.log(
 );
 if (!SIMULAR) {
   await ftp.uploadFrom(Readable.from([Buffer.from(HTACCESS)]), ".htaccess");
+  // várias cópias ao mesmo tempo (cada uma com a sua conexão FTP)
+  const fila = novas.slice(0, LIMITE);
+  const inicio = Date.now();
   let ok = 0,
-    erro = 0;
-  for (const f of novas.slice(0, LIMITE)) {
-    if (Date.now() > ATE) break;
-    try {
-      const b = await baixar(f);
-      await ftp.uploadFrom(Readable.from([b]), f.id + ".jpg");
-      indice[f.id] = f.modifiedTime;
-      ok++;
-    } catch (e) {
-      erro++;
-      console.warn("Falhou:", f.name, e.message);
+    erro = 0,
+    salvoEm = 0;
+  const salvarIndice = c => c.uploadFrom(Readable.from([Buffer.from(JSON.stringify(indice))]), "indice.json");
+  async function trabalhador(n) {
+    const c = n === 0 ? ftp : new Client(60000);
+    if (n) {
+      await c.access({ host: process.env.FTP_HOST, user: process.env.FTP_USER, password: process.env.FTP_PASS, secure: false });
+      await c.cd(await ftp.pwd());
     }
-    // guarda o índice de vez em quando (se o GitHub parar no meio, não copia tudo de novo)
-    if ((ok + erro) % 200 === 0) await ftp.uploadFrom(Readable.from([Buffer.from(JSON.stringify(indice))]), "indice.json");
+    while (fila.length && Date.now() < ATE) {
+      const f = fila.shift();
+      try {
+        const b = await baixar(f);
+        await c.uploadFrom(Readable.from([b]), f.id + ".jpg");
+        indice[f.id] = f.modifiedTime;
+        ok++;
+      } catch (e) {
+        erro++;
+        console.warn("Falhou:", f.name, e.message);
+      }
+      // guarda o índice de vez em quando (se o GitHub parar no meio, não copia tudo de novo)
+      if (ok + erro - salvoEm >= 500) {
+        salvoEm = ok + erro;
+        await salvarIndice(c);
+        console.log(`${ok + erro} feitas · ${((Date.now() - inicio) / (ok + erro) / 1000).toFixed(1)} s por foto`);
+      }
+    }
+    if (n) c.close();
   }
-  await ftp.uploadFrom(Readable.from([Buffer.from(JSON.stringify(indice))]), "indice.json");
+  await Promise.all(Array.from({ length: Number(process.env.JUNTAS) || 6 }, (_, n) => trabalhador(n)));
+  await salvarIndice(ftp);
   console.log(`Copiadas: ${ok} · com erro: ${erro} · faltam: ${Math.max(0, novas.length - ok - erro)} (vão na próxima vez)`);
 }
 ftp.close();
