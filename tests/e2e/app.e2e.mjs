@@ -1581,6 +1581,47 @@ await cenario("Pedro (vendedor: Linha de Frente, Agendamento, Instituições)", 
         sAg["instituicoes/i2"].diaFotos,
       "vendedor agenda o dia de fotos do colégio pela agenda"
     );
+    // 11/11/2026: segundo dia de fotos do mesmo colégio, num dia que já tem outro compromisso (só avisa)
+    await pg.getByRole("button", { name: "+ Agendar colégio" }).click();
+    await calmo(pg);
+    sa = pg.locator(".sheet").last();
+    await sa.getByRole("button", { name: "🏫 Particular" }).click();
+    await sa.getByLabel("Colégio").fill("Colegio Beta");
+    await sa.locator("button[type=submit]").click();
+    await calmo(pg);
+    await pg.getByRole("button", { name: "Sim, outro dia de fotos" }).click({ timeout: 6000 });
+    await calmo(pg);
+    sa = pg.locator(".sheet").last();
+    ok(/Dia de fotos 2/i.test(await sa.locator("h2").textContent()), "pergunta e abre o segundo dia de fotos do colégio");
+    await sa.locator("input[type=date]").first().fill(dia(20));
+    const media2 = sa.getByLabel("Média de alunos (obrigatório)");
+    if (!(await media2.inputValue())) await media2.fill("120");
+    await sa.locator("button[type=submit]").click();
+    await calmo(pg);
+    const s2d = await store();
+    ok(
+      s2d["instituicoes/i2"].diaFotos2 &&
+        s2d["instituicoes/i2"].diaFotos2.data === dia(20) &&
+        s2d["instituicoes/i2"].diaFotos.data === dia(15) &&
+        s2d["agenda/" + dia(20) + "_2"] &&
+        s2d["agenda/" + dia(20)],
+      "dois dias de fotos no mesmo colégio, e dois compromissos no mesmo dia (o segundo só avisa)"
+    );
+    const avDia = pg.locator(".sheet").last();
+    if (
+      /Avisar o colégio/i.test(
+        (await avDia
+          .locator("h2")
+          .textContent()
+          .catch(() => "")) || ""
+      )
+    )
+      await avDia
+        .getByRole("button", { name: /Fechar|Agora não|Depois/ })
+        .first()
+        .click()
+        .catch(() => {});
+    await calmo(pg);
     // Colégio novo cadastrado pela própria agenda
     await pg.getByRole("button", { name: "+ Agendar colégio" }).click();
     await calmo(pg);
@@ -1729,7 +1770,11 @@ await cenario("Pedro (vendedor: Linha de Frente, Agendamento, Instituições)", 
       "aba Visitas mostra a visita nova (a janela acompanha o banco)"
     );
     await jan.locator(".ja-abas").getByText("Agendamentos").click();
-    ok((await jan.locator(".ja-ev").count()) === 4, "aba Agendamentos: dia de fotos, formatura, Paspatur e becas");
+    // (o Beta tem 2 dias de fotos desde o teste do Agendar colégio: 5 linhas, com o "+ Outro dia de fotos")
+    ok(
+      (await jan.locator(".ja-ev").count()) === 5 && (await jan.getByRole("button", { name: "📸 + Outro dia de fotos" }).count()) === 1,
+      "aba Agendamentos: 2 dias de fotos, formatura, Paspatur e becas"
+    );
     await jan.getByText("‹ Voltar para a lista").click();
     // datas e turma agora ficam no card Formaturas
   });

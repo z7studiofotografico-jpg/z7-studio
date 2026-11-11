@@ -37,7 +37,7 @@ export function produtos(t) {
 }
 
 // ---------- compromissos na agenda (formatura e dia de fotos) ----------
-// Cada dia só tem UM compromisso: o documento agenda/AAAA-MM-DD guarda quem ocupou o dia.
+// Cada compromisso é um documento agenda/AAAA-MM-DD (_2, _3…); mais de um no mesmo dia só avisa (11/11/2026).
 // O vendedor sugere a data (fica "pendente", o dia já fica segurado) e só a Luciana confirma.
 export const KINDS = {
   formatura: { campo: "formatura", nome: "Formatura", ico: "🎓" },
@@ -59,13 +59,33 @@ export const formaturasDe = it =>
   );
 // a próxima formatura livre do colégio ("+ Outra formatura"); null se já tem todas
 export const proxFormatura = it => KINDS_FORMATURA.find(k => !(it && it[k] && it[k].data && it[k].status !== "recusado")) || null;
+// 11/11/2026: também mais de um dia de fotos e de Paspatur no mesmo colégio ("fotos2", "paspatur2"…)
+export const MAX_DIAS = 3;
+for (let n = 2; n <= MAX_DIAS; n++) {
+  KINDS["fotos" + n] = { campo: "diaFotos" + n, nome: "Dia de fotos " + n, ico: "📸" };
+  KINDS["paspatur" + n] = { campo: "diaPaspatur" + n, nome: "Paspatur " + n, ico: "🎞️" };
+}
+// "fotos2" → "fotos"; "formatura3" → "formatura"
+export const baseKind = k => String(k || "").replace(/\d$/, "");
+export const variantes = base => Object.keys(KINDS).filter(k => baseKind(k) === base);
+const marcado = (it, k) => {
+  const ev = it && it[KINDS[k].campo];
+  return !!(ev && ev.data && ev.status !== "recusado");
+};
+// os dias marcados do colégio para um tipo (fotos, paspatur, formatura), na ordem do dia; e o próximo livre
+export const marcadosDe = (it, base) =>
+  variantes(base)
+    .filter(k => marcado(it, k))
+    .sort((a, b) => it[KINDS[a].campo].data.localeCompare(it[KINDS[b].campo].data));
+export const proxDe = (it, base) => variantes(base).find(k => !marcado(it, k)) || null;
 // Nome do compromisso com o nome da instituição: "Dia de fotos no Colégio Alfa", "Formatura do Colégio Alfa"
 export function nomeEvento(kind, instNome) {
   const n = title(instNome || "");
   if (!n) return KINDS[kind] ? KINDS[kind].nome : "Compromisso";
-  if (kind === "paspatur") return `Paspatur no ${n}`;
+  const num = (/(\d)$/.exec(kind || "") || [])[1];
+  if (baseKind(kind) === "paspatur") return `Paspatur ${num ? num + " " : ""}no ${n}`;
   if (kind === "becas") return `Aluguel de becas no ${n}`;
-  if (kind === "fotos") return `Dia de fotos no ${n}`;
+  if (baseKind(kind) === "fotos") return `Dia de fotos ${num ? num + " " : ""}no ${n}`;
   const nf = /^formatura(\d)$/.exec(kind || "");
   return nf ? `Formatura ${nf[1]} do ${n}` : `Formatura do ${n}`;
 }
@@ -79,7 +99,9 @@ export async function reservarVarios(it, pares) {
     if (atual && atual.status === "confirmado" && !C.aprovador && atual.data !== f.data) throw erroAgenda("confirmado");
   }
   const datas = pares.map(([, f]) => f.data);
-  if (new Set(datas).size !== datas.length) throw erroAgenda("mesmodia");
+  // 11/11/2026: dois compromissos no mesmo dia só AVISAM (antes bloqueava); o aviso aparece depois de gravar
+  const avisos = [];
+  if (new Set(datas).size !== datas.length) avisos.push("Atenção: ficaram dois compromissos deste colégio no mesmo dia.");
   // Feriado não bloqueia (o formulário só avisa): dá para marcar colégio em feriado
   // Dia bloqueado por compromisso de dia inteiro (consulta médica, viagem…)
   // (se não der para conferir, o erro sobe e nada é reservado: a agenda nunca é liberada "no escuro")
@@ -94,7 +116,8 @@ export async function reservarVarios(it, pares) {
     agora = new Date().toISOString();
   // Vagas por dia = equipes (Ajustes). Cada vaga é um documento: AAAA-MM-DD, AAAA-MM-DD_2, AAAA-MM-DD_3.
   const vagas = Math.max(1, Math.min(3, Number(C.P.equipesDia) || 1));
-  const idsDoDia = d => Array.from({ length: vagas }, (_, i) => (i ? `${d}_${i + 1}` : d));
+  // além das vagas das equipes, até 6 compromissos no dia (os a mais só avisam)
+  const idsDoDia = d => Array.from({ length: 6 }, (_, i) => (i ? `${d}_${i + 1}` : d));
   const ehMeu = (sx, kind) => sx.exists() && sx.data().instId === it.id && sx.data().kind === kind;
   const slots = {};
   await FS.runTransaction(db, async tx => {
@@ -106,6 +129,11 @@ export async function reservarVarios(it, pares) {
       // a vaga que já é deste colégio, ou a primeira livre
       const vaga = lidos.find(([, sx]) => ehMeu(sx, kind)) || lidos.find(([, sx]) => !sx.exists());
       if (!vaga) throw erroAgenda("ocupado", { ocupado: lidos[0][1].data() });
+      const outros = lidos.filter(([id, sx]) => sx.exists() && id !== vaga[0]).map(([, sx]) => sx.data());
+      if (outros.length >= vagas)
+        avisos.push(
+          `Atenção: ${U.fmtDate(f.data)} já tem ${outros.map(o => nomeEvento(o.kind, o.instNome) + (o.hora ? " às " + o.hora : "")).join(" e ")}. Marcado mesmo assim.`
+        );
       const antigoId = atual && atual.data && atual.status !== "recusado" ? atual.agendaId || atual.data : null;
       const antigo = antigoId && antigoId !== vaga[0] ? FS.doc(db, "agenda", antigoId) : null;
       leit.push({ kind, f, novo: FS.doc(db, "agenda", vaga[0]), id: vaga[0], antigo, s1: antigo ? await tx.get(antigo) : null });
@@ -137,7 +165,8 @@ export async function reservarVarios(it, pares) {
       });
     }
   });
-  return { status, grupo, slots };
+  if (avisos.length) U.toast([...new Set(avisos)].join(" "));
+  return { status, grupo, slots, avisos };
 }
 export async function liberar(it, kind) {
   const ev = it[KINDS[kind].campo];
@@ -176,7 +205,7 @@ export function camposEvento(kind, f, instNome, dia) {
   hora.value = (f && f.hora) || "";
   const r1 = el("div", "row2");
   const rotDia = { paspatur: "Dia das fotos do Paspatur", becas: "Dia de medir / entregar as becas" };
-  r1.append(field(ehFormaturaKind(kind) ? "Dia da formatura" : rotDia[kind] || "Dia das fotos", data), field("Horário", hora));
+  r1.append(field(ehFormaturaKind(kind) ? "Dia da formatura" : rotDia[baseKind(kind)] || "Dia das fotos", data), field("Horário", hora));
   // feriado só avisa (pode marcar)
   const avFer = el("p", "wait");
   const verFer = () => {
@@ -192,7 +221,7 @@ export function camposEvento(kind, f, instNome, dia) {
       "p",
       "hint",
       (C.aprovador ? "Você confirma direto." : "A data fica segurada e vai para a Luciana aprovar.") +
-        " Cada dia só pode ter um compromisso."
+        " Se o dia já tiver outro compromisso, o app avisa (dá para marcar mesmo assim)."
     ),
     r1,
     avFer
@@ -214,7 +243,7 @@ export function camposEvento(kind, f, instNome, dia) {
       paspatur: "Fotos do Paspatur no colégio",
       becas: "Medir e entregar as becas no colégio"
     };
-    obs = inp((f && f.obs) || padrao[kind] || "Medir beca + ensaio de estúdio no colégio", "o que vai ser feito", 200);
+    obs = inp((f && f.obs) || padrao[baseKind(kind)] || "Medir beca + ensaio de estúdio no colégio", "o que vai ser feito", 200);
     box.append(field("O que vai ser feito", obs));
   }
   if (f && f.status === "recusado")

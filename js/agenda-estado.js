@@ -45,6 +45,13 @@ for (let n = 2; n <= 6; n++) {
   CAMPO["formatura" + n] = "formatura" + n;
   ICO["formatura" + n] = "🎓";
 }
+// mais de um dia de fotos e de Paspatur no mesmo colégio (11/11/2026): fotos2, fotos3, paspatur2, paspatur3
+for (let n = 2; n <= 3; n++) {
+  CAMPO["fotos" + n] = "diaFotos" + n;
+  ICO["fotos" + n] = "📸";
+  CAMPO["paspatur" + n] = "diaPaspatur" + n;
+  ICO["paspatur" + n] = "🎞️";
+}
 export const MESES = [
   "janeiro",
   "fevereiro",

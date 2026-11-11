@@ -4,7 +4,17 @@
 // A janela ouve o próprio colégio no banco: o que mudar (aqui ou em outro aparelho) aparece na hora.
 import { el, title, sheet } from "./ui.js";
 import * as U from "./util.js";
-import { KINDS, linhaEvento, openEvento, ehFormaturaKind, formaturasDe, proxFormatura, confirmarAlunosFormatura } from "./eventos.js";
+import {
+  KINDS,
+  linhaEvento,
+  openEvento,
+  ehFormaturaKind,
+  formaturasDe,
+  proxFormatura,
+  confirmarAlunosFormatura,
+  marcadosDe,
+  proxDe
+} from "./eventos.js";
 import { chaveColegio } from "./historico-dados.js";
 import { gruposEscolas } from "./escolas-pr.js";
 
@@ -201,7 +211,9 @@ function agenda(box, it, C) {
   const hoje = U.todayStr();
   // formaturas: todas as marcadas (uma por turma, dia ou local) ou a vazia; as recusadas aparecem para remarcar
   const fms = Object.keys(KINDS).filter(k => ehFormaturaKind(k) && it[KINDS[k].campo] && it[KINDS[k].campo].data);
-  const kinds = ["fotos", ...(fms.length ? fms : ["formatura"]), "paspatur", "becas"];
+  // dias de fotos e de Paspatur: todos os marcados (pode ter mais de um) ou o vazio
+  const dias = b => (marcadosDe(it, b).length ? marcadosDe(it, b) : [b]);
+  const kinds = [...dias("fotos"), ...(fms.length ? fms : ["formatura"]), ...dias("paspatur"), "becas"];
   kinds.forEach(k => {
     const K = KINDS[k];
     const ev = it[K.campo];
@@ -220,6 +232,13 @@ function agenda(box, it, C) {
   // mais de uma formatura no mesmo colégio: o botão fica sempre aberto
   const prox = formaturasDe(it).length ? proxFormatura(it) : null;
   if (prox) box.append(U.mkBtn("🎓 + Outra formatura (outra turma, dia ou local)", "", () => openEvento(it, prox)));
+  [
+    ["fotos", "📸 + Outro dia de fotos"],
+    ["paspatur", "🎞️ + Outro dia de Paspatur"]
+  ].forEach(([b, t]) => {
+    const px = marcadosDe(it, b).length ? proxDe(it, b) : null;
+    if (px) box.append(U.mkBtn(t, "", () => openEvento(it, px)));
+  });
   if (C.pode("agenda")) box.append(U.mkBtn("📅 Abrir a Agenda", "", () => C.ir("#agenda")));
 }
 

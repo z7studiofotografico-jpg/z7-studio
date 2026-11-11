@@ -1,6 +1,6 @@
 // Agendamento → "+ Agendar colégio": escolhe o colégio e abre o formulário da data (dia de fotos ou formatura).
 import { el, title, field, inp, sel, sheet, botoes as actions, parseTel } from "./ui.js";
-import { openEvento, formaturasDe, proxFormatura, nomeEvento } from "./eventos.js";
+import { openEvento, nomeEvento, marcadosDe, proxDe, KINDS } from "./eventos.js";
 import { confirmar } from "./confirmar.js";
 import * as U from "./util.js";
 import { TIPOS, CARTOES, CARGOS, norm } from "./instituicoes-dados.js";
@@ -214,21 +214,19 @@ export async function agendarColegio(ctx, dia) {
       }
       close();
       let kind = tipoEv.value;
-      // já tem formatura marcada: pode ser outra turma (outro dia ou local) ou mudar a que existe
-      const fms = kind === "formatura" ? formaturasDe(it) : [];
-      if (fms.length && proxFormatura(it)) {
-        const lista = fms
-          .map(k => `${nomeEvento(k, it.nome)}: ${U.fmtDate(it[k].data)}${it[k].turmas ? " (" + it[k].turmas + ")" : ""}`)
+      // já tem esse compromisso marcado (formatura, dia de fotos ou Paspatur): pode ser outro dia ou mudar o que existe
+      const ja = ["formatura", "fotos", "paspatur"].includes(kind) ? marcadosDe(it, kind) : [];
+      if (ja.length && proxDe(it, kind)) {
+        const ev = k => it[KINDS[k].campo];
+        const lista = ja
+          .map(k => `${nomeEvento(k, it.nome)}: ${U.fmtDate(ev(k).data)}${ev(k).turmas ? " (" + ev(k).turmas + ")" : ""}`)
           .join("; ");
-        const outra = await confirmar(
-          "Marcar outra formatura?",
-          `Este colégio já tem: ${lista}. É outra formatura (outra turma, dia ou local)?`,
-          {
-            sim: "Sim, outra formatura",
-            nao: "Não, mudar a que existe"
-          }
-        );
-        kind = outra ? proxFormatura(it) : fms[0];
+        const nomeTipo = { formatura: "formatura", fotos: "dia de fotos", paspatur: "dia de Paspatur" }[kind];
+        const outra = await confirmar(`Marcar outro ${nomeTipo}?`, `Este colégio já tem: ${lista}. É outro ${nomeTipo}?`, {
+          sim: `Sim, outro ${nomeTipo}`,
+          nao: "Não, mudar o que existe"
+        });
+        kind = outra ? proxDe(it, kind) : ja[0];
       }
       openEvento(it, kind, dia);
     });
