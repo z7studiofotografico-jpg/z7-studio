@@ -20,6 +20,8 @@ import {
   status,
   lockInfo,
   contatoPadrao,
+  contatoAtual,
+  escolherContato,
   vendaDe,
   precos,
   precoTxt,
@@ -84,7 +86,7 @@ export function card(it) {
 
   // Para quem mandar
   const cs = it.contatos || [];
-  let escolhido = contatoPadrao(it);
+  let escolhido = contatoAtual(it);
   const quem = el("div", "quem");
   const ns0 = passo(it, escolhido);
   if (cs.length > 1 && ns0) {
@@ -95,6 +97,7 @@ export function card(it) {
       b.setAttribute("aria-pressed", String(c === escolhido));
       b.onclick = () => {
         escolhido = c;
+        escolherContato(it, c);
         quem.querySelectorAll("button").forEach(x => x.setAttribute("aria-pressed", String(x === b)));
         paintNext();
       };
@@ -196,7 +199,7 @@ export function desenharProximo(box, it, escolhido, blocked, li) {
   row.append(
     U.mkBtn("🖼️ Prévia", "", async () =>
       openMockup({
-        tel: (contatoPadrao(it) || {}).tel,
+        tel: (contatoAtual(it) || {}).tel,
         encarte: vendaDe(it) === "paspatur" ? await (await import("./encarte.js")).encarteDoColegio(it.escola) : undefined,
         nome: title(it.nome),
         escola: title(it.escola),
@@ -211,7 +214,7 @@ export function desenharProximo(box, it, escolhido, blocked, li) {
     row.append(
       U.mkBtn("📷 Fotos para escolher", "", () =>
         openMockup({
-          tel: (contatoPadrao(it) || {}).tel,
+          tel: (contatoAtual(it) || {}).tel,
           nome: title(it.nome),
           escola: title(it.escola),
           preco: precoTxt(it),

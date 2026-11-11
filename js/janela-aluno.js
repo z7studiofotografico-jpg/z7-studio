@@ -14,7 +14,8 @@ import {
   C,
   ABERTAS,
   status,
-  contatoPadrao,
+  contatoAtual,
+  escolherContato,
   vendaDe,
   precoTxt,
   ehFormatura,
@@ -131,7 +132,7 @@ function previa(box, it) {
     kit === "paspatur" ? "o livro do Kit Paspatur aberto, com a marca d'água" : "quadro na parede e porta-retratos, com a marca d'água",
     async () =>
       openMockup({
-        tel: (contatoPadrao(it) || {}).tel,
+        tel: (contatoAtual(it) || {}).tel,
         nome: title(it.nome),
         escola: title(it.escola),
         preco: precoTxt(it),
@@ -143,7 +144,7 @@ function previa(box, it) {
   );
   bloco("📷", "Fotos para escolher", "folha com as fotos numeradas para a família escolher", () =>
     openMockup({
-      tel: (contatoPadrao(it) || {}).tel,
+      tel: (contatoAtual(it) || {}).tel,
       nome: title(it.nome),
       escola: title(it.escola),
       preco: precoTxt(it),
@@ -158,7 +159,7 @@ function previa(box, it) {
   box.append(el("h3", null, "Fotos do aluno no Drive"));
   if (it.linkPrevia) box.append(linhaVisitas(C, it)); // quantas vezes a família abriu o link da prévia
   box.append(fotos);
-  const o = { precoTxt: precoTxt(it), tel: (contatoPadrao(it) || {}).tel, salvar: (patch, msg) => save(it, patch, msg) };
+  const o = { precoTxt: precoTxt(it), tel: (contatoAtual(it) || {}).tel, salvar: (patch, msg) => save(it, patch, msg) };
   if (!precos(it).drivePrevias || driveLiberado(C)) miniaturasDoAluno(C, it, fotos, o);
   else
     fotos.append(
@@ -170,7 +171,7 @@ function previa(box, it) {
 // Conversa: mensagem pronta, resposta do cliente e ajuda do Claude
 function conversa(box, it) {
   const cs = it.contatos || [];
-  let escolhido = contatoPadrao(it);
+  let escolhido = contatoAtual(it);
   const quem = el("div", "quem");
   const prox = el("div", "next");
   const pinta = () => desenharProximo(prox, it, escolhido, false, null);
@@ -182,6 +183,7 @@ function conversa(box, it) {
       b.setAttribute("aria-pressed", String(c === escolhido));
       b.onclick = () => {
         escolhido = c;
+        escolherContato(it, c);
         quem.querySelectorAll("button").forEach(x => x.setAttribute("aria-pressed", String(x === b)));
         pinta();
       };

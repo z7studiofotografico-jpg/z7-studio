@@ -194,6 +194,12 @@ export function lockInfo(it) {
   if (!(mins >= 0 && mins <= 30)) return null;
   return { por: a.por, desde: a.desde, mine: a.por === C.me };
 }
+// o contato escolhido em "Mandar para:" (mãe, pai, formando…): a prévia abre o WhatsApp Web na conversa dele
+// (fica só na tela, não é gravado; sem escolha, vale o contato padrão)
+export function escolherContato(it, c) {
+  if (it) Object.defineProperty(it, "_contatoSel", { value: c, writable: true, configurable: true, enumerable: false });
+}
+export const contatoAtual = it => (it && it._contatoSel) || contatoPadrao(it || {});
 export function contatoPadrao(it) {
   const cs = it.contatos || [];
   return cs.find(c => c.tipo === "Mãe") || cs.find(c => c.tipo === "Pai") || cs.find(c => c.tipo === "Formando") || cs[0] || null;

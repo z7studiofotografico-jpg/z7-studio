@@ -53,3 +53,14 @@ test("link vencido: a janela do aluno avisa para mandar de novo", () => {
   assert.match(textoVisitas({ vistos: 0, ate: "2020-01-01T00:00:00Z" }), /^⏰ O link venceu/);
   assert.doesNotMatch(textoVisitas({ vistos: 1, ate: "2999-01-01T00:00:00Z" }), /venceu/);
 });
+
+test("WhatsApp Web da prévia: abre no contato escolhido (mãe, pai ou formando)", async () => {
+  const { contatoAtual, escolherContato } = await import("../js/repasse-estado.js");
+  const mae = { tipo: "Mãe", tel: "21911111111" },
+    aluno = { tipo: "Formando", tel: "21922222222" };
+  const it = { contatos: [aluno, mae] };
+  assert.equal(contatoAtual(it), mae); // sem escolha: a mãe
+  escolherContato(it, aluno);
+  assert.equal(contatoAtual(it).tel, "21922222222");
+  assert.ok(!Object.keys(it).includes("_contatoSel")); // não vai para o banco
+});

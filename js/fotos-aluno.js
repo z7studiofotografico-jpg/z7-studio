@@ -4,6 +4,7 @@ import { el, sheet, title, field } from "./ui.js";
 import * as U from "./util.js";
 import { criarDrive, idDaPasta, pastaDoColegio } from "./drive-fotos.js";
 import { openMockup } from "./mockup.js";
+import { contatoAtual } from "./repasse-estado.js";
 
 let drive = null,
   chaveUsada = "";
@@ -179,6 +180,7 @@ export function abrirFotosDoAluno(C, it, precoTxt) {
       async () => {
         close();
         openMockup({
+          tel: (contatoAtual(it) || {}).tel, // o WhatsApp Web abre na conversa de quem foi escolhido
           nome: title(it.nome || ""),
           escola: title(it.escola || ""),
           preco: precoTxt,
@@ -354,7 +356,7 @@ export async function miniaturasDoAluno(C, it, box, o = {}) {
   const bLink = U.mkBtn(it.linkPrevia ? "🔗 Mandar o link da prévia de novo" : "🔗 Mandar o link da prévia", "", async () => {
     bLink.disabled = true;
     try {
-      await (await import("./link-previa.js")).mandarLinkPrevia(C, it, r, o);
+      await (await import("./link-previa.js")).mandarLinkPrevia(C, it, r, Object.assign({}, o, { tel: (contatoAtual(it) || {}).tel }));
     } catch (e) {
       C.handleErr(e);
     } finally {
