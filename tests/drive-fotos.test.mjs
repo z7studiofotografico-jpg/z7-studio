@@ -176,6 +176,7 @@ test("foto: se o download direto falhar, baixa pela miniatura no tamanho origina
   const pedidos = [];
   const buscar = async u => {
     pedidos.push(u);
+    if (/z7studio\.com\.br\/previas/.test(u)) throw new TypeError("Failed to fetch"); // ainda não está no site
     if (/alt=media/.test(u)) throw new TypeError("Failed to fetch");
     if (/fields=thumbnailLink/.test(u))
       return { ok: true, json: async () => ({ thumbnailLink: "https://lh3.googleusercontent.com/x/AB=s220", imageMediaMetadata: { width: 1080, height: 535 } }) };
@@ -184,4 +185,16 @@ test("foto: se o download direto falhar, baixa pela miniatura no tamanho origina
   const D = criarDrive("chave", buscar);
   assert.equal(await D.baixar("f1"), "FOTO");
   assert.ok(pedidos.some(u => u === "https://lh3.googleusercontent.com/x/AB=s1080"));
+});
+
+test("foto: vem primeiro da cópia no site, sem pedir ao Drive", async () => {
+  const { criarDrive, SITE_PREVIAS } = await import("../js/drive-fotos.js");
+  const pedidos = [];
+  const buscar = async u => {
+    pedidos.push(u);
+    return { ok: true, headers: { get: () => "image/jpeg" }, blob: async () => "DO SITE" };
+  };
+  const D = criarDrive("chave", buscar);
+  assert.equal(await D.baixar("abc123"), "DO SITE");
+  assert.deepEqual(pedidos, [SITE_PREVIAS + "/abc123.jpg"]);
 });

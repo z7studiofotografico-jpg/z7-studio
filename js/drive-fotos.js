@@ -172,6 +172,8 @@ export function corpoEnvio(meta, blob, tipo, b) {
   ]);
 }
 // ---------- leitura no Drive ----------
+// cópia das prévias no site (scripts/espelhar-previas.mjs): z7studio.com.br/previas/<id do arquivo no Drive>.jpg
+export const SITE_PREVIAS = "https://z7studio.com.br/previas";
 // link da miniatura do Drive ("…=s220") no tamanho pedido (lado maior em pixels)
 export const miniaturaGrande = (link, lado) => String(link).replace(/=s\d+(-c)?$/, "") + "=s" + Math.round(lado);
 // acesso = a chave do Google (texto) ou uma função que devolve o token da conta Google da pessoa (pasta fechada)
@@ -221,6 +223,13 @@ export function criarDrive(acesso, buscar = fetch) {
   // (depois da primeira recusa, vai direto pela miniatura: cada foto pedia 3 vezes e demorava)
   let diretoRecusado = false;
   async function baixar(id) {
+    // 11/11/2026: primeiro a cópia no site (feita toda madrugada pelo GitHub); se ainda não estiver lá, o Drive
+    try {
+      const rs = await buscar(`${SITE_PREVIAS}/${id}.jpg`);
+      if (rs.ok && /^image\//.test((rs.headers && rs.headers.get && rs.headers.get("content-type")) || "image/")) return await rs.blob();
+    } catch (_) {
+      // não está no site (ou sem internet): segue para o Drive
+    }
     let erro = null;
     if (!diretoRecusado)
       try {

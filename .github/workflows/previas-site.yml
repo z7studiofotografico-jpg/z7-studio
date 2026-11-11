@@ -12,7 +12,7 @@ on:
         default: true
       limite:
         description: "Máximo de fotos nesta vez"
-        default: "3000"
+        default: "40000"
 
 concurrency:
   group: previas-site
@@ -39,4 +39,4 @@ jobs:
           FTP_USER: ${{ secrets.FTP_USER }}
           FTP_PASS: ${{ secrets.FTP_PASS }}
           SIMULAR: ${{ github.event_name == 'workflow_dispatch' && inputs.simular || 'false' }}
-          LIMITE: ${{ inputs.limite || '3000' }}
+          LIMITE: ${{ inputs.limite || '40000' }}

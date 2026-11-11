@@ -11,7 +11,7 @@ import { Client } from "basic-ftp";
 import admin from "firebase-admin";
 
 const SIMULAR = String(process.env.SIMULAR || "") === "true";
-const LIMITE = Number(process.env.LIMITE) || 3000;
+const LIMITE = Number(process.env.LIMITE) || 40000;
 const ATE = Date.now() + (Number(process.env.MINUTOS) || 300) * 60000; // para antes do limite de 6 h do GitHub
 const API = "https://www.googleapis.com/drive/v3/files";
 const CHAVE = (readFileSync(new URL("../config.js", import.meta.url), "utf8").match(/apiKey:\s*"([^"]+)"/) || [])[1];
