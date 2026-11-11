@@ -48,3 +48,8 @@ test("mensagem e visitas", () => {
     /Abriu 3 vezes · último 11\/11 .* · tocou no WhatsApp 1 vez/
   );
 });
+
+test("link vencido: a janela do aluno avisa para mandar de novo", () => {
+  assert.match(textoVisitas({ vistos: 0, ate: "2020-01-01T00:00:00Z" }), /^⏰ O link venceu/);
+  assert.doesNotMatch(textoVisitas({ vistos: 1, ate: "2999-01-01T00:00:00Z" }), /venceu/);
+});

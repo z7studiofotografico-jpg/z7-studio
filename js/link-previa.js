@@ -93,8 +93,10 @@ export function textoVisitas(d) {
       ? ` · último ${String(t.getDate()).padStart(2, "0")}/${String(t.getMonth() + 1).padStart(2, "0")} ${U.hhmm(t)}`
       : "";
   };
-  if (!v) return "👀 A família ainda não abriu o link.";
+  const venceu = d.ate && new Date(d.ate) < new Date() ? "⏰ O link venceu: toque em “Mandar o link da prévia de novo”. " : "";
+  if (!v) return venceu + "👀 A família ainda não abriu o link.";
   return (
+    venceu +
     `👀 Abriu ${v} ${v === 1 ? "vez" : "vezes"}${quando(d.vistoEm)}` +
     (c ? ` · tocou no WhatsApp ${c} ${c === 1 ? "vez" : "vezes"}` : " · ainda não tocou no WhatsApp")
   );

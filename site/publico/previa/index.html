@@ -323,7 +323,7 @@
             return { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c];
           });
         }
-        function aviso(titulo, texto) {
+        function aviso(titulo, texto, msg) {
           main.innerHTML =
             '<div class="aviso"><h1>' +
             esc(titulo) +
@@ -332,7 +332,7 @@
             '</p><a class="zap" href="https://wa.me/' +
             ZAP +
             "?text=" +
-            encodeURIComponent("Olá! Quero ver as fotos de formatura.") +
+            encodeURIComponent(msg || "Olá! Quero ver as fotos de formatura.") +
             '">Chamar no WhatsApp</a></div>';
         }
         // soma +1 em "vistos" (abriu) ou "cliques" (WhatsApp), uma vez por visita
@@ -381,7 +381,12 @@
             if (d.ate && new Date(d.ate) < new Date())
               return aviso(
                 "Este link expirou",
-                "As fotos de " + (d.nome || "formatura") + " continuam guardadas. Chame a gente no WhatsApp."
+                "As fotos de " + (d.nome || "formatura") + " continuam guardadas. Toque no botão e mandamos o link de novo.",
+                "Olá! O link das fotos de " +
+                  (d.nome || "") +
+                  (d.escola ? " (" + d.escola + ")" : "") +
+                  " expirou. Pode mandar de novo? Código " +
+                  codigo
               );
             mostrar(d);
             somar("vistos", "vistoEm");
