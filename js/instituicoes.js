@@ -16,12 +16,14 @@ import { abrirNaoFechou, listaNaoFecharam } from "./nao-fechou.js";
 import { abrirExcluirInst, faixaExclusaoInst } from "./inst-excluir.js";
 import { ocultoParaMim } from "./confirmar.js";
 import { linhaInst, abrirJanelaInst } from "./inst-janela.js";
+import { rotuloRepresentantes, escolherRepresentante } from "./escolher-pessoa.js";
 export { TIPOS, CARTOES, CARGOS, cartaoDoTipo } from "./instituicoes-dados.js";
 export { agendarColegio } from "./instituicoes-agendar.js";
 // (o Agendamento importa estas daqui; continuam disponíveis)
 export { KINDS, nomeEvento, avisarColegioPorEmail, painelAvisar, msgWhatsColegio } from "./eventos.js";
 let tab = "hoje",
-  unsub = null;
+  unsub = null,
+  repAberto = null; // "👥 Representantes": { email, nome } da pessoa aberta (tab "rep")
 const $ = id => document.getElementById(id);
 
 // ---------- tela ----------
@@ -118,6 +120,7 @@ function filtra(i, k) {
   if (k === "pend") return pendFotos(i) || (cadastroPendente(i) && (C.isAdmin || C.ehMeu(i)));
   if (k === "meus") return C.ehMeu(i) && (ABERTAS.includes(i.etapa) || pendFotos(i));
   if (k === "todos") return true;
+  if (k === "rep") return !!repAberto && (i.respEmail || "") === repAberto.email;
   return i.etapa === k;
 }
 function renderStats() {
@@ -157,7 +160,53 @@ function renderChips() {
     });
     return r;
   };
-  c.append(linha(VISOES), linha([...ETAPAS.filter(e => e !== "NÃO FECHOU").map(e => [e, title(e), COR_ETAPA[e]]), ["todos", "Todas", ""]]));
+  const l1 = linha(VISOES);
+  if (C.isAdmin) l1.append(botaoRepresentantes());
+  c.append(l1, linha([...ETAPAS.filter(e => e !== "NÃO FECHOU").map(e => [e, title(e), COR_ETAPA[e]]), ["todos", "Todas", ""]]));
+}
+// admin: "👥 Representantes" → a lista de quem tem colégios (com quantos); a pessoa escolhida mostra os colégios dela
+function pessoasComColegios() {
+  const m = new Map();
+  items
+    .filter(i => i.respEmail && !i.arquivado && !ocultoParaMim(C, i))
+    .forEach(i => {
+      const x = m.get(i.respEmail) || {
+        email: i.respEmail,
+        nome: ((C.usuarios || {})[i.respEmail] || {}).nome || i.resp || i.respEmail,
+        n: 0
+      };
+      x.n++;
+      m.set(i.respEmail, x);
+    });
+  return [...m.values()].filter(x => x.email !== C.email).sort((a, b) => b.n - a.n);
+}
+function botaoRepresentantes() {
+  const pessoas = pessoasComColegios();
+  const aberta = tab === "rep" ? repAberto : null;
+  const b = el("button", "chip chip-pessoa", rotuloRepresentantes(pessoas, aberta));
+  b.type = "button";
+  b.setAttribute("aria-pressed", String(!!aberta));
+  b.onclick = () =>
+    escolherRepresentante(
+      pessoas,
+      aberta,
+      p => {
+        repAberto = p;
+        tab = "rep";
+        renderChips();
+        renderList();
+      },
+      {
+        dica: "Toque para ver os colégios da pessoa.",
+        vazio: "Nenhum colégio com representante nesta lista.",
+        sair: () => {
+          tab = "hoje";
+          renderChips();
+          renderList();
+        }
+      }
+    );
+  return b;
 }
 // Aviso no alto da tela: colégios da planilha com o cadastro para completar (o do representante; o admin vê todos)
 function avisoCadastro() {

@@ -50,7 +50,8 @@ export function ligarAjustes(ctx, o) {
     ["pDrive", "drivePrevias", "texto"],
     ["pDriveChave", "driveChave", "texto"],
     ["pDriveCliente", "driveCliente", "texto"],
-    ["pDriveLeitura", "driveLeitura", "texto"]
+    ["pDriveLeitura", "driveLeitura", "texto"],
+    ["pEstoque", "estoqueLigado", "texto"] // 11/11/2026: desligado até começar a usar (o ano que vem)
   ];
   // Preços do Paspatur (Etapa 4): config/app → paspatur = { lfPix, lfCartao, kitPreco, kitPromo, kitCartao, kitFinal }
   const PASPATUR = [

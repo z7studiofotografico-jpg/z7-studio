@@ -55,7 +55,7 @@ const base = {
   ["usuarios/" + NOVO]: { nome: "Novo", papel: "equipe", ativo: true },
   ["usuarios/" + ANA]: { nome: "Ana Vendedora", papel: "equipe", ativo: true, modulos: ["becas", "agenda", "funil", "rep"] },
   ["usuarios/" + FORM]: { nome: "Fabi Formaturas", papel: "equipe", ativo: true, modulos: ["formaturas"] },
-  "config/app": { individual: 450, sinal: 100, prazo: 15, comissao: {} },
+  "config/app": { individual: 450, sinal: 100, prazo: 15, comissao: {}, estoqueLigado: "ligado" },
   "leads/l1": {
     nome: "Erica Souza",
     telefone: "21988887777",
@@ -2129,6 +2129,8 @@ for (const [quem, email] of [
             await b.click({ timeout: 3000 }).catch(() => {});
             cliques++;
             await calmo(pg);
+            // "👥 Representantes" abre a lista de pessoas: fecha
+            await pg.evaluate(() => document.querySelectorAll(".sheet:not([id])").forEach(x => x.remove()));
           }
         }
         await confere(h + " (abas)");
@@ -2673,11 +2675,18 @@ await cenario("Para hoje de cada um · botão da pessoa · atividades da equipe"
     /Meu Aluno/i.test(lista) && /Sem Dono/i.test(lista) && !/Do Pedro/i.test(lista),
     "Para hoje do admin: só os dele e os sem responsável"
   );
-  const chip = pg.locator("#rChips .chip-pessoa", { hasText: "Pedro" });
+  // um botão só, "👥 Representantes": abre a lista de quem tem alunos, e a pessoa escolhida abre
+  const rep = pg.locator("#rChips .chip-pessoa", { hasText: "Representantes" });
+  await rep.waitFor({ timeout: 6000 });
+  await pg.waitForFunction(() => /\(\d+\)/.test(document.querySelector("#rChips .chip-pessoa").textContent), null, { timeout: 6000 });
+  ok((await pg.locator("#rChips .chip-pessoa").count()) === 1, "um botão só: 👥 Representantes");
+  await rep.click();
+  const chip = pg.locator(".sheet .chip-pessoa", { hasText: "Pedro" });
   await chip.waitFor({ timeout: 6000 });
   const nChip = Number((await chip.textContent()).match(/\((\d+)\)/)[1]);
   await chip.click();
   await calmo(pg);
+  ok(/👥 Pedro \(\d+\) ▾/.test(await pg.textContent("#rChips .chip-pessoa")), "o botão mostra quem está aberto");
   lista = await pg.textContent("#rList");
   const [, nh, nt] = lista.match(/(\d+) para hoje · (\d+) a trabalhar/) || [];
   ok(nChip >= 2 && nChip === Number(nh) + Number(nt), "botão da pessoa com quantos alunos ela tem em andamento");

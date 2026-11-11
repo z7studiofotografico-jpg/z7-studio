@@ -12,7 +12,10 @@ export async function carregarCatalogo(C) {
   return montarCatalogo(Object.fromEntries(s.docs.map(d => [d.id, d.data()])));
 }
 // itens = [{ produto: id, qtd }]; o = { ref, modulo, motivo }
+// Estoque ligado em ⚙️ Ajustes? (11/11/2026: desligado até começar a usar; desligado, nada confere nem bloqueia)
+export const estoqueLigado = C => !!(C && C.P && C.P.estoqueLigado === "ligado");
 async function mover(C, tipo, itens, o = {}) {
+  if (!estoqueLigado(C) && tipo !== "entrada") return { avisos: [] }; // a entrada (compra) pode ir sendo lançada
   const { FS, db } = C;
   const cat = await carregarCatalogo(C);
   const porId = Object.fromEntries(cat.map(p => [p.id, p]));

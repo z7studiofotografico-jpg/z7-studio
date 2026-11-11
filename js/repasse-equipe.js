@@ -1,9 +1,10 @@
 // PR / Paspatur / Formatura (10/11/2026): cada um no seu "Para hoje".
 // - A trabalhar: os alunos que são seus, em andamento, sem data para hoje (os passados pelo admin chegam aqui);
 //   "📅 Trabalhar hoje" coloca no Para hoje.
-// - Admin: um botão para cada pessoa que tem alunos em andamento ("👥 Roberto (32)"), com o que está com ela
+// - Admin: o botão "👥 Representantes" lista quem tem alunos em andamento (Roberto 32…); a pessoa escolhida abre com o que está com ela
 //   separado em Para hoje dela · A trabalhar · Caídos. O Para hoje do admin mostra só os dele e os sem responsável.
 import { el, title, emPartes } from "./ui.js";
+import { rotuloRepresentantes, escolherRepresentante } from "./escolher-pessoa.js";
 import * as U from "./util.js";
 import { C, FS, col, tab, seg, ABERTAS, baseLF, baseSeg, ehFormatura, colNome, pessoaAberta, save } from "./repasse-estado.js";
 
@@ -79,23 +80,25 @@ async function contarEquipe() {
   contas = { chave, em: Date.now(), lista: lista.filter(p => p.n > 0).sort((a, b) => b.n - a.n) };
   return contas.lista;
 }
-// c = a fileira das abas; abrir({ email, nome }) abre a aba da pessoa
+// c = a fileira das abas; abrir({ email, nome }) abre a aba da pessoa. Um botão só, "👥 Representantes": ao tocar,
+// a lista de quem tem alunos em andamento (11/11/2026: antes era um botão por pessoa)
 export function botoesEquipe(c, abrir) {
+  let pessoas = [];
+  const b = el("button", "chip chip-pessoa", "");
+  b.type = "button";
+  b.title = "Alunos de cada representante";
+  const aberta = () => (tab === "equipe" && pessoaAberta.email ? pessoaAberta : null);
   const desenhar = lista => {
-    c.querySelectorAll(".chip-pessoa").forEach(x => x.remove());
-    const pessoas = lista.slice();
-    // a pessoa aberta continua com botão, mesmo sem ninguém em andamento
-    if (tab === "equipe" && pessoaAberta.email && !pessoas.some(p => p.email === pessoaAberta.email))
+    pessoas = lista.slice();
+    // a pessoa aberta continua na lista, mesmo sem ninguém em andamento
+    if (aberta() && !pessoas.some(p => p.email === pessoaAberta.email))
       pessoas.push({ email: pessoaAberta.email, nome: pessoaAberta.nome, n: 0 });
-    pessoas.forEach(p => {
-      const b = el("button", "chip chip-pessoa", `👥 ${U.first(title(p.nome))} (${p.n})`);
-      b.type = "button";
-      b.title = "Alunos com " + title(p.nome);
-      b.setAttribute("aria-pressed", String(tab === "equipe" && pessoaAberta.email === p.email));
-      b.onclick = () => abrir({ email: p.email, nome: p.nome });
-      c.append(b);
-    });
+    b.textContent = rotuloRepresentantes(pessoas, aberta());
+    b.setAttribute("aria-pressed", String(!!aberta()));
   };
+  b.onclick = () =>
+    escolherRepresentante(pessoas, aberta(), abrir, { dica: "Toque para ver os alunos da pessoa: para hoje, a trabalhar e caídos." });
+  c.append(b);
   desenhar(contas.chave === colNome() + "|" + seg ? contas.lista : []);
   contarEquipe()
     .then(l => {

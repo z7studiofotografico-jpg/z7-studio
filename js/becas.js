@@ -10,6 +10,7 @@ import { botaoRelatorio } from "./relatorio.js";
 import { contatoRel } from "./aluno-id.js";
 import { BECAS, TAMANHOS, FAIXAS, CAPELOS, nomeFaixa, nomeCapelo, abrirEstoqueBecas, somarUso, usoDosAlunos } from "./becas-estoque.js";
 import { ouvirUso, espelhar, acertarBecas } from "./becas-uso.js";
+import { estoqueLigado } from "./estoque.js";
 export { BECAS, TAMANHOS, FAIXAS, CAPELOS };
 let C,
   FS,
@@ -589,7 +590,7 @@ export function form(x, pre) {
     p.append(err);
     // Confere o estoque de cada tipo no período
     function faltas() {
-      if (!ret.value || !dev.value) return [];
+      if (!estoqueLigado(C) || !ret.value || !dev.value) return []; // estoque desligado em Ajustes: não confere
       const u = emUso(ret.value, dev.value, x && x.id),
         E = estoque(),
         out = [];
