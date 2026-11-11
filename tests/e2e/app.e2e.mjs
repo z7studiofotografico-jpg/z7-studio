@@ -1015,7 +1015,7 @@ await cenario("Adriano (admin), com os dados já atualizados no servidor", async
     });
     await calmo(pg);
     // venda paga: prazo de entrega (pagamento + 20 dias) em cores no cartão
-    await pg.locator("#rChips").getByText("Entregar", { exact: true }).click();
+    await pg.locator("#rChips").getByText("Vendido/Entregar", { exact: true }).click();
     await calmo(pg);
     const pz = pg.locator(".card", { hasText: "Bruno" }).locator(".prazo");
     ok(
@@ -4041,7 +4041,7 @@ await cenario("PR lista única: filtro PR/Paspatur, pessoa da equipe e chave na 
     );
     await ja.getByRole("button", { name: /Voltar para a lista/ }).click();
     // pago: a equipe não troca
-    await pg.locator("#rChips").getByText("Entregar").click();
+    await pg.locator("#rChips").getByText("Vendido/Entregar").click();
     await calmo(pg);
     await pg.locator("#rList button.lc-linha", { hasText: /Carla Paga/i }).click();
     ja = pg.locator(".janela-aluno").last();

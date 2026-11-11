@@ -465,13 +465,15 @@ function renderChips() {
   const tabs = [
     ["caidos", "Caídos"],
     ["incompletos", C.isAdmin ? "Incompletos" : "Meus incompletos"],
-    ["hoje", "Para hoje"],
+    ["buscar", "Buscar"],
     ["trabalhar", "A trabalhar"],
-    ["interessados", "Interessados"],
-    ["buscar", "Buscar"]
+    ["hoje", "Para hoje"],
+    ["interessados", "Interessados"]
   ];
+  // (ordem de 10/11: Caídos · Incompletos · Buscar · A trabalhar · Para hoje · Interessados · A conferir ·
+  //  Vendido/Entregar · Entregues · botões da equipe)
   if (C.isAdmin) tabs.push(["conferir", "A conferir"]);
-  tabs.push(["entregas", "Entregar"], ["vendidos", C.isAdmin ? "Entregues" : "Minhas vendas"]);
+  tabs.push(["entregas", "Vendido/Entregar"], ["vendidos", C.isAdmin ? "Entregues" : "Minhas vendas"]);
   tabs.forEach(([k, t]) => {
     const b = el("button", "chip", t);
     b.type = "button";
@@ -785,7 +787,7 @@ const NOMES_ABA = {
   trabalhar: "A trabalhar",
   equipe: "Equipe",
   interessados: "Interessados",
-  entregas: "Entregar",
+  entregas: "Vendido/Entregar",
   buscar: "Busca",
   conferir: "A conferir",
   incompletos: "Incompletos",
