@@ -53,7 +53,9 @@ export function abrirContrato(ctx, inst, ano) {
                 "div",
                 "empty",
                 e && e.code === "permission-denied"
-                  ? "Cole as regras novas do Firebase para usar o Contrato do colégio."
+                  ? C.isAdmin
+                    ? "Cole as regras novas do Firebase para usar o Contrato do colégio."
+                    : "Este contrato foi fechado por outra pessoa da equipe: só ela e o Adriano veem os valores."
                   : "Não foi possível carregar agora."
               )
             );

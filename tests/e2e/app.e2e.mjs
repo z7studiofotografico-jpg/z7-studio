@@ -816,8 +816,14 @@ await cenario("Adriano (admin), com os dados já atualizados no servidor", async
     await fk.getByLabel("Valor total").fill("1.000,00"); // combinaram outro valor
     await fk.locator("button[type=submit]").click();
     await calmo(pg);
-    s = await store();
-    const compras = Object.values(s).filter(x => x.nome === "Caio Kit Um");
+    // a compra a mais grava depois de reservar o ID (duas etapas): espera até 5 s (antes falhava de vez em quando)
+    let compras = [];
+    for (let t = 0; t < 25; t++) {
+      s = await store();
+      compras = Object.values(s).filter(x => x.nome === "Caio Kit Um");
+      if (compras.some(x => x.venda === "pos" && x.codigo)) break;
+      await pg.waitForTimeout(200);
+    }
     const nova = compras.find(x => x.venda === "pos");
     ok(
       compras.length === 2 && nova && nova.kitId === "k04" && nova.valor === 1000 && nova.compraDe && compras.some(x => x.kitId === "k01"),

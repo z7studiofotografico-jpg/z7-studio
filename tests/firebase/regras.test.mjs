@@ -331,7 +331,16 @@ test("PR: quem é da Linha de Frente confere se o aluno já existe antes de incl
 });
 
 test("atividades da equipe: cada um grava a sua; só o admin lê", async () => {
-  const a = { tipo: "hoje", texto: "colocou Bruno para hoje", n: 1, lista: "pr", por: "Pedro", email: PEDRO, dia: "2026-11-10", em: "2026-11-10T12:00:00Z" };
+  const a = {
+    tipo: "hoje",
+    texto: "colocou Bruno para hoje",
+    n: 1,
+    lista: "pr",
+    por: "Pedro",
+    email: PEDRO,
+    dia: "2026-11-10",
+    em: "2026-11-10T12:00:00Z"
+  };
   await assertSucceeds(setDoc(doc(como(PEDRO), "atividades", "a1"), a));
   await assertFails(setDoc(doc(como(PEDRO), "atividades", "a2"), { ...a, email: ANA }));
   await assertFails(setDoc(doc(como(PEDRO), "atividades", "a3"), { ...a, texto: "x".repeat(201) }));
@@ -594,7 +603,12 @@ test("formatura: Caído só com motivo; só o Adriano tira do Caído; a equipe n
   await assertFails(deleteDoc(doc(db, "formaturaAlunos", "a1")));
   await assertSucceeds(updateDoc(doc(como(ADRIANO), "formaturaAlunos", "a2"), { etapa: "NA FILA", resgateObs: "ok" }));
   await assertFails(getDoc(doc(como(ANA), "contratos", "i1")));
-  await assertSucceeds(setDoc(doc(db, "contratos", "i1"), { numero: "1" }));
+  // ficha do contrato: só dos colégios da própria carteira ou sem responsável (11/11/2026)
+  await assertSucceeds(setDoc(doc(db, "contratos", "i2"), { numero: "2" }));
+  await assertFails(setDoc(doc(db, "contratos", "i1"), { numero: "1" }));
+  await semRegra(x => setDoc(doc(x, "contratos", "i1"), { numero: "1" }));
+  await assertFails(getDoc(doc(db, "contratos", "i1")));
+  await assertSucceeds(getDoc(doc(como(PEDRO), "contratos", "i1")));
 });
 
 test("edições da equipe: cria o aviso só com o próprio e-mail; só o admin lê e marca como visto", async () => {
@@ -617,12 +631,28 @@ test("PR: Caído só com motivo e só o admin resgata", async () => {
 // Contrato do colégio (Aluguel de becas): quem fechou mexe; dinheiro com o representante só o admin confirma
 test("contrato do colégio: o representante cria o dele e não muda o valor depois", async () => {
   const ana = como(ANA);
-  await assertSucceeds(setDoc(doc(ana, "contratosColegio", "i3_2026"), { instId: "i3", ano: 2026, respEmail: ANA, valor: 150, quemPaga: "alunos" }));
+  await assertSucceeds(
+    setDoc(doc(ana, "contratosColegio", "i3_2026"), { instId: "i3", ano: 2026, respEmail: ANA, valor: 150, quemPaga: "alunos" })
+  );
   await assertFails(setDoc(doc(ana, "contratosColegio", "i1_2026"), { instId: "i1", ano: 2026, respEmail: PEDRO, valor: 150 }));
   await assertSucceeds(updateDoc(doc(ana, "contratosColegio", "i3_2026"), { entrega: { data: "2026-12-12", com: "Márcia" } }));
   await assertFails(updateDoc(doc(ana, "contratosColegio", "i3_2026"), { valor: 99 }));
   await assertSucceeds(updateDoc(doc(como(ADRIANO), "contratosColegio", "i3_2026"), { valor: 99 }));
   await assertFails(updateDoc(doc(como(PEDRO), "contratosColegio", "i3_2026"), { obs: "x" }));
+});
+test("contrato do colégio: cada representante lê só os contratos que fechou (e os pagamentos deles)", async () => {
+  await semRegra(async db => {
+    await setDoc(doc(db, "usuarios", "bia@equipe.com"), { nome: "Bia", papel: "equipe", ativo: true, modulos: ["becas"] });
+    await setDoc(doc(db, "contratosColegio", "i3_2026"), { instId: "i3", ano: 2026, respEmail: ANA, valor: 150 });
+    await setDoc(doc(db, "contratosColegio", "i3_2026", "pagamentos", "p1"), { valor: 50, porEmail: ANA });
+  });
+  const bia = como("bia@equipe.com");
+  await assertSucceeds(getDoc(doc(como(ANA), "contratosColegio", "i3_2026")));
+  await assertSucceeds(getDocs(collection(como(ANA), "contratosColegio", "i3_2026", "pagamentos")));
+  await assertFails(getDoc(doc(bia, "contratosColegio", "i3_2026")));
+  await assertFails(getDocs(collection(bia, "contratosColegio", "i3_2026", "pagamentos")));
+  await assertSucceeds(getDoc(doc(bia, "contratosColegio", "i9_2026"))); // ainda não existe: pode conferir para criar
+  await assertSucceeds(getDoc(doc(como(ADRIANO), "contratosColegio", "i3_2026")));
 });
 test("contrato do colégio: pagamentos e repasse", async () => {
   await semRegra(db => setDoc(doc(db, "contratosColegio", "i3_2026"), { instId: "i3", ano: 2026, respEmail: ANA }));
@@ -635,7 +665,9 @@ test("contrato do colégio: pagamentos e repasse", async () => {
   await assertSucceeds(updateDoc(pag("p2"), { repasseAvisadoEm: "2026-11-07" }));
   await assertFails(updateDoc(pag("p2"), { repassadoEm: "2026-11-07" }));
   await assertFails(updateDoc(pag("p2"), { recebidoPor: "estudio" }));
-  await assertFails(setDoc(pag("p3"), { valor: 50, recebidoPor: "representante", repassadoEm: "2026-11-07", conferido: false, porEmail: ANA }));
+  await assertFails(
+    setDoc(pag("p3"), { valor: 50, recebidoPor: "representante", repassadoEm: "2026-11-07", conferido: false, porEmail: ANA })
+  );
   const adm = doc(como(ADRIANO), "contratosColegio", "i3_2026", "pagamentos", "p2");
   await assertSucceeds(updateDoc(adm, { repassadoEm: "2026-11-08", conferido: true }));
   await assertFails(updateDoc(pag("p2"), { comprovante: "x" }));

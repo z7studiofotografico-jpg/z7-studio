@@ -245,9 +245,13 @@ service cloud.firestore {
     }
     // Formatura · Linha de Frente e Repasse (Etapa 5): o mesmo fluxo do PR, numa lista separada (nunca se liga ao PR)
     // Ficha do contrato de cada colégio (Formaturas), com o PDF assinado em base64 (sem Storage)
+    // (11/11/2026: a equipe lê e mexe só na ficha dos colégios da própria carteira ou sem responsável)
+    function turmaMinhaOuLivre(instId) {
+      return get(/databases/$(database)/documents/instituicoes/$(instId)).data.get('respEmail', '') in ['', email()];
+    }
     match /contratos/{instId} {
-      allow read: if admin() || podeForm();
-      allow create, update: if admin() || podeForm();
+      allow read: if admin() || (podeForm() && turmaMinhaOuLivre(instId));
+      allow create, update: if admin() || (podeForm() && turmaMinhaOuLivre(instId));
       allow delete: if admin();
     }
     match /formaturaAlunos/{id} {
@@ -284,14 +288,15 @@ service cloud.firestore {
     function meuContrato(cid) {
       return get(/databases/$(database)/documents/contratosColegio/$(cid)).data.get('respEmail', '') == email();
     }
+    // (11/11/2026: o representante lê só os contratos que ele fechou, com os valores e pagamentos)
     match /contratosColegio/{cid} {
-      allow read: if pode('becas');
+      allow read: if admin() || (pode('becas') && (resource == null || resource.data.get('respEmail', '') == email()));
       allow create: if admin() || (pode('becas') && request.resource.data.get('respEmail', '') == email());
       allow update: if admin() || (pode('becas') && resource.data.get('respEmail', '') == email()
         && !mudou(['valor', 'precos', 'parcelas', 'respEmail', 'respNome', 'quemPaga', 'instId', 'ano']));
       allow delete: if admin();
       match /pagamentos/{pid} {
-        allow read: if pode('becas');
+        allow read: if admin() || (pode('becas') && meuContrato(cid));
         allow create: if admin() || (pode('becas') && meuContrato(cid)
           && request.resource.data.get('conferido', false) == false
           && request.resource.data.get('porEmail', '') == email()

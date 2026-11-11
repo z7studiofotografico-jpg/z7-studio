@@ -68,6 +68,7 @@ const SHELL = [
   "./js/numeros-celular.js",
   "./js/repasse-estado.js",
   "./js/repasse-equipe.js",
+  "./js/repasse-consultas.js",
   "./js/atividades.js",
   "./js/repasse-mensagens.js",
   "./js/repasse-cartao.js",

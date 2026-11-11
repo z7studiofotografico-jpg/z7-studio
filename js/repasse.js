@@ -35,7 +35,6 @@ import {
   segNome,
   segsPermitidas,
   baseLF,
-  soMinha,
   noSeg,
   status,
   precoTxt,
@@ -58,8 +57,9 @@ import {
   mudarPessoaAberta
 } from "./repasse-estado.js";
 import { botoesEquipe, renderTrabalhar, renderEquipe, recontarEquipe, ouvirJuntas, emAndamento } from "./repasse-equipe.js";
-// Caídos: o admin vê todos; a equipe, os que ela mesma marcou
-const soMinhaCaidos = () => (C.isAdmin ? [] : [FS.where("respEmail", "==", C.email || "")]);
+import { consultaDaAba, LIMITE_ENTREGUES } from "./repasse-consultas.js";
+// Entregues (admin): 300 por vez; "Ver todos" lê até 5.000 (gasta leitura do Firebase)
+let verTodosEntregues = false;
 import { card } from "./repasse-cartao.js";
 // lista compacta: uma linha por aluno; tocar abre o cartão completo embaixo
 const linha = it =>
@@ -500,6 +500,7 @@ function avisoPreco() {
 }
 function openTab(k) {
   avisoPreco();
+  if (k !== "vendidos") verTodosEntregues = false;
   if (k !== tab) mudarFiltroPessoa(""); // trocar de aba volta para "Toda a equipe" (filtro esquecido: "Nada encontrado")
   mudarTab(k);
   renderChips();
@@ -510,53 +511,7 @@ function openTab(k) {
   }
   mudarItems([]);
   renderList(true);
-  const today = U.todayStr();
-  let q = null;
-  if (k === "trabalhar") q = emAndamento(C.email || "");
-  if (k === "equipe" && C.isAdmin && pessoaAberta.email) q = emAndamento(pessoaAberta.email, [...ABERTAS, "CAÍDO"]);
-  // a equipe vê só os contatos dela (soMinha); a busca continua mostrando todos, para achar o aluno
-  if (seg === "lf") {
-    if (k === "hoje") q = FS.query(col, ...baseLF(), ...soMinha(), FS.where("etapa", "in", ABERTAS), FS.limit(300));
-    if (k === "interessados") q = FS.query(col, ...baseLF(), ...soMinha(), FS.where("etapa", "==", "INTERESSADO"), FS.limit(200));
-    if (k === "entregas") q = FS.query(col, ...baseLF(), ...soMinha(), FS.where("etapa", "==", "PAGO"), FS.limit(300));
-  } else {
-    if (k === "hoje")
-      q = C.isAdmin
-        ? FS.query(col, FS.where("followup", "<=", today), FS.orderBy("followup"), FS.limit(150))
-        : FS.query(col, ...soMinha(), FS.where("etapa", "in", ABERTAS), FS.limit(500));
-    if (k === "interessados") q = FS.query(col, ...soMinha(), FS.where("etapa", "==", "INTERESSADO"), FS.limit(200));
-    if (k === "entregas") q = FS.query(col, ...soMinha(), FS.where("etapa", "==", "PAGO"), FS.limit(300));
-  }
-  if (k === "incompletos")
-    q = C.isAdmin
-      ? FS.query(col, FS.where("etapa", "==", "INCOMPLETO"), FS.limit(200))
-      : FS.query(
-          col,
-          ...(seg === "lf" ? baseLF() : []),
-          FS.where("etapa", "==", "INCOMPLETO"),
-          FS.where("respEmail", "==", C.email || ""),
-          FS.limit(200)
-        );
-  if (k === "vendidos")
-    q = C.isAdmin
-      ? // só consulta: o PR já passa de 1.000 entregues; até 5.000 sem o aviso de lista incompleta
-        FS.query(col, FS.where("etapa", "==", "ENTREGUE"), ...(ehFormatura() ? baseSeg() : seg === "lf" ? baseLF() : []), FS.limit(5000))
-      : FS.query(
-          col,
-          ...(seg === "lf" ? baseLF() : []),
-          FS.where("etapa", "==", "ENTREGUE"),
-          FS.where("respEmail", "==", C.email || ""),
-          FS.limit(500)
-        );
-  if (k === "conferir") q = FS.query(col, FS.where("conferido", "==", false), FS.limit(300));
-  if (k === "caidos")
-    q = FS.query(
-      col,
-      FS.where("etapa", "==", "CAÍDO"),
-      ...(ehFormatura() ? baseSeg() : seg === "lf" ? baseLF() : []),
-      ...soMinhaCaidos(),
-      FS.limit(500)
-    );
+  const q = consultaDaAba(k, verTodosEntregues);
   const falhou = err => {
     console.warn(err);
     U.showNotice("Não foi possível carregar o Repasse. Verifique a internet.");
@@ -717,6 +672,13 @@ function renderList(loading, emptyMsg) {
     const t = el("div", "notes vend-mes", textoVendasMes());
     t.id = "rVendMes";
     box.append(t);
+    if (C.isAdmin && !verTodosEntregues && items.length >= LIMITE_ENTREGUES) {
+      const mais = U.mkBtn(`Mostrando os ${LIMITE_ENTREGUES} primeiros · ver todos`, "btn-sm", () => {
+        verTodosEntregues = true;
+        openTab("vendidos");
+      });
+      box.append(mais);
+    }
     if (C.isAdmin) {
       const g = el("div", "notes vend-mes", "Total vendido: contando…");
       box.append(g);
