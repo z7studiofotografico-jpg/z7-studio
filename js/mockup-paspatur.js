@@ -233,8 +233,9 @@ async function pecas(st) {
 // ---------- fundo e textos (iguais na imagem e no vídeo) ----------
 function fundo(ctx) {
   const bg = ctx.createLinearGradient(0, 0, 0, H);
-  bg.addColorStop(0, "#efe9e2");
-  bg.addColorStop(1, "#d9cfc3");
+  // cinza claro até o cinza grafite clarinho (11/11/2026: antes bege)
+  bg.addColorStop(0, "#ededee");
+  bg.addColorStop(1, "#c8cacd");
   ctx.fillStyle = bg;
   ctx.fillRect(0, 0, W, H);
 }

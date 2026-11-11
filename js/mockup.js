@@ -220,15 +220,16 @@ async function desenharKit(cv, st) {
   const ctx = cv.getContext("2d");
   cv.width = W;
   cv.height = H;
+  // parede cinza e mesa grafite (11/11/2026: combina com o app e o site; antes bege e madeira)
   const wall = ctx.createLinearGradient(0, 0, 0, 980);
-  wall.addColorStop(0, "#efe9e2");
-  wall.addColorStop(1, "#ddd5cb");
+  wall.addColorStop(0, "#ededee");
+  wall.addColorStop(1, "#d5d7da");
   ctx.fillStyle = wall;
   ctx.fillRect(0, 0, W, 980);
   const tb = ctx.createLinearGradient(0, 980, 0, H);
-  tb.addColorStop(0, "#7a5a41");
-  tb.addColorStop(0.08, "#5e4330");
-  tb.addColorStop(1, "#3d2b1f");
+  tb.addColorStop(0, "#55595f");
+  tb.addColorStop(0.08, "#3a3d42");
+  tb.addColorStop(1, "#202225");
   ctx.fillStyle = tb;
   ctx.fillRect(0, 980, W, H - 980);
   ctx.fillStyle = "rgba(255,255,255,.08)";
