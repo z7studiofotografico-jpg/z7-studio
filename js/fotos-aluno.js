@@ -350,6 +350,18 @@ export async function miniaturasDoAluno(C, it, box, o = {}) {
     grade.append(b);
   });
   acoes.append(U.mkBtn("🖼️ Enviar a folha / montar o quadro", "btn-primary", () => abrirFotosDoAluno(C, it, o.precoTxt || "")));
+  // link da prévia no site (z7studio.com.br/previa/?c=…): a família vê as fotos, o kit, o preço e chama no WhatsApp
+  const bLink = U.mkBtn(it.linkPrevia ? "🔗 Mandar o link da prévia de novo" : "🔗 Mandar o link da prévia", "", async () => {
+    bLink.disabled = true;
+    try {
+      await (await import("./link-previa.js")).mandarLinkPrevia(C, it, r, o);
+    } catch (e) {
+      C.handleErr(e);
+    } finally {
+      bLink.disabled = false;
+    }
+  });
+  acoes.append(bLink);
   if (C.isAdmin) acoes.append(trocar, botaoEnviarNovas(C, it, o));
   box.append(acoes);
   // baixa uma a uma (prévias pequenas, com marca d'água); a janela redesenha quando o aluno muda: guarda o que já baixou

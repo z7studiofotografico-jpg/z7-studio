@@ -42,6 +42,7 @@ const SHELL = [
   "./js/mockup.js",
   "./js/video-quadro.js",
   "./js/enviar-computador.js",
+  "./js/link-previa.js",
   "./js/instituicoes.js",
   "./js/agenda.js",
   "./js/vendas.js",

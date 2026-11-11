@@ -156,6 +156,31 @@ service cloud.firestore {
       allow read, delete: if admin();
     }
     // Atividades da equipe (10/11/2026): cada um grava a sua (curta, só esses campos); só o admin lê e apaga
+    // Link da prévia no site (z7studio.com.br/previa/?c=…): o código aleatório é o id. Quem tem o link lê só aquele
+    // documento (sem login, ninguém lista a coleção). A equipe cria e atualiza (sem mexer nas contagens); a página do
+    // site, sem login, só soma +1 em "vistos" (abriu) ou em "cliques" (tocou no WhatsApp), com a hora do servidor.
+    match /previasSite/{c} {
+      function linkOk(d) {
+        return d.nome is string && d.nome.size() <= 80 && d.escola is string && d.escola.size() <= 120
+          && d.kit in ['pr', 'paspatur'] && d.idade in ['infantil', 'adulto']
+          && d.fotos is list && d.fotos.size() <= 60 && d.preco is string && d.preco.size() <= 40
+          && d.por is string && d.por.size() <= 40 && d.ate is string && d.ate.size() <= 30;
+      }
+      function soma(campo, hora) {
+        return request.resource.data.diff(resource.data).affectedKeys().hasOnly([campo, hora])
+          && request.resource.data[campo] == resource.data[campo] + 1 && request.resource.data[hora] == request.time;
+      }
+      allow get: if true;
+      allow list, delete: if admin();
+      allow create: if membro() && c.matches('[a-z0-9]{10,16}')
+        && request.resource.data.keys().hasOnly(['nome', 'escola', 'kit', 'idade', 'fotos', 'preco', 'por', 'criadoEm', 'ate', 'vistos', 'cliques', 'vistoEm', 'cliqueEm'])
+        && linkOk(request.resource.data) && request.resource.data.criadoEm is string
+        && request.resource.data.vistos == 0 && request.resource.data.cliques == 0
+        && request.resource.data.vistoEm == null && request.resource.data.cliqueEm == null;
+      allow update: if (membro() && !mudou(['vistos', 'cliques', 'vistoEm', 'cliqueEm', 'criadoEm', 'por', 'idade'])
+          && linkOk(request.resource.data))
+        || soma('vistos', 'vistoEm') || soma('cliques', 'cliqueEm');
+    }
     match /atividades/{id} {
       allow create: if membro() && request.resource.data.email == email()
         && request.resource.data.keys().hasOnly(['tipo', 'texto', 'n', 'lista', 'por', 'email', 'dia', 'em'])

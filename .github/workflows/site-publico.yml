@@ -1,0 +1,33 @@
+# Páginas do site fora do WordPress (pasta site/publico), enviadas para a Hostinger por FTP.
+# Hoje: z7studio.com.br/previa/ (o link da prévia que a equipe manda pelo app).
+name: Páginas do site
+
+on:
+  push:
+    branches: [main]
+    paths: ["site/publico/**"]
+  workflow_dispatch:
+
+concurrency:
+  group: site-publico
+  cancel-in-progress: false
+
+jobs:
+  subir:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - name: Instalar
+        working-directory: scripts
+        run: npm install --no-audit --no-fund
+      - name: Subir para o site
+        working-directory: scripts
+        env:
+          FTP_HOST: ${{ secrets.FTP_HOST }}
+          FTP_USER: ${{ secrets.FTP_USER }}
+          FTP_PASS: ${{ secrets.FTP_PASS }}
+        run: node subir-site.mjs

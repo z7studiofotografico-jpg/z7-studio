@@ -1,0 +1,514 @@
+<!doctype html>
+<html lang="pt-BR">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <meta name="robots" content="noindex, nofollow" />
+    <title>Suas fotos de formatura · Z7 Studio Fotográfico</title>
+    <meta property="og:title" content="Suas fotos de formatura estão prontas" />
+    <meta property="og:description" content="Veja as fotos, o kit e o valor. Z7 Studio Fotográfico, Nilópolis/RJ." />
+    <meta property="og:image" content="https://app.z7studio.com.br/amostras/quadro-adulto.jpg" />
+    <meta property="og:type" content="website" />
+    <meta name="theme-color" content="#2b2d31" />
+    <link rel="icon" href="https://app.z7studio.com.br/icons/favicon-64.png" />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Lato:wght@400;700&family=Playfair+Display:wght@600;700&display=swap"
+      rel="stylesheet"
+    />
+    <style>
+      :root {
+        --grafite: #2b2d31;
+        --grafite2: #3a3d42;
+        --cinza: #ededee;
+        --cinza2: #d5d7da;
+        --tinta: #1c1b1d;
+        --suave: #6b6670;
+        --vermelho: #d0202b;
+        --verde: #1fa855;
+      }
+      * {
+        box-sizing: border-box;
+      }
+      body {
+        margin: 0;
+        font-family: Lato, system-ui, sans-serif;
+        color: var(--tinta);
+        background: var(--cinza);
+        padding-bottom: 84px;
+      }
+      h1,
+      h2 {
+        font-family: "Playfair Display", Georgia, serif;
+        margin: 0;
+      }
+      header {
+        background: var(--grafite);
+        color: #fff;
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        padding: 12px 18px;
+      }
+      header img {
+        width: 44px;
+        height: 44px;
+        border-radius: 8px;
+      }
+      header b {
+        font-family: "Playfair Display", Georgia, serif;
+        font-size: 18px;
+      }
+      header small {
+        display: block;
+        opacity: 0.75;
+        font-size: 13px;
+      }
+      main {
+        max-width: 980px;
+        margin: 0 auto;
+        padding: 20px 16px;
+      }
+      .topo h1 {
+        font-size: clamp(26px, 6vw, 38px);
+      }
+      .topo p {
+        margin: 6px 0 0;
+        color: var(--suave);
+      }
+      .grade {
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+        gap: 8px;
+        margin: 18px 0 8px;
+      }
+      .grade button {
+        border: 0;
+        padding: 0;
+        background: var(--cinza2);
+        border-radius: 6px;
+        overflow: hidden;
+        aspect-ratio: 2 / 3;
+        cursor: zoom-in;
+        position: relative;
+      }
+      .grade img {
+        width: 100%;
+        height: 100%;
+        object-fit: cover;
+        display: block;
+        -webkit-user-drag: none;
+      }
+      .grade span {
+        position: absolute;
+        left: 6px;
+        top: 6px;
+        background: rgba(0, 0, 0, 0.55);
+        color: #fff;
+        font-size: 12px;
+        padding: 2px 7px;
+        border-radius: 10px;
+      }
+      .nota {
+        font-size: 13px;
+        color: var(--suave);
+        margin: 0 0 22px;
+      }
+      .cartao {
+        background: #fff;
+        border-radius: 12px;
+        padding: 20px;
+        margin: 18px 0;
+        box-shadow: 0 2px 10px rgba(0, 0, 0, 0.06);
+      }
+      .cartao h2 {
+        font-size: 24px;
+        margin-bottom: 8px;
+      }
+      .cartao ul {
+        margin: 8px 0 0;
+        padding-left: 20px;
+        line-height: 1.6;
+      }
+      .preco {
+        font-size: 30px;
+        font-weight: 700;
+        margin: 14px 0 4px;
+      }
+      .preco small {
+        font-size: 15px;
+        font-weight: 400;
+        color: var(--suave);
+      }
+      .zap {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: 8px;
+        background: var(--verde);
+        color: #fff;
+        text-decoration: none;
+        font-weight: 700;
+        font-size: 18px;
+        padding: 15px 18px;
+        border-radius: 999px;
+        margin-top: 16px;
+      }
+      .zap:hover {
+        filter: brightness(1.05);
+      }
+      .barra {
+        position: fixed;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        padding: 10px 14px calc(10px + env(safe-area-inset-bottom));
+        background: rgba(43, 45, 49, 0.96);
+        z-index: 5;
+      }
+      .barra .zap {
+        margin: 0 auto;
+        max-width: 520px;
+      }
+      .abas {
+        display: flex;
+        gap: 6px;
+        margin: 12px 0;
+        flex-wrap: wrap;
+      }
+      .abas button {
+        border: 1px solid var(--cinza2);
+        background: #fff;
+        border-radius: 999px;
+        padding: 8px 14px;
+        font: inherit;
+        cursor: pointer;
+      }
+      .abas button.on {
+        background: var(--grafite);
+        color: #fff;
+        border-color: var(--grafite);
+      }
+      video {
+        width: 100%;
+        border-radius: 10px;
+        background: var(--grafite2);
+        display: block;
+      }
+      footer {
+        text-align: center;
+        color: var(--suave);
+        font-size: 14px;
+        padding: 10px 16px 30px;
+        line-height: 1.6;
+      }
+      footer a {
+        color: var(--tinta);
+        text-decoration: none;
+        border-bottom: 2px solid var(--vermelho);
+      }
+      .aviso {
+        text-align: center;
+        padding: 50px 10px;
+      }
+      .aviso h1 {
+        font-size: 26px;
+        margin-bottom: 10px;
+      }
+      #grande {
+        position: fixed;
+        inset: 0;
+        background: rgba(0, 0, 0, 0.92);
+        display: none;
+        align-items: center;
+        justify-content: center;
+        z-index: 10;
+      }
+      #grande.on {
+        display: flex;
+      }
+      #grande img {
+        max-width: 96vw;
+        max-height: 86vh;
+        object-fit: contain;
+      }
+      #grande button {
+        position: absolute;
+        background: rgba(255, 255, 255, 0.15);
+        color: #fff;
+        border: 0;
+        font-size: 26px;
+        width: 48px;
+        height: 48px;
+        border-radius: 50%;
+        cursor: pointer;
+      }
+      #fechar {
+        top: 14px;
+        right: 14px;
+      }
+      #ant {
+        left: 10px;
+        top: 50%;
+      }
+      #prox {
+        right: 10px;
+        top: 50%;
+      }
+      #grande p {
+        position: absolute;
+        bottom: 14px;
+        color: #fff;
+        margin: 0;
+      }
+      [hidden] {
+        display: none !important;
+      }
+    </style>
+  </head>
+  <body>
+    <header>
+      <img src="https://app.z7studio.com.br/icons/icon-192.png" alt="Z7 Studio" />
+      <div><b>Z7 Studio Fotográfico</b><small>Formaturas desde 2009 · Nilópolis/RJ</small></div>
+    </header>
+    <main id="conteudo">
+      <p class="aviso" id="carregando">Carregando as fotos…</p>
+    </main>
+    <footer>
+      Z7 Studio Fotográfico · Estrada Dr. Rufino Gonçalves Ferreira, 290, Centro, Nilópolis/RJ<br />
+      WhatsApp (21) 99881-7771 · <a href="https://www.z7studio.com.br">www.z7studio.com.br</a>
+    </footer>
+    <div class="barra" id="barra" hidden></div>
+    <div id="grande" role="dialog" aria-label="Foto ampliada">
+      <img alt="" />
+      <button id="fechar" aria-label="Fechar">×</button>
+      <button id="ant" aria-label="Foto anterior">‹</button>
+      <button id="prox" aria-label="Próxima foto">›</button>
+      <p></p>
+    </div>
+    <script>
+      (function () {
+        var PROJETO = "z7-funil-e-repasse",
+          CHAVE = "AIzaSyAoUcT2xsFR0BMBr7jKAzXPlgjogx2VSHU",
+          BASE = "https://firestore.googleapis.com/v1/projects/" + PROJETO + "/databases/(default)/documents",
+          ZAP = "5521998817771",
+          AMOSTRAS = "https://app.z7studio.com.br/amostras/";
+        var KITS = {
+          pr: {
+            nome: "Kit Quadro",
+            arq: "quadro",
+            itens: ["Quadro 30x40 com a foto que você escolher", "2 porta-retratos 15x10", "As fotos digitais"]
+          },
+          paspatur: {
+            nome: "Kit Paspatur",
+            arq: "paspatur",
+            itens: ["Livro A4 de recordação escolar", "1 foto 29x21 e 1 foto 21x15", "3 fotos 7x5 e 6 fotos 4x3"]
+          }
+        };
+        var main = document.getElementById("conteudo");
+        var codigo = (new URLSearchParams(location.search).get("c") || location.hash.slice(1) || "")
+          .toLowerCase()
+          .replace(/[^a-z0-9]/g, "");
+
+        function campo(v) {
+          if (!v) return null;
+          if ("stringValue" in v) return v.stringValue;
+          if ("integerValue" in v) return Number(v.integerValue);
+          if ("arrayValue" in v) return (v.arrayValue.values || []).map(campo);
+          return null;
+        }
+        function esc(s) {
+          return String(s || "").replace(/[&<>"']/g, function (c) {
+            return { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c];
+          });
+        }
+        function aviso(titulo, texto) {
+          main.innerHTML =
+            '<div class="aviso"><h1>' +
+            esc(titulo) +
+            "</h1><p>" +
+            esc(texto) +
+            '</p><a class="zap" href="https://wa.me/' +
+            ZAP +
+            "?text=" +
+            encodeURIComponent("Olá! Quero ver as fotos de formatura.") +
+            '">Chamar no WhatsApp</a></div>';
+        }
+        // soma +1 em "vistos" (abriu) ou "cliques" (WhatsApp), uma vez por visita
+        function somar(contador, hora) {
+          try {
+            var k = "z7p-" + contador + "-" + codigo;
+            if (sessionStorage.getItem(k)) return;
+            sessionStorage.setItem(k, "1");
+          } catch (_) {}
+          var corpo = JSON.stringify({
+            writes: [
+              {
+                update: { name: "projects/" + PROJETO + "/databases/(default)/documents/previasSite/" + codigo, fields: {} },
+                updateMask: { fieldPaths: [] },
+                updateTransforms: [
+                  { fieldPath: contador, increment: { integerValue: "1" } },
+                  { fieldPath: hora, setToServerValue: "REQUEST_TIME" }
+                ],
+                currentDocument: { exists: true }
+              }
+            ]
+          });
+          var url = BASE + ":commit?key=" + CHAVE;
+          // keepalive: o envio termina mesmo quando a pessoa sai para o WhatsApp
+          fetch(url, { method: "POST", headers: { "Content-Type": "application/json" }, body: corpo, keepalive: true }).catch(
+            function () {}
+          );
+        }
+
+        if (!/^[a-z0-9]{10,16}$/.test(codigo))
+          return aviso("Link incompleto", "Confira se o link foi copiado inteiro, ou chame a gente no WhatsApp.");
+
+        fetch(BASE + "/previasSite/" + codigo + "?key=" + CHAVE)
+          .then(function (r) {
+            if (r.status === 404 || r.status === 403) return null;
+            if (!r.ok) throw new Error(r.status);
+            return r.json();
+          })
+          .then(function (j) {
+            if (!j) return aviso("Não achamos estas fotos", "O link pode ter mudado. Chame a gente no WhatsApp que mandamos de novo.");
+            var f = j.fields || {},
+              d = {};
+            Object.keys(f).forEach(function (k) {
+              d[k] = campo(f[k]);
+            });
+            if (d.ate && new Date(d.ate) < new Date())
+              return aviso(
+                "Este link expirou",
+                "As fotos de " + (d.nome || "formatura") + " continuam guardadas. Chame a gente no WhatsApp."
+              );
+            mostrar(d);
+            somar("vistos", "vistoEm");
+          })
+          .catch(function () {
+            aviso("Não consegui abrir agora", "Confira a internet e tente de novo em instantes.");
+          });
+
+        function mostrar(d) {
+          var kit = KITS[d.kit] || KITS.pr,
+            fotos = d.fotos || [];
+          var primeiro = String(d.nome || "").split(" ")[0];
+          var texto =
+            "Olá! Vi as fotos de " +
+            (d.nome || "") +
+            (d.escola ? " (" + d.escola + ")" : "") +
+            " no site e quero o " +
+            kit.nome +
+            ". Código " +
+            codigo;
+          var linkZap = "https://wa.me/" + ZAP + "?text=" + encodeURIComponent(texto);
+          document.title = "Fotos de " + (d.nome || "formatura") + " · Z7 Studio Fotográfico";
+          var h = "";
+          h += '<section class="topo"><h1>As fotos de ' + esc(primeiro || "formatura") + "</h1>";
+          h += "<p>" + esc([d.nome, d.escola].filter(Boolean).join(" · ")) + "</p></section>";
+          h += '<div class="grade" id="grade">';
+          fotos.forEach(function (id, i) {
+            h +=
+              '<button type="button" data-i="' +
+              i +
+              '"><img loading="lazy" alt="Foto ' +
+              (i + 1) +
+              '" src="/previas/' +
+              esc(id) +
+              '.jpg" data-id="' +
+              esc(id) +
+              '"><span>' +
+              (i + 1) +
+              "</span></button>";
+          });
+          h += "</div>";
+          h += '<p class="nota">Estas são prévias com marca d’água. As fotos do kit saem sem a marca e em alta qualidade.</p>';
+          h += '<section class="cartao"><h2>' + esc(kit.nome) + "</h2><ul>";
+          kit.itens.forEach(function (x) {
+            h += "<li>" + esc(x) + "</li>";
+          });
+          h += "</ul>";
+          if (d.preco) h += '<p class="preco">' + esc(d.preco) + " <small>o kit completo</small></p>";
+          h +=
+            '<p class="nota" style="margin:6px 0 0">Pagamento no Pix ou no cartão. Você escolhe as fotos pelo WhatsApp, pelo número de cada uma.</p>';
+          h += '<a class="zap" data-zap href="' + linkZap + '">💬 Quero o ' + esc(kit.nome) + "</a></section>";
+          h += '<section class="cartao"><h2>Veja como fica</h2>';
+          h +=
+            '<div class="abas"><button type="button" data-idade="infantil">Infantil</button><button type="button" data-idade="adulto">Ensino médio e adulto</button></div>';
+          h += '<video id="video" controls muted playsinline loop preload="metadata"></video></section>';
+          main.innerHTML = h;
+          document.getElementById("barra").innerHTML =
+            '<a class="zap" data-zap href="' + linkZap + '">💬 Quero o ' + esc(kit.nome) + "</a>";
+          document.getElementById("barra").hidden = false;
+          document.querySelectorAll("[data-zap]").forEach(function (a) {
+            a.addEventListener("click", function () {
+              somar("cliques", "cliqueEm");
+            });
+          });
+          // a foto ainda não chegou ao site: a miniatura do Google Drive
+          document.querySelectorAll("#grade img").forEach(function (img) {
+            img.addEventListener("error", function () {
+              if (img.dataset.drive) return;
+              img.dataset.drive = "1";
+              img.src = "https://drive.google.com/thumbnail?id=" + encodeURIComponent(img.dataset.id) + "&sz=w1200";
+            });
+          });
+          main.addEventListener("contextmenu", function (e) {
+            if (e.target.tagName === "IMG") e.preventDefault();
+          });
+          // vídeo de amostra
+          var video = document.getElementById("video");
+          function amostra(idade) {
+            document.querySelectorAll("[data-idade]").forEach(function (b) {
+              b.classList.toggle("on", b.dataset.idade === idade);
+            });
+            video.poster = AMOSTRAS + kit.arq + "-" + idade + ".jpg";
+            video.src = AMOSTRAS + kit.arq + "-" + idade + ".mp4";
+          }
+          document.querySelectorAll("[data-idade]").forEach(function (b) {
+            b.addEventListener("click", function () {
+              amostra(b.dataset.idade);
+              video.play().catch(function () {});
+            });
+          });
+          amostra(d.idade === "infantil" ? "infantil" : "adulto");
+          // foto ampliada
+          var g = document.getElementById("grande"),
+            gi = g.querySelector("img"),
+            gp = g.querySelector("p"),
+            atual = 0;
+          var imgs = Array.prototype.slice.call(document.querySelectorAll("#grade img"));
+          function abrir(i) {
+            atual = (i + imgs.length) % imgs.length;
+            gi.src = imgs[atual].src;
+            gp.textContent = "Foto " + (atual + 1) + " de " + imgs.length;
+            g.classList.add("on");
+          }
+          document.getElementById("grade").addEventListener("click", function (e) {
+            var b = e.target.closest("button");
+            if (b) abrir(Number(b.dataset.i));
+          });
+          document.getElementById("fechar").onclick = function () {
+            g.classList.remove("on");
+          };
+          document.getElementById("ant").onclick = function () {
+            abrir(atual - 1);
+          };
+          document.getElementById("prox").onclick = function () {
+            abrir(atual + 1);
+          };
+          g.addEventListener("click", function (e) {
+            if (e.target === g) g.classList.remove("on");
+          });
+          document.addEventListener("keydown", function (e) {
+            if (!g.classList.contains("on")) return;
+            if (e.key === "Escape") g.classList.remove("on");
+            if (e.key === "ArrowLeft") abrir(atual - 1);
+            if (e.key === "ArrowRight") abrir(atual + 1);
+          });
+        }
+      })();
+    </script>
+  </body>
+</html>

@@ -7,6 +7,7 @@ import { el, title, sheet } from "./ui.js";
 import * as U from "./util.js";
 import { openMockup } from "./mockup.js";
 import { miniaturasDoAluno, driveLiberado } from "./fotos-aluno.js";
+import { linhaVisitas } from "./link-previa.js";
 import { linhasRetorno } from "./retorno.js";
 import { situacaoTxt, enderecoTxt, historicoPlanilha, prazoEntrega } from "./repasse-dados.js";
 import {
@@ -154,8 +155,10 @@ function previa(box, it) {
   box.append(g);
   // as fotos do aluno no Drive, em miniatura (tocar amplia), com "🔄 Trocar as fotos"
   const fotos = el("div", "ja-fotos");
-  box.append(el("h3", null, "Fotos do aluno no Drive"), fotos);
-  const o = { precoTxt: precoTxt(it), salvar: (patch, msg) => save(it, patch, msg) };
+  box.append(el("h3", null, "Fotos do aluno no Drive"));
+  if (it.linkPrevia) box.append(linhaVisitas(C, it)); // quantas vezes a família abriu o link da prévia
+  box.append(fotos);
+  const o = { precoTxt: precoTxt(it), tel: (contatoPadrao(it) || {}).tel, salvar: (patch, msg) => save(it, patch, msg) };
   if (!precos(it).drivePrevias || driveLiberado(C)) miniaturasDoAluno(C, it, fotos, o);
   else
     fotos.append(

@@ -14,7 +14,9 @@ import {
   where,
   orderBy,
   limit,
-  getCountFromServer
+  getCountFromServer,
+  increment,
+  serverTimestamp
 } from "firebase/firestore";
 
 const ADRIANO = "z7studiofotografico@gmail.com",
@@ -672,4 +674,44 @@ test("contrato do colégio: pagamentos e repasse", async () => {
   await assertSucceeds(updateDoc(adm, { repassadoEm: "2026-11-08", conferido: true }));
   await assertFails(updateDoc(pag("p2"), { comprovante: "x" }));
   await assertFails(deleteDoc(pag("p1")));
+});
+
+test("link da prévia no site: quem tem o código lê; a página só soma visitas e cliques", async () => {
+  const d = {
+    nome: "Maria Santos",
+    escola: "Colégio Teste",
+    kit: "pr",
+    idade: "adulto",
+    fotos: ["a1", "a2"],
+    preco: "R$ 350,00",
+    por: "Pedro",
+    criadoEm: "2026-11-11T12:00:00Z",
+    ate: "2027-02-09T12:00:00Z",
+    vistos: 0,
+    cliques: 0,
+    vistoEm: null,
+    cliqueEm: null
+  };
+  const anon = env.unauthenticatedContext().firestore();
+  await assertSucceeds(setDoc(doc(como(PEDRO), "previasSite", "abcde23456"), d));
+  await assertFails(setDoc(doc(como(PEDRO), "previasSite", "abcde23457"), { ...d, vistos: 5 }));
+  await assertFails(setDoc(doc(como(PEDRO), "previasSite", "abcde23458"), { ...d, tel: "21999998888" }));
+  await assertFails(setDoc(doc(anon, "previasSite", "abcde23459"), d));
+  // a página (sem login): lê pelo código, não lista
+  await assertSucceeds(getDoc(doc(anon, "previasSite", "abcde23456")));
+  await assertFails(getDocs(collection(anon, "previasSite")));
+  await assertFails(getDocs(collection(como(PEDRO), "previasSite")));
+  // soma +1 com a hora do servidor; nada além disso
+  await assertSucceeds(updateDoc(doc(anon, "previasSite", "abcde23456"), { vistos: increment(1), vistoEm: serverTimestamp() }));
+  await assertSucceeds(updateDoc(doc(anon, "previasSite", "abcde23456"), { cliques: increment(1), cliqueEm: serverTimestamp() }));
+  await assertFails(updateDoc(doc(anon, "previasSite", "abcde23456"), { vistos: increment(5), vistoEm: serverTimestamp() }));
+  await assertFails(
+    updateDoc(doc(anon, "previasSite", "abcde23456"), { vistos: increment(1), vistoEm: serverTimestamp(), preco: "R$ 1,00" })
+  );
+  await assertFails(updateDoc(doc(anon, "previasSite", "abcde23456"), { preco: "R$ 1,00" }));
+  // a equipe atualiza fotos e preço, mas não mexe nas contagens
+  await assertSucceeds(updateDoc(doc(como(PEDRO), "previasSite", "abcde23456"), { fotos: ["b1"], preco: "R$ 300,00" }));
+  await assertFails(updateDoc(doc(como(PEDRO), "previasSite", "abcde23456"), { vistos: 0 }));
+  await assertFails(deleteDoc(doc(como(PEDRO), "previasSite", "abcde23456")));
+  await assertSucceeds(deleteDoc(doc(como(ADRIANO), "previasSite", "abcde23456")));
 });
