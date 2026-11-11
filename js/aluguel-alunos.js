@@ -30,6 +30,7 @@ import { botaoRelatorio } from "./relatorio.js";
 import { relatorioAluguel, atrasadoAluguel } from "./aluguel-relatorio.js";
 import { ITENS_PACOTE, nomeItem, lerPacote } from "./contrato-colegio-regras.js";
 import { linhaGenerica } from "./lista-compacta.js";
+import { USO, idUso, ouvirUso, espelhar, donoDoAluguel } from "./becas-uso.js";
 import { abrirJanela } from "./janela.js";
 import { abaColegio, abaHistorico } from "./aluguel-janela.js";
 
@@ -56,6 +57,7 @@ let C, FS, db, col;
 let lista = [],
   insts = [],
   usoAvulsos = { becas: {}, faixas: {}, capelos: {}, tamanhos: {} },
+  alunosUso = [], // alunos com beca reservada ou fora, de todos (cópia do estoque)
   filtro = { ano: String(ANO()), inst: "", status: "ativos", q: "" };
 const $ = id => document.getElementById(id);
 
@@ -111,7 +113,8 @@ export function mostrarAlunos(ctx, v, o) {
   v.append(k, filtros, resumo, chips, q, corpo);
   o.unsubs.push(
     FS.onSnapshot(
-      FS.query(col, FS.limit(5000)),
+      // a equipe: só os alunos dos contratos dela (e os sem contrato) (11/11/2026)
+      C.isAdmin ? FS.query(col, FS.limit(5000)) : C.carteira("alugueis"),
       s => {
         lista = s.docs.map(d => Object.assign({ id: d.id }, d.data()));
         render();
@@ -130,27 +133,22 @@ export function mostrarAlunos(ctx, v, o) {
       }
     )
   );
-  // avulsos com beca reservada ou fora: contam no estoque
+  // estoque geral: a cópia só com os números de todos os aluguéis (alunos e avulsos), de todos da equipe
   o.unsubs.push(
-    FS.onSnapshot(
-      FS.query(FS.collection(db, "becas"), FS.where("status", "in", ["reservado", "retirado"]), FS.limit(500)),
-      s => {
-        const u = { becas: {}, faixas: {}, capelos: {}, tamanhos: {} };
-        s.docs.forEach(d => {
-          const x = d.data();
-          ["becas", "faixas", "capelos"].forEach(kk =>
-            Object.entries(x[kk + "Qtd"] || {}).forEach(([z, n]) => (u[kk][z] = (Number(u[kk][z]) || 0) + (Number(n) || 0)))
-          );
-          Object.entries(x.tamanhosQtd || {}).forEach(([tp, zs]) => {
-            if (!zs || typeof zs !== "object") return;
-            const t = (u.tamanhos[tp] = u.tamanhos[tp] || {});
-            Object.entries(zs).forEach(([z, n]) => (t[z] = (Number(t[z]) || 0) + (Number(n) || 0)));
-          });
+    ouvirUso(C, u => {
+      alunosUso = u.alunos;
+      const t = { becas: {}, faixas: {}, capelos: {}, tamanhos: {} };
+      u.avulsos.forEach(x => {
+        ["becas", "faixas", "capelos"].forEach(kk =>
+          Object.entries(x[kk + "Qtd"] || {}).forEach(([z, n]) => (t[kk][z] = (Number(t[kk][z]) || 0) + (Number(n) || 0)))
+        );
+        Object.entries(x.tamanhosQtd || {}).forEach(([tp, zs]) => {
+          const m = (t.tamanhos[tp] = t.tamanhos[tp] || {});
+          Object.entries(zs || {}).forEach(([z, n]) => (m[z] = (Number(m[z]) || 0) + (Number(n) || 0)));
         });
-        usoAvulsos = u;
-      },
-      () => {}
-    )
+      });
+      usoAvulsos = t;
+    })
   );
   FS.getDocs(C.carteira("instituicoes", FS.limit(1500)))
     .then(s => {
@@ -182,7 +180,10 @@ async function excluirDoColegio(lst) {
   try {
     for (let i = 0; i < vai.length; i += 400) {
       const b = FS.writeBatch(db);
-      vai.slice(i, i + 400).forEach(a => b.delete(FS.doc(db, "alugueis", a.id)));
+      vai.slice(i, i + 400).forEach(a => {
+        b.delete(FS.doc(db, "alugueis", a.id));
+        b.delete(FS.doc(db, USO, idUso("aluno", a.id))); // a cópia do estoque
+      });
       await b.commit();
     }
     U.toast(`${vai.length} aluno${vai.length === 1 ? "" : "s"} excluído${vai.length === 1 ? "" : "s"} ✅`);
@@ -401,7 +402,9 @@ function card(a) {
   bx.title = "Excluir aluno";
   bx.setAttribute("aria-label", "Excluir aluno");
   bx.onclick = () =>
-    excluir(C, { col: "alugueis", id: a.id, rotulo: `Aluguel de ${title(a.nome)} (${title(a.instNome || "")} ${a.ano || ""})` });
+    excluir(C, { col: "alugueis", id: a.id, rotulo: `Aluguel de ${title(a.nome)} (${title(a.instNome || "")} ${a.ano || ""})` }).then(
+      ok => ok && espelhar(C, "aluno", a.id, null) // não conta mais no estoque
+    );
   top.append(el("h3", "name", title(a.nome || "")), el("span", "stage", at ? "ATRASADO NA DEVOLUÇÃO" : st.toUpperCase()), bx);
   e.append(top);
   const meta = el("div", "meta");
@@ -473,6 +476,7 @@ function card(a) {
 async function salvar(a, patch, msg) {
   try {
     await FS.updateDoc(FS.doc(db, "alugueis", a.id), Object.assign({ atualizadoEm: new Date().toISOString() }, patch));
+    espelhar(C, "aluno", a.id, Object.assign({}, a, patch));
     if (msg) U.toast(msg);
     return true;
   } catch (e) {
@@ -493,7 +497,7 @@ export async function mudarStatus(a, para) {
   }
   // reservar a beca: confere se tem livre (sem contar o próprio aluno)
   if (iDe < 1 && iPara >= 1) {
-    const uso = somarUso(usoAvulsos, usoDosAlunos(lista.filter(x => x.id !== a.id)));
+    const uso = somarUso(usoAvulsos, usoDosAlunos(alunosUso.filter(x => x.id !== a.id)));
     const falta = faltaParaAluno(C.P.estoque || {}, uso, a);
     if (falta.length) {
       await confirmar(
@@ -545,6 +549,7 @@ export async function mudarStatus(a, para) {
         throw Object.assign(new Error("O status deste aluno acabou de mudar. Confira e tente de novo."), { code: "mudou" });
       tx.update(ref, Object.assign({ atualizadoEm: new Date().toISOString() }, patch));
     });
+    espelhar(C, "aluno", a.id, Object.assign({}, a, patch, { status: para }));
     U.toast("Agora: " + para);
   } catch (e) {
     if (e && (e.code === "mudou" || e.code === "sem-estoque")) U.toast(e.message);
@@ -746,7 +751,7 @@ export function form(a, pre = {}) {
       try {
         // já reservado: a troca de tamanho/faixa/capelo também precisa ter livre
         if (a && STATUS_ALUGUEL.indexOf(a.status) >= 1 && a.status !== "Devolvida") {
-          const uso = somarUso(usoAvulsos, usoDosAlunos(lista.filter(y => y.id !== a.id)));
+          const uso = somarUso(usoAvulsos, usoDosAlunos(alunosUso.filter(y => y.id !== a.id)));
           const falta = faltaParaAluno(C.P.estoque || {}, uso, body);
           if (falta.length) {
             err.textContent = "Não tem livre: " + falta.join(", ");
@@ -754,8 +759,10 @@ export function form(a, pre = {}) {
             return;
           }
         }
-        if (a) await FS.updateDoc(FS.doc(db, "alugueis", a.id), body);
-        else
+        if (a) {
+          await FS.updateDoc(FS.doc(db, "alugueis", a.id), body);
+          espelhar(C, "aluno", a.id, Object.assign({}, a, body));
+        } else
           await FS.addDoc(
             col,
             Object.assign(body, {
@@ -764,7 +771,8 @@ export function form(a, pre = {}) {
               historico: [],
               criadoEm: new Date().toISOString(),
               criadoPor: C.me || "",
-              criadoPorEmail: C.email || ""
+              criadoPorEmail: C.email || "",
+              respEmail: await donoDoAluguel(C, inst.id, anoN) // fica com quem fechou o contrato do colégio
             })
           );
         U.toast(a ? "Salvo" : "Aluno cadastrado");

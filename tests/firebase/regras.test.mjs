@@ -78,7 +78,7 @@ beforeEach(async () => {
       resp: "Ana",
       respEmail: ANA
     });
-    await setDoc(doc(db, "becas", "b1"), { cliente: "Igreja", valor: 1200, pago: 300, caucao: 100, status: "reservado" });
+    await setDoc(doc(db, "becas", "b1"), { cliente: "Igreja", valor: 1200, pago: 300, caucao: 100, status: "reservado", respEmail: "" });
     await setDoc(doc(db, "agenda", "2099-11-10"), { data: "2099-11-10", status: "pendente", pedidoEmail: ANA, kind: "fotos" });
     await setDoc(doc(db, "privado", "p1"), { titulo: "Consulta médica" });
     await setDoc(doc(db, "tokens", "t1"), { email: ANA });
@@ -510,8 +510,10 @@ test("consultas da equipe 2: carteira de colégios, formandos e contagens da tel
   await assertSucceeds(getCountFromServer(query(c(p, "agenda"), where("status", "==", "pendente"))));
   await assertSucceeds(getDocs(query(c(p, "agenda"), where("data", ">=", "2026-01-01"), orderBy("data"), limit(400))));
   await assertSucceeds(getDocs(query(c(p, "ensaios"), where("data", ">=", "2026-01-01"), orderBy("data"), limit(600))));
-  await assertSucceeds(getDocs(query(c(como(ANA), "becas"), where("status", "in", ["reservado", "retirado"]), limit(500))));
-  await assertSucceeds(getDocs(query(c(como(ANA), "becas"), where("devolucao", ">=", "2026-01-01"), orderBy("devolucao"), limit(400))));
+  // becas: a equipe consulta pela carteira (os seus e os sem dono); o estoque vem de becasUso
+  await assertSucceeds(getDocs(query(c(como(ANA), "becas"), where("respEmail", "in", ["", ANA]), limit(3000))));
+  await assertFails(getDocs(query(c(como(ANA), "becas"), where("status", "in", ["reservado", "retirado"]), limit(500))));
+  await assertSucceeds(getDocs(c(como(ANA), "becasUso")));
 });
 test("consultas da equipe 3: PR da Linha de Frente (só o ano atual)", async () => {
   const db = como(PEDRO);
@@ -714,4 +716,42 @@ test("link da prévia no site: quem tem o código lê; a página só soma visita
   await assertFails(updateDoc(doc(como(PEDRO), "previasSite", "abcde23456"), { vistos: 0 }));
   await assertFails(deleteDoc(doc(como(PEDRO), "previasSite", "abcde23456")));
   await assertSucceeds(deleteDoc(doc(como(ADRIANO), "previasSite", "abcde23456")));
+});
+
+test("becas e alunos de aluguel: cada um vê os seus; o estoque (só números) é de todos", async () => {
+  await semRegra(async db => {
+    await setDoc(doc(db, "alugueis", "x1"), { nome: "Aluno da Ana", instId: "i1", ano: 2026, status: "Beca medida", respEmail: ANA });
+    await setDoc(doc(db, "alugueis", "x2"), {
+      nome: "Aluno da Bia",
+      instId: "i9",
+      ano: 2026,
+      status: "Beca medida",
+      respEmail: "bia@equipe.com"
+    });
+    await setDoc(doc(db, "alugueis", "x3"), { nome: "Sem contrato", instId: "i8", ano: 2026, status: "Cadastrado", respEmail: "" });
+    await setDoc(doc(db, "becas", "v1"), { cliente: "Da Bia", status: "reservado", respEmail: "bia@equipe.com" });
+  });
+  const ana = como(ANA);
+  await assertSucceeds(getDoc(doc(ana, "alugueis", "x1")));
+  await assertSucceeds(getDoc(doc(ana, "alugueis", "x3")));
+  await assertFails(getDoc(doc(ana, "alugueis", "x2")));
+  await assertFails(getDoc(doc(ana, "becas", "v1")));
+  await assertSucceeds(getDocs(query(c(ana, "alugueis"), where("respEmail", "in", ["", ANA]), limit(3000))));
+  await assertFails(getDocs(query(c(ana, "alugueis"), limit(5000))));
+  await assertSucceeds(getDocs(query(c(ana, "alugueis"), where("instId", "==", "i1"), where("respEmail", "==", ANA), limit(2000))));
+  await assertFails(updateDoc(doc(ana, "alugueis", "x2"), { status: "Pronto para retirada" }));
+  await assertSucceeds(updateDoc(doc(ana, "alugueis", "x1"), { status: "Pronto para retirada" }));
+  await assertFails(updateDoc(doc(ana, "alugueis", "x1"), { respEmail: "" })); // não solta o aluno
+  await assertSucceeds(updateDoc(doc(ana, "alugueis", "x3"), { respEmail: ANA })); // pega o sem contrato (contrato novo)
+  await assertSucceeds(setDoc(doc(ana, "alugueis", "x4"), { nome: "Novo", status: "Cadastrado", respEmail: ANA }));
+  await assertFails(setDoc(doc(ana, "alugueis", "x5"), { nome: "Novo", status: "Cadastrado", respEmail: "bia@equipe.com" }));
+  await assertSucceeds(setDoc(doc(ana, "becas", "v2"), { cliente: "X", status: "reservado", respEmail: ANA }));
+  // o estoque: só números
+  await assertSucceeds(
+    setDoc(doc(ana, "becasUso", "aluno_x1"), { tipo: "aluno", status: "Beca medida", becaTipo: "tradPreta", tamanho: "M" })
+  );
+  await assertFails(setDoc(doc(ana, "becasUso", "aluno_x9"), { tipo: "aluno", status: "Beca medida", nome: "Fulano" }));
+  await assertFails(getDocs(c(como(PEDRO), "becasUso")));
+  await assertSucceeds(getDocs(c(ana, "becasUso")));
+  await assertSucceeds(deleteDoc(doc(ana, "becasUso", "aluno_x1")));
 });

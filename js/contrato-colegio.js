@@ -72,7 +72,15 @@ export function abrirContrato(ctx, inst, ano) {
           () => {}
         ),
         FS.onSnapshot(
-          FS.query(FS.collection(db, "alugueis"), FS.where("instId", "==", inst.id), FS.limit(2000)),
+          // a equipe lê só os alunos dos seus contratos (o dono do aluno = quem fechou o contrato)
+          C.isAdmin
+            ? FS.query(FS.collection(db, "alugueis"), FS.where("instId", "==", inst.id), FS.limit(2000))
+            : FS.query(
+                FS.collection(db, "alugueis"),
+                FS.where("instId", "==", inst.id),
+                FS.where("respEmail", "==", C.email),
+                FS.limit(2000)
+              ),
           s => {
             st.alunos = s.docs
               .map(d => Object.assign({ id: d.id }, d.data()))
@@ -422,6 +430,9 @@ function formContrato(c, inst, ano, ref) {
               historico: [reg("criou o contrato")]
             })
           );
+        // os alunos de aluguel do colégio/ano ficam com quem fechou o contrato
+        if (body.respEmail && (!c || body.respEmail !== x.respEmail))
+          await (await import("./becas-uso.js")).passarAlugueis(C, inst.id, ano, body.respEmail).catch(e => console.warn("[Z7] donos", e));
         U.toast(c ? "Contrato salvo" : "Contrato criado ✅");
         close();
       } catch (e) {

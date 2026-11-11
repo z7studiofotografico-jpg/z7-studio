@@ -43,6 +43,7 @@ export function paraDocAluguel(o, ext) {
     __falta: falta,
     instId: ext.instId || "",
     instNome: ext.instNome || "",
+    respEmail: ext.respEmail || "", // quem fechou o contrato do colégio (cada um vê os seus)
     ano: Number(ext.ano) || new Date().getFullYear(),
     serie: String(o.serie || "").trim(),
     nome: String(o.nome || "").trim(),
@@ -83,6 +84,14 @@ export async function importarAlugueis(C, insts) {
       existentes.add(`${x.instId}|${x.ano}|${U.chave(x.nome)}`);
     });
   } catch (_) {}
+  // dono de cada colégio/ano = quem fechou o contrato
+  const donos = new Map();
+  try {
+    (await C.FS.getDocs(C.FS.query(C.FS.collection(C.db, "contratosColegio"), C.FS.limit(2000)))).forEach(d => {
+      const c = d.data();
+      donos.set(`${c.instId}|${Number(c.ano)}`, String(c.respEmail || "").toLowerCase());
+    });
+  } catch (_) {}
   abrirImportador(C, {
     modulo: "aluguel",
     titulo: "Importar planilha · Aluguel de becas",
@@ -110,7 +119,12 @@ export async function importarAlugueis(C, insts) {
       box.append(r, hist);
       return () => {
         const i = insts.find(x => x.id === sInst.value);
-        return { instId: i ? i.id : "", instNome: i ? i.nome : "", ano: ano.value };
+        return {
+          instId: i ? i.id : "",
+          instNome: i ? i.nome : "",
+          ano: ano.value,
+          respEmail: (i && donos.get(`${i.id}|${Number(ano.value)}`)) || ""
+        };
       };
     }
   });

@@ -16,7 +16,9 @@ async function levantar(C, it) {
   const q = (col, ...f) => FS.getDocs(FS.query(FS.collection(db, col), ...f, FS.limit(3000)));
   out.formandos = (await q("formandos", FS.where("instId", "==", it.id))).docs;
   try {
-    out.alugueis = (await q("alugueis", FS.where("instId", "==", it.id))).docs;
+    out.alugueis = (
+      await q("alugueis", FS.where("instId", "==", it.id), ...(C.isAdmin ? [] : [FS.where("respEmail", "in", ["", C.email])]))
+    ).docs;
   } catch (_) {
     out.alugueis = [];
   }

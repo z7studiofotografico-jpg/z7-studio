@@ -9,6 +9,7 @@ import * as U from "./util.js";
 import { botaoRelatorio } from "./relatorio.js";
 import { contatoRel } from "./aluno-id.js";
 import { BECAS, TAMANHOS, FAIXAS, CAPELOS, nomeFaixa, nomeCapelo, abrirEstoqueBecas, somarUso, usoDosAlunos } from "./becas-estoque.js";
+import { ouvirUso, espelhar, acertarBecas } from "./becas-uso.js";
 export { BECAS, TAMANHOS, FAIXAS, CAPELOS };
 let C,
   FS,
@@ -77,21 +78,20 @@ export function show() {
     segs.append(b);
   });
   v.append(segs);
-  // alunos com beca reservada ou fora: entram na conta do estoque dos avulsos também
+  // estoque geral (11/11/2026): a cópia só com os números de todos os aluguéis que seguram beca (becasUso), porque
+  // cada pessoa da equipe só lê os seus aluguéis. O admin acerta a cópia e os donos uma vez por dia.
   unsubs.push(
-    FS.onSnapshot(
-      FS.query(
-        FS.collection(db, "alugueis"),
-        FS.where("status", "in", ["Beca medida", "Produtos em produção", "Pronto para retirada", "Retirou a beca"]),
-        FS.limit(2000)
-      ),
-      s => {
-        alunosAtivos = s.docs.map(d => d.data());
+    ouvirUso(
+      C,
+      u => {
+        alunosAtivos = u.alunos;
+        avulsosUso = u.avulsos;
         if (parte === "avulsos") render();
       },
-      e => avisoErro(e, "contar as becas dos alunos")
+      e => avisoErro(e, "contar as becas em uso")
     )
   );
+  acertarBecas(C, U.todayStr()).catch(e => console.warn("[Z7] acerto das becas", e));
   if (parte === "alunos") {
     import("./aluguel-alunos.js").then(m => m.mostrarAlunos(C, v, { abrirEstoque: openEstoque, unsubs })).catch(e => C.handleErr(e));
     return;
@@ -134,9 +134,24 @@ export function show() {
     }
   };
   // Aluguéis recentes e futuros + os que ainda estão fora do estúdio (mesmo antigos)
+  const desde = U.addDays(-60);
+  if (!C.isAdmin) {
+    // a equipe: só os seus (e os sem dono); o filtro de datas é feito aqui
+    unsubs.push(
+      FS.onSnapshot(
+        C.carteira("becas"),
+        s => {
+          a = s.docs.map(d => Object.assign({ id: d.id }, d.data())).filter(x => (x.devolucao || "") >= desde || x.status === "retirado");
+          junta();
+        },
+        erro
+      )
+    );
+    return;
+  }
   unsubs.push(
     FS.onSnapshot(
-      FS.query(col, FS.where("devolucao", ">=", U.addDays(-60)), FS.orderBy("devolucao"), FS.limit(800)),
+      FS.query(col, FS.where("devolucao", ">=", desde), FS.orderBy("devolucao"), FS.limit(800)),
       s => {
         a = s.docs.map(d => Object.assign({ id: d.id }, d.data()));
         junta();
@@ -157,10 +172,11 @@ export function show() {
 }
 
 // Quantas becas estão comprometidas entre duas datas (para conferir o estoque)
-let alunosAtivos = []; // alunos de aluguel com beca reservada ou fora (carregados ao abrir a tela)
+let alunosAtivos = [], // alunos de aluguel com beca reservada ou fora (da cópia do estoque, de todos)
+  avulsosUso = []; // avulsos reservados ou fora (da cópia do estoque, de todos)
 function emUso(de, ate, ignora) {
   const out = somarUso({ becas: {}, faixas: {}, capelos: {}, tamanhos: {} }, usoDosAlunos(alunosAtivos));
-  lista
+  avulsosUso
     .filter(x => x.id !== ignora && ativo(x) && x.retirada && x.devolucao && x.retirada <= ate && x.devolucao >= de)
     .forEach(x => {
       Object.entries(x.becasQtd || {}).forEach(([k, v]) => {
@@ -366,6 +382,7 @@ const falta = x => reais(Math.max(0, centavos(x.valor) - centavos(x.pago)));
 async function salvar(x, patch, msg) {
   try {
     await FS.updateDoc(FS.doc(db, "becas", x.id), Object.assign(patch, { atualizadoEm: new Date().toISOString() }));
+    espelhar(C, "avulso", x.id, Object.assign({}, x, patch));
     U.toast(msg);
   } catch (e) {
     C.handleErr(e);
@@ -707,12 +724,20 @@ export function form(x, pre) {
         atualizadoEm: new Date().toISOString()
       };
       try {
-        if (x) await FS.updateDoc(FS.doc(db, "becas", x.id), body);
-        else
-          await FS.addDoc(
-            col,
-            Object.assign(body, { status: "reservado", criadoEm: new Date().toISOString(), por: C.me || "", porEmail: C.email || "" })
-          );
+        if (x) {
+          await FS.updateDoc(FS.doc(db, "becas", x.id), body);
+          espelhar(C, "avulso", x.id, Object.assign({}, x, body));
+        } else {
+          const novo = Object.assign(body, {
+            status: "reservado",
+            criadoEm: new Date().toISOString(),
+            por: C.me || "",
+            porEmail: C.email || "",
+            respEmail: C.email || "" // o aluguel fica com quem registrou (cada um vê os seus)
+          });
+          const ref = await FS.addDoc(col, novo);
+          espelhar(C, "avulso", ref.id, novo);
+        }
         close();
         U.toast(x ? "Aluguel salvo" : `Aluguel registrado: retirada ${U.fmtDate(ret.value)}`);
       } catch (e) {

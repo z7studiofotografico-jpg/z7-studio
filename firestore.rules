@@ -136,12 +136,22 @@ service cloud.firestore {
       allow delete: if admin();
     }
     // Aluguel de becas
+    // (11/11/2026: cada um da equipe vê só os aluguéis que registrou e os antigos sem dono; o estoque vem de becasUso)
     match /becas/{id} {
-      allow read, create: if pode('becas');
+      allow read: if admin() || (pode('becas') && (resource == null || minhaOuLivre()));
+      allow create: if admin() || (pode('becas') && request.resource.data.get('respEmail', '') in ['', email()]);
       // depois de registrado, a equipe não muda valor nem caução, e o "já pago" só aumenta (receber mais)
-      allow update: if admin() || (pode('becas') && !mudou(['valor', 'caucao'])
+      allow update: if admin() || (pode('becas') && minhaOuLivre() && respOk() && !mudou(['valor', 'caucao'])
         && request.resource.data.get('pago', 0) >= resource.data.get('pago', 0));
       allow delete: if admin();
+    }
+    // Estoque de becas (11/11/2026): uma cópia só com os números de cada aluguel que segura beca (sem nome, telefone
+    // nem valor). Todos com o módulo de becas leem (o estoque é de todos) e o app grava junto com o aluguel.
+    match /becasUso/{id} {
+      allow read, delete: if pode('becas');
+      allow write: if pode('becas') && id.matches('(aluno|avulso)_[A-Za-z0-9]+')
+        && request.resource.data.tipo in ['aluno', 'avulso'] && request.resource.data.status is string
+        && !request.resource.data.keys().hasAny(['nome', 'tel', 'cliente', 'valor', 'pago', 'responsavel']);
     }
     // Fila de e-mails para os colégios (enviados pelo GitHub com o Gmail do estúdio)
     match /emails/{id} {
@@ -302,9 +312,11 @@ service cloud.firestore {
       allow delete: if admin();
     }
     // Aluguel de becas · alunos dos colégios (Etapa 3): a equipe cadastra e muda o status; valor e contrato só o admin
+    // (11/11/2026: o aluno fica com quem fechou o contrato do colégio, "respEmail"; a equipe vê os seus e os sem contrato)
     match /alugueis/{id} {
-      allow read, create: if pode('becas');
-      allow update: if admin() || (pode('becas') && exclusaoOk() && !mudou(['valor', 'contratoZerado']));
+      allow read: if admin() || (pode('becas') && (resource == null || minhaOuLivre()));
+      allow create: if admin() || (pode('becas') && request.resource.data.get('respEmail', '') in ['', email()]);
+      allow update: if admin() || (pode('becas') && minhaOuLivre() && respOk() && exclusaoOk() && !mudou(['valor', 'contratoZerado']));
       allow delete: if admin();
     }
     // Contrato do colégio (Aluguel de becas): o admin e o representante que fechou. Depois de criado, valor, preços, parcelas,

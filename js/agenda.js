@@ -169,9 +169,12 @@ export function show() {
   if (C.pode("becas"))
     unsubs.push(
       FS.onSnapshot(
-        FS.query(FS.collection(db, "alugueis"), FS.where("devolucao", ">=", hoje), FS.orderBy("devolucao"), FS.limit(1500)),
+        // a equipe: só os alunos dos contratos dela (o filtro da data é feito aqui)
+        C.isAdmin
+          ? FS.query(FS.collection(db, "alugueis"), FS.where("devolucao", ">=", hoje), FS.orderBy("devolucao"), FS.limit(1500))
+          : C.carteira("alugueis"),
         snap => {
-          becasAlunos = agruparAlunos(snap.docs.map(d => d.data()));
+          becasAlunos = agruparAlunos(snap.docs.map(d => d.data()).filter(x => (x.devolucao || "") >= hoje));
           mudar({ becas: [...becasAvulsas, ...becasAlunos] });
           render();
         },
@@ -182,11 +185,13 @@ export function show() {
   if (C.pode("becas"))
     unsubs.push(
       FS.onSnapshot(
-        FS.query(FS.collection(db, "becas"), FS.where("devolucao", ">=", hoje), FS.orderBy("devolucao"), FS.limit(400)),
+        C.isAdmin
+          ? FS.query(FS.collection(db, "becas"), FS.where("devolucao", ">=", hoje), FS.orderBy("devolucao"), FS.limit(400))
+          : C.carteira("becas"),
         snap => {
           becasAvulsas = snap.docs
             .map(d => Object.assign({ id: d.id }, d.data()))
-            .filter(x => x.status !== "cancelado" && x.status !== "devolvido");
+            .filter(x => (x.devolucao || "") >= hoje && x.status !== "cancelado" && x.status !== "devolvido");
           mudar({ becas: [...becasAvulsas, ...becasAlunos] });
           render();
         },

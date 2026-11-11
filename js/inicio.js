@@ -96,7 +96,11 @@ export function criarInicio(ctx, Funil) {
           .catch(e => avisoErro(e, "contar parcelas atrasadas"));
     }
     if (pode("becas"))
-      FS.getDocs(query(collection(db, "becas"), where("status", "in", ["reservado", "retirado"]), FS.limit(500)))
+      FS.getDocs(
+        ctx.isAdmin
+          ? query(collection(db, "becas"), where("status", "in", ["reservado", "retirado"]), FS.limit(500))
+          : ctx.carteira("becas")
+      )
         .then(s => {
           const l = s.docs.map(d => d.data()),
             at = l.filter(b => b.status === "retirado" && b.devolucao && b.devolucao < hoje).length,

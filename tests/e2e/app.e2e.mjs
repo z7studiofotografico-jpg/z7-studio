@@ -3692,7 +3692,13 @@ await cenario("Contrato do colégio (pacote por aluno, quem recebeu, repasse e p
   }
   // a representante: dinheiro com ela só sai do "Falta repassar" quando o admin confirma
   {
-    const d2 = Object.assign({}, d, {
+    // os alunos do colégio ficam com quem fechou o contrato (respEmail), como o app grava desde 11/11/2026
+    const comDona = Object.fromEntries(
+      Object.entries(d)
+        .filter(([k]) => k.startsWith("alugueis/"))
+        .map(([k, v]) => [k, Object.assign({}, v, { respEmail: ANA })])
+    );
+    const d2 = Object.assign({}, d, comDona, {
       [`contratosColegio/i1_${Y}`]: {
         instId: "i1",
         instNome: "COLEGIO ALFA",
