@@ -1,6 +1,7 @@
 // PR: estado compartilhado pelas partes da tela (lista, cartão, janelas, lote) e as regras pequenas do contato.
 // As outras partes leem o estado daqui (as variáveis exportadas acompanham as mudanças) e mudam pelas funções "mudar...".
 import { comAlteracao } from "./alteracoes.js";
+import { atividadeDoPatch, registrarAtividade } from "./atividades.js";
 import * as U from "./util.js";
 export let C, FS, db, col;
 export let tab = "hoje",
@@ -112,6 +113,12 @@ export const baseLF = () => (ehFormatura() ? [FS.where("seg", "==", "lf")] : [FS
 export const baseSeg = () => (ehFormatura() ? [FS.where("seg", "==", seg)] : []);
 // A equipe trabalha só a própria carteira (o admin vê tudo): filtro das abas e dos números
 export const soMinha = () => (C.isAdmin ? [] : [FS.where("respEmail", "==", C.email || "")]);
+// Para hoje (10/11/2026): cada um vê só os seus. O admin vê os seus e os que ainda não têm responsável; o que está
+// com alguém da equipe fica no botão daquela pessoa ("Roberto (32)"), não mais misturado no Para hoje dele.
+export const meuOuLivre = it => (it.respEmail || "") === (C.email || "") || !it.respEmail;
+// aba "equipe": a pessoa aberta pelo botão (e-mail e nome)
+export let pessoaAberta = { email: "", nome: "" };
+export const mudarPessoaAberta = v => (pessoaAberta = v || { email: "", nome: "" });
 export const $ = id => document.getElementById(id);
 
 export const ETAPAS = [
@@ -202,7 +209,9 @@ export async function save(it, patch, msg, o = {}) {
   try {
     patch.atualizadoEm = new Date().toISOString();
     comAlteracao(it, patch, C.me);
+    const ativ = atividadeDoPatch(it, patch, U.todayStr());
     await FS.updateDoc(FS.doc(db, colNome(), it.id), patch);
+    if (ativ) registrarAtividade(C, Object.assign(ativ, { lista: vendaDe(it) }));
     Object.assign(it, patch);
     if (tab === "buscar") tela.renderList();
     U.toast(msg || "Salvo");

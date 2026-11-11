@@ -25,8 +25,11 @@ import {
   tela,
   metaNome,
   vendasMes,
-  textoVendasMes
+  textoVendasMes,
+  meuOuLivre,
+  vendaDe
 } from "./repasse-estado.js";
+import { registrarAtividade } from "./atividades.js";
 
 export async function refreshStats() {
   const today = U.todayStr(),
@@ -58,7 +61,11 @@ export async function refreshStats() {
             ]
     );
     const docs = s0 => s0.docs.map(d => d.data()).filter(noSeg);
-    set("rsHoje", docs(h).filter(x => ABERTAS.includes(x.etapa) && x.followup && x.followup <= today).length);
+    // (admin: só os seus e os sem responsável, igual à aba Para hoje)
+    set(
+      "rsHoje",
+      docs(h).filter(x => ABERTAS.includes(x.etapa) && x.followup && x.followup <= today && (!C.isAdmin || meuOuLivre(x))).length
+    );
     set("rsInt", docs(i).length);
     const doMes = docs(m).filter(x => (x.pagoEm || "") >= mes);
     Object.assign(vendasMes, { n: doMes.length, v: doMes.reduce((a, x) => a + (Number(x.valor) || 0), 0), pronto: true });
@@ -200,6 +207,12 @@ export async function separarLote() {
       return;
     }
     const total = ja + pegos.length;
+    registrarAtividade(C, {
+      tipo: "hoje",
+      n: pegos.length,
+      lista: ehFormatura() ? "formatura" : vendaDe(pegos[0].data()),
+      texto: `separou ${pegos.length} aluno${pegos.length > 1 ? "s" : ""} para hoje` + (esc ? ` (${esc.rotulo || esc.nomes[0]})` : "")
+    });
     U.toast(
       `${pegos.length} aluno${pegos.length > 1 ? "s" : ""} separado${pegos.length > 1 ? "s" : ""} para você · ${total} hoje` +
         (pegos.length < quantos ? ` (a fila só tinha ${pegos.length})` : "")

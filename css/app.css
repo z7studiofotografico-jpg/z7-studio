@@ -451,3 +451,13 @@ button.lc-linha[aria-expanded="true"]{border-bottom-left-radius:0;border-bottom-
 .ja-ev{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
 .ja-ev > .fu{flex:1;min-width:200px;margin:0}
 .ja-corpo .lc-linha .btn{flex:none}
+/* atividades da equipe: número vermelho no botão do admin (topo) */
+.who.ativ-btn{position:relative;cursor:pointer;border:1px solid currentColor;border-radius:8px;padding:4px 10px;opacity:1}
+.ativ-badge{position:absolute;top:-8px;right:-8px;background:#e24b4a;color:#fff;border-radius:10px;min-width:20px;height:20px;padding:0 5px;font-size:.72rem;font-weight:700;display:flex;align-items:center;justify-content:center;line-height:1}
+.ativ-badge[hidden]{display:none}
+.ativ-pessoa{display:flex;flex-direction:column;padding:8px 0;border-bottom:1px solid var(--line,#ddd)}
+.ativ-pessoa small{opacity:.8}
+.ativ-lista{margin:0 0 12px;padding-left:18px;font-size:.9rem;line-height:1.6;max-height:50vh;overflow:auto}
+/* PR: botões de cada pessoa da equipe (admin) e "Trabalhar hoje" na aba A trabalhar */
+.chip.chip-pessoa{border-style:dashed}
+.lc-item > .btn-hoje{margin:4px 0 8px}

@@ -1,5 +1,6 @@
 // "Passar para a equipe" (só admin): dar para alguém da equipe o PR de um colégio num ano (cartão do colégio)
-// ou um aluno específico (cartão do aluno no PR). Quem recebe vê os alunos em "Para hoje", já separados para ele.
+// ou um aluno específico (cartão do aluno no PR). Quem recebe vê os alunos em "A trabalhar", já separados para ele,
+// e escolhe quais pôr no "Para hoje" (10/11/2026: antes iam todos para hoje e enchiam também o Para hoje do admin).
 import { el, field, sel, sheet, botoes } from "./ui.js";
 import * as U from "./util.js";
 import { chaveColegio } from "./historico-dados.js";
@@ -19,7 +20,7 @@ const separarPara = (p, ano) => ({
   respEmail: p.email,
   separadoEm: U.todayStr(),
   separadoSeg: ano >= ANO() ? "lf" : "rep",
-  followup: U.todayStr(),
+  followup: null,
   atualizadoEm: new Date().toISOString()
 });
 function escolherPessoa(C, p, mods) {
@@ -86,7 +87,7 @@ export function passarColegio(C, inst) {
       );
       alvos = s.docs;
       info.textContent = alvos.length
-        ? `${alvos.length} aluno${alvos.length > 1 ? "s" : ""} na fila de ${g.rotulo} vão para a pessoa escolhida (entram em "Para hoje" dela).`
+        ? `${alvos.length} aluno${alvos.length > 1 ? "s" : ""} na fila de ${g.rotulo} vão para a pessoa escolhida (entram em "A trabalhar" dela).`
         : `Ninguém na fila de ${g.rotulo}: os alunos já foram separados ou compraram.`;
       ok.disabled = !alvos.length || !pessoa;
     };
@@ -161,7 +162,7 @@ export function passarGrupo(C, { de, colNome, formatura, aoTerminar }) {
     const andando = docs.filter(d => !d.data().historico && ["SEPARADO", "CONTATADO", "INTERESSADO"].includes(d.data().etapa));
     const fora = docs.length - fila.length - andando.length;
     info.textContent =
-      `${fila.length} na fila (vão para "Para hoje" da pessoa) e ${andando.length} em andamento (troca o responsável).` +
+      `${fila.length} na fila (vão para "A trabalhar" da pessoa) e ${andando.length} em andamento (troca o responsável).` +
       (fora ? ` ${fora} pagos, entregues, caídos ou incompletos ficam como estão.` : "");
     ok.disabled = !(fila.length + andando.length) || !pessoa;
     p.addEventListener("submit", async ev => {

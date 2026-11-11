@@ -155,6 +155,15 @@ service cloud.firestore {
         && request.resource.data.msg.size() <= 300 && request.resource.data.pilha.size() <= 800;
       allow read, delete: if admin();
     }
+    // Atividades da equipe (10/11/2026): cada um grava a sua (curta, só esses campos); só o admin lê e apaga
+    match /atividades/{id} {
+      allow create: if membro() && request.resource.data.email == email()
+        && request.resource.data.keys().hasOnly(['tipo', 'texto', 'n', 'lista', 'por', 'email', 'dia', 'em'])
+        && request.resource.data.texto is string && request.resource.data.texto.size() <= 200
+        && request.resource.data.tipo is string && request.resource.data.tipo.size() <= 20
+        && request.resource.data.n is int && request.resource.data.n >= 1 && request.resource.data.n <= 999;
+      allow read, delete: if admin();
+    }
     // Aluno repetido no PR: quem é da equipe pede; só o admin decide (passa para a pessoa ou mantém onde está).
     // Cada um vê só os próprios pedidos e avisos (o identificador termina com o e-mail da pessoa), marca que viu
     // a resposta e pode pedir de novo um pedido já decidido.

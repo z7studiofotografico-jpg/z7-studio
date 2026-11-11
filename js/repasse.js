@@ -52,8 +52,12 @@ import {
   colNome,
   metaNome,
   $,
-  textoVendasMes
+  textoVendasMes,
+  meuOuLivre,
+  pessoaAberta,
+  mudarPessoaAberta
 } from "./repasse-estado.js";
+import { botoesEquipe, renderTrabalhar, renderEquipe, recontarEquipe, ouvirJuntas, emAndamento } from "./repasse-equipe.js";
 // Caídos: o admin vê todos; a equipe, os que ela mesma marcou
 const soMinhaCaidos = () => (C.isAdmin ? [] : [FS.where("respEmail", "==", C.email || "")]);
 import { card } from "./repasse-cartao.js";
@@ -297,6 +301,7 @@ function mount() {
     return de;
   };
   const depoisDaLista = () => {
+    recontarEquipe();
     $("rLoteEscola").value = "";
     loadMeta().then(refreshStats);
     openTab(tab);
@@ -392,8 +397,9 @@ function renderTipos() {
     };
     c.append(b);
   });
-  // admin: só os alunos de uma pessoa da equipe (com quantos cada uma tem nesta aba)
-  if (C.isAdmin) {
+  // admin: só os alunos de uma pessoa da equipe (com quantos cada uma tem nesta aba). Para hoje, A trabalhar e o
+  // botão da pessoa já vêm separados por pessoa.
+  if (C.isAdmin && !SEPARADAS.includes(tab)) {
     const conta = new Map();
     daTela.filter(naVenda).forEach(it => {
       const k = it.respEmail || "-";
@@ -419,6 +425,7 @@ function renderTipos() {
     c.append(sel);
   }
 }
+const SEPARADAS = ["hoje", "trabalhar", "equipe"];
 function renderSegs() {
   renderTipos();
   const c = $("rSegs");
@@ -459,6 +466,7 @@ function renderChips() {
     ["caidos", "Caídos"],
     ["incompletos", C.isAdmin ? "Incompletos" : "Meus incompletos"],
     ["hoje", "Para hoje"],
+    ["trabalhar", "A trabalhar"],
     ["interessados", "Interessados"],
     ["buscar", "Buscar"]
   ];
@@ -471,6 +479,11 @@ function renderChips() {
     b.onclick = () => openTab(k);
     c.append(b);
   });
+  if (C.isAdmin)
+    botoesEquipe(c, p => {
+      mudarPessoaAberta(p);
+      openTab("equipe");
+    });
 }
 
 function avisoEdicoes() {
@@ -496,6 +509,10 @@ function openTab(k) {
   renderList(true);
   const today = U.todayStr();
   let q = null;
+  // Para hoje (10/11): admin vê os seus e os sem responsável (meuOuLivre); A trabalhar: os seus sem data para hoje;
+  // botão da pessoa: os dela, mais os caídos.
+  if (k === "trabalhar") q = emAndamento(C.email || "");
+  if (k === "equipe" && C.isAdmin && pessoaAberta.email) q = emAndamento(pessoaAberta.email, [...ABERTAS, "CAÍDO"]);
   // a equipe vê só os contatos dela (soMinha); a busca continua mostrando todos, para achar o aluno
   if (seg === "lf") {
     if (k === "hoje") q = FS.query(col, ...baseLF(), ...soMinha(), FS.where("etapa", "in", [...ABERTAS, "ENTREGUE"]), FS.limit(300));
@@ -539,17 +556,18 @@ function openTab(k) {
       ...soMinhaCaidos(),
       FS.limit(500)
     );
+  const falhou = err => {
+    console.warn(err);
+    U.showNotice("Não foi possível carregar o Repasse. Verifique a internet.");
+  };
   if (q)
-    unsubList = FS.onSnapshot(
-      q,
-      snap => {
-        mudarItems(snap.docs.map(d => Object.assign({ id: d.id }, d.data())));
+    unsubList = ouvirJuntas(
+      [q],
+      docs => {
+        mudarItems(docs.map(d => Object.assign({ id: d.id }, d.data())));
         renderList();
       },
-      err => {
-        console.warn(err);
-        U.showNotice("Não foi possível carregar o Repasse. Verifique a internet.");
-      }
+      falhou
     );
   if (k === "buscar") {
     $("rQ").focus();
@@ -655,14 +673,14 @@ function daAba() {
   // quem já comprou (entregue) fica só na aba Vendidos; em "A conferir" continua, senão a venda entregue
   // antes da conferência sumiria e a comissão nunca seria confirmada
   if (tab !== "vendidos" && tab !== "conferir") arr = arr.filter(it => it.etapa !== "ENTREGUE");
-  if (tab === "hoje") {
-    const t0 = U.todayStr();
-    arr = arr.filter(it => ABERTAS.includes(it.etapa) && it.followup && it.followup <= t0);
-  }
+  const t0 = U.todayStr();
+  if (tab === "hoje")
+    arr = arr.filter(it => ABERTAS.includes(it.etapa) && it.followup && it.followup <= t0 && (!C.isAdmin || meuOuLivre(it)));
+  if (tab === "trabalhar") arr = arr.filter(it => ABERTAS.includes(it.etapa) && !(it.followup && it.followup <= t0));
   return arr;
 }
 // lista única: Todos / Só PR / Só Paspatur; admin: só os de uma pessoa da equipe
-const daPessoa = it => !C.isAdmin || !filtroPessoa || ehFormatura() || (it.respEmail || "-") === filtroPessoa;
+const daPessoa = it => !C.isAdmin || !filtroPessoa || ehFormatura() || SEPARADAS.includes(tab) || (it.respEmail || "-") === filtroPessoa;
 function naTela() {
   return daAba().filter(it => naVenda(it) && daPessoa(it));
 }
@@ -715,7 +733,9 @@ function renderList(loading, emptyMsg) {
     const msgs = {
       vendidos: ["Nenhuma venda entregue ainda", "Quem comprou e já recebeu o kit aparece aqui, só para consulta."],
       conferir: ["Nenhuma venda para conferir ✓", "As vendas registradas pela equipe aparecem aqui até você conferir o comprovante."],
-      hoje: ["Nada para hoje", "Separe o seu lote do dia no quadro acima para começar."],
+      hoje: ["Nada para hoje", 'Separe o seu lote do dia no quadro acima, ou toque em "Trabalhar hoje" na aba A trabalhar.'],
+      trabalhar: ["Nada a trabalhar", "Os alunos passados para você, sem data para hoje, aparecem aqui."],
+      equipe: [`Nada com ${U.first(title(pessoaAberta.nome))}`, "Ninguém em andamento nem caído com essa pessoa nesta lista."],
       interessados: ["Nenhum interessado ainda", "Quem responder que quer ver a prévia aparece aqui."],
       entregas: ["Nenhuma entrega pendente", "Os kits pagos aparecem aqui, separados por cidade e bairro."],
       incompletos: [
@@ -729,6 +749,8 @@ function renderList(loading, emptyMsg) {
     list.append(e);
     return;
   }
+  if (tab === "trabalhar") return renderTrabalhar(list, arr, linha);
+  if (tab === "equipe") return renderEquipe(list, arr, linha);
   if (tab === "hoje") {
     const rank = { late: 0, today: 1, later: 2, none: 3, won: 4 };
     arr.sort((a, b) => rank[status(a)] - rank[status(b)] || (a.followup || "").localeCompare(b.followup || ""));
@@ -760,6 +782,8 @@ function renderList(loading, emptyMsg) {
 // ---------- relatório para imprimir (a aba aberta, com os números do topo) ----------
 const NOMES_ABA = {
   hoje: "Para hoje",
+  trabalhar: "A trabalhar",
+  equipe: "Equipe",
   interessados: "Interessados",
   entregas: "Entregar",
   buscar: "Busca",

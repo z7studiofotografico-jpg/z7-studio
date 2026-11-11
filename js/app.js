@@ -43,6 +43,7 @@ import { ligarAjustes } from "./ajustes.js";
 import { criarInicio } from "./inicio.js";
 import { telaCriarSenha } from "./criar-senha.js";
 import { painelNumeros } from "./numeros-tela.js";
+import { painelAtividades } from "./atividades.js";
 import { ligarWhatsCerto } from "./numeros-celular.js";
 import * as Equipe from "./equipe.js";
 import { definirExtras as feriadosExtras } from "./feriados.js";
@@ -90,6 +91,11 @@ const team = () =>
 function renderMe() {
   $("btnMe").textContent = me ? "👤 " + first(me) : "";
   $("btnTeam").hidden = !isAdmin;
+  // admin: número vermelho com as atividades novas da equipe (toque abre o resumo)
+  if (painelAtiv) {
+    painelAtiv.atualizar();
+    painelAtiv.repor();
+  }
 }
 // Módulos do app. Administradores e donos veem tudo; a equipe vê só o que foi marcado no cadastro (sem módulos = sem acesso).
 const MODULOS = [
@@ -333,6 +339,8 @@ ligarAjustes(ctx, { sair: () => signOut(auth), renderPushState, verComo: () => e
 const { renderHome, contarInst } = criarInicio(ctx, Funil);
 let usersLoaded = false,
   painelNum = null;
+// (o botão do topo com o nome do admin; liga quando entra alguém)
+const painelAtiv = painelAtividades(ctx, $("btnMe"));
 async function route() {
   if (!user || !usersLoaded) return;
   fecharRelatorio(); // trocou de tela: o relatório da tela anterior sai
@@ -694,6 +702,7 @@ onAuthStateChanged(auth, u => {
     usersLoaded = false;
     unsub.forEach(f => f());
     unsub = [];
+    painelAtiv.parar();
     Funil.parar();
     USERS = {};
   }

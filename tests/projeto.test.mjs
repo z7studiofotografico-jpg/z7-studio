@@ -101,7 +101,7 @@ test("os arquivos do app não dependem um do outro em círculo", () => {
 test("só o dono muda o estado compartilhado de cada tela", () => {
   const DONOS = {
     "repasse-estado.js": {
-      "repasse.js": ["mudarTab", "mudarSeg", "mudarItems", "mudarTipoPR", "mudarFiltroVenda", "mudarFiltroPessoa"],
+      "repasse.js": ["mudarTab", "mudarSeg", "mudarItems", "mudarTipoPR", "mudarFiltroVenda", "mudarFiltroPessoa", "mudarPessoaAberta"],
       "repasse-lote.js": ["mudarMeta"]
     },
     "agenda-estado.js": { "agenda.js": ["mudar"] },

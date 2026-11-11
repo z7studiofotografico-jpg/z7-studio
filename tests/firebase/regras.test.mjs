@@ -330,6 +330,17 @@ test("PR: quem é da Linha de Frente confere se o aluno já existe antes de incl
   await assertFails(getDoc(doc(como(PEDRO), "repasse", "antigo")));
 });
 
+test("atividades da equipe: cada um grava a sua; só o admin lê", async () => {
+  const a = { tipo: "hoje", texto: "colocou Bruno para hoje", n: 1, lista: "pr", por: "Pedro", email: PEDRO, dia: "2026-11-10", em: "2026-11-10T12:00:00Z" };
+  await assertSucceeds(setDoc(doc(como(PEDRO), "atividades", "a1"), a));
+  await assertFails(setDoc(doc(como(PEDRO), "atividades", "a2"), { ...a, email: ANA }));
+  await assertFails(setDoc(doc(como(PEDRO), "atividades", "a3"), { ...a, texto: "x".repeat(201) }));
+  await assertFails(setDoc(doc(como(PEDRO), "atividades", "a4"), { ...a, extra: 1 }));
+  await assertFails(getDoc(doc(como(PEDRO), "atividades", "a1")));
+  await assertSucceeds(getDoc(doc(como(ADRIANO), "atividades", "a1")));
+  await assertSucceeds(deleteDoc(doc(como(ADRIANO), "atividades", "a1")));
+});
+
 test("erros do app: cada um grava o seu (curto); só o admin lê", async () => {
   const e = { onde: "viewAgenda", msg: "x is undefined", pilha: "", email: PEDRO, tela: "#agenda", app: "teste", em: "2026-10-27" };
   await assertSucceeds(setDoc(doc(como(PEDRO), "erros", "e1"), e));

@@ -1718,7 +1718,10 @@ await cenario("Pedro (vendedor: Linha de Frente, Agendamento, Instituições)", 
       "visita registrada em transação; Pedro vira responsável pelo e-mail"
     );
     await jan.locator(".ja-abas").getByText("Visitas").click();
-    ok(/Vai decidir em reunião/.test(await jan.locator(".ja-corpo").textContent()), "aba Visitas mostra a visita nova (a janela acompanha o banco)");
+    ok(
+      /Vai decidir em reunião/.test(await jan.locator(".ja-corpo").textContent()),
+      "aba Visitas mostra a visita nova (a janela acompanha o banco)"
+    );
     await jan.locator(".ja-abas").getByText("Agendamentos").click();
     ok((await jan.locator(".ja-ev").count()) === 4, "aba Agendamentos: dia de fotos, formatura, Paspatur e becas");
     await jan.getByText("‹ Voltar para a lista").click();
@@ -1795,10 +1798,19 @@ await cenario("Erro no app (não é falta de internet)", async () => {
   await ctx.route(/\/js\/agenda\.js/, rt => {
     if (!antigo) return rt.continue();
     antigo = false;
-    return rt.fulfill({ contentType: "text/javascript", body: "import { naoExiste } from './ui.js'; export function init() {} export function show() {}" });
+    return rt.fulfill({
+      contentType: "text/javascript",
+      body: "import { naoExiste } from './ui.js'; export function init() {} export function show() {}"
+    });
   });
   await pg.evaluate(() => sessionStorage.removeItem("z7recarregou"));
-  const [nav] = await Promise.all([pg.waitForEvent("load", { timeout: 8000 }).then(() => true, () => false), ir(pg, "#agenda").catch(() => {})]);
+  const [nav] = await Promise.all([
+    pg.waitForEvent("load", { timeout: 8000 }).then(
+      () => true,
+      () => false
+    ),
+    ir(pg, "#agenda").catch(() => {})
+  ]);
   ok(nav && !Object.keys(await store()).some(k => k.startsWith("erros/")), "versão misturada: o app abre de novo sozinho e não vira erro");
 });
 
@@ -2552,6 +2564,7 @@ await cenario("PR por colégio e ano · passar para a equipe", async () => {
   );
   await pg.locator(".sheet:visible button[type=submit]").click();
   let s = await store();
+  ok(!s["repasse/jc1"].followup, "colégio passado: vai para A trabalhar da pessoa (sem data para hoje)");
   ok(
     s["repasse/jc1"].etapa === "SEPARADO" &&
       s["repasse/jc1"].respEmail === ANA &&
@@ -2567,7 +2580,8 @@ await cenario("PR por colégio e ano · passar para a equipe", async () => {
   await pg.waitForFunction(() => /#pr$/.test(location.hash) && document.querySelector("#rEscola")?.value, null, { timeout: 8000 });
   await calmo(pg);
   ok(
-    (await pg.locator(".janela-aluno").count()) === 0 && /João Cardoso/.test(await pg.$eval("#rEscola", x => x.selectedOptions[0].textContent)),
+    (await pg.locator(".janela-aluno").count()) === 0 &&
+      /João Cardoso/.test(await pg.$eval("#rEscola", x => x.selectedOptions[0].textContent)),
     "Ver alunos abre o PR com o colégio e o ano escolhidos"
   );
   await pg.locator("article", { hasText: "Aluno Tres" }).getByRole("button", { name: "📤 Passar para a equipe" }).click();
@@ -2576,6 +2590,71 @@ await cenario("PR por colégio e ano · passar para a equipe", async () => {
   s = await store();
   ok(s["repasse/jc3"].etapa === "SEPARADO" && s["repasse/jc3"].respEmail === PEDRO, "aluno: passa um aluno específico para a pessoa");
   ok(!erros.length, "sem erros" + (erros.length ? ": " + erros.join(" | ") : ""));
+});
+await cenario("Para hoje de cada um · botão da pessoa · atividades da equipe", async () => {
+  const Y = new Date().getFullYear();
+  const al = (nome, respEmail, etapa, followup, extra = {}) =>
+    Object.assign(
+      { nome, nomeBusca: nome, escola: "NUTA", ano: Y, etapa, followup, resp: respEmail ? respEmail.split("@")[0] : "", respEmail },
+      { contatos: [{ tipo: "Mãe", nome: "Mãe", tel: "21999990000" }], telefones: ["21999990000"] },
+      extra
+    );
+  const dados = Object.assign({}, base, {
+    "repasse/m1": al("MEU ALUNO", ADRIANO, "SEPARADO", dia(0)),
+    "repasse/m2": al("SEM DONO", "", "SEPARADO", dia(0)),
+    "repasse/m3": al("DO PEDRO HOJE", PEDRO, "SEPARADO", dia(0)),
+    "repasse/m4": al("DO PEDRO DEPOIS", PEDRO, "SEPARADO", null),
+    "repasse/m5": al("DO PEDRO CAIDO", PEDRO, "CAÍDO", null, { caidoMotivo: "Não quer" })
+  });
+  // admin: Para hoje só os dele e os sem responsável; o do Pedro fica no botão do Pedro
+  let { pg, erros, store } = await abrir(ADRIANO, dados);
+  await ir(pg, "#pr");
+  await calmo(pg);
+  let lista = await pg.textContent("#rList");
+  ok(
+    /Meu Aluno/i.test(lista) && /Sem Dono/i.test(lista) && !/Do Pedro/i.test(lista),
+    "Para hoje do admin: só os dele e os sem responsável"
+  );
+  const chip = pg.locator("#rChips .chip-pessoa", { hasText: "Pedro" });
+  await chip.waitFor({ timeout: 6000 });
+  const nChip = Number((await chip.textContent()).match(/\((\d+)\)/)[1]);
+  await chip.click();
+  await calmo(pg);
+  lista = await pg.textContent("#rList");
+  const [, nh, nt] = lista.match(/(\d+) para hoje · (\d+) a trabalhar/) || [];
+  ok(nChip >= 2 && nChip === Number(nh) + Number(nt), "botão da pessoa com quantos alunos ela tem em andamento");
+  ok(
+    /Para hoje de Pedro/.test(lista) && /A trabalhar \(/.test(lista) && /Caídos \(1\)/.test(lista) && /Do Pedro Depois/i.test(lista),
+    "botão da pessoa: para hoje, a trabalhar e caídos dela"
+  );
+  ok(!erros.length, "sem erros (admin)" + (erros.length ? ": " + erros.join(" | ") : ""));
+  // equipe: A trabalhar → Trabalhar hoje; vira atividade para o admin
+  ({ pg, erros, store } = await abrir(PEDRO, dados));
+  await ir(pg, "#pr");
+  await calmo(pg);
+  await pg.locator("#rChips .chip", { hasText: "A trabalhar" }).click();
+  await calmo(pg);
+  const item = pg.locator("#rList .lc-item", { hasText: "Do Pedro Depois" });
+  await item.waitFor({ timeout: 6000 });
+  await item.getByRole("button", { name: "📅 Trabalhar hoje" }).click();
+  const s = await store();
+  const ativ = Object.entries(s).filter(([k]) => k.startsWith("atividades/"));
+  ok(s["repasse/m4"].followup === dia(0), "Trabalhar hoje: o aluno vai para o Para hoje da pessoa");
+  ok(ativ.length === 1 && ativ[0][1].email === PEDRO && ativ[0][1].tipo === "hoje", "fica anotado nas atividades da equipe");
+  ok(!erros.length, "sem erros (equipe)" + (erros.length ? ": " + erros.join(" | ") : ""));
+  // admin: número vermelho no botão com o nome; toque abre o resumo
+  ({ pg, erros } = await abrir(ADRIANO, s));
+  const badge = pg.locator("#btnMe .ativ-badge");
+  await badge.waitFor({ timeout: 6000 });
+  ok((await badge.textContent()) === "1", "admin: número vermelho com as atividades novas");
+  await pg.locator("#btnMe").click();
+  const sh = pg.locator(".sheet").last();
+  await sh.getByText("Atividades da equipe").waitFor({ timeout: 6000 });
+  ok(/Pedro/.test(await sh.textContent()) && /1 para hoje/.test(await sh.textContent()), "resumo do dia por pessoa");
+  await sh.getByRole("button", { name: "✓ Marcar como visto" }).click();
+  await calmo(pg);
+  ok(await badge.isHidden(), "marcar como visto zera o número");
+  ok(!erros.length, "sem erros (aviso)" + (erros.length ? ": " + erros.join(" | ") : ""));
 });
 await cenario("Prévias de um colégio (lote, no computador)", async () => {
   // MARIA já comprou (PAGO no app): não precisa de prévia; JOAO ainda vai ser trabalhado
@@ -3233,7 +3312,9 @@ await cenario("Equipe exclui uma foto do aluno (vai para a lixeira do Drive)", a
         oauth2: {
           hasGrantedAllScopes: () => true,
           initTokenClient: o => ({
-            requestAccessToken: () => (window.__escopos.push(o.scope), setTimeout(() => o.callback({ access_token: "TOK", expires_in: 3600 }), 0))
+            requestAccessToken: () => (
+              window.__escopos.push(o.scope), setTimeout(() => o.callback({ access_token: "TOK", expires_in: 3600 }), 0)
+            )
           })
         }
       }
@@ -3259,7 +3340,10 @@ await cenario("Equipe exclui uma foto do aluno (vai para a lixeira do Drive)", a
   });
   await ir(pg, "#pr");
   await calmo(pg);
-  await pg.locator("#rList button.lc-linha", { hasText: /Domingos/i }).first().click();
+  await pg
+    .locator("#rList button.lc-linha", { hasText: /Domingos/i })
+    .first()
+    .click();
   const jan = pg.locator(".panel.janela-aluno");
   await jan.getByRole("tab", { name: "Prévia e fotos" }).click();
   const mostrar = jan.getByRole("button", { name: "📁 Mostrar as fotos" });
@@ -3275,7 +3359,10 @@ await cenario("Equipe exclui uma foto do aluno (vai para a lixeira do Drive)", a
     (st["repasse/dj"].fotosExcluidas || []).length === 1 && st["repasse/dj"].fotosExcluidas[0].porEmail === ANA,
     "fica anotado no aluno quem excluiu"
   );
-  ok((await pg.evaluate(() => window.__escopos)).includes("https://www.googleapis.com/auth/drive"), "pede a permissão de gravar só na hora de excluir");
+  ok(
+    (await pg.evaluate(() => window.__escopos)).includes("https://www.googleapis.com/auth/drive"),
+    "pede a permissão de gravar só na hora de excluir"
+  );
   ok(!erros.length, "sem erros" + (erros.length ? ": " + erros.join(" | ") : ""));
 });
 await cenario("Aluguel de becas · alunos dos colégios (status, estoque e produtos)", async () => {
@@ -3387,7 +3474,10 @@ await cenario("Aluguel de becas · alunos dos colégios (status, estoque e produ
   await fr.getByRole("button", { name: "🖨️ Gerar relatório" }).click();
   await pg.waitForSelector("#relatorio", { timeout: 5000 });
   const txRel = await pg.textContent("#relatorio");
-  ok(/Caio Atrasado/.test(txRel) && !/Bia Aluguel/.test(txRel) && /situação: atrasados/.test(txRel), "relatório do aluguel com filtro de situação");
+  ok(
+    /Caio Atrasado/.test(txRel) && !/Bia Aluguel/.test(txRel) && /situação: atrasados/.test(txRel),
+    "relatório do aluguel com filtro de situação"
+  );
   await pg.locator("#relatorio").getByRole("button", { name: "Fechar" }).click();
   // lista compacta (como no PR, Formatura e Instituições): tocar na linha abre a janela com abas
   await pg.evaluate(() => (window.__z7CartaoNaLista = false));
@@ -4207,7 +4297,10 @@ await cenario("Várias formaturas no mesmo colégio e alunos confirmados depois"
   await pg.locator("#fmCorpo button.lc-linha", { hasText: "Colegio Beta" }).click();
   const jf = pg.locator(".janela-aluno");
   await jf.locator(".ja-abas").getByText("Alunos").click();
-  ok((await jf.getByRole("button", { name: /Abrir alunos e parcelas/ }).count()) === 1, "colégio fechado: aba Alunos com o atalho da turma");
+  ok(
+    (await jf.getByRole("button", { name: /Abrir alunos e parcelas/ }).count()) === 1,
+    "colégio fechado: aba Alunos com o atalho da turma"
+  );
   await jf.locator(".ja-abas").getByText("Datas").click();
   ok(/Formatura 2 do Colegio Beta/.test(await jf.locator(".ja-corpo").textContent()), "colégio fechado: aba Datas com todas as formaturas");
   ok(!erros.length, "sem erros" + (erros.length ? ": " + erros.join(" | ") : ""));

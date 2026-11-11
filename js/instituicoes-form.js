@@ -7,6 +7,7 @@ import { TIPOS, CARTOES, CARGOS, FOTOGRAFO, RESULTADOS, PASSOS, SEGMENTOS, semSe
 import { C, FS, db, col, tipo, items } from "./instituicoes-estado.js";
 import { cadastroFalta, cadastroPendente } from "./instituicao-cadastro.js";
 import { abrirExcluirInst } from "./inst-excluir.js";
+import { registrarAtividade } from "./atividades.js";
 // Atalhos de data do próximo passo
 function quandoBtns(target) {
   const q = el("div", "quick");
@@ -441,6 +442,11 @@ export function openVisita(it) {
           tx.update(ref, p2);
         });
         U.toast(etapa === "FECHADO" ? "Fechado! 🎉" : quando.value ? "Retorno em " + U.fmtDate(quando.value) : "Visita registrada");
+        registrarAtividade(C, {
+          tipo: etapa === "FECHADO" ? "venda" : "visita",
+          lista: "inst",
+          texto: `registrou ${String(como.value).toLowerCase()} no ${title(it.nome)}` + (etapa === "FECHADO" ? " e fechou 🎉" : "")
+        });
       } catch (er) {
         C.handleErr(er);
       }

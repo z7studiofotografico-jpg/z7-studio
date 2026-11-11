@@ -114,6 +114,11 @@ botão "Mudar ano" nas importações de Formatura/Paspatur, aba Vendidos (admin)
    atualização): agora o app apaga a cópia e abre de novo sozinho (erros.js: ehVersaoMisturada/recarregarNovo). 1 era
    "Quota exceeded" (limite gratuito diário do Firestore): a tela agora explica que volta de madrugada. Botão
    "🧹 Limpar a lista" nos Erros do app.
+10. ~~Para hoje de cada um + aviso da equipe~~ (10/11): passar colégio/aluno para a equipe não marca mais "hoje"
+   (followup null → aba nova "A trabalhar" da pessoa, com "📅 Trabalhar hoje"). Para hoje do admin: só os dele e os
+   sem responsável (meuOuLivre). Admin: botão "👥 Pessoa (n)" por colaborador (Para hoje dela · A trabalhar · Caídos;
+   js/repasse-equipe.js). Atividades da equipe (coleção "atividades", js/atividades.js): número vermelho no botão
+   "👤 Adriano"; "Marcar como visto" guarda no aparelho. REGRAS DO FIREBASE PRECISAM SER PUBLICADAS (match /atividades).
 8. **PRÓXIMO PASSO: Preços** — a Luciana está confusa com os preços; sentar junto e mapear todos os valores
    (PR, Paspatur, Formatura, Linha de Frente/Repasse, Pix/cartão, promo, última oferta, mínimos/descontos)
    antes de mexer em qualquer coisa.
