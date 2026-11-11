@@ -43,8 +43,11 @@ jobs:
         working-directory: tests/e2e
         run: |
           npm install --no-audit --no-fund
-          npx playwright install --with-deps chromium
+      # usa o Google Chrome que já vem no GitHub (instalar o Chromium baixava pacotes do Ubuntu: lento e,
+      # quando o espelho do Ubuntu cai, o teste falhava sem ter rodado)
       - name: Abrir o app num navegador e usar como o Adriano e o vendedor
+        env:
+          CHROMIUM: /usr/bin/google-chrome
         run: |
           node tests/e2e/app.e2e.mjs > saida.txt 2>&1 && { cat saida.txt; exit 0; }
           cat saida.txt
