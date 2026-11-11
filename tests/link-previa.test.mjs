@@ -21,7 +21,7 @@ test("página pública: só primeiro e último nome, sem telefone", () => {
   assert.equal(d.fotos.length, MAX_FOTOS);
   assert.equal(d.fotos[0], "x0");
   assert.equal(d.por, "Pedro");
-  assert.equal(d.ate, "2027-02-09T12:00:00.000Z");
+  assert.equal(d.ate, "2026-12-11T12:00:00.000Z");
   assert.ok(!JSON.stringify(d).includes("21999998888"));
   // sem fotos separadas: usa a folha; preço sem cadastro ("[valor do kit]") não aparece
   const d2 = dadosLink({ nome: "Bia" }, { folhas: [{ id: "f1" }], fotos: [] }, "[valor do kit]", "");

@@ -11,7 +11,7 @@ export const SITE_LINK = "https://z7studio.com.br/previa/?c=";
 export const COLECAO = "previasSite";
 const LETRAS = "abcdefghjkmnpqrstuvwxyz23456789"; // sem 0/o, 1/l/i (a família pode digitar)
 export const MAX_FOTOS = 60;
-const DIAS = 90; // o link vale 90 dias (depois a página pede para chamar no WhatsApp)
+const DIAS = 30; // o link vale 30 dias (depois a página pede para chamar no WhatsApp)
 
 export function codigoNovo(aleatorio = n => crypto.getRandomValues(new Uint8Array(n))) {
   return [...aleatorio(10)].map(b => LETRAS[b % LETRAS.length]).join("");
@@ -61,7 +61,7 @@ export async function mandarLinkPrevia(C, it, r, o = {}) {
   if (!d.fotos.length) return U.toast("Este aluno ainda não tem fotos no Drive.");
   let codigo = it.linkPrevia;
   if (codigo) {
-    // já tem link: atualiza as fotos e o preço, e renova o prazo (os números de visitas continuam)
+    // já tem link: atualiza as fotos e o preço, e renova o prazo de 30 dias (os números de visitas continuam)
     const { nome, escola, kit, fotos, preco, ate } = d;
     await FS.updateDoc(FS.doc(C.db, COLECAO, codigo), { nome, escola, kit, fotos, preco, ate });
   } else {
