@@ -98,10 +98,7 @@ export function show() {
         ? novoFormando()
         : import("./cadastro-aluno.js").then(m => m.abrirCadastroAluno(C, { modulo: "formatura" })).catch(e => C.handleErr(e))
     ),
-    // prévia para o cliente (como no PR), aqui com até ~70 fotos por aluno
-    U.mkBtn("🖼️ Prévia e fotos", "btn-sm", () =>
-      import("./mockup.js").then(m => m.openMockup({ toast: U.toast, maxFotos: 70 })).catch(e => C.handleErr(e))
-    ),
+    // (12/11/2026: o "Prévia e fotos" do topo saiu, como no PR: a prévia é feita na janela de cada aluno)
     U.mkBtn("📋 Kits e preços", "btn-sm", () => openKits()),
     U.mkBtn("💲 Preços mínimos", "btn-sm", () => Ev.openPrecos()),
     botaoRelatorio(
