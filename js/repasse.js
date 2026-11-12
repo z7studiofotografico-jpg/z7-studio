@@ -72,7 +72,6 @@ const linha = it =>
     selo: x => (!ehFormatura() && vendaDe(x) === "paspatur" ? "🎞️ Paspatur" : "")
   });
 import { sheet, field, actions } from "./repasse-janelas.js";
-import { openDados } from "./repasse-form.js";
 import { refreshStats, refreshLote, separarLote, loadMeta, pintarEscolas, escolaEscolhida, gruposPR } from "./repasse-lote.js";
 export { ETAPAS } from "./repasse-estado.js";
 let unsubList = null,
@@ -174,7 +173,11 @@ export function parar() {
   }
 }
 // abrir um aluno do PR já na tela certa (Formaturas usa o mesmo cadastro)
-export const novoAluno = () => openDados(null);
+// (11/11/2026: a tela única de cadastro; o openDados(null) antigo continua para quem chamar direto)
+export const novoAluno = () =>
+  import("./cadastro-aluno.js")
+    .then(m => m.abrirCadastroAluno(C, { modulo: ehFormatura() ? "formatura" : "pr" }))
+    .catch(e => C.handleErr(e));
 function mount() {
   mounted = true;
   const v0 = $("viewRepasse");
@@ -185,7 +188,14 @@ function mount() {
   const head = el("div", "vhead");
   head.append(el("h2", null, "PR"));
   const hb = el("div", "quick");
-  hb.append(U.mkBtn("+ Aluno", "btn-primary", () => openDados(null)));
+  // 11/11/2026: o "+ Aluno" abre a tela única de cadastro (colégio, ID e o que contratou)
+  hb.append(
+    U.mkBtn("+ Aluno", "btn-primary", () =>
+      import("./cadastro-aluno.js")
+        .then(m => m.abrirCadastroAluno(C, { modulo: ehFormatura() ? "formatura" : filtroVenda === "paspatur" ? "paspatur" : "pr" }))
+        .catch(e => C.handleErr(e))
+    )
+  );
   // "Só Paspatur" aberto: a prévia já sai como o livro do Kit Paspatur
   hb.append(
     U.mkBtn("🖼️ Prévia e fotos", "", () =>
@@ -204,6 +214,14 @@ function mount() {
       )
     );
   hb.append(botaoRelatorio(relatorioPR, () => C.me));
+  // backup: a lista da aba aberta numa planilha
+  hb.append(
+    U.mkBtn("⬇️ Planilha", "btn-sm", () =>
+      import("./cadastro-aluno.js")
+        .then(m => m.baixarPlanilha(ehFormatura() ? "formatura" : "pr", naTela(), m.CAMPOS_PR))
+        .catch(e => C.handleErr(e))
+    )
+  );
   const imp = U.mkBtn("Importar planilha", "", () => importarAqui());
   imp.id = "rImport";
   imp.hidden = !C.isAdmin;

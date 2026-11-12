@@ -105,6 +105,15 @@ export function render() {
         mods.append(l);
       });
       r.append(mods);
+      // "Ajuda no cadastro" (11/11/2026): o admin liga quando precisa de ajuda; a pessoa cadastra alunos em qualquer colégio
+      const aj = document.createElement("label");
+      aj.className = "chk";
+      const ca = document.createElement("input");
+      ca.type = "checkbox";
+      ca.checked = u.ajudaCadastro === true;
+      ca.onchange = () => updUser(em, { ajudaCadastro: ca.checked });
+      aj.append(ca, document.createTextNode(" 🤝 Ajuda no cadastro (cadastra alunos em qualquer colégio)"));
+      r.append(aj);
     }
     r.append(acts);
     box.appendChild(r);

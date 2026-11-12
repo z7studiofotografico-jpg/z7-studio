@@ -267,6 +267,11 @@ const ctx = {
   get verComo() {
     return verComo;
   },
+  // "Ajuda no cadastro" ligada pelo admin em Equipe: cadastra alunos em qualquer colégio (11/11/2026)
+  get ajudaCadastro() {
+    const p = USERS[((user && user.email) || "").toLowerCase()];
+    return !verComo && !!(p && p.ativo !== false && p.ajudaCadastro === true);
+  },
   get user() {
     return user;
   },

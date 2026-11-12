@@ -15,9 +15,38 @@ export function criarInicio(ctx, Funil) {
     $("hello").textContent = (h < 12 ? "Bom dia" : h < 18 ? "Boa tarde" : "Boa noite") + (ctx.me ? ", " + first(ctx.me) : "") + "!";
     const { late, today } = Funil.contagem();
     $("tVendas").textContent = ctx.isAdmin ? "Abrir" : "Meu desempenho";
+    // lista de nomes dos colégios para o cadastro de alunos (a equipe sem Instituições lê dela): o admin atualiza 1x por dia
+    if (ctx.isAdmin && !ctx.verComo)
+      try {
+        if (localStorage.getItem("z7listaColegios") !== todayStr()) {
+          localStorage.setItem("z7listaColegios", todayStr());
+          FS.getDocs(query(collection(db, "instituicoes"), FS.limit(2000)))
+            .then(s =>
+              import("./cadastro-aluno.js").then(m =>
+                m.gravarListaColegios(
+                  ctx,
+                  s.docs.map(d => Object.assign({ id: d.id }, d.data()))
+                )
+              )
+            )
+            .catch(e => console.warn("[Z7] lista de colégios", e));
+        }
+      } catch (_) {}
+    // ➕ Cadastrar aluno: abre a tela única (não é uma tela do menu)
+    const tc = document.getElementById("tileCadastrar");
+    if (tc && !tc.dataset.ligado) {
+      tc.dataset.ligado = "1";
+      tc.addEventListener("click", ev => {
+        ev.preventDefault();
+        import("./cadastro-aluno.js").then(m => m.abrirCadastroAluno(ctx)).catch(e => ctx.handleErr(e));
+      });
+    }
     document.querySelectorAll(".tile[data-mod]").forEach(t => {
       // Produtos e estoque: some enquanto o estoque estiver desligado em Ajustes (11/11/2026: começa no ano que vem)
-      t.hidden = !pode(t.dataset.mod) || (t.dataset.mod === "produtos" && !(ctx.P && ctx.P.estoqueLigado === "ligado"));
+      t.hidden =
+        t.dataset.mod === "cadastrar"
+          ? !(ctx.isAdmin || ["becas", "rep", "lf", "formaturas", "colegios"].some(m => pode(m)))
+          : !pode(t.dataset.mod) || (t.dataset.mod === "produtos" && !(ctx.P && ctx.P.estoqueLigado === "ligado"));
     });
     $("tFunil").textContent =
       late + today ? `${late + today} para hoje` + (late ? ` · ${late} atrasado${late > 1 ? "s" : ""}` : "") : "Nada pendente hoje ✓";

@@ -70,7 +70,10 @@ export function mostrarAlunos(ctx, v, o) {
   head.append(el("h2", null, "Aluguel de becas · alunos"));
   const hb = el("div", "agact");
   hb.append(
-    U.mkBtn("+ Aluno", "btn-primary btn-sm", () => form(null)),
+    // 11/11/2026: o "+ Aluno" abre a tela única de cadastro (colégio, ID e o que contratou)
+    U.mkBtn("+ Aluno", "btn-primary btn-sm", () =>
+      import("./cadastro-aluno.js").then(m => m.abrirCadastroAluno(C, { modulo: "becas" })).catch(e => C.handleErr(e))
+    ),
     U.mkBtn("📦 Estoque", "btn-sm", () => o.abrirEstoque()),
     U.mkBtn("Importar planilha", "btn-sm", () =>
       import("./aluguel-importar.js").then(m => m.importarAlugueis(C, insts)).catch(e => C.handleErr(e))
@@ -78,6 +81,9 @@ export function mostrarAlunos(ctx, v, o) {
     botaoRelatorio(
       () => relatorioAluguel(C, lista, filtro),
       () => C.me
+    ),
+    U.mkBtn("⬇️ Planilha", "btn-sm", () =>
+      import("./cadastro-aluno.js").then(m => m.baixarPlanilha("aluguel-becas", lista, m.CAMPOS_ALUGUEL)).catch(e => C.handleErr(e))
     )
   );
   head.append(hb);

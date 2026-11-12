@@ -97,7 +97,9 @@ export function show() {
       import("./instituicoes.js").then(m => m.novaInstituicao(C, "publico")).catch(e => C.handleErr(e))
     ),
     U.mkBtn("+ Aluno", "btn-primary btn-sm", () =>
-      parte === "va" ? novoFormando() : import("./repasse.js").then(m => m.novoAluno()).catch(e => C.handleErr(e))
+      parte === "va"
+        ? novoFormando()
+        : import("./cadastro-aluno.js").then(m => m.abrirCadastroAluno(C, { modulo: "formatura" })).catch(e => C.handleErr(e))
     ),
     // prévia para o cliente (como no PR), aqui com até ~70 fotos por aluno
     U.mkBtn("🖼️ Prévia e fotos", "btn-sm", () =>

@@ -755,3 +755,16 @@ test("becas e alunos de aluguel: cada um vê os seus; o estoque (só números) �
   await assertSucceeds(getDocs(c(ana, "becasUso")));
   await assertSucceeds(deleteDoc(doc(ana, "becasUso", "aluno_x1")));
 });
+
+test("Ajuda no cadastro: com a chave ligada, lê todos os colégios para cadastrar alunos", async () => {
+  await semRegra(async db => {
+    await setDoc(doc(db, "instituicoes", "outro"), { nome: "Colégio do Pedro", tipo: "publico", respEmail: PEDRO });
+    await setDoc(doc(db, "usuarios", ANA), { nome: "Ana", papel: "equipe", ativo: true, modulos: ["becas"], ajudaCadastro: true });
+  });
+  await assertSucceeds(getDocs(query(c(como(ANA), "instituicoes"), limit(1500))));
+  await assertSucceeds(setDoc(doc(como(ANA), "ids", "26CDP"), { ultimo: 3 }));
+  await semRegra(db => setDoc(doc(db, "usuarios", ANA), { nome: "Ana", papel: "equipe", ativo: true, modulos: ["becas"] }));
+  await assertFails(getDocs(query(c(como(ANA), "instituicoes"), limit(1500))));
+  // a própria pessoa não liga a chave
+  await assertFails(updateDoc(doc(como(ANA), "usuarios", ANA), { ajudaCadastro: true }));
+});

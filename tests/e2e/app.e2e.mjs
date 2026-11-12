@@ -110,6 +110,15 @@ const base = {
     resp: "Pedro Vendedor",
     vendidoEm: dia(-40)
   },
+  // colégio para onde o aluno do Repasse foi transferido (o cadastro de aluno só aceita colégio cadastrado)
+  "instituicoes/i10": { nome: "COLEGIO NOVO", tipo: "publico", etapa: "A VISITAR", resp: "", respEmail: "", contatos: [], visitas: [] },
+  // a lista de nomes dos colégios (quem não tem Instituições cadastra aluno por ela)
+  "config/colegios": {
+    lista: [
+      { id: "i1", nome: "COLEGIO ALFA", sigla: "", tipo: "particular" },
+      { id: "i10", nome: "COLEGIO NOVO", sigla: "", tipo: "publico" }
+    ]
+  },
   "instituicoes/i2": { nome: "COLEGIO BETA", tipo: "particular", etapa: "A VISITAR", resp: "", respEmail: "", contatos: [], visitas: [] },
   // turma do ano passado (Repasse) com uma aluna que ficou só com o Kit 01
   "instituicoes/i9": {
@@ -488,23 +497,30 @@ async function etapa(pg, nome, fn) {
     await ir(pg, "#home").catch(() => {});
   }
 }
-// "+ Aluno" no PR: abre a janela, preenche, confere o que ficou escrito (preenche de novo se algo se perdeu) e salva
-async function incluirAluno(pg, { nome, colegio, tel, contato }) {
+// "+ Aluno" no PR (11/11/2026: abre a tela única ➕ Cadastrar aluno): escolhe o colégio, o número do ID e salva
+async function incluirAluno(pg, { nome, colegio, tel, contato, numero = "31" }) {
   await pg.getByRole("button", { name: "+ Aluno" }).click();
-  const fa = pg.locator(".sheet:visible").filter({ hasText: "Incluir aluno no PR" }).last();
-  await fa.getByLabel("Nome do aluno").waitFor();
+  const fa = pg.locator(".sheet:visible").filter({ hasText: "Cadastrar aluno" }).last();
+  await fa.getByLabel("Colégio").waitFor();
+  await fa
+    .getByLabel("Colégio")
+    .selectOption({ label: colegio }, { timeout: 8000 })
+    .catch(async e => {
+      const ops = await fa.getByLabel("Colégio").evaluate(s => [...s.options].map(o => o.textContent).join(" | "));
+      throw new Error(`colégio "${colegio}" não está na lista: ${ops} (${e.message.split("\n")[0]})`);
+    });
   await calmo(pg);
   const campos = [
+    [fa.getByLabel("Número do ID do aluno"), numero],
     [fa.getByLabel("Nome do aluno"), nome],
-    [fa.getByLabel("Colégio"), colegio],
     [fa.getByLabel("WhatsApp"), tel],
-    [fa.getByLabel("Nome", { exact: true }), contato]
+    [fa.getByLabel("Responsável (se for menor)"), contato]
   ];
   for (let tentativa = 0; tentativa < 3; tentativa++) {
     for (const [c, v] of campos) if ((await c.inputValue()) !== v) await c.fill(v);
     if ((await Promise.all(campos.map(([c]) => c.inputValue()))).every((v, i) => v === campos[i][1])) break;
   }
-  await fa.locator("button[type=submit]").click();
+  await fa.getByRole("button", { name: "Salvar", exact: true }).click();
   await calmo(pg);
   return fa;
 }
@@ -530,7 +546,7 @@ await cenario("Adriano (admin), com os dados já atualizados no servidor", async
       s["ensaios/c1"].titulo === "" && s["privado/c1"] && s["privado/c1"].titulo === "Consulta médica",
       "assunto particular foi para 'privado'"
     );
-    ok((await visiveis(pg)).length === 8, "admin vê os 8 cards");
+    ok((await visiveis(pg)).length === 9, "admin vê os 9 cards (com ➕ Cadastrar aluno)");
     ok(/1 para hoje/.test(await pg.textContent("#tFunil")), "card do Funil conta o contato de hoje");
     ok(/atrasad/.test(await pg.textContent("#tFormaturas")), "card Formaturas mostra parcela atrasada");
     // Ajustes: 9.5 não pode virar 95
@@ -1690,7 +1706,7 @@ await cenario("Pedro (vendedor: Linha de Frente, Agendamento, Instituições)", 
         paulo.codigo === String(hoje.getFullYear()).slice(2) + "CA-31" &&
         paulo.codigoBusca === String(hoje.getFullYear()).slice(2) + "CA31" &&
         paulo.escola === "COLEGIO ALFA",
-      "+ Aluno: ganha o próximo ID do colégio e o nome do colégio como já está no PR (" +
+      "+ Aluno: ID com a sigla do colégio e o número digitado, e o nome do colégio do cadastro (" +
         (paulo && paulo.codigo + " · " + paulo.escola) +
         ")"
     );
@@ -1700,13 +1716,15 @@ await cenario("Pedro (vendedor: Linha de Frente, Agendamento, Instituições)", 
     const sp2 = await store();
     const paulos = Object.values(sp2).filter(x => x.nome === "Paulo Manual");
     ok(
-      paulos.length === nAntes && paulos[0].contatos[0].nome === "Marta" && /já está na sua lista/.test(await pg.textContent("body")),
+      paulos.length === nAntes &&
+        paulos[0].contatos[0].nome === "Marta" &&
+        /já está (na sua lista|em tudo)/.test(await pg.textContent("body")),
       "+ Aluno repetido (dele mesmo): avisa e não sobrescreve"
     );
     await fa.click({ position: { x: 5, y: 5 } }); // toque fora do painel fecha
     await calmo(pg);
     // aluno que está na fila do repasse: não passa sozinho; vai um pedido para o admin decidir
-    fa = await incluirAluno(pg, { nome: "Carla Fila", colegio: "Colegio Alfa", tel: "21922223333", contato: "Vera" });
+    fa = await incluirAluno(pg, { nome: "Carla Fila", colegio: "Colegio Alfa", tel: "21922223333", contato: "Vera", numero: "32" });
     const sp3 = await store();
     const pedC = Object.entries(sp3).find(([k, v]) => k.startsWith("pedidos/") && v.alvoId === "r5" && v.porEmail === PEDRO);
     ok(
@@ -1719,7 +1737,7 @@ await cenario("Pedro (vendedor: Linha de Frente, Agendamento, Instituições)", 
     );
     ok(/Carla Fila.*Aguardando/i.test(await pg.textContent("#rPedidos")), "vendedor vê o pedido aguardando");
     // de novo o mesmo aluno, ainda aguardando: avisa que já foi pedido
-    fa = await incluirAluno(pg, { nome: "Carla Fila", colegio: "Colegio Alfa", tel: "21922223333", contato: "Vera" });
+    fa = await incluirAluno(pg, { nome: "Carla Fila", colegio: "Colegio Alfa", tel: "21922223333", contato: "Vera", numero: "32" });
     ok(
       /já foi pedido por você e está aguardando/.test(await pg.textContent("body")),
       "pedido repetido: avisa que esse aluno já foi pedido"
@@ -1987,7 +2005,8 @@ await cenario("Relatórios para imprimir (um por card)", async () => {
         "busca pelo ID (“ca 05”) acha o aluno"
       );
       await pg.getByRole("button", { name: "+ Aluno" }).click();
-      const fa = pg.locator(".sheet:visible").filter({ hasText: "Incluir aluno no PR" }).last();
+      const fa = pg.locator(".sheet:visible").filter({ hasText: "Cadastrar aluno" }).last();
+      await fa.getByLabel("Colégio").selectOption({ index: 1 });
       await fa.getByLabel("WhatsApp").fill("20988887777");
       ok(
         await fa
@@ -4129,21 +4148,20 @@ await cenario("PR lista única: filtro PR/Paspatur, pessoa da equipe e chave na 
     ja = pg.locator(".janela-aluno").last();
     ok(await ja.locator(".venda-como").getByRole("button", { name: /PR/ }).isDisabled(), "venda paga: a equipe não troca");
     await ja.getByRole("button", { name: /Voltar para a lista/ }).click();
-    // + Aluno: escolhe como vender
+    // + Aluno: escolhe como vender (tela única: Kit Quadro ou Kit Paspatur)
     await pg.getByRole("button", { name: "+ Aluno" }).click();
     await calmo(pg);
     const f = pg.locator(".sheet").last();
-    ok((await pg.locator(".sheet").last().getByLabel("Vender como").inputValue()) === "pr", "+ Aluno começa marcado como PR");
-    // (às vezes o texto do colégio caía no campo do nome: confere e escreve de novo)
+    ok((await f.getByLabel("Kit", { exact: true }).inputValue()) === "pr", "+ Aluno começa marcado como PR");
+    await f.getByLabel("Colégio").selectOption({ label: "Colegio Alfa" });
     for (let t = 0; t < 3; t++) {
+      await f.getByLabel("Número do ID do aluno").fill("77");
       await f.getByLabel("Nome do aluno").fill("Pedro Novo Paspatur");
-      await f.getByLabel("Colégio", { exact: true }).fill("Colegio Alfa");
       if ((await f.getByLabel("Nome do aluno").inputValue()) === "Pedro Novo Paspatur") break;
     }
-    await f.getByLabel("Vender como").selectOption("paspatur");
-    await f.locator("button[type=submit]").click();
+    await f.getByLabel("Kit", { exact: true }).selectOption("paspatur");
+    await f.getByRole("button", { name: "Salvar", exact: true }).click();
     await calmo(pg);
-    await f.locator("button[type=submit]").click(); // incluir assim mesmo (vai para Incompletos)
     await esperaNome(pg, "Pedro Novo Paspatur");
     const novo = Object.values(await store()).find(x => x && x.nomeBusca === "PEDRO NOVO PASPATUR");
     ok(
@@ -4155,6 +4173,51 @@ await cenario("PR lista única: filtro PR/Paspatur, pessoa da equipe e chave na 
     );
     ok(!erros.length, "sem erros no console: " + erros.join(" | "));
   }
+});
+await cenario("➕ Cadastrar aluno: colégio primeiro, ID obrigatório, um aluno em vários módulos", async () => {
+  const Y = new Date().getFullYear();
+  const { pg, erros, store } = await abrir(ADRIANO, migrar(base));
+  await ir(pg, "#home");
+  await pg.locator("#tileCadastrar").click();
+  const f = pg.locator(".sheet").filter({ hasText: "Cadastrar aluno" }).last();
+  await f.getByLabel("Colégio").waitFor();
+  ok(
+    /Escolha o colégio para continuar/.test(await f.textContent()) && (await f.getByLabel("Nome do aluno").isDisabled()),
+    "sem colégio: a ficha fica travada"
+  );
+  await f.getByLabel("Colégio").selectOption({ label: "Colegio Alfa" });
+  ok((await f.locator(".cad-pref").textContent()) === String(Y).slice(2) + "CA-", "o começo do ID vem pronto (ano + sigla)");
+  await f.getByLabel("Nome do aluno").fill("Bianca Teste");
+  await f.locator(".quick").getByText("👘 Aluguel de becas").click();
+  await f.locator(".quick").getByText("🖼️ PR (kit de fotos)").click();
+  await f.getByRole("button", { name: "Salvar", exact: true }).click();
+  ok(/Falta: o número do ID do aluno/.test(await f.textContent()), "sem o número do ID não salva");
+  await f.getByLabel("Número do ID do aluno").fill("40");
+  await f.getByLabel("WhatsApp").fill("21977776666");
+  await f.getByRole("button", { name: "Salvar e cadastrar outro" }).click();
+  await calmo(pg);
+  const s = await store();
+  const cod = String(Y).slice(2) + "CA-40";
+  const al = Object.entries(s).filter(([k, v]) => k.startsWith("alugueis/") && v.codigo === cod);
+  const pr = Object.entries(s).filter(([k, v]) => k.startsWith("repasse/") && v.codigo === cod);
+  ok(
+    al.length === 1 && pr.length === 1 && al[0][1].instId === "i1" && pr[0][1].instId === "i1",
+    "um aluno, o mesmo ID no Aluguel de becas e no PR"
+  );
+  const f2 = pg.locator(".sheet").filter({ hasText: "Cadastrar aluno" }).last();
+  await f2.getByLabel("Número do ID do aluno").waitFor();
+  ok(
+    (await f2.getByLabel("Número do ID do aluno").inputValue()) === "41" && (await f2.getByLabel("Colégio").inputValue()) === "i1",
+    "cadastrar outro: mesmo colégio e o próximo número"
+  );
+  // o mesmo ID com outro nome: trava
+  await f2.getByLabel("Número do ID do aluno").fill("40");
+  await f2.getByLabel("Nome do aluno").fill("Outro Nome Qualquer");
+  await f2.locator(".quick").getByText("🖼️ PR (kit de fotos)").click();
+  await f2.getByRole("button", { name: "Salvar", exact: true }).click();
+  await calmo(pg);
+  ok(/já é de Bianca Teste/.test(await f2.textContent()), "ID que já é de outro aluno: avisa e não salva");
+  ok(!erros.length, "sem erros" + (erros.length ? ": " + erros.join(" | ") : ""));
 });
 await cenario("Registrar venda: endereço completo obrigatório e CEP preenche a rua", async () => {
   const Y = new Date().getFullYear();

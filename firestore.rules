@@ -47,6 +47,7 @@ service cloud.firestore {
     function minhaTurma(instId) {
       return instId != '' && get(/databases/$(database)/documents/instituicoes/$(instId)).data.get('respEmail', '') == email();
     }
+    function ajudaCadastro() { return logado() && perfil().get('ajudaCadastro', false) == true && perfil().ativo == true; }
     function meuPedido() { return resource.data.get('pedidoEmail', email()) == email(); }
     // Formulário do site (WordPress, sem login): só cria um lead novo, sem dono, com estes campos e tamanhos
     function doSite() {
@@ -96,7 +97,8 @@ service cloud.firestore {
 
     match /instituicoes/{id} {
       // quem só tem Formaturas também lê as turmas da carteira (para ver os formandos), mas não muda o cadastro
-      allow read: if admin() || ((pode('colegios') || pode('formaturas')) && minhaOuLivre());
+      // (11/11/2026: quem está com a "Ajuda no cadastro" ligada pelo admin lê todos, para cadastrar alunos)
+      allow read: if admin() || ((pode('colegios') || pode('formaturas')) && minhaOuLivre()) || ajudaCadastro();
       allow create: if admin() || (pode('colegios') && request.resource.data.get('respEmail', email()) == email());
       // valores da turma (kits, contrato) e responsável: só admin (o responsável recebe a comissão da turma)
       allow update: if admin() || (pode('colegios') && minhaOuLivre() && respOk() && exclusaoOk() && !mudou(['kits', 'contratoTurma'])
@@ -228,7 +230,7 @@ service cloud.firestore {
     // ID do aluno (26CEPNCP-01) e do ensaio fechado no Funil (ensaio_26EST → 26EST-00001): último número usado.
     // Quem cadastra reserva o próximo número (o contador só sobe), assim dois cadastros ao mesmo tempo nunca pegam o mesmo ID.
     match /ids/{prefixo} {
-      function cadastraAluno() { return pode('rep') || pode('lf') || pode('colegios') || pode('formaturas') || pode('funil'); }
+      function cadastraAluno() { return pode('rep') || pode('lf') || pode('colegios') || pode('formaturas') || pode('funil') || pode('becas'); }
       allow read: if admin() || cadastraAluno();
       allow create: if admin() || (cadastraAluno() && request.resource.data.keys().hasOnly(['ultimo'])
         && request.resource.data.ultimo is int && request.resource.data.ultimo > 0);

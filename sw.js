@@ -37,6 +37,8 @@ const SHELL = [
   "./js/inst-excluir.js",
   "./js/nao-fechou.js",
   "./js/regras.js",
+  "./js/cadastro-aluno.js",
+  "./js/cadastro-regras.js",
   "./js/calc.js",
   "./js/feriados.js",
   "./js/repasse.js",
