@@ -508,13 +508,19 @@ button.lc-linha[aria-expanded="true"]{border-bottom-left-radius:0;border-bottom-
 .fila-topo{display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap}
 .fila-lista{margin-top:6px}
 .fila-aluno{font-size:.88rem;padding:5px 0 5px 10px;border-left:3px solid var(--line,#ddd);margin:3px 0}
-/* 🤖 Cadastro automático: conferência das fichas */
+/* 🤖 Cadastro automático: conferência das fichas (a ficha à esquerda, os campos na ordem da ficha à direita) */
+.panel.ficha-janela{max-width:1180px}
 .ficha-topo{display:flex;justify-content:space-between;align-items:center;gap:10px}
-.ficha-foto{max-width:220px;width:100%;border-radius:8px;cursor:zoom-in;display:block;margin:8px 0}
-.ficha-foto.grande{max-width:100%;cursor:zoom-out}
-.ficha-campos{display:grid;grid-template-columns:repeat(auto-fill,minmax(170px,1fr));gap:6px 10px}
+.ficha-foto{width:100%;border-radius:8px;cursor:zoom-in;display:block;margin:8px 0}
+.ficha-foto.grande{position:fixed;inset:2vh 2vw;width:auto;height:96vh;max-width:96vw;margin:auto;object-fit:contain;z-index:1000;background:#000;cursor:zoom-out}
+.ficha-campos{display:grid;grid-template-columns:repeat(6,minmax(0,1fr));gap:8px 12px;align-content:start}
+.ficha-campos .field{margin:0}
+.ficha-campos input{width:100%;min-width:0}
+.fc-1{grid-column:span 1}.fc-2{grid-column:span 2}.fc-3{grid-column:span 3}.fc-4{grid-column:span 4}.fc-6{grid-column:1/-1}
 .ficha-campos .duvida input{border-color:var(--warn);background:color-mix(in srgb,var(--warn) 12%,transparent)}
-@media(min-width:900px){.ficha-conf{display:grid;grid-template-columns:260px 1fr;gap:12px}.ficha-conf .ficha-topo,.ficha-conf>.hint{grid-column:1/-1}}
+.ficha-conf{display:grid;grid-template-columns:minmax(0,1fr);gap:10px}
+@media(min-width:900px){.ficha-conf{grid-template-columns:340px minmax(0,1fr);align-items:start}.ficha-conf .ficha-topo,.ficha-conf>.hint{grid-column:1/-1}}
+@media(max-width:600px){.ficha-campos{grid-template-columns:repeat(2,minmax(0,1fr))}.fc-1,.fc-2,.fc-3{grid-column:span 1}.fc-4,.fc-6{grid-column:1/-1}}
 /* janela do representante */
 .pessoa-topo{display:flex;flex-direction:column;gap:6px}
 .pessoa-busca{width:100%}

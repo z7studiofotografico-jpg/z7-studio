@@ -17,7 +17,7 @@ export const CAMPOS = [
   ["celMae", "Celular da mãe"],
   ["pai", "Pai"],
   ["celPai", "Celular do pai"],
-  ["rua", "Rua"],
+  ["rua", "Endereço"],
   ["numeroCasa", "Nº"],
   ["bairro", "Bairro"],
   ["cidade", "Cidade"],
@@ -26,6 +26,24 @@ export const CAMPOS = [
 ];
 const LADO = 1600; // tamanho em que a letra da ficha dá para ler (testado em 12/11/2026)
 
+// a tela de conferência, em linhas de 6 colunas: [campo, largura]
+const ORDEM_CONF = [
+  ["numero", 2],
+  ["turma", 2],
+  ["nasc", 2],
+  ["nome", 4],
+  ["celAluno", 2],
+  ["mae", 4],
+  ["celMae", 2],
+  ["pai", 4],
+  ["celPai", 2],
+  ["rua", 6],
+  ["numeroCasa", 1],
+  ["bairro", 3],
+  ["cidade", 2],
+  ["cep", 2],
+  ["email", 4]
+];
 export const chaveGrupo = (escola, ano) => U.chave(escola).replace(/[^A-Z0-9]+/g, "-") + "_" + (ano || "");
 const idFicha = (escola, ano, pasta) => (chaveGrupo(escola, ano) + "_" + U.chave(pasta).replace(/[^A-Z0-9]+/g, "-")).slice(0, 140);
 
@@ -375,7 +393,7 @@ async function conferir(C, g, colNome, depois) {
   sheet(
     "📋 Conferir fichas · " + g.escola,
     (p, close) => {
-      p.classList.add("cad");
+      p.classList.add("cad", "ficha-janela");
       const fichas = g.fichas.filter(f => f.status === "lida").sort((a, b) => a.pasta.localeCompare(b.pasta, "pt-BR", { numeric: true }));
       const info = el("p", "hint", `${fichas.length} fichas para conferir. Os campos com ⚠️ estavam difíceis de ler: confira com a foto.`);
       p.append(info);
@@ -389,8 +407,12 @@ async function conferir(C, g, colNome, depois) {
         foto.onclick = () => foto.classList.toggle("grande");
         const campos = el("div", "ficha-campos");
         const ins = {};
-        CAMPOS.forEach(([k, rot]) => {
-          const d = el("div", "field" + ((f.duvidas || []).includes(k) ? " duvida" : ""));
+        // na ordem da ficha: nº, turma e nascimento · aluno e celular · mãe e celular · pai e celular · endereço ·
+        // nº, bairro e cidade · CEP e e-mail (12/11/2026)
+        const ROT = Object.fromEntries(CAMPOS);
+        ORDEM_CONF.forEach(([k, larg]) => {
+          const rot = ROT[k];
+          const d = el("div", "field fc-" + larg + ((f.duvidas || []).includes(k) ? " duvida" : ""));
           const l = el("label", null, ((f.duvidas || []).includes(k) ? "⚠️ " : "") + rot);
           const i = el("input");
           i.value = (f.lido || {})[k] || "";
