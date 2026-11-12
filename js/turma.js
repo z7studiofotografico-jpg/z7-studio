@@ -219,7 +219,7 @@ export function openTurma(ctx, inst, kits, aoFechar, opcoes) {
       p.append(q);
       T.lst = el("div", "grid");
       p.append(T.lst);
-      if (T.opcoes.novo) setTimeout(() => abrirFormando(T), 0);
+      if (T.opcoes.novo) setTimeout(() => abrirFormando(T, null, T.opcoes.dados ? { dados: T.opcoes.dados } : undefined), 0);
       unsub = FS.onSnapshot(
         C.isAdmin ? FS.query(col, FS.where("instId", "==", T.inst.id), FS.limit(2000)) : C.carteira("formandos"),
         snap => {

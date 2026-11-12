@@ -4243,6 +4243,20 @@ await cenario("➕ Cadastrar aluno: colégio primeiro, ID obrigatório, um aluno
   await f2.getByRole("button", { name: "Salvar", exact: true }).click();
   await calmo(pg);
   ok(/já é de Bianca Teste/.test(await f2.textContent()), "ID que já é de outro aluno: avisa e não salva");
+  // venda antecipada: depois de salvar, o kit e as parcelas abrem com nome, WhatsApp, ID e turma já preenchidos
+  await f2.getByLabel("Número do ID do aluno").fill("42");
+  await f2.getByLabel("Nome do aluno").fill("Carla Antecipada");
+  await f2.getByLabel("WhatsApp", { exact: true }).fill("21955554444");
+  await f2.locator(".cad-op", { hasText: "Kit Quadro" }).click();
+  await f2.locator(".cad-op", { hasText: "Venda antecipada" }).click();
+  await f2.getByRole("button", { name: "Salvar", exact: true }).click();
+  const fv = pg.locator(".sheet").filter({ hasText: "Novo aluno" }).last();
+  await fv.getByLabel("Nome").first().waitFor({ timeout: 8000 });
+  ok(
+    /Carla Antecipada/i.test(await fv.locator("input").first().inputValue()) &&
+      (await fv.locator("input[placeholder*='automático'], input[placeholder*='26']").first().inputValue()) === String(Y).slice(2) + "CA-42",
+    "venda antecipada abre já preenchida (nome e ID)"
+  );
   ok(!erros.length, "sem erros" + (erros.length ? ": " + erros.join(" | ") : ""));
 });
 await cenario("Registrar venda: endereço completo obrigatório e CEP preenche a rua", async () => {

@@ -318,7 +318,7 @@ const abrirTurma = (i, novo) =>
   );
 
 // ➕ Cadastrar aluno → Venda antecipada: abre a turma do colégio já no cadastro do aluno (kit e parcelas)
-export function abrirVendaAntecipada(ctx, inst) {
+export function abrirVendaAntecipada(ctx, inst, dados) {
   if (!C) init(ctx);
   if (!inst || inst.etapa !== "FECHADO")
     return U.toast("Venda antecipada: o colégio precisa estar fechado (com a tabela de kits) em Instituições.");
@@ -329,6 +329,7 @@ export function abrirVendaAntecipada(ctx, inst) {
     () => (insts.length ? carregarTudo(true) : null),
     {
       novo: true,
+      dados,
       sigla: inst.sigla || siglaDe(inst.nome, [])
     }
   );

@@ -122,7 +122,7 @@ const OPCOES = [
   ["pr", "🖼️", "PR", "Kit Quadro: quadro 30x40 + 2 porta-retratos"],
   ["paspatur", "🎞️", "Paspatur", "Kit Paspatur: livro A4"],
   ["formatura", "🎓", "Formatura", "fotos digitais da formatura"],
-  ["va", "📝", "Venda antecipada", "kit da formatura com parcelas (abre a turma)"]
+  ["va", "📝", "Venda antecipada", "escolhe o kit e as parcelas logo depois, já preenchido"]
 ];
 
 export function abrirCadastroAluno(C, o = {}) {
@@ -523,10 +523,10 @@ export function abrirCadastroAluno(C, o = {}) {
         const pedido = feitos.find(x => String(x).startsWith("pedido: "));
         if (pedido) U.toast(pedido.slice(8));
         else if (feitos.length) U.toast(`✅ ${f.codigo} · ${title(f.nome)}: ${feitos.join(", ")}`);
-        // venda antecipada: abre a turma do colégio para o kit e as parcelas
+        // venda antecipada: abre o kit e as parcelas já com nome, WhatsApp, ID e turma preenchidos
         if (fazer.includes("va")) {
           const m = await import("./formaturas.js");
-          return m.abrirVendaAntecipada(C, f.inst);
+          return m.abrirVendaAntecipada(C, f.inst, { nome: d.nome, tel: d.tel, codigo: d.codigo, serie: d.serie });
         }
         if (outro)
           abrirCadastroAluno(C, {

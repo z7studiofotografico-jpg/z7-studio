@@ -54,16 +54,17 @@ export function formFormando(ctx, T, f, preset) {
   const col = FS.collection(db, "formandos");
   const adm = C.isAdmin,
     base = preset && preset.base,
+    pre = base || (preset && preset.dados), // dados já preenchidos (aluno do Kit 01 ou o ➕ Cadastrar aluno)
     kitsTodos = kitsDe(C.P, T.inst);
   preset = preset || {};
   // na venda depois das fotos (compra a mais de quem já tem o Kit 01) só aparecem os kits 02 a 05
   const kits = preset.venda ? kitsTodos.filter(k => !ehAdesao(k.id)) : kitsTodos;
   const tituloVenda = preset.venda === "rep" ? "Venda no repasse" : "Venda depois das fotos";
   sheet(preset.venda ? tituloVenda : f ? "Editar aluno" : "Novo aluno", (fp, fechar) => {
-    const nome = inp(f ? title(f.nome) : base ? title(base.nome) : "", "nome do aluno");
+    const nome = inp(f ? title(f.nome) : pre ? title(pre.nome) : "", "nome do aluno");
     nome.required = true;
     nome.disabled = !!f && !adm;
-    const tel = inp(f ? f.tel : base ? base.tel : "", "WhatsApp do responsável", 30);
+    const tel = inp(f ? f.tel : pre ? pre.tel : "", "WhatsApp do responsável", 30);
     tel.inputMode = "tel";
     const r1 = el("div", "row2");
     r1.append(field("Nome", nome), field("WhatsApp", tel));
@@ -79,8 +80,8 @@ export function formFormando(ctx, T, f, preset) {
     tel.addEventListener("input", conferirTel);
     conferirTel();
     // ID do aluno (separação das fotos): o app dá o próximo número da turma; o admin pode trocar
-    const codigoIn = inp(f ? f.codigo || "" : base ? base.codigo || "" : "", f ? "ex.: 26CEPNCP-07" : "automático (ex.: 26CEPNCP-07)", 30);
-    codigoIn.disabled = (!!f || !!base) && !adm;
+    const codigoIn = inp(f ? f.codigo || "" : pre ? pre.codigo || "" : "", f ? "ex.: 26CEPNCP-07" : "automático (ex.: 26CEPNCP-07)", 30);
+    codigoIn.disabled = (!!f || !!pre) && !adm;
     fp.append(field("ID do aluno", codigoIn));
     // Kit do contrato: todo formando entra pelo menos com o Kit 01 (adesão)
     const kitAtual = f && f.status !== "semkit" ? f.kitId || (ehKit01(f) ? "k01" : f.kit ? "outro" : "k01") : preset.venda ? "k04" : "k01";
@@ -99,7 +100,13 @@ export function formFormando(ctx, T, f, preset) {
     const kitTxt = inp(f && kitAtual === "outro" ? f.kit : "", "nome do kit", 80);
     const fKitTxt = field("Qual kit", kitTxt);
     fp.append(fKitTxt);
-    const serie = sel(["Pré", "5º ano", "9º ano", "Ensino médio", "Outra"], f ? f.serie : base ? base.serie : "", "série");
+    const serie0 = f ? f.serie : pre ? pre.serie : "";
+    const series = ["Pré", "5º ano", "9º ano", "Ensino médio", "Outra"];
+    const serie = sel(
+      series.concat(serie0 && !series.some(x => U.chave(x) === U.chave(serie0)) ? [serie0] : []),
+      series.find(x => U.chave(x) === U.chave(serie0)) || serie0,
+      "série"
+    );
     // depois da formatura, o antecipado não vale mais
     const avisoVenda = el("p", "wait");
     fp.append(avisoVenda);
@@ -334,7 +341,7 @@ export function formFormando(ctx, T, f, preset) {
           ? comAno(codigoIn.value.trim().toUpperCase(), anoTurma(T))
           : f
             ? f.codigo || ""
-            : await codigoNovo(T, nome.value, base);
+            : await codigoNovo(T, nome.value, pre);
         const body = {
           codigo,
           contrato: k && ehAdesao(k.id) ? "adesao" : "album",
