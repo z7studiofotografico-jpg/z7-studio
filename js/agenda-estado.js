@@ -8,6 +8,7 @@ export let privados = {},
   items = [],
   ensaios = [],
   passados = [],
+  antigos = [], // 11/11/2026: ensaios e compromissos dos meses que já passaram (só para o calendário)
   comps = [],
   visitas = [],
   becas = [],
@@ -20,6 +21,7 @@ export function mudar(o) {
   if ("items" in o) items = o.items;
   if ("ensaios" in o) ensaios = o.ensaios;
   if ("passados" in o) passados = o.passados;
+  if ("antigos" in o) antigos = o.antigos;
   if ("comps" in o) comps = o.comps;
   if ("visitas" in o) visitas = o.visitas;
   if ("becas" in o) becas = o.becas;

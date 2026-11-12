@@ -28,6 +28,7 @@ import {
   items,
   ensaios,
   comps,
+  antigos,
   visitas,
   becas,
   filtro,
@@ -126,7 +127,8 @@ export function show() {
   };
   unsubs.push(
     FS.onSnapshot(
-      FS.query(col, FS.where("data", ">=", hoje), FS.orderBy("data"), FS.limit(400)),
+      // (11/11/2026: também o ano que passou, para ver os meses anteriores no calendário)
+      FS.query(col, FS.where("data", ">=", U.addDays(-400)), FS.orderBy("data"), FS.limit(1200)),
       snap => {
         mudar({ items: snap.docs.map(d => Object.assign({ id: d.id }, d.data())) });
         render();
@@ -138,7 +140,7 @@ export function show() {
   if (vejoEnsaios())
     unsubs.push(
       FS.onSnapshot(
-        FS.query(colE, FS.where("data", ">=", U.addDays(-90)), FS.orderBy("data"), FS.limit(600)),
+        FS.query(colE, FS.where("data", ">=", U.addDays(-400)), FS.orderBy("data"), FS.limit(2000)),
         snap => {
           // cancelados saem da agenda; o pedido de exclusão da equipe some para a equipe (o admin vê a pendência)
           const todos = snap.docs
@@ -146,7 +148,14 @@ export function show() {
             .filter(x => x.status !== "cancelado" && !(x.excluido && !C.isAdmin));
           mudar({ ensaios: todos.filter(x => x.kind !== "pessoal" && x.data >= hoje) });
           mudar({ comps: todos.filter(x => x.kind === "pessoal" && x.data >= hoje) });
-          mudar({ passados: todos.filter(x => x.kind !== "pessoal" && x.data < hoje && x.status !== "remarcar" && x.status !== "faltou") });
+          // (os passados para a entrega das fotos continuam sendo os dos últimos 90 dias)
+          const d90 = U.addDays(-90);
+          mudar({
+            passados: todos.filter(
+              x => x.kind !== "pessoal" && x.data >= d90 && x.data < hoje && x.status !== "remarcar" && x.status !== "faltou"
+            )
+          });
+          mudar({ antigos: todos.filter(x => x.data < hoje && x.status !== "remarcar") });
           render();
         },
         e => erro(e, "ensaios")
@@ -233,8 +242,9 @@ function renderChips() {
   if (!c) return;
   c.innerHTML = "";
   const ops = [
-    ["tudo", "Tudo", items.length + ensaios.length + comps.length + visitas.length + becas.length],
-    ["colegio", "Colégios", items.length]
+    // (os números contam só o que vem pela frente)
+    ["tudo", "Tudo", items.filter(x => x.data >= U.todayStr()).length + ensaios.length + comps.length + visitas.length + becas.length],
+    ["colegio", "Colégios", items.filter(x => x.data >= U.todayStr()).length]
   ];
   if (vejoEnsaios()) ops.push(["ensaio", "Ensaios", ensaios.length], ["comp", "Compromissos", comps.length]);
   if (vejoVisitas()) ops.push(["visita", "Visitas", visitas.length]);
@@ -333,7 +343,8 @@ function render() {
   calBox.innerHTML = "";
   renderMes(calBox, ent);
   const ate60 = U.addDays(60);
-  const entL = ent.filter(it => it.t !== "f" || it.data <= ate60);
+  // a lista é só do que vem pela frente (o que passou fica no calendário)
+  const entL = ent.filter(it => it.data >= hoje && (it.t !== "f" || it.data <= ate60));
   prox.append(el("h3", "grp", "Próximos compromissos"));
   if (!entL.length) {
     const e = el("div", "empty");
@@ -414,6 +425,12 @@ function entradas(hoje) {
       .forEach(x => ent.push({ data: x.data, hora: x.hora || "", t: "e", x }));
   if (filtro === "tudo" || filtro === "comp")
     comps.forEach(x => ent.push({ data: x.data, hora: x.diaInteiro ? "" : x.hora || "", t: "p", x }));
+  // meses que já passaram: os ensaios e compromissos que aconteceram (só aparecem no calendário)
+  antigos.forEach(x => {
+    const pessoal = x.kind === "pessoal";
+    if (filtro === "tudo" || filtro === (pessoal ? "comp" : "ensaio"))
+      ent.push({ data: x.data, hora: (pessoal && x.diaInteiro ? "" : x.hora) || "", t: pessoal ? "p" : "e", x });
+  });
   if (filtro === "tudo" || filtro === "visita")
     visitas.forEach(x => ent.push({ data: x.followup, hora: x.followupHora || "99", t: "v", x }));
   if (filtro === "tudo" || filtro === "beca")
@@ -546,7 +563,7 @@ function renderMes(box, ent) {
     mudar({ mesVis: `${d.getFullYear()}-${U.pad(d.getMonth() + 1)}`, selDia: "" });
     render();
   });
-  ant.disabled = mesVis <= hoje.slice(0, 7);
+  ant.disabled = false; // 11/11/2026: dá para ver os meses anteriores
   ant.setAttribute("aria-label", "Mês anterior");
   const prx = U.mkBtn("›", "btn-sm", () => {
     const d = new Date(y, m, 1);
