@@ -35,8 +35,10 @@ export async function agendarColegio(ctx, dia) {
         ["paspatur", "🎞️ Paspatur (fotos no colégio)"],
         ["becas", "👘 Aluguel de becas (medir / entregar no colégio)"]
       ],
-      "fotos"
+      "",
+      "Escolha o que vai marcar"
     );
+    tipoEv.required = true; // 11/11/2026: não vem mais "Dia de fotos" marcado (marcava foto quando era aluguel de becas)
     // primeiro: particular, público ou faculdade/curso; a lista de colégios mostra só os desse grupo
     let grupo = "";
     const doGrupo = () => (grupo ? lista.filter(i => CARTOES[grupo].tipos.includes(i.tipo)) : []);
@@ -135,6 +137,12 @@ export async function agendarColegio(ctx, dia) {
     p.addEventListener("submit", async ev => {
       ev.preventDefault();
       err.hidden = true;
+      if (!tipoEv.value) {
+        err.textContent = "Escolha o que vai marcar: dia de fotos, formatura, Paspatur ou aluguel de becas.";
+        err.hidden = false;
+        tipoEv.focus();
+        return;
+      }
       if (!grupo) {
         err.textContent = "Escolha primeiro se o colégio é particular ou público.";
         err.hidden = false;

@@ -1557,6 +1557,7 @@ await cenario("Pedro (vendedor: Linha de Frente, Agendamento, Instituições)", 
     await pg.getByRole("button", { name: "+ Agendar colégio" }).click();
     await calmo(pg);
     let sa = pg.locator(".sheet").last();
+    await sa.getByLabel("O que vai marcar").selectOption("fotos");
     // primeiro pergunta se é particular ou público; colégio do outro grupo: avisa onde está cadastrado
     ok(await sa.getByLabel("Colégio").isDisabled(), "Agendar colégio: pergunta particular ou público antes do nome");
     await sa.getByRole("button", { name: "🏛️ Público" }).click();
@@ -1608,6 +1609,7 @@ await cenario("Pedro (vendedor: Linha de Frente, Agendamento, Instituições)", 
     await pg.getByRole("button", { name: "+ Agendar colégio" }).click();
     await calmo(pg);
     sa = pg.locator(".sheet").last();
+    await sa.getByLabel("O que vai marcar").selectOption("fotos");
     await sa.getByRole("button", { name: "🏫 Particular" }).click();
     await sa.getByLabel("Colégio").fill("Colegio Beta");
     await sa.locator("button[type=submit]").click();
@@ -2441,6 +2443,7 @@ await cenario("Agenda: agendar colégio no dia tocado", async () => {
       await calmo(pg);
       let sa = pg.locator(".sheet").last();
       const dataTxt = ((await sa.textContent()).match(/Dia (\d\d)\/(\d\d)\/(\d{4})/) || []).slice(1);
+      await sa.getByLabel("O que vai marcar").selectOption("fotos");
       await sa.getByRole("button", { name: "🏫 Particular" }).click();
       await sa.getByLabel("Colégio").fill("Colegio Beta");
       await sa.locator("button[type=submit]").click();
@@ -2483,6 +2486,7 @@ await cenario("Agenda: agendar colégio no dia tocado", async () => {
     await pg.getByRole("button", { name: "+ Agendar colégio" }).click();
     await calmo(pg);
     sh = pg.locator(".sheet").last();
+    await sh.getByLabel("O que vai marcar").selectOption("fotos");
     await sh.getByRole("button", { name: "🏫 Particular" }).click();
     await sh.getByLabel("Colégio").fill("Colegio Beta");
     await sh.locator("button[type=submit]").click();
