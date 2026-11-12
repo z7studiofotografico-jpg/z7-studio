@@ -370,11 +370,8 @@ function mount() {
   irPara("rsHoje", () => openTab("hoje"));
   irPara("rsInt", () => openTab("interessados"));
   irPara("rsMes", () => openTab("entregas"));
-  // a fila é separada no "Seu lote de hoje"
-  irPara("rsFila", () => {
-    $("rLote").scrollIntoView({ behavior: "smooth", block: "center" });
-    $("rLoteBtn").focus();
-  });
+  // a fila: quem são, separados por colégio (com "Passar o colégio inteiro")
+  irPara("rsFila", () => import("./fila-colegios.js").then(m => m.abrirFilaPorColegio(depoisDaLista)).catch(e => C.handleErr(e)));
   try {
     if (!localStorage.getItem("z7rguide")) g.open = true;
     g.addEventListener("toggle", () => {

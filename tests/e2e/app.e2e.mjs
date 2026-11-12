@@ -1021,6 +1021,15 @@ await cenario("Adriano (admin), com os dados já atualizados no servidor", async
     // PR: admin confere a venda feita pelo vendedor
     await ir(pg, "#pr");
     await calmo(pg);
+    // "Na fila": tocar abre quem são, por colégio, com o botão de passar o colégio inteiro
+    await pg.locator("#rsFila").click();
+    const fila = pg.locator(".sheet").filter({ hasText: "Na fila: por colégio" });
+    await fila.getByText("COLEGIO ALFA").first().waitFor({ timeout: 8000 });
+    ok(
+      /\d+ alunos/.test(await fila.textContent()) && (await fila.getByRole("button", { name: /Passar o colégio inteiro/ }).count()) > 0,
+      "Na fila: abre por colégio com Passar o colégio inteiro"
+    );
+    await fila.getByRole("button", { name: "Fechar" }).click();
     await pg.locator("#rChips").getByText("A conferir").click();
     await calmo(pg);
     await pg.locator(".card").filter({ hasText: "Bruno" }).getByRole("button", { name: "✔ Conferir venda" }).click();
@@ -3819,7 +3828,7 @@ await cenario("Formaturas · abas Linha de Frente / Repasse / Venda Antecipada, 
     /Preço da Formatura \(Linha de Frente\) em branco/.test(await pg.textContent("#viewFormaturas")),
     "preço da Formatura em branco: avisa (não usa o preço do PR)"
   );
-  ok(await pg.getByRole("button", { name: "🖼️ Prévia e fotos" }).isVisible(), "Formatura tem o botão de prévia e fotos");
+  ok(!(await pg.getByRole("button", { name: "🖼️ Prévia e fotos" }).isVisible()), "Formatura: sem o Prévia e fotos no topo (fica na janela do aluno)");
   const larg = await pg.evaluate(() => {
     const v = document.querySelector("#viewFormaturas");
     const r = v.getBoundingClientRect();

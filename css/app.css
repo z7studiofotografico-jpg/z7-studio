@@ -504,3 +504,7 @@ button.lc-linha[aria-expanded="true"]{border-bottom-left-radius:0;border-bottom-
 .cad-num .imp>h3{display:flex;align-items:center;gap:10px;margin:0 0 8px;font-size:16px}
 .cad-num .imp>h3::before{counter-increment:bloco;content:counter(bloco);display:inline-flex;align-items:center;justify-content:center;flex:none;width:26px;height:26px;border-radius:50%;background:var(--bar);color:var(--bar-fg);font-size:13px}
 .cad .row2,.cad .row3{gap:10px}
+/* Na fila: por colégio */
+.fila-topo{display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap}
+.fila-lista{margin-top:6px}
+.fila-aluno{font-size:.88rem;padding:5px 0 5px 10px;border-left:3px solid var(--line,#ddd);margin:3px 0}
