@@ -260,8 +260,9 @@ const ctx = {
   get isAdmin() {
     return isAdmin;
   },
+  // 11/11/2026: o admin (Adriano) também confirma datas, e o que o admin marca já entra confirmado
   get aprovador() {
-    return !verComo && APROVADORES.includes(emailReal());
+    return !verComo && (isAdmin || APROVADORES.includes(emailReal()));
   },
   get verComo() {
     return verComo;

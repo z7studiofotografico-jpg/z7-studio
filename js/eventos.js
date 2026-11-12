@@ -64,6 +64,8 @@ export const MAX_DIAS = 3;
 for (let n = 2; n <= MAX_DIAS; n++) {
   KINDS["fotos" + n] = { campo: "diaFotos" + n, nome: "Dia de fotos " + n, ico: "📸" };
   KINDS["paspatur" + n] = { campo: "diaPaspatur" + n, nome: "Paspatur " + n, ico: "🎞️" };
+  // 11/11/2026: aluguel de becas também em mais de um dia (marcar o 2º dia tirava o 1º do lugar)
+  KINDS["becas" + n] = { campo: "diaBecas" + n, nome: "Aluguel de becas " + n, ico: "👘" };
 }
 // "fotos2" → "fotos"; "formatura3" → "formatura"
 export const baseKind = k => String(k || "").replace(/\d$/, "");
@@ -84,7 +86,7 @@ export function nomeEvento(kind, instNome) {
   if (!n) return KINDS[kind] ? KINDS[kind].nome : "Compromisso";
   const num = (/(\d)$/.exec(kind || "") || [])[1];
   if (baseKind(kind) === "paspatur") return `Paspatur ${num ? num + " " : ""}no ${n}`;
-  if (kind === "becas") return `Aluguel de becas no ${n}`;
+  if (baseKind(kind) === "becas") return `Aluguel de becas ${num ? num + " " : ""}no ${n}`;
   if (baseKind(kind) === "fotos") return `Dia de fotos ${num ? num + " " : ""}no ${n}`;
   const nf = /^formatura(\d)$/.exec(kind || "");
   return nf ? `Formatura ${nf[1]} do ${n}` : `Formatura do ${n}`;

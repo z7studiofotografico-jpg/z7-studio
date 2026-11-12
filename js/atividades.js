@@ -83,15 +83,21 @@ const lerVisto = () => {
 // Botão do admin no topo (btn = o "👤 Adriano"). Liga/desliga sozinho conforme quem está usando (atualizar()).
 export function painelAtividades(C, btn) {
   let unsub = null,
+    unsubPend = null,
     novas = [],
+    pend = [], // datas de colégio esperando confirmação (marcadas pela equipe)
     ligadoPara = "";
   const badge = el("span", "ativ-badge");
   badge.hidden = true;
   const pintar = () => {
-    badge.textContent = novas.length > 99 ? "99+" : String(novas.length);
-    badge.hidden = !novas.length;
+    const n = novas.length + pend.length;
+    badge.textContent = n > 99 ? "99+" : String(n);
+    badge.hidden = !n;
     const nome = (btn.firstChild && btn.firstChild.nodeType === 3 ? btn.firstChild.textContent : "").trim();
-    btn.setAttribute("aria-label", novas.length ? `${nome} · ${novas.length} atividades novas da equipe` : nome);
+    btn.setAttribute(
+      "aria-label",
+      n ? `${nome} · ${pend.length ? pend.length + " datas para confirmar · " : ""}${novas.length} atividades novas da equipe` : nome
+    );
   };
   const ligar = () => {
     if (unsub) unsub();
@@ -106,6 +112,16 @@ export function painelAtividades(C, btn) {
       },
       e => console.warn("[Z7] atividades", e)
     );
+    // as datas que a equipe marcou nos colégios e esperam a confirmação (Luciana ou Adriano)
+    if (unsubPend) unsubPend();
+    unsubPend = C.FS.onSnapshot(
+      C.FS.query(C.FS.collection(C.db, "agenda"), C.FS.where("status", "==", "pendente"), C.FS.limit(100)),
+      s => {
+        pend = s.docs.map(d => Object.assign({ id: d.id }, d.data())).filter(x => x.instId);
+        pintar();
+      },
+      e => console.warn("[Z7] datas para confirmar", e)
+    );
   };
   const abrir = async () => {
     if (!C.isAdmin) return;
@@ -117,9 +133,33 @@ export function painelAtividades(C, btn) {
     } catch (e) {
       console.warn("[Z7] atividades do dia", e);
     }
+    // datas para confirmar: o mesmo cartão do Agendamento (aprovar ou recusar)
+    let cartoes = [];
+    if (pend.length && C.aprovador) {
+      try {
+        const est = await import("./agenda-estado.js");
+        if (!est.C) est.iniciar(C);
+        const { cardPedido } = await import("./agenda-colegios.js");
+        const grupos = new Map();
+        pend.forEach(x => grupos.set(x.grupo || x.id, [...(grupos.get(x.grupo || x.id) || []), x]));
+        cartoes = [...grupos.values()].map(gr => cardPedido(gr.sort((a, b) => (a.data || "").localeCompare(b.data || ""))));
+      } catch (e) {
+        console.warn("[Z7] datas para confirmar", e);
+      }
+    }
     sheet(
       "Atividades da equipe",
       (p, close) => {
+        if (cartoes.length) {
+          p.append(el("h3", null, `📅 Datas para confirmar (${pend.length})`));
+          const g = el("div", "grid");
+          cartoes.forEach(c => {
+            // aprovar ou recusar: fecha a janela (o número do botão atualiza sozinho)
+            c.querySelectorAll(".actions button").forEach(b => b.addEventListener("click", () => setTimeout(close, 50)));
+            g.append(c);
+          });
+          p.append(g);
+        }
         const res = resumoPorPessoa(doDia);
         p.append(el("h3", null, "Hoje"));
         if (!res.length) p.append(el("p", "hint", "Ninguém da equipe registrou atividade hoje."));
@@ -161,8 +201,10 @@ export function painelAtividades(C, btn) {
       if (quem === ligadoPara) return;
       ligadoPara = quem;
       if (unsub) unsub();
-      unsub = null;
+      if (unsubPend) unsubPend();
+      unsub = unsubPend = null;
       novas = [];
+      pend = [];
       if (quem) {
         btn.classList.add("ativ-btn");
         btn.setAttribute("role", "button");
@@ -193,7 +235,9 @@ export function painelAtividades(C, btn) {
     },
     parar() {
       if (unsub) unsub();
-      unsub = null;
+      if (unsubPend) unsubPend();
+      unsub = unsubPend = null;
+      pend = [];
       ligadoPara = "";
     }
   };

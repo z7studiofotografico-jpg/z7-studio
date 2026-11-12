@@ -498,7 +498,7 @@ const tipoDe = it =>
           ? "fotos"
           : /^paspatur\d?$/.test(it.x.kind || "")
             ? "paspatur"
-            : it.x.kind === "becas"
+            : /^becas\d?$/.test(it.x.kind || "")
               ? "becasCol"
               : "comp"
       : it.t === "e"

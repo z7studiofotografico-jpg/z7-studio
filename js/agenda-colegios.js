@@ -33,8 +33,23 @@ export function linhaColegio(x) {
     );
   else if (x.status === "confirmado" && x.contato && x.contato.tel && !x.avisadoWhats && x.pedidoPor)
     t.append(el("span", "wait", `📲 ${U.first(x.pedidoPor)} vai avisar o colégio`));
+  // editar ou desmarcar a data (11/11/2026): o admin e a Luciana sempre; quem pediu, enquanto não foi confirmada
+  if (x.instId && (C.aprovador || (meu && x.status !== "confirmado")))
+    fim.append(U.mkBtn("✏️ Editar / desmarcar", "btn-sm", () => editarData(x)));
   r.append(t, fim);
   return r;
+}
+// abre a janela da data no colégio (a mesma de Instituições): mudar dia, hora, local ou desmarcar
+async function editarData(x) {
+  try {
+    const s = await FS.getDoc(FS.doc(db, "instituicoes", x.instId));
+    if (!s.exists()) return U.toast("Não achei o colégio desta data.");
+    const ev = await import("./eventos.js");
+    ev.init(C);
+    ev.openEvento(Object.assign({ id: s.id }, s.data()), x.kind);
+  } catch (e) {
+    C.handleErr(e);
+  }
 }
 // Abre a mensagem pronta e, se a data já está confirmada, marca que o colégio foi avisado
 export function avisar(arg, extra) {

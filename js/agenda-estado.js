@@ -51,6 +51,8 @@ for (let n = 2; n <= 3; n++) {
   ICO["fotos" + n] = "📸";
   CAMPO["paspatur" + n] = "diaPaspatur" + n;
   ICO["paspatur" + n] = "🎞️";
+  CAMPO["becas" + n] = "diaBecas" + n;
+  ICO["becas" + n] = "👘";
 }
 export const MESES = [
   "janeiro",

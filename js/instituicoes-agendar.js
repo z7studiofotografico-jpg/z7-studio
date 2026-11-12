@@ -215,13 +215,15 @@ export async function agendarColegio(ctx, dia) {
       close();
       let kind = tipoEv.value;
       // já tem esse compromisso marcado (formatura, dia de fotos ou Paspatur): pode ser outro dia ou mudar o que existe
-      const ja = ["formatura", "fotos", "paspatur"].includes(kind) ? marcadosDe(it, kind) : [];
+      const ja = ["formatura", "fotos", "paspatur", "becas"].includes(kind) ? marcadosDe(it, kind) : [];
       if (ja.length && proxDe(it, kind)) {
         const ev = k => it[KINDS[k].campo];
         const lista = ja
           .map(k => `${nomeEvento(k, it.nome)}: ${U.fmtDate(ev(k).data)}${ev(k).turmas ? " (" + ev(k).turmas + ")" : ""}`)
           .join("; ");
-        const nomeTipo = { formatura: "formatura", fotos: "dia de fotos", paspatur: "dia de Paspatur" }[kind];
+        const nomeTipo = { formatura: "formatura", fotos: "dia de fotos", paspatur: "dia de Paspatur", becas: "dia de aluguel de becas" }[
+          kind
+        ];
         const outra = await confirmar(`Marcar outro ${nomeTipo}?`, `Este colégio já tem: ${lista}. É outro ${nomeTipo}?`, {
           sim: `Sim, outro ${nomeTipo}`,
           nao: "Não, mudar o que existe"

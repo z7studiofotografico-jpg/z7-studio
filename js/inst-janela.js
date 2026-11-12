@@ -213,7 +213,7 @@ function agenda(box, it, C) {
   const fms = Object.keys(KINDS).filter(k => ehFormaturaKind(k) && it[KINDS[k].campo] && it[KINDS[k].campo].data);
   // dias de fotos e de Paspatur: todos os marcados (pode ter mais de um) ou o vazio
   const dias = b => (marcadosDe(it, b).length ? marcadosDe(it, b) : [b]);
-  const kinds = [...dias("fotos"), ...(fms.length ? fms : ["formatura"]), ...dias("paspatur"), "becas"];
+  const kinds = [...dias("fotos"), ...(fms.length ? fms : ["formatura"]), ...dias("paspatur"), ...dias("becas")];
   kinds.forEach(k => {
     const K = KINDS[k];
     const ev = it[K.campo];
@@ -234,7 +234,8 @@ function agenda(box, it, C) {
   if (prox) box.append(U.mkBtn("🎓 + Outra formatura (outra turma, dia ou local)", "", () => openEvento(it, prox)));
   [
     ["fotos", "📸 + Outro dia de fotos"],
-    ["paspatur", "🎞️ + Outro dia de Paspatur"]
+    ["paspatur", "🎞️ + Outro dia de Paspatur"],
+    ["becas", "👘 + Outro dia de aluguel de becas"]
   ].forEach(([b, t]) => {
     const px = marcadosDe(it, b).length ? proxDe(it, b) : null;
     if (px) box.append(U.mkBtn(t, "", () => openEvento(it, px)));

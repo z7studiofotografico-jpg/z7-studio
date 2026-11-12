@@ -2713,14 +2713,19 @@ await cenario("Para hoje de cada um · botão da pessoa · atividades da equipe"
   ({ pg, erros } = await abrir(ADRIANO, s));
   const badge = pg.locator("#btnMe .ativ-badge");
   await badge.waitFor({ timeout: 6000 });
-  ok((await badge.textContent()) === "1", "admin: número vermelho com as atividades novas");
+  // o número soma as atividades novas e as datas de colégio esperando confirmação
+  const nPend = Object.entries(s).filter(([k, v]) => k.startsWith("agenda/") && v && v.status === "pendente" && v.instId).length;
+  ok((await badge.textContent()) === String(1 + nPend), "admin: número vermelho com as atividades novas (e as datas para confirmar)");
   await pg.locator("#btnMe").click();
   const sh = pg.locator(".sheet").last();
   await sh.getByText("Atividades da equipe").waitFor({ timeout: 6000 });
   ok(/Pedro/.test(await sh.textContent()) && /1 para hoje/.test(await sh.textContent()), "resumo do dia por pessoa");
   await sh.getByRole("button", { name: "✓ Marcar como visto" }).click();
   await calmo(pg);
-  ok(await badge.isHidden(), "marcar como visto zera o número");
+  ok(
+    nPend ? (await badge.textContent()) === String(nPend) : await badge.isHidden(),
+    "marcar como visto zera as atividades (ficam as datas para confirmar)"
+  );
   ok(!erros.length, "sem erros (aviso)" + (erros.length ? ": " + erros.join(" | ") : ""));
 });
 await cenario("Prévias de um colégio (lote, no computador)", async () => {
@@ -4353,7 +4358,7 @@ await cenario("Várias formaturas no mesmo colégio e alunos confirmados depois"
   s = await store();
   const f2 = s["instituicoes/i2"].formatura2 || {};
   ok(
-    f2.data === dia(30) && f2.turmas === "9º ano B" && f2.alunos === 25 && f2.status === "pendente" && f2.local === "Salão Fantasy",
+    f2.data === dia(30) && f2.turmas === "9º ano B" && f2.alunos === 25 && f2.status === "confirmado" && f2.local === "Salão Fantasy",
     "Formatura 2 gravada com turmas, local e previsão de alunos: " + JSON.stringify(f2)
   );
   ok(
