@@ -195,23 +195,15 @@ function msgOcupado(e) {
   return `O dia ${U.fmtDate(o.data)}/${String(o.data || "").slice(0, 4)} já está ocupado: ${nomeEvento(o.kind, o.instNome)}${o.hora ? " às " + o.hora : ""} (${o.status === "confirmado" ? "confirmado" : "aguardando a Luciana"}). Escolha outra data.`;
 }
 // O que o estúdio faz no dia do colégio (botões na data; "Outros" para o resto)
-export const FAZER = [
-  "Medir becas",
-  "Entregar becas",
-  "Recolher becas",
-  "Ensaio do PR",
-  "Fotos do Paspatur",
-  "Foto da turma",
-  "Fotografar o colégio"
-];
+export const FAZER = ["Medir becas", "Entregar becas", "Recolher becas", "Ensaio do PR", "Fotos do Paspatur", "Foto da turma"];
+FAZER.push("Fotografar o colégio");
 export function camposEvento(kind, f, instNome, dia) {
   const K = KINDS[kind],
     box = el("div", "imp");
   const data = el("input");
   data.type = "date";
   data.value = dia || (f && f.status !== "recusado" && f.data) || "";
-  // dia já marcado que passou (ex.: o dia de fotos, ao marcar outra formatura): não trava o formulário
-  data.min = data.value && data.value < U.todayStr() ? data.value : U.todayStr();
+  // 11/11/2026: aceita data que já passou (o trabalho às vezes é feito antes e lançado depois)
   const hora = el("input");
   hora.type = "time";
   hora.value = (f && f.hora) || "";
@@ -562,6 +554,30 @@ export function openEvento(it, kind, dia) {
       soFotos.onchange = sync;
       setTimeout(sync, 0);
     }
+    // só a formatura (o dia de fotos fica para depois, ou não vai ter)
+    let soForm = null;
+    if (dBox && !extra) {
+      soForm = el("input");
+      soForm.type = "checkbox";
+      soForm.checked = !!(ev && ev.data && !(fot && fot.data));
+      const lF = el("label", "chk");
+      lF.append(soForm, " Agendar só a formatura (sem o dia de fotos)");
+      p.insertBefore(lF, dBox);
+      const syncF = () => {
+        dBox.hidden = soForm.checked;
+        if (soForm.checked && soFotos) soFotos.checked = false;
+        if (soFotos && soFotos.onchange) soFotos.onchange();
+      };
+      soForm.addEventListener("change", syncF);
+      if (soFotos)
+        soFotos.addEventListener("change", () => {
+          if (soFotos.checked) {
+            soForm.checked = false;
+            dBox.hidden = false;
+          }
+        });
+      setTimeout(syncF, 0);
+    }
     p.append(box);
     // Com quem foi combinado (recebe o WhatsApp e o e-mail) e a média de alunos (obrigatória)
     const resp = el("div", "imp");
@@ -654,9 +670,9 @@ export function openEvento(it, kind, dia) {
     p.addEventListener("submit", async evt => {
       evt.preventDefault();
       const f = box.valor(),
-        fd = dBox ? dBox.valor() : null;
+        fd = dBox && !(soForm && soForm.checked) ? dBox.valor() : null;
       const sem = !!(soFotos && soFotos.checked);
-      if (sem && !fd.data) {
+      if (sem && (!fd || !fd.data)) {
         dBox.erro("Escolha o dia das fotos.");
         return;
       }
@@ -723,7 +739,7 @@ export function openEvento(it, kind, dia) {
         return;
       }
       // Sugestão (não obrigatório): lembra o vendedor do dia de medir beca + ensaio
-      if (dBox && !fd.data && !avisado) {
+      if (dBox && fd && !fd.data && !avisado) {
         avisado = true;
         dBox.erro("Não esqueça do dia de medir beca e fazer o ensaio! Se ainda não combinou, toque de novo para salvar só a formatura.");
         p.querySelector("button[type=submit]").textContent = "Salvar só a formatura";

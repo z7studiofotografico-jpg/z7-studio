@@ -113,8 +113,7 @@ export function openEnsaio(x, pre) {
     p.append(r2);
     const data = el("input");
     data.type = "date";
-    data.required = true;
-    data.min = U.todayStr();
+    data.required = true; // (11/11/2026: aceita data que já passou, para lançar depois)
     data.value = x ? x.data : pre.data || "";
     const hora = el("input");
     hora.type = "time";
@@ -311,7 +310,6 @@ export function openComp(x, diaPre) {
     const data = el("input");
     data.type = "date";
     data.required = true;
-    data.min = U.todayStr();
     data.value = x ? x.data : diaPre || "";
     const intL = el("label", "chk");
     const intC = el("input");
