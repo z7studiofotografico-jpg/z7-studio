@@ -2,6 +2,7 @@
 // Coleção "formandos": { instId, instNome, nome, tel, serie, contrato, kit, valor, parcelas, primeiroVenc, formaPag,
 //   pagamentos: [{ data, valor, por }], pagas (= quantidade de pagamentos), proxVenc, status, resp, respEmail, vendidoEm }
 // Regras de parcela e dinheiro: js/regras.js. Só o administrador registra pagamento e muda valores.
+import { linhaGenerica } from "./lista-compacta.js";
 import { linhasRetorno, abrirRetorno } from "./retorno.js";
 import { pedirData } from "./confirmar.js";
 import {
@@ -417,7 +418,46 @@ function desenhar(T) {
     T.lst.append(el("div", "empty", "Ninguém nesse filtro."));
     return;
   }
-  emPartes(T.lst, arr, f => card(T, f, candSet));
+  T.lst.classList.add("lc-lista");
+  emPartes(T.lst, arr, f => linha(T, f, candSet));
+}
+// uma linha por formando, no mesmo desenho do PR e do Funil; tocar abre o cartão completo embaixo
+function linha(T, f, candSet) {
+  const comprou = ativo(f),
+    sem = f.status === "semkit",
+    saiu = !comprou && !sem,
+    at = comprou && atrasado(f),
+    q0 = comprou && quitado(f),
+    pg = pagasDe(f),
+    np = nParcelas(f);
+  const selo = saiu
+    ? SITUACOES[f.status].toUpperCase()
+    : sem
+      ? "AINDA NÃO COMPROU"
+      : f.entregueEm
+        ? "ENTREGUE"
+        : q0
+          ? "QUITADO"
+          : at
+            ? "ATRASADO"
+            : "EM DIA";
+  return linhaGenerica({
+    id: f.id || f.codigo || f.nome,
+    cor: saiu ? "fim" : f.entregueEm ? "verde" : q0 ? "azul" : at ? "vermelho" : sem ? "amarelo" : "cinza",
+    titulo: title(f.nome),
+    tags: [f.codigo],
+    sub: [f.serie, sem ? "" : f.kit || (ehKit01(f) ? "Kit 01" : "Kit"), f.valor && !sem ? brl(f.valor) : "", f.tel]
+      .filter(Boolean)
+      .join(" · "),
+    passo: comprou
+      ? q0
+        ? `${np}/${np} parcelas pagas ✓`
+        : `${pg}/${np} pagas` + (f.primeiroVenc ? ` · ${at ? "venceu" : "vence"} ${U.fmtDate(vencDa(f, pg + 1))}` : "")
+      : "",
+    passoCls: at ? "late" : "",
+    selo,
+    card: () => card(T, f, candSet)
+  });
 }
 function card(T, f, candSet) {
   const cand = candSet.has(f),
