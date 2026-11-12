@@ -133,11 +133,12 @@ if (!SIMULAR) {
     erro = 0,
     salvoEm = 0;
   const salvarIndice = c => c.uploadFrom(Readable.from([Buffer.from(JSON.stringify(indice))]), "indice.json");
+  const pasta = await ftp.pwd(); // (antes de começar: o cliente principal já vai estar ocupado copiando)
   async function trabalhador(n) {
     const c = n === 0 ? ftp : new Client(60000);
     if (n) {
       await c.access({ host: process.env.FTP_HOST, user: process.env.FTP_USER, password: process.env.FTP_PASS, secure: false });
-      await c.cd(await ftp.pwd());
+      await c.cd(pasta);
     }
     while (fila.length && Date.now() < ATE) {
       const f = fila.shift();
