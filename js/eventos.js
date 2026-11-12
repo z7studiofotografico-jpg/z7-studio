@@ -194,6 +194,16 @@ function msgOcupado(e) {
   const o = e.ocupado || {};
   return `O dia ${U.fmtDate(o.data)}/${String(o.data || "").slice(0, 4)} já está ocupado: ${nomeEvento(o.kind, o.instNome)}${o.hora ? " às " + o.hora : ""} (${o.status === "confirmado" ? "confirmado" : "aguardando a Luciana"}). Escolha outra data.`;
 }
+// O que o estúdio faz no dia do colégio (botões na data; "Outros" para o resto)
+export const FAZER = [
+  "Medir becas",
+  "Entregar becas",
+  "Recolher becas",
+  "Ensaio do PR",
+  "Fotos do Paspatur",
+  "Foto da turma",
+  "Fotografar o colégio"
+];
 export function camposEvento(kind, f, instNome, dia) {
   const K = KINDS[kind],
     box = el("div", "imp");
@@ -241,12 +251,53 @@ export function camposEvento(kind, f, instNome, dia) {
     turmas = inp(f && f.turmas, "ex.: 9º ano A e B (deixe vazio se for a turma toda)", 120);
     box.append(r2, field("Turmas desta formatura", turmas));
   } else {
-    const padrao = {
-      paspatur: "Fotos do Paspatur no colégio",
-      becas: "Medir e entregar as becas no colégio"
+    // 11/11/2026: botões com o que o estúdio faz no colégio (marca um ou mais); "Outros" abre o campo para escrever
+    const PADRAO = {
+      fotos: ["Medir becas", "Ensaio do PR"],
+      paspatur: ["Fotos do Paspatur"],
+      becas: ["Medir becas", "Entregar becas"]
     };
-    obs = inp((f && f.obs) || padrao[baseKind(kind)] || "Medir beca + ensaio de estúdio no colégio", "o que vai ser feito", 200);
-    box.append(field("O que vai ser feito", obs));
+    const ja = String((f && f.obs) || "").trim();
+    const marcados = new Set(ja ? ja.split(" + ").filter(x => FAZER.includes(x)) : PADRAO[baseKind(kind)] || []);
+    const outrosTxt = ja
+      ? ja
+          .split(" + ")
+          .filter(x => !FAZER.includes(x))
+          .join(" + ")
+      : "";
+    const chips = el("div", "chips");
+    FAZER.forEach(t => {
+      const b = el("button", "chip", t);
+      b.type = "button";
+      b.setAttribute("aria-pressed", String(marcados.has(t)));
+      b.onclick = () => {
+        if (marcados.has(t)) marcados.delete(t);
+        else marcados.add(t);
+        b.setAttribute("aria-pressed", String(marcados.has(t)));
+      };
+      chips.append(b);
+    });
+    const outros = inp(outrosTxt, "escreva o que mais vai ser feito", 150);
+    outros.setAttribute("aria-label", "Outros: o que mais vai ser feito");
+    const bOut = el("button", "chip", "✏️ Outros");
+    bOut.type = "button";
+    bOut.setAttribute("aria-pressed", String(!!outrosTxt));
+    outros.hidden = !outrosTxt;
+    bOut.onclick = () => {
+      outros.hidden = !outros.hidden;
+      bOut.setAttribute("aria-pressed", String(!outros.hidden));
+      if (!outros.hidden) outros.focus();
+    };
+    chips.append(bOut);
+    const fz = el("div", "field");
+    fz.append(el("label", null, "O que vai ser feito (toque para marcar)"), chips, outros);
+    box.append(fz);
+    // o texto que fica gravado: os marcados na ordem dos botões + o que foi escrito em Outros
+    obs = {
+      get value() {
+        return [...FAZER.filter(t => marcados.has(t)), !outros.hidden ? outros.value.trim() : ""].filter(Boolean).join(" + ");
+      }
+    };
   }
   if (f && f.status === "recusado")
     box.append(

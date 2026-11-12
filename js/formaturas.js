@@ -320,6 +320,22 @@ const abrirTurma = (i, novo) =>
     }
   );
 
+// ➕ Cadastrar aluno → Venda antecipada: abre a turma do colégio já no cadastro do aluno (kit e parcelas)
+export function abrirVendaAntecipada(ctx, inst) {
+  if (!C) init(ctx);
+  if (!inst || inst.etapa !== "FECHADO")
+    return U.toast("Venda antecipada: o colégio precisa estar fechado (com a tabela de kits) em Instituições.");
+  openTurma(
+    C,
+    inst,
+    Ev.produtos(inst.tipo).filter(x => !x.formatura),
+    () => (insts.length ? carregarTudo(true) : null),
+    {
+      novo: true,
+      sigla: inst.sigla || siglaDe(inst.nome, [])
+    }
+  );
+}
 // Venda Antecipada: turmas deste ano ou turmas de anos anteriores (oferecer kit a quem ficou só com o Kit 01)
 let seg = (() => {
   try {

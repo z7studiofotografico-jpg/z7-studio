@@ -15,8 +15,8 @@ const ANO = () => new Date().getFullYear();
 export function modulosDe(C) {
   const out = [];
   if (C.isAdmin || C.pode("becas")) out.push("becas");
-  if (C.isAdmin || C.pode("rep") || C.pode("lf")) out.push("pr");
-  if (C.isAdmin || C.pode("formaturas") || C.pode("colegios")) out.push("formatura");
+  if (C.isAdmin || C.pode("rep") || C.pode("lf")) out.push("pr", "paspatur");
+  if (C.isAdmin || C.pode("formaturas") || C.pode("colegios")) out.push("formatura", "va");
   return out;
 }
 export const podeCadastrar = C => modulosDe(C).length > 0;
@@ -102,300 +102,439 @@ async function procurar(C, f) {
   return achados;
 }
 
+export const TURMAS = ["Pré", "5º ano", "9º ano", "Ensino Médio", "Profissionalizante"];
+const GRUPOS = [
+  ["particular", "🏫 Particular"],
+  ["publico", "🏛️ Público"],
+  ["superior", "🎓 Faculdade / curso"]
+];
+const OPCOES = [
+  ["becas", "👘", "Aluguel de becas", "beca, tamanho, faixa e capelo"],
+  ["pr", "🖼️", "PR", "Kit Quadro: quadro 30x40 + 2 porta-retratos"],
+  ["paspatur", "🎞️", "Paspatur", "Kit Paspatur: livro A4"],
+  ["formatura", "🎓", "Formatura", "fotos digitais da formatura"],
+  ["va", "📝", "Venda antecipada", "kit da formatura com parcelas (abre a turma)"]
+];
+
 export function abrirCadastroAluno(C, o = {}) {
   const mods = modulosDe(C);
   if (!mods.length) return U.toast("Você não tem acesso para cadastrar alunos.");
-  sheet("➕ Cadastrar aluno", async (p, close) => {
-    const carregando = el("p", "hint", "Carregando os colégios…");
-    p.append(carregando);
-    let insts = [];
-    try {
-      insts = await colegios(C);
-    } catch (e) {
-      carregando.className = "wait";
-      carregando.textContent = "Não consegui carregar os colégios. Confira a internet e tente de novo.";
-      return;
-    }
-    carregando.remove();
-    const st = { achados: [], repetido: null, ultimo: o.ultimo || null };
-    // ---------- 1. Colégio ----------
-    const sCol = sel(
-      insts.map(i => [i.id, title(i.nome)]),
-      o.instId || "",
-      "Escolha o colégio"
-    );
-    sCol.setAttribute("aria-label", "Colégio");
-    const ano = inp(String(o.ano || ANO()), "2026", 4);
-    ano.inputMode = "numeric";
-    const serie = inp(o.serie || "", "3º ano A", 40);
-    const r1 = el("div", "row3");
-    r1.append(field("Colégio", sCol), field("Ano", ano), field("Série / turma", serie));
-    const trava = el("p", "wait");
-    const novoCol = U.mkBtn("🏫 O colégio não está na lista: cadastrar em Instituições", "btn-sm", () => {
-      close();
-      C.ir("#instituicoes");
-      U.toast("Cadastre o colégio e depois volte em ➕ Cadastrar aluno.");
-    });
-    const s1 = el("section", "cad-parte");
-    s1.append(el("h3", null, "1. Colégio"), r1, trava, novoCol);
-    // ---------- 2. Quem é ----------
-    const pref = el("b", "cad-pref", "");
-    const num = inp(o.numero || "", "02", 4);
-    num.inputMode = "numeric";
-    num.setAttribute("aria-label", "Número do ID do aluno");
-    const idBox = el("div", "cad-id");
-    idBox.append(pref, num);
-    const nome = inp("", "Aghata Souza", 120);
-    nome.setAttribute("aria-label", "Nome do aluno");
-    const tel = inp("", "(21) 99999-0000", 20);
-    tel.inputMode = "tel";
-    const avTel = el("p", "wait");
-    avTel.hidden = true;
-    tel.addEventListener("input", async () => {
-      const { avisoTel } = await import("./aluno-id.js");
-      const t = avisoTel(tel.value);
-      avTel.textContent = t ? "⚠️ " + t : "";
-      avTel.hidden = !t;
-    });
-    const resp = inp("", "Maria Souza", 80);
-    const tipoResp = sel(["Mãe", "Pai", "Responsável", "Formando"], "Mãe");
-    const r2 = el("div", "row2");
-    r2.append(field("Número do ID (obrigatório)", idBox), field("Nome do aluno", nome));
-    const r3 = el("div", "row3");
-    r3.append(field("WhatsApp", tel), field("Responsável (se for menor)", resp), field("É o(a)", tipoResp));
-    const aviso = el("div", "cad-aviso");
-    const s2 = el("section", "cad-parte");
-    s2.append(el("h3", null, "2. Quem é"), r2, r3, avTel, aviso);
-    // ---------- 3. O que contratou ----------
-    const s3 = el("section", "cad-parte");
-    s3.append(el("h3", null, "3. O que contratou"));
-    const marca = {};
-    const caixa = (k, txt) => {
-      const l = el("label", "chk");
-      const c = el("input");
-      c.type = "checkbox";
-      c.value = k;
-      c.checked = o.modulo === k || (o.modulo === "paspatur" && k === "pr");
-      l.append(c, document.createTextNode(" " + txt));
-      marca[k] = c;
-      return l;
-    };
-    const linhaMods = el("div", "quick");
-    if (mods.includes("becas")) linhaMods.append(caixa("becas", "👘 Aluguel de becas"));
-    if (mods.includes("pr")) linhaMods.append(caixa("pr", "🖼️ PR (kit de fotos)"));
-    if (mods.includes("formatura")) linhaMods.append(caixa("formatura", "🎓 Formatura (fotos digitais)"));
-    s3.append(linhaMods);
-    // becas
-    const bTipo = sel(BECAS, "tradPreta", "Escolha a beca"),
-      bTam = sel(TAMANHOS, "", "Tamanho"),
-      bFaixa = sel(FAIXAS, "", "Sem faixa"),
-      bCap = sel(CAPELOS, "", "Sem capelo"),
-      bValor = inpReais("");
-    const bMenos = el("input");
-    bMenos.type = "checkbox";
-    const lMenos = el("label", "chk");
-    lMenos.append(bMenos, document.createTextNode(" Menos longa (P1, M1…)"));
-    const dBecas = el("div", "cad-mod");
-    const rb1 = el("div", "row3"),
-      rb2 = el("div", "row3");
-    rb1.append(field("Beca", bTipo), field("Tamanho", bTam), lMenos);
-    rb2.append(field("Faixa", bFaixa), field("Capelo", bCap), field("Valor do aluguel", bValor));
-    dBecas.append(el("b", null, "👘 Aluguel de becas"), rb1, rb2);
-    // PR
-    const prKit = sel(
-      [
-        ["pr", "Kit Quadro (quadro 30x40 + 2 porta-retratos)"],
-        ["paspatur", "Kit Paspatur (livro A4)"]
-      ],
-      o.modulo === "paspatur" ? "paspatur" : "pr"
-    );
-    const dPR = el("div", "cad-mod");
-    dPR.append(el("b", null, "🖼️ PR"), field("Kit", prKit));
-    const dForm = el("div", "cad-mod");
-    dForm.append(el("b", null, "🎓 Formatura"), el("p", "hint", "Entra na lista da Formatura do ano (Linha de Frente ou Repasse)."));
-    s3.append(dBecas, dPR, dForm);
-    const erro = el("p", "err");
-    erro.hidden = true;
-    const acts = el("div", "panel-actions");
-    const bSalvar = U.mkBtn("Salvar", "", () => salvar(false));
-    const bOutro = U.mkBtn("Salvar e cadastrar outro", "btn-primary", () => salvar(true));
-    acts.append(U.mkBtn("Cancelar", "", close), el("span", "flex1"), bSalvar, bOutro);
-    p.append(s1, s2, s3, erro, acts);
-
-    const inst = () => insts.find(i => i.id === sCol.value) || null;
-    const ficha = () => ({
-      inst: inst(),
-      ano: Number(ano.value) || 0,
-      codigo: idDoAluno(ano.value, inst(), num.value),
-      nome: nome.value.trim(),
-      modulos: Object.keys(marca).filter(k => marca[k].checked),
-      becaTipo: bTipo.value
-    });
-    // trava: sem colégio, o resto fica desligado
-    const pintar = () => {
-      const i = inst();
-      pref.textContent = i ? prefixoId(ano.value, i) : "??-";
-      trava.hidden = !!i;
-      trava.textContent = insts.length
-        ? "🔒 Escolha o colégio para continuar. O resto da ficha fica travado até lá."
-        : "🔒 Nenhum colégio cadastrado para você. Cadastre o colégio em Instituições primeiro.";
-      novoCol.hidden = !!i;
-      [s2, s3].forEach(s => {
-        s.classList.toggle("cad-travado", !i);
-        s.querySelectorAll("input, select").forEach(x => (x.disabled = !i));
+  sheet(
+    "➕ Cadastrar aluno",
+    async (p, close) => {
+      p.classList.add("cad");
+      const carregando = el("p", "hint", "Carregando os colégios…");
+      p.append(carregando);
+      let insts = [];
+      try {
+        insts = await colegios(C);
+      } catch (e) {
+        carregando.className = "wait";
+        carregando.textContent = "Não consegui carregar os colégios. Confira a internet e tente de novo.";
+        return;
+      }
+      carregando.remove();
+      const { CARTOES, cartaoDoTipo } = await import("./instituicoes-dados.js");
+      const st = { achados: [], repetido: null };
+      const parte = (n, t, sub) => {
+        const s = el("section", "cad-parte");
+        const h = el("div", "cad-tit");
+        h.append(el("span", "cad-n", String(n)), el("b", null, t));
+        if (sub) h.append(el("small", null, sub));
+        s.append(h);
+        return s;
+      };
+      // ---------- 1. Colégio ----------
+      const s1 = parte(1, "Colégio", "particular ou público, depois o colégio");
+      let grupo = o.instId ? cartaoDoTipo((insts.find(i => i.id === o.instId) || {}).tipo) || "" : "";
+      const chipsG = el("div", "chips cad-grupos");
+      const sCol = el("select");
+      sCol.setAttribute("aria-label", "Colégio");
+      const encherCol = () => {
+        sCol.innerHTML = "";
+        const lst = grupo
+          ? insts.filter(i => (CARTOES[grupo] || { tipos: [] }).tipos.includes(i.tipo) || (!i.tipo && grupo === "particular"))
+          : [];
+        const v = el("option", null, grupo ? `Escolha o colégio (${lst.length})` : "Escolha antes: particular ou público");
+        v.value = "";
+        sCol.append(v);
+        lst.forEach(i => {
+          const op = el("option", null, title(i.nome));
+          op.value = i.id;
+          sCol.append(op);
+        });
+        sCol.disabled = !grupo;
+      };
+      GRUPOS.forEach(([k, t]) => {
+        const b = el("button", "chip", t);
+        b.type = "button";
+        b.dataset.k = k;
+        b.setAttribute("aria-pressed", String(grupo === k));
+        b.onclick = () => {
+          grupo = k;
+          chipsG.querySelectorAll("button").forEach(x => x.setAttribute("aria-pressed", String(x === b)));
+          encherCol();
+          pintar();
+          sCol.focus();
+        };
+        chipsG.append(b);
       });
-      dBecas.hidden = !(marca.becas && marca.becas.checked);
-      dPR.hidden = !(marca.pr && marca.pr.checked);
-      dForm.hidden = !(marca.formatura && marca.formatura.checked);
-      lMenos.hidden = !COM_MENOS_LONGA.includes(bTipo.value);
-    };
-    // procura o aluno (ID e nome) com uma pausa, para não buscar a cada letra
-    let espera = null;
-    const conferir = () => {
-      clearTimeout(espera);
-      espera = setTimeout(async () => {
-        const f = ficha();
-        if (!f.inst || (!f.codigo && f.nome.length < 5)) {
-          st.achados = [];
-          st.repetido = null;
-          return mostrarAviso(f);
+      encherCol();
+      if (o.instId) sCol.value = o.instId;
+      const ano = inp(String(o.ano || ANO()), "2026", 4);
+      ano.inputMode = "numeric";
+      ano.setAttribute("aria-label", "Ano");
+      const turma = sel(
+        [...TURMAS.map(t => [t, t]), ["outra", "Outra…"]],
+        TURMAS.includes(o.serie) ? o.serie : o.serie ? "outra" : "",
+        "Escolha a turma"
+      );
+      turma.setAttribute("aria-label", "Turma");
+      const turmaOutra = inp(TURMAS.includes(o.serie) ? "" : o.serie || "", "ex.: 3º ano A", 40);
+      turmaOutra.setAttribute("aria-label", "Outra turma");
+      const r1 = el("div", "cad-g3");
+      r1.append(field("Colégio", sCol), field("Ano", ano), field("Turma", turma));
+      const fOutra = field("Qual turma?", turmaOutra);
+      const trava = el("p", "cad-trava");
+      const novoCol = U.mkBtn("🏫 Não está na lista? Cadastrar o colégio", "btn-sm", () => {
+        close();
+        C.ir("#instituicoes");
+        U.toast("Cadastre o colégio e depois volte em ➕ Cadastrar aluno.");
+      });
+      s1.append(chipsG, r1, fOutra, trava, novoCol);
+      // ---------- 2. Quem é ----------
+      const s2 = parte(2, "Aluno", "o número do ID é o do aluno na escola");
+      const pref = el("b", "cad-pref", "");
+      const num = inp(o.numero || "", "02", 4);
+      num.inputMode = "numeric";
+      num.setAttribute("aria-label", "Número do ID do aluno");
+      const idBox = el("div", "cad-id");
+      idBox.append(pref, num);
+      const nome = inp("", "nome completo", 120);
+      nome.setAttribute("aria-label", "Nome do aluno");
+      const r2 = el("div", "cad-g2id");
+      r2.append(field("ID (obrigatório)", idBox), field("Nome do aluno", nome));
+      // telefones: quantos precisar (mãe, pai, aluno…)
+      const tels = el("div", "cad-tels");
+      const linhasTel = [];
+      const avTel = el("p", "wait");
+      avTel.hidden = true;
+      const addTel = (tipo = "Mãe") => {
+        const r = el("div", "cad-tel");
+        const tp = sel(["Mãe", "Pai", "Responsável", "Formando", "Outro"], tipo);
+        tp.setAttribute("aria-label", "Quem é");
+        const nm = inp("", "nome", 80);
+        nm.setAttribute("aria-label", linhasTel.length ? "Nome do contato " + (linhasTel.length + 1) : "Nome do responsável");
+        const tl = inp("", "(21) 99999-0000", 20);
+        tl.inputMode = "tel";
+        tl.setAttribute("aria-label", linhasTel.length ? "WhatsApp " + (linhasTel.length + 1) : "WhatsApp");
+        tl.addEventListener("input", async () => {
+          const { avisoTel } = await import("./aluno-id.js");
+          const t = linhasTel.map(x => avisoTel(x.tl.value)).find(Boolean);
+          avTel.textContent = t ? "⚠️ " + t : "";
+          avTel.hidden = !t;
+        });
+        r.append(tp, nm, tl);
+        if (linhasTel.length) {
+          const x = U.mkBtn("✕", "btn-sm", () => {
+            r.remove();
+            linhasTel.splice(linhasTel.indexOf(item), 1);
+          });
+          x.setAttribute("aria-label", "Tirar este telefone");
+          r.append(x);
         }
+        const item = { tp, nm, tl };
+        linhasTel.push(item);
+        tels.append(r);
+        return item;
+      };
+      addTel("Mãe");
+      const maisTel = U.mkBtn("+ Outro telefone", "btn-sm", () => addTel(linhasTel.length === 1 ? "Pai" : "Formando").tl.focus());
+      // endereço (opcional): o CEP preenche rua, bairro e cidade
+      const end = el("details", "cad-end");
+      end.append(el("summary", null, "🏠 Endereço (opcional)"));
+      const cep = inp("", "00000-000", 9);
+      cep.inputMode = "numeric";
+      const rua = inp("", "rua", 120),
+        nro = inp("", "nº", 10),
+        bai = inp("", "bairro", 60),
+        cid = inp("", "cidade", 60),
+        cepInfo = el("small", "hint", "");
+      const re1 = el("div", "cad-g3"),
+        re2 = el("div", "cad-g2");
+      re1.append(field("CEP", cep), field("Rua", rua), field("Número", nro));
+      re2.append(field("Bairro", bai), field("Cidade", cid));
+      end.append(re1, cepInfo, re2);
+      cep.addEventListener("input", async () => {
+        const { lerCep, buscarCep } = await import("./cep.js");
+        const d = lerCep(cep.value);
+        if (!d) return;
+        cepInfo.textContent = "Buscando o CEP…";
+        try {
+          const r = await buscarCep(d);
+          if (!r) return (cepInfo.textContent = "CEP não encontrado. Preencha à mão.");
+          rua.value = title(r.rua);
+          bai.value = title(r.bairro);
+          cid.value = title(r.cidade);
+          cepInfo.textContent = "✓ Confira e coloque o número.";
+          nro.focus();
+        } catch (_) {
+          cepInfo.textContent = "Não consegui buscar o CEP agora. Preencha à mão.";
+        }
+      });
+      const aviso = el("div", "cad-aviso");
+      s2.append(r2, el("label", "cad-rot", "Telefones (WhatsApp)"), tels, maisTel, avTel, end, aviso);
+      // ---------- 3. O que contratou ----------
+      const s3 = parte(3, "O que contratou", "pode marcar mais de um");
+      const marca = {};
+      const grade = el("div", "cad-ops");
+      OPCOES.filter(([k]) => mods.includes(k)).forEach(([k, ico, t, sub]) => {
+        const b = el("label", "cad-op");
+        const c = el("input");
+        c.type = "checkbox";
+        c.value = k;
+        c.checked = o.modulo === k;
+        b.append(c, el("span", "cad-op-ico", ico), el("b", null, t), el("small", null, sub));
+        marca[k] = c;
+        grade.append(b);
+      });
+      // PR e Paspatur: um ou outro (o aluno troca depois, se precisar)
+      [
+        ["pr", "paspatur"],
+        ["paspatur", "pr"]
+      ].forEach(
+        ([a1, b1]) => marca[a1] && marca[b1] && marca[a1].addEventListener("change", () => marca[a1].checked && (marca[b1].checked = false))
+      );
+      // Linha de Frente ou Repasse (PR, Paspatur e Formatura)
+      const frente = sel(
+        [
+          ["lf", "Linha de Frente (ano atual)"],
+          ["rep", "Repasse (anos anteriores)"]
+        ],
+        Number(o.ano || ANO()) < ANO() ? "rep" : "lf"
+      );
+      frente.setAttribute("aria-label", "Lista");
+      const fFrente = field("Entra na lista", frente);
+      frente.addEventListener("change", () => {
+        if (frente.value === "rep" && Number(ano.value) >= ANO()) ano.value = String(ANO() - 1);
+        if (frente.value === "lf") ano.value = String(ANO());
+        pintar();
+        conferir();
+      });
+      // becas
+      const bTipo = sel(BECAS, "tradPreta", "Escolha a beca"),
+        bTam = sel(TAMANHOS, "", "Tamanho"),
+        bFaixa = sel(FAIXAS, "", "Sem faixa"),
+        bCap = sel(CAPELOS, "", "Sem capelo"),
+        bValor = inpReais("");
+      const bMenos = el("input");
+      bMenos.type = "checkbox";
+      const lMenos = el("label", "chk");
+      lMenos.append(bMenos, document.createTextNode(" Menos longa (P1, M1…)"));
+      const dBecas = el("div", "cad-mod");
+      const rb1 = el("div", "cad-g3"),
+        rb2 = el("div", "cad-g3");
+      rb1.append(field("Beca", bTipo), field("Tamanho", bTam), field("Valor do aluguel", bValor));
+      rb2.append(field("Faixa", bFaixa), field("Capelo", bCap), lMenos);
+      dBecas.append(el("b", null, "👘 Aluguel de becas"), rb1, rb2);
+      s3.append(grade, fFrente, dBecas);
+      const erro = el("p", "err");
+      erro.hidden = true;
+      const acts = el("div", "panel-actions cad-acoes");
+      const bSalvar = U.mkBtn("Salvar", "", () => salvar(false));
+      const bOutro = U.mkBtn("Salvar e cadastrar outro", "btn-primary", () => salvar(true));
+      acts.append(U.mkBtn("Cancelar", "", close), el("span", "flex1"), bSalvar, bOutro);
+      p.append(s1, s2, s3, erro, acts);
+
+      const inst = () => insts.find(i => i.id === sCol.value) || null;
+      const serieTxt = () => (turma.value === "outra" ? turmaOutra.value.trim() : turma.value);
+      const ficha = () => ({
+        inst: inst(),
+        ano: Number(ano.value) || 0,
+        codigo: idDoAluno(ano.value, inst(), num.value),
+        nome: nome.value.trim(),
+        modulos: Object.keys(marca).filter(k => marca[k].checked),
+        becaTipo: bTipo.value
+      });
+      // trava: sem colégio, o resto fica desligado
+      function pintar() {
+        const i = inst();
+        pref.textContent = i ? prefixoId(ano.value, i) : "??-";
+        trava.hidden = !!i;
+        trava.textContent = !grupo
+          ? "🔒 Toque em Particular, Público ou Faculdade / curso para ver os colégios."
+          : "🔒 Escolha o colégio. O resto da ficha fica travado até lá.";
+        novoCol.hidden = !!i;
+        fOutra.hidden = turma.value !== "outra";
+        [s2, s3].forEach(sec => {
+          sec.classList.toggle("cad-travado", !i);
+          sec.querySelectorAll("input, select, button").forEach(x => (x.disabled = !i || (x.type === "checkbox" && x.dataset.ja === "1")));
+        });
+        const m = k => marca[k] && marca[k].checked;
+        dBecas.hidden = !m("becas");
+        fFrente.hidden = !(m("pr") || m("paspatur") || m("formatura"));
+        lMenos.hidden = !COM_MENOS_LONGA.includes(bTipo.value);
+      }
+      // procura o aluno (ID e nome) com uma pausa, para não buscar a cada letra
+      let espera = null;
+      function conferir() {
+        clearTimeout(espera);
+        espera = setTimeout(async () => {
+          const f = ficha();
+          if (!f.inst || (!f.codigo && f.nome.length < 5)) {
+            st.repetido = null;
+            return mostrarAviso(f);
+          }
+          st.achados = await procurar(C, f);
+          st.repetido = conferirRepetido(f, st.achados);
+          mostrarAviso(f);
+        }, 500);
+      }
+      function mostrarAviso(f) {
+        aviso.innerHTML = "";
+        Object.values(marca).forEach(c => {
+          delete c.dataset.ja;
+          c.closest(".cad-op").classList.remove("cad-ja");
+        });
+        const r = st.repetido;
+        if (r && r.idDeOutro)
+          aviso.append(
+            el(
+              "p",
+              "err",
+              `O ID ${f.codigo} já é de ${title(r.idDeOutro.nome)} (${NOMES_MODULO[r.idDeOutro.modulo]}). Confira o número do aluno na escola.`
+            )
+          );
+        else if (r && r.mesmoAluno.length) {
+          const a0 = r.mesmoAluno[0];
+          const onde = [...new Set(r.mesmoAluno.map(x => NOMES_MODULO[x.modulo]))].join(", ");
+          const b = el("div", "notice");
+          b.append(el("span", null, `Já existe ${f.codigo} · ${title(a0.nome)} · ${title(a0.escola)} ${a0.ano || ""} (no ${onde}). `));
+          b.append(
+            U.mkBtn("Usar este aluno", "btn-sm btn-primary", () => {
+              nome.value = title(a0.nome);
+              if (!linhasTel[0].tl.value && a0.tel) linhasTel[0].tl.value = String(a0.tel).replace(/^55/, "");
+              if (!linhasTel[0].nm.value && a0.responsavel) linhasTel[0].nm.value = title(a0.responsavel);
+              U.toast("Dados puxados. Marque o que mais ele contratou.");
+            })
+          );
+          aviso.append(b);
+          // o que ele já tem fica marcado como "já tem" (não cria de novo)
+          r.mesmoAluno.forEach(x => {
+            const c = marca[x.modulo];
+            if (!c) return;
+            c.checked = false;
+            c.dataset.ja = "1";
+            c.closest(".cad-op").classList.add("cad-ja");
+          });
+        } else if (r && r.parecidos.length) {
+          const a0 = r.parecidos[0];
+          aviso.append(
+            el(
+              "p",
+              "wait",
+              `⚠️ Parecido: ${title(a0.nome)}${a0.codigo ? " (ID " + a0.codigo + ")" : ""} · ${title(a0.escola)} · no ${NOMES_MODULO[a0.modulo]}. Se for o mesmo aluno, use o mesmo número do ID.`
+            )
+          );
+        }
+        pintar();
+      }
+      [sCol, ano, turma].forEach(x => x.addEventListener("change", () => (pintar(), conferir())));
+      [num, nome].forEach(x => x.addEventListener("input", conferir));
+      Object.values(marca).forEach(c => c.addEventListener("change", pintar));
+      bTipo.addEventListener("change", pintar);
+      pintar();
+      if (inst()) conferir();
+      setTimeout(() => (inst() ? num : grupo ? sCol : chipsG.querySelector("button")).focus(), 30);
+
+      async function salvar(outro) {
+        erro.hidden = true;
+        const f = ficha();
+        const falta = faltaParaSalvar(f);
+        if (turma.value === "outra" && !turmaOutra.value.trim()) falta.push("a turma");
+        if (falta.length) return mostrarErro("Falta: " + falta.join(", ") + ".");
         st.achados = await procurar(C, f);
         st.repetido = conferirRepetido(f, st.achados);
         mostrarAviso(f);
-      }, 500);
-    };
-    function mostrarAviso(f) {
-      aviso.innerHTML = "";
-      Object.values(marca).forEach(c => {
-        c.disabled = !inst();
-        c.parentNode.title = "";
-      });
-      const r = st.repetido;
-      if (!r) return;
-      if (r.idDeOutro) {
-        aviso.append(
-          el(
-            "p",
-            "err",
-            `O ID ${f.codigo} já é de ${title(r.idDeOutro.nome)} (${NOMES_MODULO[r.idDeOutro.modulo]}). Confira o número do aluno na escola.`
-          )
-        );
-        return;
-      }
-      if (r.mesmoAluno.length) {
-        const a = r.mesmoAluno[0];
-        const onde = [...new Set(r.mesmoAluno.map(x => NOMES_MODULO[x.modulo]))].join(", ");
-        const b = el("div", "notice");
-        b.append(el("span", null, `Já existe ${f.codigo} · ${title(a.nome)} · ${title(a.escola)} ${a.ano || ""} (no ${onde}). `));
-        b.append(
-          U.mkBtn("Usar este aluno", "btn-sm btn-primary", () => {
-            nome.value = title(a.nome);
-            if (!tel.value && a.tel) tel.value = String(a.tel).replace(/^55/, "");
-            if (!resp.value && a.responsavel) resp.value = title(a.responsavel);
-            U.toast("Dados puxados. Marque o que mais ele contratou.");
-          })
-        );
-        aviso.append(b);
-        // o que ele já tem fica marcado e travado (não cria de novo)
-        r.mesmoAluno.forEach(x => {
-          const k = x.modulo === "paspatur" ? "pr" : x.modulo;
-          if (marca[k]) {
-            marca[k].checked = false;
-            marca[k].disabled = true;
-            marca[k].parentNode.title = "Já está no " + NOMES_MODULO[x.modulo];
-          }
-        });
-        pintar();
-        return;
-      }
-      if (r.parecidos.length) {
-        const a = r.parecidos[0];
-        aviso.append(
-          el(
-            "p",
-            "wait",
-            `⚠️ Parecido: ${title(a.nome)}${a.codigo ? " (ID " + a.codigo + ")" : ""} · ${title(a.escola)} · no ${NOMES_MODULO[a.modulo]}. Se for o mesmo aluno, use o mesmo número do ID.`
-          )
-        );
-      }
-    }
-    [sCol, ano].forEach(x => x.addEventListener("change", () => (pintar(), conferir())));
-    [num, nome].forEach(x => x.addEventListener("input", conferir));
-    Object.values(marca).forEach(c => c.addEventListener("change", pintar));
-    bTipo.addEventListener("change", pintar);
-    pintar();
-    if (inst()) conferir();
-    setTimeout(() => (inst() ? num : sCol).focus(), 30);
-
-    async function salvar(outro) {
-      erro.hidden = true;
-      const f = ficha();
-      const falta = faltaParaSalvar(f);
-      if (falta.length) return mostrarErro("Falta: " + falta.join(", ") + ".");
-      // confere de novo agora (alguém pode ter cadastrado enquanto isso)
-      st.achados = await procurar(C, f);
-      st.repetido = conferirRepetido(f, st.achados);
-      mostrarAviso(f);
-      if (st.repetido.idDeOutro) return mostrarErro("Esse número de ID já é de outro aluno. Confira o número.");
-      const ja = new Set(st.repetido.mesmoAluno.map(x => (x.modulo === "paspatur" ? "pr" : x.modulo)));
-      const fazer = f.modulos.filter(k => !ja.has(k));
-      if (!fazer.length) return mostrarErro("Esse aluno já está em tudo o que foi marcado.");
-      bSalvar.disabled = bOutro.disabled = true;
-      const d = {
-        inst: f.inst,
-        ano: f.ano,
-        serie: serie.value.trim(),
-        codigo: f.codigo,
-        nome: f.nome,
-        tel: U.digits(tel.value).replace(/^55(?=\d{10,11}$)/, ""),
-        resp: resp.value.trim(),
-        tipoResp: tipoResp.value
-      };
-      const feitos = [];
-      try {
-        if (fazer.includes("becas"))
-          feitos.push(
-            await criarAluguel(C, d, {
-              becaTipo: bTipo.value,
-              tamanho: bTam.value,
-              menosLonga: COM_MENOS_LONGA.includes(bTipo.value) && bMenos.checked,
-              faixa: bFaixa.value,
-              capelo: bCap.value,
-              valor: lerReais(bValor.value)
-            })
-          );
-        if (fazer.includes("pr")) feitos.push(await criarPR(C, "repasse", d, prKit.value));
-        if (fazer.includes("formatura")) feitos.push(await criarPR(C, "formaturaAlunos", d, ""));
-        await guardarNumero(C, f.ano, f.inst, f.codigo);
-      } catch (e) {
-        bSalvar.disabled = bOutro.disabled = false;
-        if (e && e.aviso) return mostrarErro((feitos.length ? "Gravado em: " + feitos.join(", ") + ". " : "") + e.message);
-        if (feitos.length) U.toast("Gravado em: " + feitos.join(", ") + ". O resto deu erro.");
-        return C.handleErr(e);
-      }
-      // aluno de outra carteira no PR: foi um pedido para o admin (o aviso vem do pedido)
-      const pedido = feitos.find(x => String(x).startsWith("pedido: "));
-      if (pedido) {
-        close();
-        return U.toast(pedido.slice(8));
-      }
-      U.toast(`✅ ${f.codigo} · ${title(f.nome)}: ${feitos.join(", ")}`);
-      close();
-      if (outro)
-        abrirCadastroAluno(C, {
-          instId: f.inst.id,
+        if (st.repetido.idDeOutro) return mostrarErro("Esse número de ID já é de outro aluno. Confira o número.");
+        const ja = new Set(st.repetido.mesmoAluno.map(x => x.modulo));
+        // PR e Paspatur são a mesma lista: se já está em um, não entra no outro
+        if (ja.has("pr") || ja.has("paspatur")) ["pr", "paspatur"].forEach(k => ja.add(k));
+        const fazer = f.modulos.filter(k => !ja.has(k));
+        if (!fazer.length) return mostrarErro("Esse aluno já está em tudo o que foi marcado.");
+        bSalvar.disabled = bOutro.disabled = true;
+        const contatos = linhasTel
+          .map(x => ({ tipo: x.tp.value, nome: x.nm.value.trim(), tel: U.digits(x.tl.value).replace(/^55(?=\d{10,11}$)/, "") }))
+          .filter(x => x.tel.length >= 10 && x.tel.length <= 11);
+        const endereco = [cep, rua, nro, bai, cid].some(x => x.value.trim())
+          ? {
+              cep: cep.value.replace(/\D/g, ""),
+              rua: rua.value.trim(),
+              numero: nro.value.trim(),
+              bairro: bai.value.trim(),
+              cidade: cid.value.trim()
+            }
+          : {};
+        const d = {
+          inst: f.inst,
           ano: f.ano,
-          serie: serie.value.trim(),
-          modulo: f.modulos.length === 1 ? (f.modulos[0] === "pr" ? prKit.value : f.modulos[0]) : o.modulo,
-          numero: String((parseInt(num.value, 10) || 0) + 1).padStart(2, "0")
-        });
-    }
-    function mostrarErro(t) {
-      erro.textContent = t;
-      erro.hidden = false;
-    }
-  });
+          serie: serieTxt(),
+          codigo: f.codigo,
+          nome: f.nome,
+          contatos,
+          tel: (contatos[0] || {}).tel || "",
+          resp: ((contatos.find(c => c.tipo !== "Formando") || {}).nome || "").trim(),
+          endereco,
+          seg: frente.value
+        };
+        const feitos = [];
+        try {
+          if (fazer.includes("becas"))
+            feitos.push(
+              await criarAluguel(C, d, {
+                becaTipo: bTipo.value,
+                tamanho: bTam.value,
+                menosLonga: COM_MENOS_LONGA.includes(bTipo.value) && bMenos.checked,
+                faixa: bFaixa.value,
+                capelo: bCap.value,
+                valor: lerReais(bValor.value)
+              })
+            );
+          if (fazer.includes("pr")) feitos.push(await criarPR(C, "repasse", d, "pr"));
+          if (fazer.includes("paspatur")) feitos.push(await criarPR(C, "repasse", d, "paspatur"));
+          if (fazer.includes("formatura")) feitos.push(await criarPR(C, "formaturaAlunos", d, ""));
+          await guardarNumero(C, f.ano, f.inst, f.codigo);
+        } catch (e) {
+          bSalvar.disabled = bOutro.disabled = false;
+          if (e && e.aviso) return mostrarErro((feitos.length ? "Gravado em: " + feitos.join(", ") + ". " : "") + e.message);
+          if (feitos.length) U.toast("Gravado em: " + feitos.join(", ") + ". O resto deu erro.");
+          return C.handleErr(e);
+        }
+        close();
+        const pedido = feitos.find(x => String(x).startsWith("pedido: "));
+        if (pedido) U.toast(pedido.slice(8));
+        else if (feitos.length) U.toast(`✅ ${f.codigo} · ${title(f.nome)}: ${feitos.join(", ")}`);
+        // venda antecipada: abre a turma do colégio para o kit e as parcelas
+        if (fazer.includes("va")) {
+          const m = await import("./formaturas.js");
+          return m.abrirVendaAntecipada(C, f.inst);
+        }
+        if (outro)
+          abrirCadastroAluno(C, {
+            instId: f.inst.id,
+            ano: f.ano,
+            serie: serieTxt(),
+            modulo: f.modulos.length === 1 ? f.modulos[0] : o.modulo,
+            numero: String((parseInt(num.value, 10) || 0) + 1).padStart(2, "0")
+          });
+      }
+      function mostrarErro(t) {
+        erro.textContent = t;
+        erro.hidden = false;
+      }
+    },
+    { div: true, wide: true }
+  );
 }
 
 // ---------- gravação em cada módulo ----------
@@ -416,7 +555,9 @@ async function criarAluguel(C, d, b) {
     codigo: d.codigo,
     codigoBusca: codigoBusca(d.codigo),
     tel: d.tel,
+    contatos: d.contatos || [],
     responsavel: d.resp,
+    endereco: d.endereco || {},
     becaTipo: b.becaTipo,
     tamanho: b.tamanho,
     menosLonga: !!b.menosLonga,
@@ -449,8 +590,8 @@ async function criarPR(C, colecao, d, kit) {
   const agora = new Date().toISOString(),
     hoje = U.todayStr(),
     ano = d.ano,
-    atual = ano >= ANO();
-  const contatos = d.tel ? [{ tipo: d.resp ? d.tipoResp : "Formando", nome: d.resp || d.nome, tel: d.tel }] : [];
+    atual = d.seg ? d.seg === "lf" : ano >= ANO();
+  const contatos = (d.contatos || []).map(c => ({ tipo: c.tipo, nome: c.nome || (c.tipo === "Formando" ? d.nome : ""), tel: c.tel }));
   const falta = !contatos.length ? ["telefone"] : [];
   const daEquipe = !C.isAdmin,
     meu = daEquipe && !falta.length;
@@ -468,7 +609,7 @@ async function criarPR(C, colecao, d, kit) {
     contatos,
     telefones: contatos.map(c => c.tel),
     dataEnsaio: "",
-    endereco: {},
+    endereco: d.endereco || {},
     obs: "",
     etapa: falta.length ? "INCOMPLETO" : meu ? "SEPARADO" : "NA FILA",
     followup: meu ? hoje : null,
