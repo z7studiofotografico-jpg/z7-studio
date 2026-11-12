@@ -768,3 +768,10 @@ test("Ajuda no cadastro: com a chave ligada, lê todos os colégios para cadastr
   // a própria pessoa não liga a chave
   await assertFails(updateDoc(doc(como(ANA), "usuarios", ANA), { ajudaCadastro: true }));
 });
+
+test("Cadastro automático: a foto da ficha (dados pessoais) só o admin lê e grava", async () => {
+  await assertSucceeds(setDoc(doc(como(ADRIANO), "fichas", "f1"), { escola: "X", ano: 2026, status: "nova", img: "data:" }));
+  await assertSucceeds(setDoc(doc(como(ADRIANO), "fichasPedidos", "X_2026"), { escola: "X", ano: 2026, status: "na fila" }));
+  await assertFails(getDoc(doc(como(PEDRO), "fichas", "f1")));
+  await assertFails(setDoc(doc(como(PEDRO), "fichasPedidos", "Y_2026"), { status: "na fila" }));
+});

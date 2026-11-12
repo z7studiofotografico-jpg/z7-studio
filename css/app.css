@@ -508,3 +508,10 @@ button.lc-linha[aria-expanded="true"]{border-bottom-left-radius:0;border-bottom-
 .fila-topo{display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap}
 .fila-lista{margin-top:6px}
 .fila-aluno{font-size:.88rem;padding:5px 0 5px 10px;border-left:3px solid var(--line,#ddd);margin:3px 0}
+/* 🤖 Cadastro automático: conferência das fichas */
+.ficha-topo{display:flex;justify-content:space-between;align-items:center;gap:10px}
+.ficha-foto{max-width:220px;width:100%;border-radius:8px;cursor:zoom-in;display:block;margin:8px 0}
+.ficha-foto.grande{max-width:100%;cursor:zoom-out}
+.ficha-campos{display:grid;grid-template-columns:repeat(auto-fill,minmax(170px,1fr));gap:6px 10px}
+.ficha-campos .duvida input{border-color:var(--warn);background:color-mix(in srgb,var(--warn) 12%,transparent)}
+@media(min-width:900px){.ficha-conf{display:grid;grid-template-columns:260px 1fr;gap:12px}.ficha-conf .ficha-topo,.ficha-conf>.hint{grid-column:1/-1}}

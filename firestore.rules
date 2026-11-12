@@ -171,6 +171,13 @@ service cloud.firestore {
     // Link da prévia no site (z7studio.com.br/previa/?c=…): o código aleatório é o id. Quem tem o link lê só aquele
     // documento (sem login, ninguém lista a coleção). A equipe cria e atualiza (sem mexer nas contagens); a página do
     // site, sem login, só soma +1 em "vistos" (abriu) ou em "cliques" (tocou no WhatsApp), com a hora do servidor.
+    // 🤖 Cadastro automático: fotos das fichas (dados pessoais) e pedidos de leitura, só o admin
+    match /fichas/{f} {
+      allow read, write: if admin();
+    }
+    match /fichasPedidos/{g} {
+      allow read, write: if admin();
+    }
     match /previasSite/{c} {
       function linkOk(d) {
         return d.nome is string && d.nome.size() <= 80 && d.escola is string && d.escola.size() <= 120

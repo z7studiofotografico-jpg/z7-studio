@@ -279,7 +279,17 @@ export function abrirPreviasLote(C, o = {}) {
     semTel.type = "checkbox";
     const lSem = el("label", "chk");
     lSem.append(semTel, document.createTextNode(" Pular também quem está sem telefone"));
-    if (!livre) p.append(lTrab, lSem);
+    // 🤖 Cadastro automático: a 1ª foto de cada aluno é a ficha preenchida; fica guardada (só o admin vê) para o
+    // Claude ler e não entra na prévia do cliente
+    const ficha = el("input");
+    ficha.type = "checkbox";
+    ficha.checked = !livre;
+    const lFicha = el("label", "chk");
+    lFicha.append(
+      ficha,
+      document.createTextNode(" A 1ª foto de cada aluno é a ficha (guardar para o 🤖 Cadastro automático e tirar da prévia)")
+    );
+    if (!livre) p.append(lTrab, lSem, lFicha);
     else separadas.parentNode.lastChild.textContent = " Também salvar as fotos separadas (com o mesmo nome do arquivo original)";
     // Importação: colégio e turma (vão no cabeçalho da folha) e, se quiser, as fotos individuais também
     const iCol = el("input"),
@@ -484,6 +494,24 @@ export function abrirPreviasLote(C, o = {}) {
           }
           if (!alunos.length) return (info.textContent = "Todos os alunos dessa pasta já compraram: nada a gerar." + resumoFora);
         }
+        // a ficha (1ª foto) sai da prévia e vai para o Cadastro automático, no colégio do app
+        let escolaApp = col.nome;
+        if (!livre && ficha.checked) {
+          alunos.forEach(a => {
+            if (a.arquivos.length > 1 && !a.ficha) {
+              a.ficha = a.arquivos[0];
+              a.arquivos = a.arquivos.slice(1);
+            }
+          });
+          try {
+            const doApp = await alunosDoColegio(C, colNome, col);
+            const conta = {};
+            doApp.forEach(x => (conta[x.escola] = (conta[x.escola] || 0) + 1));
+            escolaApp = Object.keys(conta).sort((a, b) => conta[b] - conta[a])[0] || col.nome;
+          } catch (e) {
+            console.warn("[Z7] fichas: colégio no app", e);
+          }
+        }
         info.textContent = `${alunos.length} aluno${alunos.length > 1 ? "s" : ""} para trabalhar em “${origem.name}”.${resumoFora} Agora escolha onde salvar as prévias.`;
         destino = await window.showDirectoryPicker({ id: "z7-previas", mode: "readwrite" });
         // salvar dentro da pasta das fotos mistura as prévias com as fotos (na próxima vez elas viram "alunos")
@@ -509,7 +537,17 @@ export function abrirPreviasLote(C, o = {}) {
           conta.total += a.arquivos.length;
           conta.acima += Math.max(0, a.arquivos.length - (a.max || MAX_FOTOS));
         });
+        let fichasOk = 0;
         const fazer = async (a, i) => {
+          if (a.ficha && !a.fichaOk)
+            try {
+              const { guardarFicha } = await import("./fichas.js");
+              await guardarFicha(C, { escola: escolaApp, ano: col.ano, colNome, pasta: a.nome, file: await a.ficha.getFile() });
+              a.fichaOk = true;
+              fichasOk++;
+            } catch (e) {
+              console.warn("[Z7] ficha de", a.nome, e);
+            }
           const fotos = [],
             nomesFotos = [];
           a.erros = [];
@@ -672,6 +710,7 @@ export function abrirPreviasLote(C, o = {}) {
           resumoFora +
           " " +
           resumoFotos() +
+          (fichasOk ? ` 🤖 ${fichasOk} fichas guardadas para o Cadastro automático.` : "") +
           (falharam.length ? ` ⚠️ ${falharam.length} aluno${falharam.length > 1 ? "s" : ""} com foto que não saiu (motivo abaixo).` : "") +
           (livre
             ? " As prévias ficam só no seu computador, nessa pasta: é só mandar pelo WhatsApp para quem vai vender."

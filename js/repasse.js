@@ -201,6 +201,9 @@ function mount() {
       U.mkBtn("🗂️ Prévias de um colégio", "", () =>
         import("./previas-lote.js").then(m => m.abrirPreviasLote(C, { col: colNome() })).catch(e => C.handleErr(e))
       ),
+      U.mkBtn("🤖 Cadastro automático", "", () =>
+        import("./fichas.js").then(m => m.abrirCadastroAutomatico(C, colNome())).catch(e => C.handleErr(e))
+      ),
       // quem está sem prévia no Drive: já comprou (normal) × falta gerar (com o "📤 Enviar foto")
       U.mkBtn("🔎 Conferir fotos", "", () =>
         import("./conferir-fotos.js").then(m => m.abrirConferirFotos(C, colNome())).catch(e => C.handleErr(e))

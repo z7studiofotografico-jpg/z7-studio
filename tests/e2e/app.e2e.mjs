@@ -339,6 +339,17 @@ const base = {
     pedidoPor: "Pedro Vendedor"
   }
 };
+// 🤖 Cadastro automático: uma ficha já lida pelo Claude, esperando a conferência (sem número na ficha)
+base["fichas/ficha1"] = {
+  escola: "COLEGIO ALFA",
+  ano: hoje.getFullYear(),
+  colNome: "repasse",
+  pasta: "26 -CA- 031 - GUSTAVO FICHA",
+  img: "data:image/gif;base64,R0lGODlhAQABAAAAACw=",
+  status: "lida",
+  lido: { numero: "CIEP 433", nome: "Gustavo Ficha", celAluno: "97356-6011", mae: "Solange", celMae: "21 96754-4923", turma: "3007", bairro: "Inhoaíba" },
+  duvidas: ["rua"]
+};
 // fila da Linha de Frente: 30 contatos para separar
 for (let i = 0; i < 30; i++)
   base["repasse/fila" + String(i).padStart(2, "0")] = {
@@ -1030,6 +1041,22 @@ await cenario("Adriano (admin), com os dados já atualizados no servidor", async
       "Na fila: abre por colégio com Passar o colégio inteiro"
     );
     await fila.getByRole("button", { name: "Fechar" }).click();
+    // 🤖 Cadastro automático: conferir a ficha lida e confirmar (sem número na ficha → o menor número livre)
+    await pg.getByRole("button", { name: "🤖 Cadastro automático" }).click();
+    const ca = pg.locator(".sheet").filter({ hasText: "🤖 Cadastro automático" });
+    await ca.getByRole("button", { name: /Conferir \(1\)/ }).click();
+    const cf = pg.locator(".sheet").filter({ hasText: "Conferir fichas" });
+    await cf.getByText("Sem número na ficha").waitFor({ timeout: 8000 });
+    await cf.getByRole("button", { name: "✔ Confirmar" }).click();
+    await cf.getByText(/cadastro novo/).waitFor({ timeout: 8000 });
+    s = await store();
+    const gus = Object.values(s).find(x => x && x.nome === "GUSTAVO FICHA");
+    ok(
+      gus && gus.codigo === String(hoje.getFullYear()).slice(2) + "CA-31" && gus.contatos.length === 2 && gus.contatos[0].tel === "21973566011" && !s["fichas/ficha1"],
+      "Cadastro automático: confirma a ficha, ID com o menor número livre, telefones certos e a foto da ficha apagada"
+    );
+    await cf.getByRole("button", { name: "Fechar" }).click();
+    await ca.getByRole("button", { name: "Fechar" }).click().catch(() => {});
     await pg.locator("#rChips").getByText("A conferir").click();
     await calmo(pg);
     await pg.locator(".card").filter({ hasText: "Bruno" }).getByRole("button", { name: "✔ Conferir venda" }).click();
