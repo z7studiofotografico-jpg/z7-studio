@@ -6,7 +6,6 @@
 // cada aba busca só o que precisa (hoje, interessados, pagos, busca).
 // Partes: repasse-estado.js (estado e regras do contato), repasse-mensagens.js (textos), repasse-cartao.js (cartão),
 // repasse-janelas.js (venda, entrega, notas), repasse-form.js (dados e "+ Aluno"), repasse-lote.js (números e lote).
-import { openMockup } from "./mockup.js";
 import { el, title, emPartes, clicavel } from "./ui.js";
 import * as U from "./util.js";
 import { norm, situacaoTxt } from "./repasse-dados.js";
@@ -37,7 +36,6 @@ import {
   baseLF,
   noSeg,
   status,
-  precoTxt,
   tipoPR,
   mudarTipoPR,
   filtroVenda,
@@ -196,12 +194,7 @@ function mount() {
         .catch(e => C.handleErr(e))
     )
   );
-  // "Só Paspatur" aberto: a prévia já sai como o livro do Kit Paspatur
-  hb.append(
-    U.mkBtn("🖼️ Prévia e fotos", "", () =>
-      openMockup({ preco: precoTxt(), toast: U.toast, kit: !ehFormatura() && filtroVenda === "paspatur" ? "paspatur" : "pr" })
-    )
-  );
+  // (11/11/2026: o botão "Prévia e fotos" do topo saiu: a prévia é feita na janela de cada aluno)
   // admin, no computador: prévias leves com marca d'água de um colégio inteiro (para o representante)
   if (C.isAdmin)
     hb.append(

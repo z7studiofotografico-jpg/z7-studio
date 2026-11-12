@@ -57,7 +57,27 @@ export const moduloPR = d => (d && d.vendaComo === "paspatur" ? "paspatur" : "pr
 export function linhasPlanilha(lista, campos) {
   return [campos.map(([, t]) => t), ...lista.map(x => campos.map(([k]) => valorCampo(x, k)))];
 }
+// contatos em colunas separadas: "c:Mãe:nome", "c:Mãe:tel" (Formando = o aluno; o 1º de cada tipo)
+const contatoDe = (x, tipo) => {
+  const cs = Array.isArray(x.contatos) ? x.contatos : [];
+  const c = cs.find(y => y && y.tipo === tipo);
+  if (c) return c;
+  // aluguel antigo: só o WhatsApp e o responsável
+  if (tipo === "Formando" && !cs.length && x.tel) return { nome: x.nome, tel: x.tel };
+  if (tipo === "Responsável" && !cs.length && x.responsavel) return { nome: x.responsavel, tel: "" };
+  return null;
+};
+export const COLUNAS_CONTATOS = ["Mãe", "Pai", "Formando", "Responsável"].flatMap(t => [
+  [`c:${t}:nome`, t === "Formando" ? "Aluno (contato)" : t],
+  [`c:${t}:tel`, "Telefone " + (t === "Formando" ? "do aluno" : t === "Mãe" ? "da mãe" : t === "Pai" ? "do pai" : "do responsável")]
+]);
 function valorCampo(x, k) {
+  if (k.startsWith("c:")) {
+    const [, tipo, campo] = k.split(":");
+    const c = contatoDe(x, tipo);
+    return c ? c[campo] || "" : "";
+  }
+  if (k === "vendaComo") return x.vendaComo === "paspatur" ? "Paspatur" : "PR";
   const v = k.split(".").reduce((o, p) => (o && o[p] != null ? o[p] : ""), x);
   if (Array.isArray(v)) return v.map(y => (y && typeof y === "object" ? [y.tipo, y.nome, y.tel].filter(Boolean).join(" ") : y)).join("; ");
   if (v && typeof v === "object") return JSON.stringify(v);

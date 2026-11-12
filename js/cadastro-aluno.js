@@ -8,7 +8,16 @@ import * as U from "./util.js";
 import { lerReais } from "./regras.js";
 import { codigoBusca } from "./aluno-id.js";
 import { BECAS, TAMANHOS, FAIXAS, CAPELOS, COM_MENOS_LONGA } from "./becas-estoque.js";
-import { prefixoId, idDoAluno, faltaParaSalvar, conferirRepetido, NOMES_MODULO, moduloPR, siglaDoColegio } from "./cadastro-regras.js";
+import {
+  COLUNAS_CONTATOS,
+  prefixoId,
+  idDoAluno,
+  faltaParaSalvar,
+  conferirRepetido,
+  NOMES_MODULO,
+  moduloPR,
+  siglaDoColegio
+} from "./cadastro-regras.js";
 
 const ANO = () => new Date().getFullYear();
 // quais módulos a pessoa pode cadastrar
@@ -684,8 +693,7 @@ export const CAMPOS_ALUGUEL = [
   ["instNome", "Colégio"],
   ["ano", "Ano"],
   ["serie", "Série"],
-  ["tel", "WhatsApp"],
-  ["responsavel", "Responsável"],
+  ...COLUNAS_CONTATOS,
   ["becaTipo", "Beca"],
   ["tamanho", "Tamanho"],
   ["faixa", "Faixa"],
@@ -702,7 +710,7 @@ export const CAMPOS_PR = [
   ["escola", "Colégio"],
   ["ano", "Ano"],
   ["turma", "Turma"],
-  ["contatos", "Contatos"],
+  ...COLUNAS_CONTATOS,
   ["vendaComo", "Kit"],
   ["etapa", "Etapa"],
   ["resp", "Responsável na equipe"],
