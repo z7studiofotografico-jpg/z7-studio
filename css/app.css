@@ -515,3 +515,8 @@ button.lc-linha[aria-expanded="true"]{border-bottom-left-radius:0;border-bottom-
 .ficha-campos{display:grid;grid-template-columns:repeat(auto-fill,minmax(170px,1fr));gap:6px 10px}
 .ficha-campos .duvida input{border-color:var(--warn);background:color-mix(in srgb,var(--warn) 12%,transparent)}
 @media(min-width:900px){.ficha-conf{display:grid;grid-template-columns:260px 1fr;gap:12px}.ficha-conf .ficha-topo,.ficha-conf>.hint{grid-column:1/-1}}
+/* janela do representante */
+.pessoa-topo{display:flex;flex-direction:column;gap:6px}
+.pessoa-busca{width:100%}
+.pessoa-chips{flex-wrap:wrap}
+.pessoa-paginas{display:flex;justify-content:space-between;align-items:center;gap:8px;margin:8px 0}

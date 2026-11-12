@@ -347,7 +347,15 @@ base["fichas/ficha1"] = {
   pasta: "26 -CA- 031 - GUSTAVO FICHA",
   img: "data:image/gif;base64,R0lGODlhAQABAAAAACw=",
   status: "lida",
-  lido: { numero: "CIEP 433", nome: "Gustavo Ficha", celAluno: "97356-6011", mae: "Solange", celMae: "21 96754-4923", turma: "3007", bairro: "Inhoaíba" },
+  lido: {
+    numero: "CIEP 433",
+    nome: "Gustavo Ficha",
+    celAluno: "97356-6011",
+    mae: "Solange",
+    celMae: "21 96754-4923",
+    turma: "3007",
+    bairro: "Inhoaíba"
+  },
   duvidas: ["rua"]
 };
 // fila da Linha de Frente: 30 contatos para separar
@@ -1052,11 +1060,18 @@ await cenario("Adriano (admin), com os dados já atualizados no servidor", async
     s = await store();
     const gus = Object.values(s).find(x => x && x.nome === "GUSTAVO FICHA");
     ok(
-      gus && gus.codigo === String(hoje.getFullYear()).slice(2) + "CA-31" && gus.contatos.length === 2 && gus.contatos[0].tel === "21973566011" && !s["fichas/ficha1"],
+      gus &&
+        gus.codigo === String(hoje.getFullYear()).slice(2) + "CA-31" &&
+        gus.contatos.length === 2 &&
+        gus.contatos[0].tel === "21973566011" &&
+        !s["fichas/ficha1"],
       "Cadastro automático: confirma a ficha, ID com o menor número livre, telefones certos e a foto da ficha apagada"
     );
     await cf.getByRole("button", { name: "Fechar" }).click();
-    await ca.getByRole("button", { name: "Fechar" }).click().catch(() => {});
+    await ca
+      .getByRole("button", { name: "Fechar" })
+      .click()
+      .catch(() => {});
     await pg.locator("#rChips").getByText("A conferir").click();
     await calmo(pg);
     await pg.locator(".card").filter({ hasText: "Bruno" }).getByRole("button", { name: "✔ Conferir venda" }).click();
@@ -2754,9 +2769,20 @@ await cenario("Para hoje de cada um · botão da pessoa · atividades da equipe"
   const [, nh, nt] = lista.match(/(\d+) para hoje · (\d+) a trabalhar/) || [];
   ok(nChip >= 2 && nChip === Number(nh) + Number(nt), "botão da pessoa com quantos alunos ela tem em andamento");
   ok(
-    /Para hoje de Pedro/.test(lista) && /A trabalhar \(/.test(lista) && /Caídos \(1\)/.test(lista) && /Do Pedro Depois/i.test(lista),
-    "botão da pessoa: para hoje, a trabalhar e caídos dela"
+    /Para hoje \(1\)/.test(lista) && /A trabalhar \(\d+\)/.test(lista) && /Caídos \(1\)/.test(lista) && /Do Pedro Hoje/i.test(lista),
+    "janela da pessoa: as etapas com os números, abre no Para hoje"
   );
+  // outra etapa: por colégio; a busca procura em todos os alunos dela
+  await pg.locator("#rList .pessoa-chips .chip", { hasText: "A trabalhar" }).click();
+  await calmo(pg);
+  lista = await pg.textContent("#rList");
+  ok(
+    /NUTA \(1\)/.test(lista) && /Do Pedro Depois/i.test(lista) && !/Do Pedro Hoje/i.test(lista),
+    "A trabalhar da pessoa, agrupado por colégio"
+  );
+  await pg.locator("#rList .pessoa-busca").fill("caido");
+  await calmo(pg);
+  ok(/Do Pedro Caido/i.test(await pg.textContent("#rList")), "a busca da pessoa acha em qualquer etapa");
   ok(!erros.length, "sem erros (admin)" + (erros.length ? ": " + erros.join(" | ") : ""));
   // equipe: A trabalhar → Trabalhar hoje; vira atividade para o admin
   ({ pg, erros, store } = await abrir(PEDRO, dados));
@@ -3855,7 +3881,10 @@ await cenario("Formaturas · abas Linha de Frente / Repasse / Venda Antecipada, 
     /Preço da Formatura \(Linha de Frente\) em branco/.test(await pg.textContent("#viewFormaturas")),
     "preço da Formatura em branco: avisa (não usa o preço do PR)"
   );
-  ok(!(await pg.getByRole("button", { name: "🖼️ Prévia e fotos" }).isVisible()), "Formatura: sem o Prévia e fotos no topo (fica na janela do aluno)");
+  ok(
+    !(await pg.getByRole("button", { name: "🖼️ Prévia e fotos" }).isVisible()),
+    "Formatura: sem o Prévia e fotos no topo (fica na janela do aluno)"
+  );
   const larg = await pg.evaluate(() => {
     const v = document.querySelector("#viewFormaturas");
     const r = v.getBoundingClientRect();
@@ -4290,7 +4319,8 @@ await cenario("➕ Cadastrar aluno: colégio primeiro, ID obrigatório, um aluno
   await fv.getByLabel("Nome").first().waitFor({ timeout: 8000 });
   ok(
     /Carla Antecipada/i.test(await fv.locator("input").first().inputValue()) &&
-      (await fv.locator("input[placeholder*='automático'], input[placeholder*='26']").first().inputValue()) === String(Y).slice(2) + "CA-42",
+      (await fv.locator("input[placeholder*='automático'], input[placeholder*='26']").first().inputValue()) ===
+        String(Y).slice(2) + "CA-42",
     "venda antecipada abre já preenchida (nome e ID)"
   );
   ok(!erros.length, "sem erros" + (erros.length ? ": " + erros.join(" | ") : ""));

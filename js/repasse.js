@@ -54,7 +54,8 @@ import {
   pessoaAberta,
   mudarPessoaAberta
 } from "./repasse-estado.js";
-import { botoesEquipe, renderTrabalhar, renderEquipe, recontarEquipe, ouvirJuntas, emAndamento } from "./repasse-equipe.js";
+import { botoesEquipe, renderTrabalhar, recontarEquipe, ouvirJuntas, emAndamento } from "./repasse-equipe.js";
+import { renderPessoa } from "./pessoa-janela.js";
 import { consultaDaAba, LIMITE_ENTREGUES } from "./repasse-consultas.js";
 // Entregues (admin): 300 por vez; "Ver todos" lê até 5.000 (gasta leitura do Firebase)
 let verTodosEntregues = false;
@@ -702,6 +703,8 @@ function renderList(loading, emptyMsg) {
     }
     list.append(box);
   }
+  // a pessoa (admin): etapas com números, por colégio, 50 por página (pessoa-janela.js)
+  if (tab === "equipe") return renderPessoa(list, arr, linha);
   if (!arr.length) {
     const e = el("div", "empty");
     e.style.gridColumn = "1/-1";
@@ -726,7 +729,6 @@ function renderList(loading, emptyMsg) {
     return;
   }
   if (tab === "trabalhar") return renderTrabalhar(list, arr, linha);
-  if (tab === "equipe") return renderEquipe(list, arr, linha);
   if (tab === "hoje") {
     const rank = { late: 0, today: 1, later: 2, none: 3, won: 4 };
     arr.sort((a, b) => rank[status(a)] - rank[status(b)] || (a.followup || "").localeCompare(b.followup || ""));

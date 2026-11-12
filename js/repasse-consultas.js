@@ -2,6 +2,7 @@
 // A equipe vê só os contatos dela (soMinha); a busca continua mostrando todos, para achar o aluno.
 import { C, FS, col, seg, ABERTAS, baseLF, baseSeg, soMinha, ehFormatura, pessoaAberta } from "./repasse-estado.js";
 import { emAndamento } from "./repasse-equipe.js";
+import { consultaPessoa } from "./pessoa-janela.js";
 import * as U from "./util.js";
 
 export const LIMITE_ENTREGUES = 300;
@@ -12,9 +13,11 @@ export function consultaDaAba(k, todosEntregues = false) {
   const today = U.todayStr();
   let q = null;
   if (k === "trabalhar") q = emAndamento(C.email || "");
-  if (k === "equipe" && C.isAdmin && pessoaAberta.email) q = emAndamento(pessoaAberta.email, [...ABERTAS, "CAÍDO"]);
+  if (k === "equipe" && C.isAdmin && pessoaAberta.email) q = consultaPessoa(pessoaAberta.email);
   if (seg === "lf") {
-    if (k === "hoje") q = FS.query(col, ...baseLF(), ...soMinha(), FS.where("etapa", "in", ABERTAS), FS.limit(300));
+    // admin: lê os em andamento de todos e mostra só os dele e os sem responsável (aluno antigo pode não ter o
+    // campo respEmail, então não dá para filtrar no Firebase); com a equipe toda trabalhando passa de 300
+    if (k === "hoje") q = FS.query(col, ...baseLF(), ...soMinha(), FS.where("etapa", "in", ABERTAS), FS.limit(C.isAdmin ? 3000 : 300));
     if (k === "interessados") q = FS.query(col, ...baseLF(), ...soMinha(), FS.where("etapa", "==", "INTERESSADO"), FS.limit(200));
     if (k === "entregas") q = FS.query(col, ...baseLF(), ...soMinha(), FS.where("etapa", "==", "PAGO"), FS.limit(300));
   } else {
