@@ -291,7 +291,13 @@ export function abrirPreviasLote(C, o = {}) {
       ficha,
       document.createTextNode(" A 1ª foto de cada aluno é a ficha (guardar para o 🤖 Cadastro automático e tirar da prévia)")
     );
-    if (!livre) p.append(lTrab, lSem, lFicha);
+    // só as fichas (sem gerar as prévias de novo): para guardar as fichas de um colégio que já tem as prévias prontas
+    const soFichas = el("input");
+    soFichas.type = "checkbox";
+    const lSoF = el("label", "chk");
+    lSoF.append(soFichas, document.createTextNode(" Só guardar as fichas (as prévias desse colégio já estão prontas)"));
+    soFichas.onchange = () => soFichas.checked && (ficha.checked = true);
+    if (!livre) p.append(lTrab, lSem, lFicha, lSoF);
     else separadas.parentNode.lastChild.textContent = " Também salvar as fotos separadas (com o mesmo nome do arquivo original)";
     // Importação: colégio e turma (vão no cabeçalho da folha) e, se quiser, as fotos individuais também
     const iCol = el("input"),
@@ -511,12 +517,6 @@ export function abrirPreviasLote(C, o = {}) {
         // a ficha (1ª foto) sai da prévia e vai para o Cadastro automático, no colégio do app
         let escolaApp = col.nome;
         if (!livre && ficha.checked) {
-          alunos.forEach(a => {
-            if (a.arquivos.length > 1 && !a.ficha) {
-              a.ficha = a.arquivos[0];
-              a.arquivos = a.arquivos.slice(1);
-            }
-          });
           try {
             const doApp = await alunosDoColegio(C, colNome, col);
             const conta = {};
@@ -525,6 +525,25 @@ export function abrirPreviasLote(C, o = {}) {
           } catch (e) {
             console.warn("[Z7] fichas: colégio no app", e);
           }
+        }
+        // só as fichas: guarda e termina (não pede a pasta de destino)
+        if (!livre && soFichas.checked) {
+          const { guardarFicha } = await import("./fichas.js");
+          barra.hidden = false;
+          barra.max = alunos.length;
+          let ok = 0;
+          for (const [i, a] of alunos.entries()) {
+            info.textContent = `Ficha ${i + 1} de ${alunos.length}: ${a.nome}…`;
+            try {
+              await guardarFicha(C, { escola: escolaApp, ano: col.ano, colNome, pasta: a.nome, arquivos: a.arquivos });
+              ok++;
+            } catch (e) {
+              console.warn("[Z7] ficha de", a.nome, e);
+            }
+            barra.value = i + 1;
+          }
+          info.textContent = `Pronto! 🤖 ${ok} de ${alunos.length} fichas guardadas para o Cadastro automático.`;
+          return;
         }
         info.textContent = `${alunos.length} aluno${alunos.length > 1 ? "s" : ""} para trabalhar em “${origem.name}”.${resumoFora} Agora escolha onde salvar as prévias.`;
         destino = await window.showDirectoryPicker({ id: "z7-previas", mode: "readwrite" });
@@ -553,10 +572,12 @@ export function abrirPreviasLote(C, o = {}) {
         });
         let fichasOk = 0;
         const fazer = async (a, i) => {
-          if (a.ficha && !a.fichaOk)
+          // a ficha (o app acha o papel nas primeiras fotos) sai da prévia e vai para o Cadastro automático
+          if (!livre && ficha.checked && !a.fichaOk && a.arquivos.length > 1)
             try {
               const { guardarFicha } = await import("./fichas.js");
-              await guardarFicha(C, { escola: escolaApp, ano: col.ano, colNome, pasta: a.nome, file: await a.ficha.getFile() });
+              const usada = await guardarFicha(C, { escola: escolaApp, ano: col.ano, colNome, pasta: a.nome, arquivos: a.arquivos });
+              a.arquivos = a.arquivos.filter(h => h !== usada);
               a.fichaOk = true;
               fichasOk++;
             } catch (e) {

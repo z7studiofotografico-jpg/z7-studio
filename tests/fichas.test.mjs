@@ -25,3 +25,29 @@ test("fichas: telefone com DDD 21 quando vem sem; contatos com telefone", () => 
   );
   assert.equal(chaveGrupo("CIEP 433 - Togo", 2026), "CIEP-433-TOGO_2026");
 });
+
+test("fichas: acha o papel branco (ficha) na foto e ignora a renda da beca", async () => {
+  const { acharPapel, ordemFicha } = await import("../js/fichas.js");
+  const w = 100,
+    h = 150,
+    d = new Uint8ClampedArray(w * h * 4);
+  const pinta = (x0, y0, x1, y1, v, xadrez = false) => {
+    for (let y = y0; y < y1; y++)
+      for (let x = x0; x < x1; x++) {
+        const i = (y * w + x) * 4;
+        const c = xadrez && (x + y) % 2 ? 20 : v;
+        d[i] = d[i + 1] = d[i + 2] = c;
+        d[i + 3] = 255;
+      }
+  };
+  pinta(0, 0, w, h, 20); // beca preta
+  pinta(40, 20, 60, 60, 240, true); // renda: branca mas vazada
+  pinta(30, 70, 70, 130, 235); // a ficha
+  pinta(35, 90, 65, 91, 40); // uma linha escrita
+  const p = acharPapel(d, w, h);
+  assert.ok(p && p.x0 === 30 && p.y0 === 70 && p.x1 === 69 && p.y1 === 129, JSON.stringify(p));
+  pinta(30, 70, 70, 130, 20);
+  assert.equal(acharPapel(d, w, h), null); // sem ficha
+  assert.deepEqual(ordemFicha(["A (2).jpg", "A (3).jpg", "A.JPG"]), [2, 0, 1]);
+  assert.deepEqual(ordemFicha(["A (2).JPG", "A (1).JPG"]), [1, 0]);
+});

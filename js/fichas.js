@@ -30,45 +30,140 @@ export const chaveGrupo = (escola, ano) => U.chave(escola).replace(/[^A-Z0-9]+/g
 const idFicha = (escola, ano, pasta) => (chaveGrupo(escola, ano) + "_" + U.chave(pasta).replace(/[^A-Z0-9]+/g, "-")).slice(0, 140);
 
 // ---------- 1. Prévias de um colégio: guarda a foto da ficha ----------
-async function fotoParaTexto(file) {
+// A ficha ocupa só um pedaço da foto (o aluno segura o papel na frente do corpo): o app acha o papel branco e guarda
+// só ele, em alta resolução (12/11/2026: guardando a foto inteira em 1600 px, os telefones ficavam ilegíveis).
+// data = pixels RGBA de uma miniatura w × h; devolve a caixa do papel (em pixels da miniatura) ou null
+export function acharPapel(data, w, h) {
+  const branco = new Uint8Array(w * h);
+  for (let i = 0; i < w * h; i++) {
+    const r = data[i * 4],
+      g = data[i * 4 + 1],
+      b = data[i * 4 + 2];
+    const mn = Math.min(r, g, b),
+      mx = Math.max(r, g, b);
+    branco[i] = mn > 150 && mx - mn < 45 ? 1 : 0;
+  }
+  const visto = new Uint8Array(w * h);
+  let melhor = null;
+  for (let s0 = 0; s0 < w * h; s0++) {
+    if (!branco[s0] || visto[s0]) continue;
+    let x0 = w,
+      y0 = h,
+      x1 = 0,
+      y1 = 0,
+      n = 0;
+    const pilha = [s0];
+    visto[s0] = 1;
+    while (pilha.length) {
+      const p = pilha.pop();
+      n++;
+      const x = p % w,
+        y = (p / w) | 0;
+      if (x < x0) x0 = x;
+      if (x > x1) x1 = x;
+      if (y < y0) y0 = y;
+      if (y > y1) y1 = y;
+      for (const q of [x > 0 ? p - 1 : -1, x < w - 1 ? p + 1 : -1, p - w, p + w])
+        if (q >= 0 && q < w * h && branco[q] && !visto[q]) {
+          visto[q] = 1;
+          pilha.push(q);
+        }
+    }
+    const bw = x1 - x0 + 1,
+      bh = y1 - y0 + 1,
+      cheio = n / (bw * bh),
+      prop = bh / bw;
+    // papel: grande, quase todo branco (a renda da beca é branca mas vazada) e em pé
+    if (n < w * h * 0.02 || cheio < 0.6 || prop < 0.9 || prop > 2.2) continue;
+    if (!melhor || n * cheio > melhor.nota) melhor = { x0, y0, x1, y1, nota: n * cheio };
+  }
+  return melhor;
+}
+// ordem para procurar a ficha: o arquivo sem número, depois (1), (2)… ou _1, _2…
+export function ordemFicha(nomes) {
+  const num = n => {
+    const m = String(n).match(/(?:\((\d+)\)|_(\d+))\s*\.[a-z]+$/i);
+    return m ? Number(m[1] || m[2]) : 0;
+  };
+  return nomes
+    .map((n, i) => [n, i])
+    .sort((a, b) => num(a[0]) - num(b[0]) || a[1] - b[1])
+    .map(x => x[1]);
+}
+async function abrirImagem(file) {
   const url = URL.createObjectURL(file);
   try {
-    const img = await new Promise((res, rej) => {
-      const i = new Image();
-      i.onload = () => res(i);
-      i.onerror = rej;
-      i.src = url;
-    });
-    const r = Math.min(1, LADO / Math.max(img.width, img.height));
-    const c = document.createElement("canvas");
-    c.width = Math.round(img.width * r);
-    c.height = Math.round(img.height * r);
-    c.getContext("2d").drawImage(img, 0, 0, c.width, c.height);
-    // o documento do Firebase cabe até 1 MB: baixa a qualidade se precisar
-    for (const q of [0.85, 0.75, 0.6]) {
-      const d = c.toDataURL("image/jpeg", q);
-      if (d.length < 900000) return d;
-    }
-    return c.toDataURL("image/jpeg", 0.5);
+    const img = new Image();
+    img.src = url;
+    await img.decode();
+    return img;
   } finally {
-    URL.revokeObjectURL(url);
+    setTimeout(() => URL.revokeObjectURL(url), 1000);
   }
 }
-export async function guardarFicha(C, { escola, ano, colNome, pasta, file }) {
+const paraTexto = c => {
+  // o documento do Firebase cabe até 1 MB: baixa a qualidade se precisar
+  for (const q of [0.85, 0.75, 0.6]) {
+    const d = c.toDataURL("image/jpeg", q);
+    if (d.length < 900000) return d;
+  }
+  return c.toDataURL("image/jpeg", 0.5);
+};
+// { img (dataURL), achou } da foto: só o papel (com margem), até 1800 px; sem papel, a foto inteira em 1600 px
+export async function fotoDaFicha(file) {
+  const img = await abrirImagem(file);
+  const W = 200,
+    H = Math.round((img.height * W) / img.width);
+  const mini = document.createElement("canvas");
+  mini.width = W;
+  mini.height = H;
+  const mx = mini.getContext("2d", { willReadFrequently: true });
+  mx.drawImage(img, 0, 0, W, H);
+  const p = acharPapel(mx.getImageData(0, 0, W, H).data, W, H);
+  const k = img.width / W;
+  const box = p
+    ? (() => {
+        const m = 0.04 * Math.max(p.x1 - p.x0, p.y1 - p.y0);
+        const x0 = Math.max(0, (p.x0 - m) * k),
+          y0 = Math.max(0, (p.y0 - m) * k);
+        return [x0, y0, Math.min(img.width, (p.x1 + 1 + m) * k) - x0, Math.min(img.height, (p.y1 + 1 + m) * k) - y0];
+      })()
+    : [0, 0, img.width, img.height];
+  const lado = p ? 1800 : LADO;
+  const r = Math.min(1, lado / Math.max(box[2], box[3]));
+  const c = document.createElement("canvas");
+  c.width = Math.round(box[2] * r);
+  c.height = Math.round(box[3] * r);
+  c.getContext("2d").drawImage(img, box[0], box[1], box[2], box[3], 0, 0, c.width, c.height);
+  return { img: paraTexto(c), achou: !!p };
+}
+// guarda a ficha do aluno: procura o papel nas 3 primeiras fotos (pela ordem dos nomes); devolve o arquivo usado
+export async function guardarFicha(C, { escola, ano, colNome, pasta, arquivos }) {
   const { FS, db } = C;
-  const ref = FS.doc(db, "fichas", idFicha(escola, ano, pasta));
-  const img = await fotoParaTexto(file);
-  await FS.setDoc(ref, {
+  const ordem = ordemFicha(arquivos.map(h => h.name)).slice(0, 3);
+  let escolhida = null,
+    foto = null;
+  for (const i of ordem) {
+    const f = await fotoDaFicha(await arquivos[i].getFile());
+    if (f.achou || !foto) {
+      escolhida = arquivos[i];
+      foto = f;
+    }
+    if (f.achou) break;
+  }
+  await FS.setDoc(FS.doc(db, "fichas", idFicha(escola, ano, pasta)), {
     escola,
     ano: Number(ano) || null,
     colNome,
     pasta,
-    arquivo: file.name,
-    img,
+    arquivo: escolhida.name,
+    img: foto.img,
+    semPapel: !foto.achou,
     status: "nova",
     criadoEm: new Date().toISOString(),
     por: C.me || ""
   });
+  return escolhida;
 }
 
 // ---------- 2. Leitura (o Claude usa pelo navegador do computador) ----------
