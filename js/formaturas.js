@@ -108,12 +108,6 @@ export function show() {
   );
   if (C.isAdmin)
     hb.append(
-      U.mkBtn("🗂️ Prévias de um colégio", "btn-sm", () =>
-        import("./previas-lote.js").then(m => m.abrirPreviasLote(C, { col: "formaturaAlunos" })).catch(e => C.handleErr(e))
-      ),
-      U.mkBtn("🤖 Cadastro automático", "btn-sm", () =>
-        import("./fichas.js").then(m => m.abrirCadastroAutomatico(C, "formaturaAlunos")).catch(e => C.handleErr(e))
-      ),
       U.mkBtn("🔎 Conferir fotos", "btn-sm", () =>
         import("./conferir-fotos.js").then(m => m.abrirConferirFotos(C, "formaturaAlunos")).catch(e => C.handleErr(e))
       ),

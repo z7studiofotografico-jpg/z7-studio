@@ -163,7 +163,7 @@ export function contatosDaFicha(l) {
 }
 
 // ---------- 4. Janela: 🤖 Cadastro automático ----------
-export function abrirCadastroAutomatico(C, colNome) {
+export function abrirCadastroAutomatico(C, colNome = "") {
   sheet(
     "🤖 Cadastro automático",
     async (p, close) => {
@@ -172,7 +172,7 @@ export function abrirCadastroAutomatico(C, colNome) {
         el(
           "p",
           "hint",
-          "1) Gere as prévias do colégio em “Prévias de um colégio” (a 1ª foto de cada aluno é a ficha). 2) Toque em Pedir a leitura. 3) Escreva para o Claude: “lê as fichas”. 4) Confira aqui e confirme."
+          "1) Gere as prévias do colégio em “🗂️ Prévias de um colégio” (a 1ª foto de cada aluno é a ficha). 2) Toque em Pedir a leitura. 3) Escreva para o Claude: “lê as fichas”. 4) Confira aqui e confirme."
         )
       );
       const lista = el("div");
@@ -183,7 +183,7 @@ export function abrirCadastroAutomatico(C, colNome) {
         let fichas, pedidos;
         try {
           const [a, b] = await Promise.all([
-            FS.getDocs(FS.query(FS.collection(db, "fichas"), FS.where("colNome", "==", colNome))),
+            FS.getDocs(colNome ? FS.query(FS.collection(db, "fichas"), FS.where("colNome", "==", colNome)) : FS.collection(db, "fichas")),
             FS.getDocs(FS.collection(db, "fichasPedidos"))
           ]);
           fichas = a.docs.map(d => ({ id: d.id, ...d.data() }));
@@ -196,7 +196,8 @@ export function abrirCadastroAutomatico(C, colNome) {
         const grupos = new Map();
         fichas.forEach(f => {
           const k = chaveGrupo(f.escola, f.ano);
-          if (!grupos.has(k)) grupos.set(k, { escola: f.escola, ano: f.ano, nova: 0, lida: 0, fichas: [] });
+          if (!grupos.has(k))
+            grupos.set(k, { escola: f.escola, ano: f.ano, colNome: f.colNome || colNome || "repasse", nova: 0, lida: 0, fichas: [] });
           const g = grupos.get(k);
           g[f.status] = (g[f.status] || 0) + 1;
           g.fichas.push(f);
@@ -225,7 +226,7 @@ export function abrirCadastroAutomatico(C, colNome) {
                 await FS.setDoc(FS.doc(db, "fichasPedidos", k), {
                   escola: g.escola,
                   ano: g.ano,
-                  colNome,
+                  colNome: g.colNome,
                   status: "na fila",
                   pedidoEm: new Date().toISOString(),
                   por: C.me || ""
@@ -235,7 +236,7 @@ export function abrirCadastroAutomatico(C, colNome) {
               })
             );
           if (g.lida) {
-            acoes.append(U.mkBtn(`📋 Conferir (${g.lida})`, "btn-sm", () => conferir(C, g, colNome, montar)));
+            acoes.append(U.mkBtn(`📋 Conferir (${g.lida})`, "btn-sm", () => conferir(C, g, g.colNome, montar)));
             acoes.append(
               U.mkBtn("⬇️ Planilha", "btn-sm", () =>
                 import("./cadastro-aluno.js").then(m =>

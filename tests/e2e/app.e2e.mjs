@@ -1050,7 +1050,9 @@ await cenario("Adriano (admin), com os dados já atualizados no servidor", async
     );
     await fila.getByRole("button", { name: "Fechar" }).click();
     // 🤖 Cadastro automático: conferir a ficha lida e confirmar (sem número na ficha → o menor número livre)
-    await pg.getByRole("button", { name: "🤖 Cadastro automático" }).click();
+    await ir(pg, "#home");
+    await pg.locator("#tileCadastrar").click();
+    await pg.locator(".sheet .cad-fotos").getByRole("button", { name: "🤖 Cadastro automático" }).click();
     const ca = pg.locator(".sheet").filter({ hasText: "🤖 Cadastro automático" });
     await ca.getByRole("button", { name: /Conferir \(1\)/ }).click();
     const cf = pg.locator(".sheet").filter({ hasText: "Conferir fichas" });
@@ -1068,10 +1070,16 @@ await cenario("Adriano (admin), com os dados já atualizados no servidor", async
       "Cadastro automático: confirma a ficha, ID com o menor número livre, telefones certos e a foto da ficha apagada"
     );
     await cf.getByRole("button", { name: "Fechar" }).click();
-    await ca
-      .getByRole("button", { name: "Fechar" })
-      .click()
-      .catch(() => {});
+    // fecha as janelas e volta para o PR
+    await ca.getByRole("button", { name: "Fechar" }).click();
+    await pg
+      .locator(".sheet .cad-fotos")
+      .locator("xpath=ancestor::*[contains(@class,'panel')]")
+      .getByRole("button", { name: "Cancelar" })
+      .first()
+      .click();
+    await ir(pg, "#pr");
+    await calmo(pg);
     await pg.locator("#rChips").getByText("A conferir").click();
     await calmo(pg);
     await pg.locator(".card").filter({ hasText: "Bruno" }).getByRole("button", { name: "✔ Conferir venda" }).click();
@@ -2888,8 +2896,15 @@ await cenario("Prévias de um colégio (lote, no computador)", async () => {
     const fila = [origem, destino];
     window.showDirectoryPicker = async () => fila.shift();
   });
-  await ir(pg, "#pr");
-  await pg.getByRole("button", { name: "🗂️ Prévias de um colégio" }).click();
+  // (12/11/2026: as prévias ficam no ➕ Cadastrar aluno, em Fotos; estas pastas não têm ficha na 1ª foto)
+  await ir(pg, "#home");
+  await pg.locator("#tileCadastrar").click();
+  await pg.locator(".sheet .cad-fotos").getByRole("button", { name: "🗂️ Prévias de um colégio" }).click();
+  await pg
+    .locator(".sheet:visible")
+    .last()
+    .getByLabel(/A 1ª foto de cada aluno é a ficha/)
+    .uncheck();
   await pg.locator(".sheet:visible").getByRole("button", { name: "Escolher a pasta do colégio" }).click();
   await pg.waitForFunction(() => /Pronto!/.test(document.querySelector(".sheet:last-of-type")?.textContent || ""), null, {
     timeout: 15000

@@ -241,10 +241,12 @@ export function escolherPastaComum() {
     i.click();
   });
 }
-// o = { col: "repasse" | "paspatur" | "formaturaAlunos" } (a lista onde procurar quem já comprou)
+// o = { col: "repasse" | "paspatur" | "formaturaAlunos" | "auto" } (a lista onde procurar quem já comprou;
+//     "auto" = PR ou Formatura, o app escolhe pelo colégio da pasta)
 //     livre: true (Agendamento → Importação): qualquer pasta; nomes dos alunos e das fotos ficam exatamente como estão
 export function abrirPreviasLote(C, o = {}) {
-  const colNome = o.col || "repasse",
+  let colNome = o.col && o.col !== "auto" ? o.col : "repasse";
+  const auto = o.col === "auto",
     livre = !!o.livre;
   sheet(livre ? "📥 Importação · prévias de uma pasta" : "🖼️ Gerar prévias de um colégio", (p, close) => {
     p.append(
@@ -471,6 +473,18 @@ export function abrirPreviasLote(C, o = {}) {
         const titulo = tituloImp();
         if (livre) alunos = montarImportacao(alunos, { individuais: porFoto.checked, titulo });
         const col = nomeDoColegio(origem.name);
+        // PR e Formatura num lugar só: a lista onde o colégio tem mais alunos
+        if (auto && !livre) {
+          info.textContent = "Procurando o colégio no app…";
+          const [pr, fo] = await Promise.all(
+            ["repasse", "formaturaAlunos"].map(n =>
+              alunosDoColegio(C, n, col)
+                .then(l => l.length)
+                .catch(() => 0)
+            )
+          );
+          colNome = fo > pr ? "formaturaAlunos" : "repasse";
+        }
         let resumoFora = "";
         if (!livre && (soTrabalho.checked || semTel.checked)) {
           info.textContent = "Conferindo no app quem já comprou…";

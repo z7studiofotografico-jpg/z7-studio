@@ -520,3 +520,4 @@ button.lc-linha[aria-expanded="true"]{border-bottom-left-radius:0;border-bottom-
 .pessoa-busca{width:100%}
 .pessoa-chips{flex-wrap:wrap}
 .pessoa-paginas{display:flex;justify-content:space-between;align-items:center;gap:8px;margin:8px 0}
+.cad-fotos{border-style:dashed}

@@ -155,6 +155,31 @@ export function abrirCadastroAluno(C, o = {}) {
         s.append(h);
         return s;
       };
+      // ---------- Fotos do colégio inteiro (admin): prévias e 🤖 Cadastro automático, PR e Formatura num lugar só ----------
+      if (C.isAdmin) {
+        const f = el("section", "cad-parte cad-fotos");
+        const h = el("div", "cad-tit");
+        h.append(el("span", "cad-n", "📸"), el("b", null, "Fotos"), el("small", null, "do colégio inteiro, no computador"));
+        const q = el("div", "quick");
+        q.append(
+          U.mkBtn("🗂️ Prévias de um colégio", "btn-sm", () =>
+            import("./previas-lote.js").then(m => m.abrirPreviasLote(C, { col: "auto" })).catch(e => C.handleErr(e))
+          ),
+          U.mkBtn("🤖 Cadastro automático", "btn-sm", () =>
+            import("./fichas.js").then(m => m.abrirCadastroAutomatico(C)).catch(e => C.handleErr(e))
+          )
+        );
+        f.append(
+          h,
+          el(
+            "p",
+            "hint",
+            "Gere as prévias (PR, Paspatur ou Formatura: o app acha pelo colégio). Depois, o Cadastro automático lê as fichas."
+          ),
+          q
+        );
+        p.append(f);
+      }
       // ---------- 1. Colégio ----------
       const s1 = parte(1, "Colégio", "particular ou público, depois o colégio");
       let grupo = o.instId ? cartaoDoTipo((insts.find(i => i.id === o.instId) || {}).tipo) || "" : "";

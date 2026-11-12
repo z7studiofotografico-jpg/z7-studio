@@ -196,15 +196,9 @@ function mount() {
     )
   );
   // (11/11/2026: o botão "Prévia e fotos" do topo saiu: a prévia é feita na janela de cada aluno)
-  // admin, no computador: prévias leves com marca d'água de um colégio inteiro (para o representante)
+  // (12/11/2026: "Prévias de um colégio" e "🤖 Cadastro automático" foram para o ➕ Cadastrar aluno, em Fotos)
   if (C.isAdmin)
     hb.append(
-      U.mkBtn("🗂️ Prévias de um colégio", "", () =>
-        import("./previas-lote.js").then(m => m.abrirPreviasLote(C, { col: colNome() })).catch(e => C.handleErr(e))
-      ),
-      U.mkBtn("🤖 Cadastro automático", "", () =>
-        import("./fichas.js").then(m => m.abrirCadastroAutomatico(C, colNome())).catch(e => C.handleErr(e))
-      ),
       // quem está sem prévia no Drive: já comprou (normal) × falta gerar (com o "📤 Enviar foto")
       U.mkBtn("🔎 Conferir fotos", "", () =>
         import("./conferir-fotos.js").then(m => m.abrirConferirFotos(C, colNome())).catch(e => C.handleErr(e))
