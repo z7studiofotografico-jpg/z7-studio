@@ -3,7 +3,7 @@
 // dinheiro (recebido no estúdio, falta repassar com o colégio e com o representante, comissão), pagamentos dos alunos
 // (quem recebeu cada um), alunos e pacotes (um por um ou vários de uma vez) e o relatório de produção.
 // Quem mexe: o admin e o representante que fechou. Cada mudança guarda quem fez e quando. Regras em contrato-colegio-regras.js.
-import { el, title, field, inp, inpReais, sel, sheet, botoes } from "./ui.js";
+import { el, title, field, inp, inpReais, sel, sheet, botoes, bloco } from "./ui.js";
 import * as U from "./util.js";
 import { lerReais, brl } from "./regras.js";
 import { confirmar } from "./confirmar.js";
@@ -362,18 +362,17 @@ function formContrato(c, inst, ano, ref) {
     });
     const err = el("p", "err");
     err.hidden = true;
-    p.append(
-      r1,
-      field("Preço de cada item (o aluno paga a soma do pacote dele)", precos),
-      r2,
-      r3,
-      r4,
-      field("Pacote padrão (quem não tiver PACOTE na planilha)", pacote),
-      field("Unidade", unidade),
-      field("Observação", obs),
-      err,
-      botoes(close, c ? "Salvar" : "Criar contrato")
-    );
+    // blocos numerados, no padrão do ➕ Cadastrar aluno
+    p.classList.add("cad");
+    const b1 = bloco(1, "Quem fechou e quem paga");
+    b1.append(r1, r2);
+    const b2 = bloco(2, "Preços e pacote", "o aluno paga a soma dos itens do pacote dele");
+    b2.append(field("Preço de cada item", precos), field("Pacote padrão (quem não tiver PACOTE na planilha)", pacote));
+    const b3 = bloco(3, "Contato do colégio");
+    b3.append(r3, field("Unidade", unidade));
+    const b4 = bloco(4, "Entrega e observações");
+    b4.append(r4, field("Observação", obs));
+    p.append(b1, b2, b3, b4, err, botoes(close, c ? "Salvar" : "Criar contrato"));
     p.addEventListener("submit", async ev => {
       ev.preventDefault();
       const nomeResp = (pessoas.find(([em]) => em === sResp.value) || [, ""])[1];

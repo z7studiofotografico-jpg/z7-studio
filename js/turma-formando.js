@@ -3,7 +3,7 @@
 import { comAlteracao } from "./alteracoes.js";
 import { lerReais, brl, dividir, pagamentosDe, pagasDe, recebido, proxVenc, ehKit01, ativo, FORMAS } from "./regras.js";
 import { kitsDe, plano, ehAdesao, anoDaTurma, vendaSugerida, proximoVenc, devolucao, DEVOLVE_DESISTENCIA } from "./contrato.js";
-import { el, title, field, inp, inpReais, sel, sheet, botoes } from "./ui.js";
+import { el, title, field, inp, inpReais, sel, sheet, botoes, blocosDesde } from "./ui.js";
 import * as U from "./util.js";
 import { siglaDe, siglaUsada, reservarCodigo, comAno, avisoTel } from "./aluno-id.js";
 let C, FS, db;
@@ -233,7 +233,15 @@ export function formFormando(ctx, T, f, preset) {
     obs.rows = 2;
     obs.maxLength = 500;
     obs.value = f ? f.obs || "" : "";
-    fp.append(field("Observação", obs));
+    const fObs = field("Observação", obs);
+    fp.append(fObs);
+    // blocos numerados, no padrão do ➕ Cadastrar aluno
+    blocosDesde(fp, [
+      [r1, "Aluno"],
+      [r0, "Kit e venda"],
+      [r3, "Pagamento"],
+      [fObs, "Observação"]
+    ]);
     const err = el("p", "err");
     err.hidden = true;
     fp.append(err);

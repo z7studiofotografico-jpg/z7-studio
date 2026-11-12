@@ -281,3 +281,17 @@ export function emBlocos(p, cortes) {
     els.forEach(x => b.append(x));
   });
 }
+// Igual ao emBlocos, mas marcando pelo elemento onde cada bloco começa (janelas que montam partes só às vezes):
+// marcos = [[elemento, título, subtítulo]]; cada bloco vai do seu elemento até antes do próximo marco
+export function blocosDesde(p, marcos) {
+  p.classList.add("cad");
+  const filhos = [...p.children];
+  const idx = marcos.map(([e]) => filhos.indexOf(e));
+  marcos.forEach(([e, titulo, sub], i) => {
+    if (idx[i] < 0) return;
+    const fim = idx.slice(i + 1).find(x => x > idx[i]);
+    const b = bloco(i + 1, titulo, sub);
+    e.before(b);
+    filhos.slice(idx[i], fim == null ? filhos.length : fim).forEach(x => b.append(x));
+  });
+}
