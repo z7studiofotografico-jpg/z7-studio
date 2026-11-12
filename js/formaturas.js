@@ -93,9 +93,6 @@ export function show() {
   head.append(el("h2", null, "Formaturas"));
   const hb = el("div", "agact");
   hb.append(
-    U.mkBtn("+ Instituição", "btn-verde btn-sm", () =>
-      import("./instituicoes.js").then(m => m.novaInstituicao(C, "publico")).catch(e => C.handleErr(e))
-    ),
     U.mkBtn("+ Aluno", "btn-primary btn-sm", () =>
       parte === "va"
         ? novoFormando()
