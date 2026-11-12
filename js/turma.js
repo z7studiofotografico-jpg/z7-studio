@@ -3,6 +3,7 @@
 //   pagamentos: [{ data, valor, por }], pagas (= quantidade de pagamentos), proxVenc, status, resp, respEmail, vendidoEm }
 // Regras de parcela e dinheiro: js/regras.js. Só o administrador registra pagamento e muda valores.
 import { linhaGenerica } from "./lista-compacta.js";
+import { botaoPlanilha, CAMPOS_FORMANDOS } from "./planilha-backup.js";
 import { linhasRetorno, abrirRetorno } from "./retorno.js";
 import { pedirData } from "./confirmar.js";
 import {
@@ -194,6 +195,14 @@ export function openTurma(ctx, inst, kits, aoFechar, opcoes) {
       const bar = el("div", "actions");
       bar.append(U.mkBtn("+ Aluno", "btn-primary", () => abrirFormando(T)));
       bar.append(U.mkBtn("🖨️ Lista da turma", "", () => abrirRelatorio(relatorioTurma(T), C.me)));
+      bar.append(
+        botaoPlanilha(
+          "turma-" + (T.inst.sigla || "formatura"),
+          () => T.lista,
+          CAMPOS_FORMANDOS,
+          e => C.handleErr(e)
+        )
+      );
       if (C.isAdmin) bar.append(U.mkBtn("Importar planilha", "", () => importarFormandos(C, T.inst, T.lista)));
       bar.append(
         U.mkBtn("📄 Ficha do contrato", "", () =>

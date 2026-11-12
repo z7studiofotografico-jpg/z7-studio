@@ -6,6 +6,7 @@ import { linhaEvento, KINDS_FORMATURA } from "./eventos.js";
 import * as U from "./util.js";
 import { openImport } from "./instituicoes-import.js";
 import { botaoRelatorio, contar } from "./relatorio.js";
+import { botaoPlanilha, CAMPOS_INST } from "./planilha-backup.js";
 import { contatoRel } from "./aluno-id.js";
 import { TIPOS, CARTOES, ETAPAS, ABERTAS, SEGMENTOS, cartaoDoTipo, norm, status, pendFotos } from "./instituicoes-dados.js";
 import { C, FS, tipo, items, mudarTipo, mudarItems, iniciar, lockInfo, mensagem, save, claim } from "./instituicoes-estado.js";
@@ -49,6 +50,14 @@ export function show(t) {
   hb.append(U.mkBtn("+ Nova instituição", "btn-primary", () => openForm(null)));
   if (C.isAdmin) hb.append(U.mkBtn("Importar planilha", "", () => openImport(C, T.tipos, T.nome, items)));
   hb.append(botaoRelatorio(relatorioInst, () => C.me));
+  hb.append(
+    botaoPlanilha(
+      "colegios-" + tipo,
+      () => items.filter(i => !ocultoParaMim(C, i)),
+      CAMPOS_INST,
+      e => C.handleErr(e)
+    )
+  );
   hb.append(U.mkBtn("❌ Não fecharam: motivos", "", () => listaNaoFecharam(items.filter(i => !ocultoParaMim(C, i)))));
   head.append(hb);
   v.append(head);

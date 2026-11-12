@@ -104,6 +104,8 @@ const SHELL = [
   "./js/contrato-colegio.js",
   "./js/contrato-colegio-regras.js",
   "./js/lista-compacta.js",
+  "./js/funil-mensagens.js",
+  "./js/planilha-backup.js",
   "./js/janela-aluno.js",
   "./js/inst-janela.js",
   "./js/janela.js",

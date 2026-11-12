@@ -65,3 +65,26 @@ test("planilha: mãe, pai e aluno em colunas separadas", () => {
   assert.deepEqual(l[1].slice(0, 7), ["Ana", "Maria", "21911", "", "", "Ana", "21933"]);
   assert.equal(l[1][l[1].length - 1], "PR");
 });
+
+test("planilha: contatos do colégio numerados (contato, cargo e telefone em colunas)", () => {
+  const l = linhasPlanilha(
+    [
+      {
+        nome: "Colégio X",
+        contatos: [
+          { nome: "Márcia", cargo: "Coordenador(a)", tel: "21999990000" },
+          { nome: "João", tel: "2122223333" }
+        ]
+      }
+    ],
+    [
+      ["nome", "Colégio"],
+      ["n:1:nome", "Contato 1"],
+      ["n:1:tel", "Telefone 1"],
+      ["n:2:nome", "Contato 2"],
+      ["n:2:cargo", "Cargo 2"],
+      ["n:3:nome", "Contato 3"]
+    ]
+  );
+  assert.deepEqual(l[1], ["Colégio X", "Márcia", "21999990000", "João", "", ""]);
+});

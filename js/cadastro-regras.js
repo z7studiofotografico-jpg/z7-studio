@@ -72,6 +72,12 @@ export const COLUNAS_CONTATOS = ["Mãe", "Pai", "Formando", "Responsável"].flat
   [`c:${t}:tel`, "Telefone " + (t === "Formando" ? "do aluno" : t === "Mãe" ? "da mãe" : t === "Pai" ? "do pai" : "do responsável")]
 ]);
 function valorCampo(x, k) {
+  // n:1:nome = o 1º contato da lista (colégios: contato, cargo, telefone, e-mail)
+  if (k.startsWith("n:")) {
+    const [, i, campo] = k.split(":");
+    const c = (Array.isArray(x.contatos) ? x.contatos : [])[Number(i) - 1];
+    return c ? c[campo] || "" : "";
+  }
   if (k.startsWith("c:")) {
     const [, tipo, campo] = k.split(":");
     const c = contatoDe(x, tipo);
