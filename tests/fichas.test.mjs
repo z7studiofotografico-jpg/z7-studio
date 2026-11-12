@@ -51,3 +51,21 @@ test("fichas: acha o papel branco (ficha) na foto e ignora a renda da beca", asy
   assert.deepEqual(ordemFicha(["A (2).jpg", "A (3).jpg", "A.JPG"]), [2, 0, 1]);
   assert.deepEqual(ordemFicha(["A (2).JPG", "A (1).JPG"]), [1, 0]);
 });
+
+test("fichas: junta com o aluno que já está no app (nome curto da planilha, pasta, número)", async () => {
+  const { acharExistente, dadosDaPasta } = await import("../js/fichas.js");
+  const ex = [
+    { id: "a", nome: "NATALY BRENDA", nomeBusca: "NATALY BRENDA", codigo: "26CIEP433-02" },
+    { id: "b", nome: "YASMIN ALEXANDRA", nomeBusca: "YASMIN ALEXANDRA", codigo: "26CIEP433-04" },
+    { id: "c", nome: "WELLINGTON DE SOUZA", nomeBusca: "WELLINGTON DE SOUZA", codigo: "26CIEP433-05" }
+  ];
+  assert.deepEqual(dadosDaPasta("26 -CIEP433- 002 - NATALY BRENDA"), { num: 2, nome: "NATALY BRENDA" });
+  assert.equal(acharExistente(ex, { pasta: "26 -CIEP433- 002 - NATALY BRENDA" }, { nome: "Nataly Brenda A. da Silva" }).id, "a");
+  // a pasta 004 é do Wellington, mas no app o 04 é a Yasmin: vale o nome
+  assert.equal(
+    acharExistente(ex, { pasta: "26 -CIEP433- 004 - WELLINGTON DE SOUZA" }, { nome: "Wellington de Souza dos S. Serrano" }).id,
+    "c"
+  );
+  assert.equal(acharExistente(ex, { pasta: "x" }, { nome: "Wellington de Souza Serrano" }).id, "c");
+  assert.equal(acharExistente(ex, { pasta: "26 -CIEP433- 009 - FULANO" }, { nome: "Fulano Novo" }), null);
+});

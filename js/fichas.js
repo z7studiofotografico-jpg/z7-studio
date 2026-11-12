@@ -75,6 +75,14 @@ export function acharPapel(data, w, h) {
       prop = bh / bw;
     // papel: grande, quase todo branco (a renda da beca é branca mas vazada) e em pé
     if (n < w * h * 0.02 || cheio < 0.6 || prop < 0.9 || prop > 2.2) continue;
+    // tem que ter escrita dentro (a luz clara do fundo é branca e lisa)
+    let escuro = 0;
+    for (let y = y0; y <= y1; y++)
+      for (let x = x0; x <= x1; x++) {
+        const i = (y * w + x) * 4;
+        if (Math.max(data[i], data[i + 1], data[i + 2]) < 110) escuro++;
+      }
+    if (escuro / (bw * bh) < 0.005) continue;
     if (!melhor || n * cheio > melhor.nota) melhor = { x0, y0, x1, y1, nota: n * cheio };
   }
   return melhor;
@@ -393,8 +401,12 @@ async function conferir(C, g, colNome, depois) {
           campos.append(d);
         });
         const aviso = el("p", "hint");
-        const sem = !soNumero((f.lido || {}).numero);
-        if (sem) aviso.textContent = "⚠️ Sem número na ficha: ao confirmar, recebe o menor número livre.";
+        const ja = acharExistente(existentes, f, f.lido || {});
+        aviso.textContent = ja
+          ? `🔗 Junta com o aluno que já está no app: ${title(ja.nome)} (${ja.codigo || "sem ID"})`
+          : soNumero((f.lido || {}).numero)
+            ? "Cadastro novo, com o número da ficha."
+            : "⚠️ Cadastro novo e sem número na ficha: ao confirmar, recebe o menor número livre.";
         const ok = U.mkBtn("✔ Confirmar", "btn-primary btn-sm", async () => {
           ok.disabled = true;
           try {
@@ -422,14 +434,43 @@ async function conferir(C, g, colNome, depois) {
   );
 }
 
+// "26 -CIEP433- 002 - NATALY BRENDA" → { num: 2, nome: "NATALY BRENDA" }
+export function dadosDaPasta(pasta) {
+  const m = String(pasta || "").match(/-\s*(\d{1,4})\s*-\s*(.+)$/);
+  return m ? { num: Number(m[1]), nome: m[2].trim() } : { num: null, nome: "" };
+}
+const LIGA = new Set(["DE", "DA", "DO", "DAS", "DOS", "E"]);
+const palavras = n =>
+  U.chave(n)
+    .replace(/[^A-Z0-9 ]/g, " ")
+    .split(/\s+/)
+    .filter(w => w.length > 1 && !LIGA.has(w));
+const contem = (maior, menor) => {
+  const m = new Set(palavras(maior)),
+    p = palavras(menor);
+  return p.length > 0 && p.every(w => m.has(w));
+};
+// o aluno que já está no app: pelo nome da pasta (como ele foi cadastrado), pelo nome curto dentro do nome da
+// ficha ("NATALY BRENDA" ⊂ "Nataly Brenda A. da Silva"), pelo número da pasta com o mesmo primeiro nome, ou pelo nº da ficha
+export function acharExistente(existentes, f, lido) {
+  const dp = dadosDaPasta(f.pasta);
+  const n1 = palavras(lido.nome)[0];
+  const porPasta = dp.nome && existentes.find(x => x.nomeBusca === U.chave(dp.nome));
+  if (porPasta) return porPasta;
+  const dentro = existentes.filter(x => contem(lido.nome, x.nome) || (dp.nome && contem(dp.nome, x.nome) && contem(x.nome, dp.nome)));
+  if (dentro.length === 1) return dentro[0];
+  const porNumPasta = dp.num && existentes.find(x => (lerCodigo(x.codigo || "") || {}).n === dp.num && palavras(x.nome)[0] === n1);
+  if (porNumPasta) return porNumPasta;
+  const nFicha = soNumero(lido.numero);
+  return (nFicha && existentes.find(x => (lerCodigo(x.codigo || "") || {}).n === nFicha)) || null;
+}
+
 // grava o aluno (junta com o que já existe pelo ID ou pelo nome) e apaga a foto da ficha
 export async function confirmar(C, { f, lido, colNome, existentes, usados, sigla }) {
   const { FS, db } = C;
   if (!lido.nome) throw Object.assign(new Error("Falta o nome do aluno."), { aviso: true });
   const nFicha = soNumero(lido.numero);
-  const porNome = existentes.find(x => x.nomeBusca === U.chave(lido.nome));
-  const porNum = nFicha && existentes.find(x => (lerCodigo(x.codigo || "") || {}).n === nFicha);
-  const achado = porNome || porNum;
+  const achado = acharExistente(existentes, f, lido);
   const n = achado && lerCodigo(achado.codigo || "") ? lerCodigo(achado.codigo).n : nFicha || menorLivre(usados);
   usados.add(n);
   const codigo = (achado && achado.codigo) || fmtCodigo(Number(f.ano), sigla, n);
@@ -449,6 +490,11 @@ export async function confirmar(C, { f, lido, colNome, existentes, usados, sigla
       fichaLidaEm: agora
     };
     if (lido.turma) patch.turma = lido.turma;
+    // o nome completo da ficha no lugar do curto ("NATALY BRENDA" → "NATALY BRENDA A. DA SILVA")
+    if (contem(lido.nome, achado.nome) && palavras(lido.nome).length > palavras(achado.nome).length) {
+      patch.nome = lido.nome.toUpperCase();
+      patch.nomeBusca = U.chave(lido.nome);
+    }
     if (lido.nasc) patch.nascimento = lido.nasc;
     if (lido.email) patch.email = lido.email.toLowerCase();
     const temEnd = Object.values(endereco).some(Boolean);
