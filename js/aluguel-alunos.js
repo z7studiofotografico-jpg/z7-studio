@@ -6,7 +6,7 @@
 // Status: Cadastrado → Beca medida (reserva beca, faixa e capelo) → Produtos em produção (se comprou algum) →
 // Pronto para retirada → Retirou a beca (baixa o estoque dos produtos) → Devolvida (beca volta ao estoque).
 // "Atrasado na devolução": retirou e passou da data de devolução (destaque para o Adriano).
-import { el, title, field, inp, inpReais, sel, sheet, botoes, wa, clicavel } from "./ui.js";
+import { bloco, el, title, field, inp, inpReais, sel, sheet, botoes, wa, clicavel } from "./ui.js";
 import * as U from "./util.js";
 import { lerReais, brl } from "./regras.js";
 import { confirmar, confirmarStatus, excluir, faixaExclusao, ocultoParaMim, perguntarSeEnviou, pedirTexto } from "./confirmar.js";
@@ -711,18 +711,17 @@ export function form(a, pre = {}) {
     }
     const err = el("p", "err");
     err.hidden = true;
-    p.append(
-      r0,
-      r1,
-      r2,
-      r3,
-      r4,
-      r5,
-      field("Pacote (vazio = padrão do contrato)", pac),
-      field("Observação", obs),
-      err,
-      botoes(close, a ? "Salvar" : "Cadastrar")
-    );
+    // blocos numerados, no padrão do Cadastrar aluno (11/11/2026)
+    const b1 = bloco(1, "Colégio"),
+      b2 = bloco(2, "Aluno"),
+      b3 = bloco(3, "Beca e valor"),
+      b4 = bloco(4, "Datas, pacote e observação");
+    b1.append(r0);
+    b2.append(r1);
+    b3.append(r2, r3, r4);
+    b4.append(r5, field("Pacote (vazio = padrão do contrato)", pac), field("Observação", obs));
+    p.classList.add("cad");
+    p.append(b1, b2, b3, b4, err, botoes(close, a ? "Salvar" : "Cadastrar"));
     p.addEventListener("submit", async ev => {
       ev.preventDefault();
       const inst = insts.find(i => i.id === sInst.value);

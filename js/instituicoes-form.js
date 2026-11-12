@@ -1,5 +1,5 @@
 // Instituições: cadastro (nova / editar) e registro de visita ou contato, com o próximo passo.
-import { el, title, field, inp, sel, sheet, botoes as actions, parseTel } from "./ui.js";
+import { el, emBlocos, title, field, inp, sel, sheet, botoes as actions, parseTel } from "./ui.js";
 import { reservarVarios, msgErroData, camposEvento, produtos, avisarColegioPorEmail } from "./eventos.js";
 import * as U from "./util.js";
 import { siglaDe } from "./aluno-id.js";
@@ -34,6 +34,7 @@ export function openForm(it) {
     nome.required = true;
     if (cadastroPendente(it))
       p.append(el("p", "wait", "📋 Complete o cadastro deste colégio. Falta: " + cadastroFalta(it).join(", ") + "."));
+    const m0 = p.children.length;
     p.append(field("Nome", nome));
     // O tipo vem do cartão que foi aberto; no cartão de faculdade e curso profissionalizante, escolhe qual dos dois
     const tipoSel =
@@ -76,6 +77,7 @@ export function openForm(it) {
     p.append(r1, r2);
     const fot = sel(FOTOGRAFO, it && it.fotografoHoje, "—");
     p.append(field("Fotógrafo hoje", fot));
+    const m1 = p.children.length;
     // Alunos por série (as séries que formam) e total
     const porSerie = (it && it.alunosPorSerie) || {};
     const segBox = el("div", "series");
@@ -122,7 +124,7 @@ export function openForm(it) {
       segChk.forEach(([, , q]) => {
         q.closest(".prow").hidden = true;
       });
-    p.append(el("h3", null, "Contatos"));
+    const m2 = p.children.length;
     const lista = el("div", "imp");
     p.append(lista);
     const linhas = [];
@@ -149,6 +151,7 @@ export function openForm(it) {
     p.append(field("E-mail da instituição", email));
     const hor = inp(it && it.horario, "ex.: só funciona à tarde");
     p.append(field("Melhor horário para contato", hor));
+    const m3 = p.children.length;
     const nota = el("textarea");
     nota.rows = 3;
     nota.maxLength = 2000;
@@ -164,6 +167,13 @@ export function openForm(it) {
       };
       p.append(del);
     }
+    // blocos numerados, no padrão do Cadastrar aluno (11/11/2026)
+    emBlocos(p, [
+      [m0, m1, "Instituição", "nome, sigla do ID e endereço"],
+      [m1, m2, "Alunos", "quantos formam em cada série"],
+      [m2, m3, "Contatos", "quem recebe as datas e as mensagens"],
+      [m3, p.children.length, "Anotações"]
+    ]);
     p.append(actions(close, "Salvar"));
     p.addEventListener("submit", async ev => {
       ev.preventDefault();

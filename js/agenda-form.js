@@ -1,5 +1,5 @@
 // Agenda: janelinhas de marcar ensaio no estúdio e compromisso (separadas de agenda.js).
-import { el, field, sheet, botoes, avisoErro } from "./ui.js";
+import { el, emBlocos, field, sheet, botoes, avisoErro } from "./ui.js";
 import { lerReais } from "./regras.js";
 import { feriado } from "./feriados.js";
 import { nomeEvento } from "./instituicoes.js";
@@ -189,6 +189,15 @@ export function openEnsaio(x, pre) {
     obs.placeholder = "ex.: vem com a mãe e o cachorro";
     obs.value = x ? x.obs || "" : pre.obs || "";
     p.append(field("Observação", obs), err);
+    // blocos numerados, no padrão do Cadastrar aluno (11/11/2026)
+    {
+      const ix = e => [...p.children].indexOf(e);
+      emBlocos(p, [
+        [ix(r1), ix(r2), "Cliente", "nome e WhatsApp"],
+        [ix(r2), ix(fs0), "Ensaio", "tipo, dia e horário"],
+        [ix(fs0), p.children.length, "Pagamento e observação"]
+      ]);
+    }
     const a = botoes(close, x ? "Salvar" : "Marcar ensaio");
     if (x) {
       const del = el("button", "btn btn-danger", "Excluir");
@@ -356,6 +365,14 @@ export function openComp(x, diaPre) {
     const err = el("p", "err");
     err.hidden = true;
     p.append(err);
+    {
+      const ix = e => [...p.children].indexOf(e);
+      const fObs = obs.closest(".field");
+      emBlocos(p, [
+        [ix(r1), ix(fObs), "Quando", "dia, horário e se é particular"],
+        [ix(fObs), p.children.length, "Observação"]
+      ]);
+    }
     const a = botoes(close, x ? "Salvar" : "Marcar compromisso");
     if (x) {
       const del = el("button", "btn btn-danger", "Excluir");

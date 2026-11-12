@@ -2,7 +2,7 @@
 // Coleção "becas": { cliente, tel, tipoEvento ("nosso" | "outro"), evento, dataEvento, retirada, retiradaHora, devolucao,
 //   qtd (total de becas), becasQtd: { pelerineAzul, infAzul, infPreta, tradPreta, americana }, faixasQtd: { azul, branca, ... }, capelosQtd: { capelo }, tamanhosQtd: { tradPreta: { M: 7, G: 5 }, ... } (por tipo de beca), tamanhos (texto, ex.: "Beca tradicional preta: 7 M, 5 G"; o jabor já vai com a beca), valor, caucao, pago, formaPag, status, obs }
 // Status: reservado → retirado → devolvido (ou cancelado). Retirada e devolução aparecem no Agendamento.
-import { el, title, field, inp, inpReais, sheet, botoes, wa as abrirWa, avisoErro, gradeQtd, clicavel } from "./ui.js";
+import { el, emBlocos, title, field, inp, inpReais, sheet, botoes, wa as abrirWa, avisoErro, gradeQtd, clicavel } from "./ui.js";
 import { ENDERECO, ESTUDIO } from "./mensagens.js";
 import { lerReais, centavos, reais, brl } from "./regras.js";
 import * as U from "./util.js";
@@ -523,6 +523,7 @@ export function form(x, pre) {
       p.append(f);
       return g.ins;
     };
+    const mGrade = p.children.length;
     const qB = grade("Becas", BECAS, x ? x.becasQtd || (x.qtd ? { tradPreta: x.qtd } : {}) : pre.becasQtd, "");
     const qF = grade("Faixas", FAIXAS, x ? x.faixasQtd : pre.faixasQtd, " (faixa)");
     const qC = grade(
@@ -565,6 +566,7 @@ export function form(x, pre) {
       val.disabled = true;
       cau.disabled = true;
     }
+    const mValores = p.children.length;
     const r6 = el("div", "row3");
     r6.append(field("Valor total", val), field("Já pago", pago), field("Caução", cau));
     p.append(r6);
@@ -648,6 +650,16 @@ export function form(x, pre) {
     }
     [ret, dev].forEach(i => i.addEventListener("change", checa));
     if (x) checa();
+    // blocos numerados, no padrão do Cadastrar aluno (11/11/2026)
+    {
+      const ix = e => [...p.children].indexOf(e);
+      emBlocos(p, [
+        [ix(r1), ix(r3), "Cliente e evento"],
+        [ix(r3), mGrade, "Datas", "retirada, evento e devolução"],
+        [mGrade, mValores, "Becas, faixas e capelos", "quantidade e tamanhos"],
+        [mValores, p.children.length, "Valores e pagamento"]
+      ]);
+    }
     const a = botoes(close, x ? "Salvar" : "Registrar aluguel");
     if (x && x.status !== "cancelado") {
       const cb = el("button", "btn btn-danger", "Cancelar aluguel");

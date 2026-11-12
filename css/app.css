@@ -498,3 +498,9 @@ button.lc-linha[aria-expanded="true"]{border-bottom-left-radius:0;border-bottom-
 .cad-aviso .notice{display:flex;flex-wrap:wrap;gap:6px;align-items:center;margin-top:8px}
 .cad-acoes{position:sticky;bottom:0;background:var(--surface);padding-top:8px}
 .flex1{flex:1}
+/* janelas no padrão do Cadastrar aluno: cada caixa .imp vira um bloco numerado (11/11/2026) */
+.cad-num{counter-reset:bloco}
+.cad-num .imp{background:var(--next);border:1px solid var(--line);border-radius:14px;padding:14px 16px;margin:12px 0}
+.cad-num .imp>h3{display:flex;align-items:center;gap:10px;margin:0 0 8px;font-size:16px}
+.cad-num .imp>h3::before{counter-increment:bloco;content:counter(bloco);display:inline-flex;align-items:center;justify-content:center;flex:none;width:26px;height:26px;border-radius:50%;background:var(--bar);color:var(--bar-fg);font-size:13px}
+.cad .row2,.cad .row3{gap:10px}

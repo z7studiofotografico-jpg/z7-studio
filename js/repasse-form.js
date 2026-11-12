@@ -1,5 +1,5 @@
 // PR: dados do formando (completar ou corrigir) e "+ Aluno" (incluir à mão, sem planilha)
-import { el, title } from "./ui.js";
+import { el, emBlocos, title } from "./ui.js";
 import * as U from "./util.js";
 import { norm, faltando, docId, semTelefone } from "./repasse-dados.js";
 import { codigoBusca, comAno, avisoTel } from "./aluno-id.js";
@@ -68,7 +68,7 @@ export function openDados(it) {
       r2.append(field("Curso / série", curso), field("Turma", turma));
       p.append(r2);
     }
-    p.append(el("h3", null, "Contatos"));
+    const mContatos = p.children.length;
     const linhas = [];
     const lista = el("div", "imp");
     p.append(lista);
@@ -133,6 +133,11 @@ export function openDados(it) {
     const erro = el("p", "err");
     erro.hidden = true;
     p.append(erro);
+    // blocos numerados, no padrão do Cadastrar aluno (11/11/2026)
+    emBlocos(p, [
+      [[...p.children].findIndex(x => x.querySelector && x.querySelector("input")), mContatos, "Aluno", "nome, colégio, ano e ID"],
+      [mContatos, p.children.length, "Contatos", "quem atende o WhatsApp"]
+    ]);
     p.append(actions(close, "Salvar"));
     // aluno novo: entra na fila (ou já separado para quem incluiu), como se tivesse vindo da planilha
     async function criar(d, falta) {

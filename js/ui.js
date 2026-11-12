@@ -259,3 +259,25 @@ export function gradeQtd(tipos, atual, opts = {}) {
   });
   return { box, ins };
 }
+
+// Bloco numerado das janelas (11/11/2026, o padrão do "Cadastrar aluno"): ① Título · subtítulo
+export function bloco(n, titulo, sub) {
+  const s = el("section", "cad-parte");
+  const h = el("div", "cad-tit");
+  h.append(el("span", "cad-n", String(n)), el("b", null, titulo));
+  if (sub) h.append(el("small", null, sub));
+  s.append(h);
+  return s;
+}
+// Janela já montada → blocos numerados: cortes = [[do elemento nº, até antes do nº, título, subtítulo]] (filhos de p)
+export function emBlocos(p, cortes) {
+  const filhos = [...p.children];
+  p.classList.add("cad");
+  cortes.forEach(([de, ate, titulo, sub], i) => {
+    const b = bloco(i + 1, titulo, sub);
+    const els = filhos.slice(de, ate);
+    if (!els.length) return;
+    els[0].before(b);
+    els.forEach(x => b.append(x));
+  });
+}

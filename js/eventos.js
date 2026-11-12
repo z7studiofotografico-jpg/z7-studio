@@ -495,6 +495,7 @@ export function openEvento(it, kind, dia) {
   // formatura extra (outra turma): o dia de fotos é o mesmo do colégio; desmarcar não mexe nele nem na média
   const extra = comFotos && kind !== "formatura";
   sheet(nomeEvento(kind, it.nome), (p, close) => {
+    p.classList.add("cad", "cad-num"); // blocos numerados (o padrão do Cadastrar aluno)
     const travado = !C.aprovador && ev && ev.status === "confirmado" && (!comFotos || (fot && fot.status === "confirmado"));
     if (travado) {
       [

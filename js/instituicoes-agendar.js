@@ -1,5 +1,5 @@
 // Agendamento → "+ Agendar colégio": escolhe o colégio e abre o formulário da data (dia de fotos ou formatura).
-import { el, title, field, inp, sel, sheet, botoes as actions, parseTel } from "./ui.js";
+import { bloco, el, title, field, inp, sel, sheet, botoes as actions, parseTel } from "./ui.js";
 import { openEvento, nomeEvento, marcadosDe, proxDe, KINDS } from "./eventos.js";
 import { confirmar } from "./confirmar.js";
 import * as U from "./util.js";
@@ -81,7 +81,13 @@ export async function agendarColegio(ctx, dia) {
       b.onclick = () => escolherGrupo(k);
       grupos.append(b);
     });
-    p.append(field("O que vai marcar", tipoEv), field("Particular ou público?", grupos), field("Colégio", nome), dl);
+    // (11/11/2026: no padrão do Cadastrar aluno, em blocos numerados)
+    p.classList.add("cad");
+    const b1 = bloco(1, "O que vai marcar", "dia de fotos, formatura, Paspatur ou aluguel de becas");
+    b1.append(field("O que vai marcar", tipoEv));
+    const b2 = bloco(2, "Colégio", "particular ou público, depois o colégio");
+    b2.append(field("Particular ou público?", grupos), field("Colégio", nome), dl);
+    p.append(b1, b2);
     // Colégio novo: cadastra aqui mesmo, sem sair da agenda
     const novoBox = el("div", "imp");
     novoBox.hidden = true;
@@ -132,7 +138,8 @@ export async function agendarColegio(ctx, dia) {
     nome.addEventListener("change", () => {
       if (nome.value.trim() && !acha() && !acha(lista) && novoBox.hidden) btNovo.onclick();
     });
-    p.append(btNovo, novoBox, err);
+    b2.append(btNovo, novoBox);
+    p.append(err);
     p.append(actions(close, "Continuar"));
     p.addEventListener("submit", async ev => {
       ev.preventDefault();
