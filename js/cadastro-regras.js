@@ -73,6 +73,14 @@ export const COLUNAS_CONTATOS = ["Mãe", "Pai", "Responsável"].flatMap(t => [
   [`c:${t}:nome`, t],
   [`c:${t}:tel`, "Telefone " + (t === "Mãe" ? "da mãe" : t === "Pai" ? "do pai" : "do responsável")]
 ]);
+// endereço completo, uma parte por coluna
+export const COLUNAS_ENDERECO = [
+  ["endereco.rua", "Rua"],
+  ["endereco.numero", "Número"],
+  ["endereco.bairro", "Bairro"],
+  ["endereco.cidade", "Cidade"],
+  ["endereco.cep", "CEP"]
+];
 function valorCampo(x, k) {
   // n:1:nome = o 1º contato da lista (colégios: contato, cargo, telefone, e-mail)
   if (k.startsWith("n:")) {

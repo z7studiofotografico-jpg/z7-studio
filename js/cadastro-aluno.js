@@ -11,6 +11,7 @@ import { BECAS, TAMANHOS, FAIXAS, CAPELOS, COM_MENOS_LONGA } from "./becas-estoq
 import {
   COLUNAS_CONTATOS,
   TEL_ALUNO,
+  COLUNAS_ENDERECO,
   prefixoId,
   idDoAluno,
   faltaParaSalvar,
@@ -696,6 +697,7 @@ export const CAMPOS_ALUGUEL = [
   ["ano", "Ano"],
   ["serie", "Série"],
   ...COLUNAS_CONTATOS,
+  ...COLUNAS_ENDERECO,
   ["becaTipo", "Beca"],
   ["tamanho", "Tamanho"],
   ["faixa", "Faixa"],
@@ -714,6 +716,7 @@ export const CAMPOS_PR = [
   ["ano", "Ano"],
   ["turma", "Turma"],
   ...COLUNAS_CONTATOS,
+  ...COLUNAS_ENDERECO,
   ["vendaComo", "Kit"],
   ["etapa", "Etapa"],
   ["resp", "Responsável na equipe"],
