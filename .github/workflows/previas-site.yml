@@ -3,7 +3,9 @@ name: Prévias do Drive para o site
 on:
   schedule:
     # 06:00 UTC = 3h em Brasília, todo dia
-    - cron: "0 6 * * *"
+    # 11/11/2026: enquanto a cópia inicial (89 mil fotos) não termina, roda a cada 6 horas (uma rodada por vez);
+    # depois de copiado tudo, cada rodada só lista o Drive e copia as novas
+    - cron: "0 */6 * * *"
   workflow_dispatch:
     inputs:
       simular:
@@ -38,5 +40,6 @@ jobs:
           FTP_HOST: ${{ secrets.FTP_HOST }}
           FTP_USER: ${{ secrets.FTP_USER }}
           FTP_PASS: ${{ secrets.FTP_PASS }}
+          JUNTAS: "10"
           SIMULAR: ${{ github.event_name == 'workflow_dispatch' && inputs.simular || 'false' }}
           LIMITE: ${{ inputs.limite || '40000' }}
