@@ -527,3 +527,4 @@ button.lc-linha[aria-expanded="true"]{border-bottom-left-radius:0;border-bottom-
 .pessoa-chips{flex-wrap:wrap}
 .pessoa-paginas{display:flex;justify-content:space-between;align-items:center;gap:8px;margin:8px 0}
 .cad-fotos{border-style:dashed}
+.ficha-cep{font-size:.88rem;display:flex;gap:8px;align-items:center;flex-wrap:wrap;min-height:1.2em}

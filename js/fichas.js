@@ -422,6 +422,42 @@ async function conferir(C, g, colNome, depois) {
           d.append(l, i);
           campos.append(d);
         });
+        // CEP: busca o endereço oficial (Correios) e oferece para usar; bairro e cidade vazios são preenchidos
+        const cepInfo = el("div", "ficha-cep fc-6");
+        campos.append(cepInfo);
+        const olharCep = async () => {
+          const { lerCep, buscarCep } = await import("./cep.js");
+          const d = lerCep(ins.cep.value);
+          cepInfo.textContent = "";
+          if (!d) return;
+          cepInfo.textContent = "Buscando o CEP…";
+          try {
+            const r = await buscarCep(d);
+            if (!r) return (cepInfo.textContent = "⚠️ CEP não encontrado nos Correios: confira o número com a ficha.");
+            if (!ins.bairro.value.trim()) ins.bairro.value = title(r.bairro);
+            if (!ins.cidade.value.trim()) ins.cidade.value = title(r.cidade);
+            const bate =
+              r.rua && U.chave(ins.rua.value).includes(U.chave(r.rua).replace(/^(RUA|ESTRADA|AVENIDA|TRAVESSA|R|ESTR|AV)\.?\s+/, ""));
+            cepInfo.textContent = `📍 Pelo CEP: ${[title(r.rua), title(r.bairro), title(r.cidade)].filter(Boolean).join(" · ")} ${bate ? "✓" : ""}`;
+            if (r.rua && !bate) {
+              cepInfo.append(
+                U.mkBtn("Usar a rua do CEP", "btn-sm", () => {
+                  // guarda o que estava escrito (lote, quadra, referência) depois da rua oficial
+                  const resto = ins.rua.value.trim();
+                  ins.rua.value = title(r.rua) + (resto ? " (" + resto + ")" : "");
+                  if (r.bairro) ins.bairro.value = title(r.bairro);
+                  if (r.cidade) ins.cidade.value = title(r.cidade);
+                  cepInfo.lastChild.remove();
+                  cepInfo.textContent += " ✓";
+                })
+              );
+            }
+          } catch (_) {
+            cepInfo.textContent = "Não consegui buscar o CEP agora.";
+          }
+        };
+        ins.cep.addEventListener("change", olharCep);
+        olharCep();
         const aviso = el("p", "hint");
         const ja = acharExistente(existentes, f, f.lido || {});
         aviso.textContent = ja
