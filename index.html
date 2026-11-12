@@ -182,19 +182,16 @@
   <form class="panel" id="form" autocomplete="off">
     <h2 id="formTitle">Novo lead</h2>
     <div class="field"><label for="fNome">Nome</label><input id="fNome" required maxlength="80"></div>
-    <div class="row2">
-      <div class="field"><label for="fTel">WhatsApp</label><input id="fTel" inputmode="tel" placeholder="21 99999-9999" maxlength="25"></div>
-      <div class="field"><label for="fValor">Valor orçado (R$)</label><input id="fValor" inputmode="decimal" placeholder="330"></div>
-    </div>
+    <div class="field"><label for="fTel">WhatsApp</label><input id="fTel" inputmode="tel" placeholder="21 99999-9999" maxlength="25"></div>
     <div class="row2">
       <div class="field"><label for="fServ">Serviço</label><select id="fServ"></select></div>
       <div class="field"><label for="fOrig">Origem</label><select id="fOrig"></select></div>
     </div>
+    <div class="field"><label for="fValor">Valor orçado (R$)</label><input id="fValor" inputmode="decimal" placeholder="330"></div>
     <div class="row2">
       <div class="field"><label for="fEtapa">Etapa</label><select id="fEtapa"></select></div>
       <div class="field"><label for="fFu">Próximo contato</label><input id="fFu" type="date"></div>
     </div>
-    <div class="field"><label for="fResp">Responsável</label><select id="fResp"></select></div>
     <div class="quick" aria-label="Agendar próximo contato">
       <button type="button" class="btn btn-sm" data-add="0">Hoje</button>
       <button type="button" class="btn btn-sm" data-add="1">Amanhã</button>
@@ -202,6 +199,7 @@
       <button type="button" class="btn btn-sm" data-add="7">+7 dias</button>
       <button type="button" class="btn btn-sm" data-add="-1">Sem data</button>
     </div>
+    <div class="field"><label for="fResp">Responsável</label><select id="fResp"></select></div>
     <div class="field"><label for="fNotas">Notas</label><textarea id="fNotas" rows="3" maxlength="1500" placeholder="Curso, instituição, data da colação, objeções…"></textarea></div>
     <div id="confirmDel" class="confirm" hidden>Apagar este lead de vez?
       <button type="button" class="btn btn-sm btn-danger" id="delYes">Apagar</button>

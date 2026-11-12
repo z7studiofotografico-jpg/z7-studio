@@ -1,6 +1,7 @@
 // Funil de vendas: leads do WhatsApp, mensagens prontas, follow-ups e venda.
 // Antes ficava dentro do index.html; agora é um módulo como os outros.
-import { avisoErro, emPartes, norm, clicavel } from "./ui.js";
+import { avisoErro, emPartes, norm, clicavel, emBlocos } from "./ui.js";
+import { linhaGenerica } from "./lista-compacta.js";
 import { campoReais, centavos, reais } from "./regras.js";
 import { ESTUDIO } from "./mensagens.js";
 import * as U from "./util.js";
@@ -254,6 +255,38 @@ function renderStats() {
   } catch (_) {}
 }
 
+// texto do próximo contato (no cartão e na linha da lista)
+function textoFu(l, s) {
+  if (OPEN.includes(l.etapa))
+    return l.followup
+      ? s === "late"
+        ? "Atrasado desde " + fmtDate(l.followup)
+        : s === "today"
+          ? "Contato para hoje"
+          : "Próximo contato: " + fmtDate(l.followup)
+      : "Sem data de contato";
+  return l.etapa === "FECHADO"
+    ? "Fechado" + (l.fechadoEm ? " em " + fmtDate(l.fechadoEm) : "") + (l.conferido === false ? " · ⏳ a conferir" : "")
+    : "Encerrado";
+}
+// uma linha por lead, no mesmo desenho da lista do PR; tocar abre o cartão completo embaixo
+function linha(l) {
+  const s = status(l);
+  const cor = s === "won" ? "verde" : s === "late" ? "vermelho" : s === "today" ? "amarelo" : OPEN.includes(l.etapa) ? "cinza" : "fim";
+  return linhaGenerica({
+    id: l.id,
+    cor,
+    titulo: l.nome || "Sem nome",
+    tags: [l.codigoEnsaio],
+    sub: [l.servico, l.origem, l.telefone, C.nomeDe(l) ? "👤 " + first(C.nomeDe(l)) : "", l.valor ? money(l.valor) : ""]
+      .filter(Boolean)
+      .join(" · "),
+    passo: textoFu(l, s),
+    passoCls: s === "late" || s === "today" ? s : "",
+    selo: l.etapa,
+    card: () => card(l)
+  });
+}
 function card(l) {
   const s = status(l);
   const el = document.createElement("article");
@@ -296,19 +329,7 @@ function card(l) {
 
   const fu = document.createElement("div");
   fu.className = "fu " + (s === "late" ? "late" : s === "today" ? "today" : l.followup ? "" : "none");
-  if (OPEN.includes(l.etapa))
-    fu.textContent = l.followup
-      ? s === "late"
-        ? "Atrasado desde " + fmtDate(l.followup)
-        : s === "today"
-          ? "Contato para hoje"
-          : "Próximo contato: " + fmtDate(l.followup)
-      : "Sem data de contato";
-  else
-    fu.textContent =
-      l.etapa === "FECHADO"
-        ? "Fechado" + (l.fechadoEm ? " em " + fmtDate(l.fechadoEm) : "") + (l.conferido === false ? " · ⏳ a conferir" : "")
-        : "Encerrado";
+  fu.textContent = textoFu(l, s);
   el.appendChild(fu);
   if (l.notas) {
     const n = document.createElement("p");
@@ -528,6 +549,7 @@ export function render() {
   );
   const list = $("list");
   list.innerHTML = "";
+  list.classList.add("lc-lista");
   if (!arr.length) {
     const e = document.createElement("div");
     e.className = "empty";
@@ -542,7 +564,7 @@ export function render() {
     list.appendChild(e);
     return;
   }
-  emPartes(list, arr, card);
+  emPartes(list, arr, linha);
   garantirIds();
 }
 // Venda fechada sem ID (ficou sem internet na hora): dá o ID assim que der (admin, ou quem é o responsável)
@@ -650,6 +672,14 @@ export function syncLeads() {
 
 function ligar() {
   $("btnNew").onclick = () => openForm(null);
+  // a janela do lead no padrão do ➕ Cadastrar aluno: blocos numerados
+  if (!$("form").classList.contains("cad"))
+    emBlocos($("form"), [
+      [1, 3, "Contato"],
+      [3, 5, "Serviço e valor"],
+      [5, 8, "Próximo contato"],
+      [8, 9, "Notas"]
+    ]);
   // relatório para imprimir (os leads que esta pessoa vê)
   if (!$("btnRelFunil")) {
     const b = botaoRelatorio(relatorioFunil, () => C.me);
