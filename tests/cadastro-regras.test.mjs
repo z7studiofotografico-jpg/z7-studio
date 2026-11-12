@@ -1,6 +1,14 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { prefixoId, idDoAluno, faltaParaSalvar, conferirRepetido, linhasPlanilha, COLUNAS_CONTATOS } from "../js/cadastro-regras.js";
+import {
+  prefixoId,
+  idDoAluno,
+  faltaParaSalvar,
+  conferirRepetido,
+  linhasPlanilha,
+  COLUNAS_CONTATOS,
+  TEL_ALUNO
+} from "../js/cadastro-regras.js";
 
 const nuta = { id: "i1", nome: "C.E. Nuta Bartlet James" };
 
@@ -59,10 +67,10 @@ test("planilha: mãe, pai e aluno em colunas separadas", () => {
         ]
       }
     ],
-    [["nome", "Aluno"], ...COLUNAS_CONTATOS, ["vendaComo", "Kit"]]
+    [["nome", "Aluno"], TEL_ALUNO, ...COLUNAS_CONTATOS, ["vendaComo", "Kit"]]
   );
-  assert.deepEqual(l[0].slice(0, 7), ["Aluno", "Mãe", "Telefone da mãe", "Pai", "Telefone do pai", "Aluno (contato)", "Telefone do aluno"]);
-  assert.deepEqual(l[1].slice(0, 7), ["Ana", "Maria", "21911", "", "", "Ana", "21933"]);
+  assert.deepEqual(l[0].slice(0, 7), ["Aluno", "Telefone do aluno", "Mãe", "Telefone da mãe", "Pai", "Telefone do pai", "Responsável"]);
+  assert.deepEqual(l[1].slice(0, 7), ["Ana", "21933", "Maria", "21911", "", "", ""]);
   assert.equal(l[1][l[1].length - 1], "PR");
 });
 

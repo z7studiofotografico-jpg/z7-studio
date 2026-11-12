@@ -10,6 +10,7 @@ import { codigoBusca } from "./aluno-id.js";
 import { BECAS, TAMANHOS, FAIXAS, CAPELOS, COM_MENOS_LONGA } from "./becas-estoque.js";
 import {
   COLUNAS_CONTATOS,
+  TEL_ALUNO,
   prefixoId,
   idDoAluno,
   faltaParaSalvar,
@@ -690,6 +691,7 @@ async function guardarNumero(C, ano, inst, codigo) {
 export const CAMPOS_ALUGUEL = [
   ["codigo", "ID"],
   ["nome", "Aluno"],
+  TEL_ALUNO,
   ["instNome", "Colégio"],
   ["ano", "Ano"],
   ["serie", "Série"],
@@ -707,6 +709,7 @@ export const CAMPOS_ALUGUEL = [
 export const CAMPOS_PR = [
   ["codigo", "ID"],
   ["nome", "Aluno"],
+  TEL_ALUNO,
   ["escola", "Colégio"],
   ["ano", "Ano"],
   ["turma", "Turma"],

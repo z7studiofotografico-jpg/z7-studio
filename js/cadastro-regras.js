@@ -67,9 +67,11 @@ const contatoDe = (x, tipo) => {
   if (tipo === "Responsável" && !cs.length && x.responsavel) return { nome: x.responsavel, tel: "" };
   return null;
 };
-export const COLUNAS_CONTATOS = ["Mãe", "Pai", "Formando", "Responsável"].flatMap(t => [
-  [`c:${t}:nome`, t === "Formando" ? "Aluno (contato)" : t],
-  [`c:${t}:tel`, "Telefone " + (t === "Formando" ? "do aluno" : t === "Mãe" ? "da mãe" : t === "Pai" ? "do pai" : "do responsável")]
+// o telefone do aluno vai logo depois do nome dele (o nome não se repete); depois mãe, pai e responsável
+export const TEL_ALUNO = ["c:Formando:tel", "Telefone do aluno"];
+export const COLUNAS_CONTATOS = ["Mãe", "Pai", "Responsável"].flatMap(t => [
+  [`c:${t}:nome`, t],
+  [`c:${t}:tel`, "Telefone " + (t === "Mãe" ? "da mãe" : t === "Pai" ? "do pai" : "do responsável")]
 ]);
 function valorCampo(x, k) {
   // n:1:nome = o 1º contato da lista (colégios: contato, cargo, telefone, e-mail)
