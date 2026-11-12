@@ -40,6 +40,6 @@ jobs:
           FTP_HOST: ${{ secrets.FTP_HOST }}
           FTP_USER: ${{ secrets.FTP_USER }}
           FTP_PASS: ${{ secrets.FTP_PASS }}
-          JUNTAS: "10"
+          JUNTAS: "6"
           SIMULAR: ${{ github.event_name == 'workflow_dispatch' && inputs.simular || 'false' }}
           LIMITE: ${{ inputs.limite || '40000' }}

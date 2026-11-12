@@ -134,13 +134,27 @@ if (!SIMULAR) {
     salvoEm = 0;
   const salvarIndice = c => c.uploadFrom(Readable.from([Buffer.from(JSON.stringify(indice))]), "indice.json");
   const pasta = await ftp.pwd(); // (antes de começar: o cliente principal já vai estar ocupado copiando)
+  // a Hostinger às vezes derruba a conexão: o trabalhador abre outra e segue (a foto volta para a fila)
+  const conectar = async () => {
+    const c = new Client(60000);
+    await c.access({ host: process.env.FTP_HOST, user: process.env.FTP_USER, password: process.env.FTP_PASS, secure: false });
+    await c.cd(pasta);
+    return c;
+  };
+  const espera = ms => new Promise(r => setTimeout(r, ms));
+  const tentativas = new Map();
   async function trabalhador(n) {
-    const c = n === 0 ? ftp : new Client(60000);
-    if (n) {
-      await c.access({ host: process.env.FTP_HOST, user: process.env.FTP_USER, password: process.env.FTP_PASS, secure: false });
-      await c.cd(pasta);
-    }
+    let c = n === 0 ? ftp : null;
     while (fila.length && Date.now() < ATE) {
+      if (!c || c.closed) {
+        try {
+          c = await conectar();
+        } catch (e) {
+          console.warn(`Conexão ${n}: não abriu (${e.message}); tenta de novo em 30 s`);
+          await espera(30000);
+          continue;
+        }
+      }
       const f = fila.shift();
       try {
         const b = await baixar(f);
@@ -148,20 +162,32 @@ if (!SIMULAR) {
         indice[f.id] = f.modifiedTime;
         ok++;
       } catch (e) {
-        erro++;
-        console.warn("Falhou:", f.name, e.message);
+        const t = (tentativas.get(f.id) || 0) + 1;
+        tentativas.set(f.id, t);
+        if (c.closed && t < 3)
+          fila.push(f); // caiu a conexão: tenta essa foto de novo depois
+        else {
+          erro++;
+          console.warn("Falhou:", f.name, e.message);
+        }
+        if (c.closed) await espera(5000);
       }
       // guarda o índice de vez em quando (se o GitHub parar no meio, não copia tudo de novo)
-      if (ok + erro - salvoEm >= 500) {
+      if (ok + erro - salvoEm >= 500 && !c.closed) {
         salvoEm = ok + erro;
-        await salvarIndice(c);
+        await salvarIndice(c).catch(e => console.warn("Índice não salvou agora:", e.message));
         console.log(`${ok + erro} feitas · ${((Date.now() - inicio) / (ok + erro) / 1000).toFixed(1)} s por foto`);
       }
     }
-    if (n) c.close();
+    if (c && c !== ftp) c.close();
   }
   await Promise.all(Array.from({ length: Number(process.env.JUNTAS) || 6 }, (_, n) => trabalhador(n)));
-  await salvarIndice(ftp);
+  // o índice no final, numa conexão nova (a principal pode ter caído)
+  const fim = await conectar().catch(() => null);
+  if (fim) {
+    await salvarIndice(fim).catch(e => console.warn("Índice não salvou:", e.message));
+    fim.close();
+  }
   console.log(`Copiadas: ${ok} · com erro: ${erro} · faltam: ${Math.max(0, novas.length - ok - erro)} (vão na próxima vez)`);
 }
 ftp.close();
