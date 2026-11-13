@@ -149,6 +149,12 @@ export function precoTxt(it) {
   if (P.kitPreco) return U.money(P.kitPreco);
   return "[valor do kit]";
 }
+// a linha do cartão da prévia: "R$ 377,00 no cartão · até 10x sem juros ou até 12x com juros" ("" sem preço no cartão)
+export function cartaoTxt(it) {
+  const P = precos(it);
+  const v = it && segDe(it) === "lf" ? P.lfCartao : P.kitCartao;
+  return Number(v) ? `${U.money(v)} no cartão · ${parcTxt(parcDe(it))}` : "";
+}
 export function ofertaTxt(it) {
   const P = precos(it);
   if (segDe(it) === "lf") {

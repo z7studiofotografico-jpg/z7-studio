@@ -35,7 +35,7 @@ export function idadeDe(it) {
 }
 // o documento público (nada de telefone, e-mail ou valores internos)
 // r = resultado de fotosDoAluno ({ folhas, fotos }); preco = o texto do preço do kit; agora = Date (testes)
-export function dadosLink(it, r, preco, por, agora = new Date()) {
+export function dadosLink(it, r, preco, por, agora = new Date(), cartao = "") {
   const fotos = (r.fotos && r.fotos.length ? r.fotos : r.folhas || []).slice(0, MAX_FOTOS).map(f => String(f.id));
   return {
     nome: nomeCurto(it.nome).slice(0, 80),
@@ -44,6 +44,7 @@ export function dadosLink(it, r, preco, por, agora = new Date()) {
     idade: idadeDe(it),
     fotos,
     preco: /\[/.test(preco || "") ? "" : String(preco || "").slice(0, 40),
+    cartao: /\[/.test(preco || "") ? "" : String(cartao || "").slice(0, 90),
     por: U.first(por || "").slice(0, 40),
     criadoEm: agora.toISOString(),
     ate: new Date(agora.getTime() + DIAS * 864e5).toISOString()
@@ -57,13 +58,13 @@ export const mensagemLink = (it, codigo) =>
 // Cria (ou atualiza) o link e abre o WhatsApp com a mensagem. o = { tel, precoTxt, salvar(patch, msg) }
 export async function mandarLinkPrevia(C, it, r, o = {}) {
   const FS = C.FS;
-  const d = dadosLink(it, r, o.precoTxt, C.me);
+  const d = dadosLink(it, r, o.precoTxt, C.me, new Date(), o.cartaoTxt);
   if (!d.fotos.length) return U.toast("Este aluno ainda não tem fotos no Drive.");
   let codigo = it.linkPrevia;
   if (codigo) {
     // já tem link: atualiza as fotos e o preço, e renova o prazo de 30 dias (os números de visitas continuam)
-    const { nome, escola, kit, fotos, preco, ate } = d;
-    await FS.updateDoc(FS.doc(C.db, COLECAO, codigo), { nome, escola, kit, fotos, preco, ate });
+    const { nome, escola, kit, fotos, preco, cartao, ate } = d;
+    await FS.updateDoc(FS.doc(C.db, COLECAO, codigo), { nome, escola, kit, fotos, preco, cartao, ate });
   } else {
     codigo = codigoNovo();
     await FS.setDoc(FS.doc(C.db, COLECAO, codigo), Object.assign(d, { vistos: 0, cliques: 0, vistoEm: null, cliqueEm: null }));

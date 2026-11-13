@@ -85,20 +85,20 @@ export function esquecerListas() {
 const NOMES = ["Quadro", "Porta-retratos 1", "Porta-retratos 2"];
 const NOMES_PAS = ["Direita", "Esquerda", "Pequenas", "Tirinha", "Calendário"];
 // admin: aluno sem foto no Drive ganha o botão de enviar (gera a prévia e grava na pasta do colégio)
-function botaoEnviar(C, it, p, close, precoTxt) {
+function botaoEnviar(C, it, p, close, precoTxt, cartaoTxt) {
   if (!C.isAdmin) return;
   p.append(
     U.mkBtn("📤 Enviar foto", "btn-primary", () => {
       close();
       import("./enviar-foto.js")
-        .then(m => m.enviarFotoAluno(C, it, { verFotos: () => abrirFotosDoAluno(C, it, precoTxt) }))
+        .then(m => m.enviarFotoAluno(C, it, { verFotos: () => abrirFotosDoAluno(C, it, precoTxt, cartaoTxt) }))
         .catch(e => C.handleErr(e));
     })
   );
 }
 
 // precoTxt: o texto do preço do kit (o mesmo da prévia)
-export function abrirFotosDoAluno(C, it, precoTxt) {
+export function abrirFotosDoAluno(C, it, precoTxt, cartaoTxt = "") {
   sheet("🖼️ Fotos de " + U.first(title(it.nome || "")), async (p, close) => {
     const raiz = idDaPasta(C.P.drivePrevias);
     if (!raiz) {
@@ -123,7 +123,7 @@ export function abrirFotosDoAluno(C, it, precoTxt) {
     if (r.erro) {
       info.className = "wait";
       info.textContent = r.erro;
-      botaoEnviar(C, it, p, close, precoTxt);
+      botaoEnviar(C, it, p, close, precoTxt, cartaoTxt);
       p.append(U.mkBtn("Fechar", "", close));
       return;
     }
@@ -184,6 +184,7 @@ export function abrirFotosDoAluno(C, it, precoTxt) {
           nome: title(it.nome || ""),
           escola: title(it.escola || ""),
           preco: precoTxt,
+          cartao: cartaoTxt,
           toast: U.toast,
           fotos: escolha.map(i => blobs[i]),
           kit: pas ? "paspatur" : "pr",
@@ -351,7 +352,9 @@ export async function miniaturasDoAluno(C, it, box, o = {}) {
     b.setAttribute("aria-label", rot === String(Number(rot)) ? "Foto " + rot : rot);
     grade.append(b);
   });
-  acoes.append(U.mkBtn("🖼️ Enviar a folha / montar o quadro", "btn-primary", () => abrirFotosDoAluno(C, it, o.precoTxt || "")));
+  acoes.append(
+    U.mkBtn("🖼️ Enviar a folha / montar o quadro", "btn-primary", () => abrirFotosDoAluno(C, it, o.precoTxt || "", o.cartaoTxt || ""))
+  );
   // link da prévia no site (z7studio.com.br/previa/?c=…): a família vê as fotos, o kit, o preço e chama no WhatsApp
   const bLink = U.mkBtn(it.linkPrevia ? "🔗 Mandar o link da prévia de novo" : "🔗 Mandar o link da prévia", "", async () => {
     bLink.disabled = true;
@@ -394,7 +397,7 @@ export async function miniaturasDoAluno(C, it, box, o = {}) {
 function botaoEnviarNovas(C, it, o) {
   return U.mkBtn("📤 Enviar fotos novas", "", () =>
     import("./enviar-foto.js")
-      .then(m => m.enviarFotoAluno(C, it, { verFotos: () => abrirFotosDoAluno(C, it, o.precoTxt || "") }))
+      .then(m => m.enviarFotoAluno(C, it, { verFotos: () => abrirFotosDoAluno(C, it, o.precoTxt || "", o.cartaoTxt || "") }))
       .catch(e => C.handleErr(e))
   );
 }

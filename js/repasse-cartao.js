@@ -25,6 +25,7 @@ import {
   vendaDe,
   precos,
   precoTxt,
+  cartaoTxt,
   parcDe,
   assumir,
   save,
@@ -203,7 +204,7 @@ export function desenharProximo(box, it, escolhido, blocked, li) {
     })
   );
   // fotos do aluno direto do Google Drive (quando a pasta das prévias está ligada em Ajustes)
-  if (C.P.drivePrevias) row.append(U.mkBtn("🖼️ Fotos do aluno", "", () => abrirFotosDoAluno(C, it, precoTxt(it))));
+  if (C.P.drivePrevias) row.append(U.mkBtn("🖼️ Fotos do aluno", "", () => abrirFotosDoAluno(C, it, precoTxt(it), cartaoTxt(it))));
   // a prévia fica sempre à mão (desde o 1º contato), não só depois do "Quer ver a prévia"
   row.append(
     U.mkBtn("🖼️ Prévia", "", async () =>
@@ -213,6 +214,7 @@ export function desenharProximo(box, it, escolhido, blocked, li) {
         nome: title(it.nome),
         escola: title(it.escola),
         preco: precoTxt(it),
+        cartao: cartaoTxt(it),
         toast: U.toast,
         maxFotos: ehFormatura() ? 70 : 15,
         kit: vendaDe(it) === "paspatur" ? "paspatur" : "pr"
@@ -227,6 +229,7 @@ export function desenharProximo(box, it, escolhido, blocked, li) {
           nome: title(it.nome),
           escola: title(it.escola),
           preco: precoTxt(it),
+          cartao: cartaoTxt(it),
           modo: "escolha",
           maxFotos: ehFormatura() ? 70 : 15,
           kit: vendaDe(it) === "paspatur" ? "paspatur" : "pr"

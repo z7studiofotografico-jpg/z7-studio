@@ -3,6 +3,7 @@
 // - "Fotos para escolher": todas as fotos do ensaio numeradas, para o formando escolher o que vai em cada lugar.
 // Toda imagem sai com marca d'água repetida (um print não serve como foto final).
 import { el, avisoErro } from "./ui.js";
+import { exemplo } from "./mockup-exemplo.js";
 import { noComputador, copiarImagem, abrirWhatsAppWeb } from "./enviar-computador.js";
 const W = 1080,
   H = 1350;
@@ -73,73 +74,6 @@ function marca(ctx, x, y, w, h, forte = false) {
       ctx.fillText("PRÉVIA · Z7 STUDIO", xx + (Math.round(yy / step) % 2) * fs * 4.5 + 1.5, yy + 1.5);
     }
   }
-  ctx.restore();
-}
-// Sem foto ainda: uma foto de exemplo desenhada (formando de beca e capelo num fundo de estúdio), em vez do quadro branco
-export function exemplo(ctx, x, y, w, h) {
-  ctx.save();
-  ctx.beginPath();
-  ctx.rect(x, y, w, h);
-  ctx.clip();
-  const bg = ctx.createRadialGradient(x + w / 2, y + h * 0.35, 10, x + w / 2, y + h * 0.45, Math.max(w, h));
-  bg.addColorStop(0, "#d8c7b2");
-  bg.addColorStop(0.55, "#9c8670");
-  bg.addColorStop(1, "#4b3d31");
-  ctx.fillStyle = bg;
-  ctx.fillRect(x, y, w, h);
-  const cx = x + w / 2,
-    u = Math.min(w, h * 0.75);
-  // beca (ombros e corpo)
-  const beca = ctx.createLinearGradient(cx - u * 0.5, 0, cx + u * 0.5, 0);
-  beca.addColorStop(0, "#14182b");
-  beca.addColorStop(0.5, "#252b47");
-  beca.addColorStop(1, "#14182b");
-  ctx.fillStyle = beca;
-  ctx.beginPath();
-  ctx.moveTo(cx - u * 0.46, y + h);
-  ctx.quadraticCurveTo(cx - u * 0.44, y + h * 0.66, cx - u * 0.12, y + h * 0.6);
-  ctx.lineTo(cx + u * 0.12, y + h * 0.6);
-  ctx.quadraticCurveTo(cx + u * 0.44, y + h * 0.66, cx + u * 0.46, y + h);
-  ctx.closePath();
-  ctx.fill();
-  // faixa
-  ctx.fillStyle = "#b3202a";
-  ctx.beginPath();
-  ctx.moveTo(cx - u * 0.12, y + h * 0.6);
-  ctx.lineTo(cx - u * 0.04, y + h);
-  ctx.lineTo(cx - u * 0.12, y + h);
-  ctx.lineTo(cx - u * 0.2, y + h * 0.63);
-  ctx.closePath();
-  ctx.fill();
-  // pescoço e rosto
-  ctx.fillStyle = "#c69c7d";
-  ctx.fillRect(cx - u * 0.06, y + h * 0.5, u * 0.12, h * 0.11);
-  ctx.beginPath();
-  ctx.ellipse(cx, y + h * 0.43, u * 0.13, u * 0.16, 0, 0, Math.PI * 2);
-  ctx.fill();
-  // capelo
-  ctx.fillStyle = "#111";
-  ctx.beginPath();
-  ctx.moveTo(cx, y + h * 0.27);
-  ctx.lineTo(cx + u * 0.26, y + h * 0.31);
-  ctx.lineTo(cx, y + h * 0.35);
-  ctx.lineTo(cx - u * 0.26, y + h * 0.31);
-  ctx.closePath();
-  ctx.fill();
-  ctx.fillRect(cx - u * 0.13, y + h * 0.32, u * 0.26, h * 0.05);
-  ctx.strokeStyle = "#d4a017";
-  ctx.lineWidth = Math.max(2, u * 0.012);
-  ctx.beginPath();
-  ctx.moveTo(cx, y + h * 0.31);
-  ctx.lineTo(cx + u * 0.2, y + h * 0.33);
-  ctx.lineTo(cx + u * 0.2, y + h * 0.42);
-  ctx.stroke();
-  // aviso discreto
-  ctx.fillStyle = "rgba(255,255,255,.85)";
-  ctx.font = `600 ${Math.max(14, Math.round(u * 0.07))}px 'Source Sans 3', sans-serif`;
-  ctx.textAlign = "center";
-  ctx.textBaseline = "alphabetic";
-  ctx.fillText("foto de exemplo", cx, y + h * 0.12);
   ctx.restore();
 }
 // Sugestão automática: no quadro, a foto mais "em pé" (retrato); nos porta-retratos, as próximas, sem repetir
@@ -215,6 +149,30 @@ function rodape(ctx, cor) {
   ctx.fillText("Prévia com marca d'água · reprodução proibida · as fotos entregues não têm marca", 60, H - 30);
 }
 
+// o preço da prévia: uma linha fina, o Pix grande em vermelho com "no Pix" ao lado, e o cartão embaixo
+// (valor em negrito e as parcelas em cinza). Usado no kit PR e no Kit Paspatur.
+export function blocoPreco(ctx, st, x, y, maxW) {
+  ctx.textAlign = "left";
+  ctx.textBaseline = "alphabetic";
+  ctx.fillStyle = "rgba(28,27,29,.15)";
+  ctx.fillRect(x, y, Math.min(maxW, 300), 2);
+  ctx.fillStyle = "#b3202a";
+  ctx.font = "700 66px 'Barlow Condensed', sans-serif";
+  ctx.fillText(st.preco, x, y + 72);
+  const lp = ctx.measureText(st.preco).width;
+  ctx.fillStyle = "#6b6670";
+  ctx.font = "600 24px 'Source Sans 3', sans-serif";
+  ctx.fillText("no Pix", x + lp + 12, y + 70);
+  if (!st.cartao) return y + 72;
+  const [valor, parc] = String(st.cartao).split(" · ");
+  ctx.fillStyle = "#1c1b1d";
+  ctx.font = "700 28px 'Source Sans 3', sans-serif";
+  ctx.fillText("ou " + valor, x, y + 114);
+  if (!parc) return y + 114;
+  ctx.fillStyle = "#6b6670";
+  ctx.font = "600 21px 'Source Sans 3', sans-serif";
+  return wrap(ctx, parc.replace(" ou até ", " · "), x, y + 146, maxW, 26);
+}
 async function desenharKit(cv, st) {
   await prep();
   const ctx = cv.getContext("2d");
@@ -241,42 +199,35 @@ async function desenharKit(cv, st) {
   ctx.textBaseline = "alphabetic";
   ctx.fillStyle = "#b3202a";
   ctx.font = "700 30px 'Barlow Condensed', sans-serif";
-  ctx.fillText("KIT RECORDAÇÃO", x, 170);
+  ctx.fillText("KIT RECORDAÇÃO", x, 150);
   ctx.fillStyle = "#1c1b1d";
   ctx.font = "700 58px 'Barlow Condensed', sans-serif";
-  wrap(ctx, (st.nome || "").trim().split(/\s+/).slice(0, 2).join(" ").toUpperCase() || "SEU NOME", x, 232, 360, 58);
+  wrap(ctx, (st.nome || "").trim().split(/\s+/).slice(0, 2).join(" ").toUpperCase() || "SEU NOME", x, 210, 360, 58);
   ctx.fillStyle = "#4a4549";
-  ctx.font = "600 26px 'Source Sans 3', sans-serif";
+  ctx.font = "600 24px 'Source Sans 3', sans-serif";
   ["Quadro 30x40 · moldura preta", "2 porta-retratos 15x10", "Fotos digitais do ensaio"].forEach((t, i) =>
-    ctx.fillText("• " + t, x, 360 + i * 40)
+    ctx.fillText("• " + t, x, 336 + i * 36)
   );
   if (st.escola) {
     ctx.fillStyle = "#6b6670";
-    ctx.font = "400 22px 'Source Sans 3', sans-serif";
-    wrap(ctx, st.escola, x, 500, 360, 28);
+    ctx.font = "400 21px 'Source Sans 3', sans-serif";
+    wrap(ctx, st.escola, x, 460, 360, 26);
   }
-  if (st.preco) {
-    ctx.fillStyle = "#b3202a";
-    ctx.font = "700 64px 'Barlow Condensed', sans-serif";
-    ctx.fillText(st.preco, x, 640);
-    ctx.fillStyle = "#6b6670";
-    ctx.font = "600 22px 'Source Sans 3', sans-serif";
-    ctx.fillText("no Pix", x, 676);
-  }
+  if (st.preco) blocoPreco(ctx, st, x, 530, 360);
   if (logoImg) {
     ctx.save();
     ctx.beginPath();
-    ctx.arc(x + 40, 770, 40, 0, Math.PI * 2);
+    ctx.arc(x + 40, 830, 40, 0, Math.PI * 2);
     ctx.clip();
-    ctx.drawImage(logoImg, x, 730, 80, 80);
+    ctx.drawImage(logoImg, x, 790, 80, 80);
     ctx.restore();
   }
   ctx.fillStyle = "#1c1b1d";
   ctx.font = "700 30px 'Barlow Condensed', sans-serif";
-  ctx.fillText("Z7 STUDIO", x + 96, 765);
+  ctx.fillText("Z7 STUDIO", x + 96, 825);
   ctx.fillStyle = "#6b6670";
   ctx.font = "400 20px 'Source Sans 3', sans-serif";
-  ctx.fillText("Fotográfico", x + 96, 792);
+  ctx.fillText("Fotográfico", x + 96, 852);
   // porta-retratos 15x10 em pé sobre o aparador
   moldura(ctx, 560, 900, 220, 330, 16, f(1), { blur: 24, off: 12 });
   moldura(ctx, 810, 930, 210, 315, 16, f(2), { blur: 24, off: 12 });
@@ -371,6 +322,7 @@ export function openMockup({
   nome = "",
   escola = "",
   preco = "",
+  cartao = "",
   modo = "kit",
   toast = null,
   fotos = [],
@@ -386,6 +338,8 @@ export function openMockup({
     nome,
     escola: escola || "",
     preco: /\[/.test(preco) ? "" : preco,
+    // a linha do cartão, embaixo do Pix: "R$ 377,00 no cartão · até 10x sem juros ou até 12x com juros"
+    cartao: /\[/.test(preco) ? "" : cartao,
     modo,
     encarte: encarte === "turma" ? "turma" : "calendario"
   };
@@ -463,6 +417,13 @@ export function openMockup({
   const fPreco = fieldOf("Preço no Pix", iPreco);
   f1.append(fieldOf("Nome", iNome), fPreco);
   p.append(f1);
+  const iCartao = el("input");
+  iCartao.value = st.cartao;
+  iCartao.maxLength = 90;
+  iCartao.placeholder = "R$ 0 no cartão · até 10x sem juros ou até 12x com juros";
+  iCartao.id = "mkCartao";
+  const fCartao = fieldOf("Cartão", iCartao);
+  p.append(fCartao);
   // Kit Paspatur: o ano do calendário (a partir de agosto, o do ano que vem)
   const iAno = el("input");
   iAno.id = "mkAnoCal";
@@ -577,6 +538,10 @@ export function openMockup({
   };
   iPreco.oninput = () => {
     st.preco = iPreco.value;
+    redraw();
+  };
+  iCartao.oninput = () => {
+    st.cartao = iCartao.value;
     redraw();
   };
 
@@ -846,3 +811,4 @@ function alertMsg(p, t) {
 // usados também pela prévia da formatura (js/previa.js)
 export { cover, marca, prep, loadImg };
 export const logoAtual = () => logoImg;
+export { exemplo };

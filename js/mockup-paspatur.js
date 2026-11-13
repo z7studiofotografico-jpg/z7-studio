@@ -7,7 +7,7 @@
 // Lugares (st.slots): 0 = página da direita, 1 = foto grande da esquerda, 2 = as 3 pequenas, 3 = a tira de 6,
 // 4 = a foto do calendário ou a foto da turma (A4 deitada, já pronta). st.anoCal = ano do calendário.
 export const ehTurma = st => st.encarte === "turma";
-import { cover, marca, prep, logoAtual, loadImg, exemplo } from "./mockup.js";
+import { cover, marca, prep, logoAtual, loadImg, exemplo, blocoPreco } from "./mockup.js";
 
 export const W = 1080,
   H = 1350;
@@ -247,7 +247,7 @@ function fundo(ctx) {
   ctx.fillRect(0, MESA, W, H - MESA);
 }
 // título, nome, colégio (grande) e preço; maxW = largura da coluna de texto
-function textos(ctx, st, maxW) {
+function textos(ctx, st, maxW, comPreco = true) {
   const x = 60;
   ctx.textAlign = "left";
   ctx.textBaseline = "alphabetic";
@@ -265,15 +265,7 @@ function textos(ctx, st, maxW) {
   ctx.fillStyle = CINZA;
   ctx.font = "600 24px 'Source Sans 3', sans-serif";
   y = wrap(ctx, `Livro com as fotos do ensaio + ${ehTurma(st) ? "foto da turma" : "calendário"}`, x, y + 46, maxW, 30);
-  if (st.preco) {
-    ctx.fillStyle = VERMELHO;
-    ctx.font = "700 62px 'Barlow Condensed', sans-serif";
-    ctx.fillText(st.preco, x, y + 74);
-    const lp = ctx.measureText(st.preco).width;
-    ctx.fillStyle = CINZA;
-    ctx.font = "600 22px 'Source Sans 3', sans-serif";
-    ctx.fillText("no Pix", x + lp + 14, y + 72);
-  }
+  if (st.preco && comPreco) blocoPreco(ctx, st, x, y + 30, maxW);
 }
 function rodape(ctx) {
   const lg = logoAtual(),
@@ -321,7 +313,7 @@ export async function desenharPaspatur(cv, st) {
   cv.width = W;
   cv.height = H;
   fundo(ctx);
-  textos(ctx, st, 470);
+  textos(ctx, st, 470, false);
   // em cima à direita: a capa fechada e o calendário
   const pw = 210,
     ph = Math.round(pw * 1.414);
@@ -354,7 +346,33 @@ export async function desenharPaspatur(cv, st) {
   d.addColorStop(1, "rgba(0,0,0,0)");
   ctx.fillStyle = d;
   ctx.fillRect(x0 + lw - 14, topo, 28, PH * k);
+  if (st.preco) precoNaMesa(ctx, st, topo + PH * k + 24);
   rodape(ctx);
+}
+// o preço na mesa grafite, embaixo do livro: o Pix à esquerda e o cartão à direita (mesmas cores, em claro)
+function precoNaMesa(ctx, st, y) {
+  ctx.textAlign = "left";
+  ctx.textBaseline = "alphabetic";
+  ctx.fillStyle = "rgba(255,255,255,.12)";
+  ctx.fillRect(60, y, W - 120, 2);
+  ctx.fillStyle = "#e0525b";
+  ctx.font = "700 60px 'Barlow Condensed', sans-serif";
+  ctx.fillText(st.preco, 60, y + 68);
+  const lp = ctx.measureText(st.preco).width;
+  ctx.fillStyle = "#a39fa6";
+  ctx.font = "600 22px 'Source Sans 3', sans-serif";
+  ctx.fillText("no Pix", 60 + lp + 12, y + 66);
+  if (!st.cartao) return;
+  const [valor, parc] = String(st.cartao).split(" · ");
+  const xc = W / 2 + 20;
+  ctx.fillStyle = "#f0eef0";
+  ctx.font = "700 28px 'Source Sans 3', sans-serif";
+  ctx.fillText("ou " + valor, xc, y + 42);
+  if (parc) {
+    ctx.fillStyle = "#a39fa6";
+    ctx.font = "600 21px 'Source Sans 3', sans-serif";
+    ctx.fillText(parc.replace(" ou até ", " · "), xc, y + 72);
+  }
 }
 
 // ---------- o vídeo ----------

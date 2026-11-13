@@ -18,6 +18,7 @@ import {
   escolherContato,
   vendaDe,
   precoTxt,
+  cartaoTxt,
   ehFormatura,
   colNome,
   save,
@@ -136,6 +137,7 @@ function previa(box, it) {
         nome: title(it.nome),
         escola: title(it.escola),
         preco: precoTxt(it),
+        cartao: cartaoTxt(it),
         toast: U.toast,
         maxFotos: max,
         kit,
@@ -148,6 +150,7 @@ function previa(box, it) {
       nome: title(it.nome),
       escola: title(it.escola),
       preco: precoTxt(it),
+      cartao: cartaoTxt(it),
       modo: "escolha",
       maxFotos: max,
       kit
@@ -159,7 +162,12 @@ function previa(box, it) {
   box.append(el("h3", null, "Fotos do aluno no Drive"));
   if (it.linkPrevia) box.append(linhaVisitas(C, it)); // quantas vezes a família abriu o link da prévia
   box.append(fotos);
-  const o = { precoTxt: precoTxt(it), tel: (contatoAtual(it) || {}).tel, salvar: (patch, msg) => save(it, patch, msg) };
+  const o = {
+    precoTxt: precoTxt(it),
+    cartaoTxt: cartaoTxt(it),
+    tel: (contatoAtual(it) || {}).tel,
+    salvar: (patch, msg) => save(it, patch, msg)
+  };
   if (!precos(it).drivePrevias || driveLiberado(C)) miniaturasDoAluno(C, it, fotos, o);
   else
     fotos.append(

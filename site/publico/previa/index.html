@@ -136,6 +136,11 @@
         font-weight: 700;
         margin: 14px 0 4px;
       }
+      .cartao-pag {
+        font-size: 17px;
+        font-weight: 700;
+        margin: 0 0 4px;
+      }
       .preco small {
         font-size: 15px;
         font-weight: 400;
@@ -434,7 +439,8 @@
             h += "<li>" + esc(x) + "</li>";
           });
           h += "</ul>";
-          if (d.preco) h += '<p class="preco">' + esc(d.preco) + " <small>o kit completo</small></p>";
+          if (d.preco) h += '<p class="preco">' + esc(d.preco) + " <small>no Pix · o kit completo</small></p>";
+          if (d.preco && d.cartao) h += '<p class="cartao-pag">' + esc(d.cartao) + "</p>";
           h +=
             '<p class="nota" style="margin:6px 0 0">Pagamento no Pix ou no cartão. Você escolhe as fotos pelo WhatsApp, pelo número de cada uma.</p>';
           h += '<a class="zap" data-zap href="' + linkZap + '">💬 Quero o ' + esc(kit.nome) + "</a></section>";

@@ -183,6 +183,7 @@ service cloud.firestore {
         return d.nome is string && d.nome.size() <= 80 && d.escola is string && d.escola.size() <= 120
           && d.kit in ['pr', 'paspatur'] && d.idade in ['infantil', 'adulto']
           && d.fotos is list && d.fotos.size() <= 60 && d.preco is string && d.preco.size() <= 40
+          && (!('cartao' in d) || (d.cartao is string && d.cartao.size() <= 90))
           && d.por is string && d.por.size() <= 40 && d.ate is string && d.ate.size() <= 30;
       }
       function soma(campo, hora) {
@@ -192,7 +193,7 @@ service cloud.firestore {
       allow get: if true;
       allow list, delete: if admin();
       allow create: if membro() && c.matches('[a-z0-9]{10,16}')
-        && request.resource.data.keys().hasOnly(['nome', 'escola', 'kit', 'idade', 'fotos', 'preco', 'por', 'criadoEm', 'ate', 'vistos', 'cliques', 'vistoEm', 'cliqueEm'])
+        && request.resource.data.keys().hasOnly(['nome', 'escola', 'kit', 'idade', 'fotos', 'preco', 'cartao', 'por', 'criadoEm', 'ate', 'vistos', 'cliques', 'vistoEm', 'cliqueEm'])
         && linkOk(request.resource.data) && request.resource.data.criadoEm is string
         && request.resource.data.vistos == 0 && request.resource.data.cliques == 0
         && request.resource.data.vistoEm == null && request.resource.data.cliqueEm == null;
