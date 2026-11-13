@@ -356,6 +356,8 @@ export function abrirCadastroAutomatico(C, colNome = "") {
                 montar();
               })
             );
+          // fichas que o Claude não conseguiu ler (foto desfocada ou sem a ficha): a equipe digita da ficha em papel
+          if (g.nova) acoes.append(U.mkBtn(`✍️ Preencher à mão (${g.nova})`, "btn-sm", () => conferir(C, g, g.colNome, montar, "nova")));
           if (g.lida) {
             acoes.append(U.mkBtn(`📋 Conferir (${g.lida})`, "btn-sm", () => conferir(C, g, g.colNome, montar)));
             acoes.append(
@@ -383,7 +385,7 @@ export function abrirCadastroAutomatico(C, colNome = "") {
 }
 
 // ---------- 5. Conferência: a ficha de um lado, os campos do outro ----------
-async function conferir(C, g, colNome, depois) {
+async function conferir(C, g, colNome, depois, status = "lida") {
   const { FS, db } = C;
   // alunos que já estão no app (mesmo colégio e ano): para juntar e para achar o número livre
   const s = await FS.getDocs(FS.query(FS.collection(db, colNome), FS.where("escola", "==", g.escola), FS.where("ano", "==", g.ano)));
@@ -394,8 +396,14 @@ async function conferir(C, g, colNome, depois) {
     "📋 Conferir fichas · " + g.escola,
     (p, close) => {
       p.classList.add("cad", "ficha-janela");
-      const fichas = g.fichas.filter(f => f.status === "lida").sort((a, b) => a.pasta.localeCompare(b.pasta, "pt-BR", { numeric: true }));
-      const info = el("p", "hint", `${fichas.length} fichas para conferir. Os campos com ⚠️ estavam difíceis de ler: confira com a foto.`);
+      const fichas = g.fichas.filter(f => f.status === status).sort((a, b) => a.pasta.localeCompare(b.pasta, "pt-BR", { numeric: true }));
+      const info = el(
+        "p",
+        "hint",
+        status === "nova"
+          ? `${fichas.length} fichas sem leitura (foto desfocada ou sem a ficha). Digite os dados da ficha em papel e confirme; a pasta já diz quem é o aluno.`
+          : `${fichas.length} fichas para conferir. Os campos com ⚠️ estavam difíceis de ler: confira com a foto.`
+      );
       p.append(info);
       fichas.forEach(f => p.append(cartao(f)));
       p.append(U.mkBtn("Fechar", "", () => (close(), depois())));
@@ -415,7 +423,8 @@ async function conferir(C, g, colNome, depois) {
           const d = el("div", "field fc-" + larg + ((f.duvidas || []).includes(k) ? " duvida" : ""));
           const l = el("label", null, ((f.duvidas || []).includes(k) ? "⚠️ " : "") + rot);
           const i = el("input");
-          i.value = (f.lido || {})[k] || "";
+          // sem leitura: o nome vem da pasta ("26 -CIEP433- 019 - CAMILLE V.S PACHECO")
+          i.value = (f.lido || {})[k] || (k === "nome" && !f.lido ? title(dadosDaPasta(f.pasta).nome) : "");
           i.id = "fc-" + f.id.slice(-20) + "-" + k;
           l.htmlFor = i.id;
           ins[k] = i;
@@ -484,6 +493,15 @@ async function conferir(C, g, colNome, depois) {
         });
         const topo = el("div", "ficha-topo");
         topo.append(el("b", null, f.pasta), ok);
+        // pasta que não é de aluno ("14,8", "A3"): tira da lista
+        if (status === "nova")
+          topo.append(
+            U.mkBtn("🗑 Não é aluno", "btn-sm", async () => {
+              await FS.deleteDoc(FS.doc(db, "fichas", f.id));
+              f.status = "descartada";
+              b.replaceChildren(el("p", "hint", `🗑 ${f.pasta}: tirada da lista.`));
+            })
+          );
         b.append(topo, aviso, foto, campos);
         return b;
       }
