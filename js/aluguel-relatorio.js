@@ -3,7 +3,7 @@
 import { title } from "./ui.js";
 import * as U from "./util.js";
 import { ocultoParaMim } from "./confirmar.js";
-import { nomeFaixa, nomeCapelo, usoDosAlunos } from "./becas-estoque.js";
+import { nomeFaixa, nomeCapelo, usoDosAlunos, tamanhoBeca, idadeBeca, TAMANHOS } from "./becas-estoque.js";
 import { pedirFiltros } from "./relatorio.js";
 import { contatoRel, ordemCodigo } from "./aluno-id.js";
 import { pacoteDoAluno, nomeItem } from "./contrato-colegio-regras.js";
@@ -94,7 +94,7 @@ export async function relatorioAluguel(C, lista, filtro) {
     contatoRel(a.tel, ""),
     a.serie || "",
     kit(a),
-    a.tamanho ? a.tamanho + (a.menosLonga ? "1" : "") : "—",
+    a.becaTipo ? tamanhoBeca(a).replace(" · sem tamanho", " (sem tamanho)") : "—",
     [a.faixa && nomeFaixa(a.faixa), a.capelo && nomeCapelo(a.capelo)].filter(Boolean).join(" · "),
     atrasadoAluguel(a, hoje) ? "ATRASADO" : a.status || "Cadastrado",
     a.devolucao ? U.fmtDate(a.devolucao) : ""
@@ -124,6 +124,40 @@ export async function relatorioAluguel(C, lista, filtro) {
           ["Atrasados", arr.filter(a => atrasadoAluguel(a, hoje)).length]
         ]
       },
+      // quantas becas de cada tamanho, infantil e adulto separados
+      ...(arr.some(a => a.tamanho)
+        ? [
+            {
+              titulo: "Becas por tamanho",
+              tabela: {
+                cols: ["Beca", "Tamanho", "Alunos"],
+                linhas: Object.entries(
+                  arr.reduce((m, a) => {
+                    if (!a.tamanho) return m;
+                    const k = idadeBeca(a.becaTipo) + "|" + a.tamanho + (a.menosLonga ? "1" : "");
+                    m[k] = (m[k] || 0) + 1;
+                    return m;
+                  }, {})
+                )
+                  .sort((x, y) => {
+                    const ord = k => {
+                      const [i, t] = k.split("|");
+                      return (
+                        (i === "infantil" ? 0 : 100) +
+                        TAMANHOS.findIndex(([z]) => z === t.replace(/1$/, "")) * 2 +
+                        (t.endsWith("1") ? 1 : 0)
+                      );
+                    };
+                    return ord(x[0]) - ord(y[0]);
+                  })
+                  .map(([k, n]) => {
+                    const [i, t] = k.split("|");
+                    return [i === "infantil" ? "Infantil" : "Adulto", t, n];
+                  })
+              }
+            }
+          ]
+        : []),
       ...(arr.length ? [] : [{ titulo: "Nenhum aluno com esses filtros", nota: "Volte e escolha outro colégio, turma ou situação." }]),
       ...Object.entries(porCol)
         .sort((a, b) => a[0].localeCompare(b[0], "pt-BR"))

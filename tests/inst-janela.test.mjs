@@ -48,7 +48,10 @@ test("filtros do relatório do aluguel de becas", async () => {
     { nome: "C", ano: 2026, instId: "c2", serie: "9º ANO", status: "Devolvida" },
     { nome: "D", ano: 2025, instId: "c1", serie: "9º ANO" }
   ];
-  const n = f => filtrarRelatorio(l, f, "2026-11-10").map(a => a.nome).join("");
+  const n = f =>
+    filtrarRelatorio(l, f, "2026-11-10")
+      .map(a => a.nome)
+      .join("");
   assert.equal(n({}), "ABCD");
   assert.equal(n({ ano: "2026", inst: "c1" }), "AB");
   assert.equal(n({ ano: "2026", turma: "9º ANO" }), "AC");

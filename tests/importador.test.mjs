@@ -21,7 +21,10 @@ test("status da planilha: CAIDO vira Caído", () => {
   assert.equal(statusDaPlanilha("VENDA ANTECIPADA"), "Vendido");
 });
 test("aluguel: linha da planilha vira aluno (P1 = P menos longa; faixa e capelo pelo nome; valor 0 = contrato zerado)", () => {
-  assert.deepEqual(lerTamanho("p1"), { tamanho: "P", menosLonga: true });
+  assert.deepEqual(lerTamanho("p1"), { tamanho: "P", menosLonga: true, idade: "adulto" });
+  assert.deepEqual(lerTamanho("P ADULTO"), { tamanho: "P", menosLonga: false, idade: "adulto" });
+  assert.deepEqual(lerTamanho("Infantil m"), { tamanho: "M", menosLonga: false, idade: "infantil" });
+  assert.deepEqual(lerTamanho("GG"), { tamanho: "GG", menosLonga: false, idade: "" });
   const d = paraDocAluguel(
     { nome: " Ana ", tamanho: "M1", faixa: "Azul fina", capelo: "preto", valor: "" },
     { instId: "i1", instNome: "C.E. Alfa", ano: "2026" }

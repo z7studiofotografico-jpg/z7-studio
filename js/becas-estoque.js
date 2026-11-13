@@ -51,6 +51,19 @@ export const CAPELOS_ANTIGOS = [["capelo", "Capelo"]];
 export const nomeFaixa = k => ([...FAIXAS, ...FAIXAS_ANTIGAS].find(f => f[0] === k) || [k, k])[1];
 export const nomeCapelo = k => ([...CAPELOS, ...CAPELOS_ANTIGOS].find(f => f[0] === k) || [k, k])[1];
 export const nomeBeca = k => (BECAS.find(b => b[0] === k) || [k, k])[1];
+// infantil ou adulto: os tamanhos são diferentes, então sempre aparece escrito
+export const idadeBeca = k => (String(k || "").startsWith("inf") ? "infantil" : "adulto");
+// "Infantil GG", "Adulto P1" (P1 = P menos longa); sem tamanho: "Adulto · sem tamanho"
+export function tamanhoBeca(a) {
+  const i = idadeBeca(a && a.becaTipo);
+  const t = a && a.tamanho ? a.tamanho + (a.menosLonga ? "1" : "") : "";
+  return (i === "infantil" ? "Infantil" : "Adulto") + (t ? " " + t : " · sem tamanho");
+}
+// o modelo sem repetir "beca" e "infantil": "preta", "tradicional preta", "pelerine azul"
+export const modeloBeca = k =>
+  nomeBeca(k)
+    .replace(/^Beca\s+/i, "")
+    .replace(/^infantil\s+/i, "");
 
 const n0 = v => Number(v) || 0;
 // Alunos de aluguel: em que estado está a beca, a faixa e o capelo

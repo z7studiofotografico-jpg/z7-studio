@@ -36,3 +36,23 @@ test("aluguel: ID da planilha vira o ID do app", () => {
   assert.equal(idDaPlanilha("", 2026, inst), "");
   assert.equal(idDaPlanilha("abc", 2026, inst), "");
 });
+import { paraDocAluguel } from "../js/aluguel-importar.js";
+test("aluguel: colunas Aluguel, Paspatur e Canudo viram o kit do aluno", () => {
+  const ext = { instId: "x", instNome: "Escola Legacy School - Nilópolis", inst: { nome: "Escola Legacy School - Nilópolis" }, ano: 2026 };
+  assert.deepEqual(paraDocAluguel({ nome: "A", codigo: "3", itBeca: "1", itPaspatur: "1", itCanudo: "1" }, ext).pacote, [
+    "beca",
+    "paspatur",
+    "canudo"
+  ]);
+  assert.deepEqual(paraDocAluguel({ nome: "B", itPaspatur: "-", itCanudo: "" }, ext).pacote, []);
+  assert.equal(paraDocAluguel({ nome: "A", codigo: "3" }, ext).codigo, "26ELSN-03");
+});
+import { tamanhoBeca } from "../js/becas-estoque.js";
+test("beca: infantil ou adulto sempre escrito", () => {
+  assert.equal(tamanhoBeca({ becaTipo: "infPreta", tamanho: "GG" }), "Infantil GG");
+  assert.equal(tamanhoBeca({ becaTipo: "tradPreta", tamanho: "P", menosLonga: true }), "Adulto P1");
+  assert.equal(tamanhoBeca({ becaTipo: "tradPreta" }), "Adulto · sem tamanho");
+  const ext = { instId: "x", inst: { nome: "Escola Legacy School - Nilópolis" }, ano: 2026, idade: "infantil" };
+  assert.equal(paraDocAluguel({ nome: "A", tamanho: "GG" }, ext).becaTipo, "infPreta");
+  assert.equal(paraDocAluguel({ nome: "B", tamanho: "P ADULTO" }, ext).becaTipo, "tradPreta");
+});

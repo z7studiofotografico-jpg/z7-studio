@@ -25,16 +25,22 @@ export const CAMPOS_ALUGUEL = [
   { k: "capelo", nome: "Capelo", sinonimos: ["Cor do capelo"] },
   { k: "valor", nome: "Valor", sinonimos: ["Valor do aluguel", "Preço"] },
   { k: "pacote", nome: "Pacote", sinonimos: ["Itens", "Kit", "Produtos"] },
+  // planilha com uma coluna por item (1 = o aluno tem): Aluguel (a beca), Paspatur, Canudo, Certificado
+  { k: "itBeca", nome: "Aluguel (item)", sinonimos: ["Aluguel", "Aluguel da beca"] },
+  { k: "itPaspatur", nome: "Paspatur (item)", sinonimos: ["Paspatur"] },
+  { k: "itCanudo", nome: "Canudo (item)", sinonimos: ["Canudo"] },
+  { k: "itCertificado", nome: "Certificado (item)", sinonimos: ["Certificado"] },
   { k: "unidade", nome: "Unidade", sinonimos: ["Unidade do colégio", "Filial"] },
   { k: "obs", nome: "Observação", sinonimos: ["Obs", "Observações"] }
 ];
-// "P1" = P menos longa; "M" = M
+// "P1" = P menos longa (só existe na adulto); "P ADULTO" / "INFANTIL M" dizem qual beca; "M" = M
 export function lerTamanho(v) {
-  const t = String(v || "")
-    .toUpperCase()
-    .replace(/\s/g, "");
+  const bruto = U.chave(v).toUpperCase();
+  const idade = /ADULT/.test(bruto) ? "adulto" : /INFANT|INF\b/.test(bruto) ? "infantil" : "";
+  const t = bruto.replace(/ADULTO?|INFANTIL|INF\b/g, "").replace(/[\s.-]/g, "");
   const m = t.match(/^(PPP|PP|P|M|G|GG|XG|XXG|EXG)(1)?$/);
-  return m && TAMANHOS.some(([z]) => z === m[1]) ? { tamanho: m[1], menosLonga: !!m[2] } : { tamanho: "", menosLonga: false };
+  if (!m || !TAMANHOS.some(([z]) => z === m[1])) return { tamanho: "", menosLonga: false, idade };
+  return { tamanho: m[1], menosLonga: !!m[2], idade: m[2] ? "adulto" : idade };
 }
 // ID da planilha: o número do aluno (1, 02) vira 26SIGLA-01; um ID completo (26LSN-01) fica como está
 export function idDaPlanilha(v, ano, inst) {
@@ -42,6 +48,23 @@ export function idDaPlanilha(v, ano, inst) {
   if (!t) return "";
   if (lerCodigo(t)) return t.toUpperCase().replace(/\s+/g, "");
   return /^\d{1,4}$/.test(t) ? idDoAluno(ano, inst, t) : "";
+}
+// itens marcados nas colunas de item (qualquer coisa que não seja vazio, "-" ou "0")
+export function itensMarcados(o) {
+  const tem = v =>
+    !["", "-", "0", "nao", "não", "n"].includes(
+      String(v == null ? "" : v)
+        .trim()
+        .toLowerCase()
+    );
+  return [
+    ["itBeca", "beca"],
+    ["itPaspatur", "paspatur"],
+    ["itCanudo", "canudo"],
+    ["itCertificado", "certificado"]
+  ]
+    .filter(([k]) => tem(o[k]))
+    .map(([, i]) => i);
 }
 export function paraDocAluguel(o, ext) {
   const t = lerTamanho(o.tamanho);
@@ -63,9 +86,10 @@ export function paraDocAluguel(o, ext) {
     codigoBusca: codigo ? codigoBusca(codigo) : "",
     tel: U.digits(o.tel),
     responsavel: String(o.responsavel || "").trim(),
-    becaTipo: "tradPreta",
+    // infantil ou adulto: o que a célula disser; se não disser, o que foi escolhido na tela da importação
+    becaTipo: (t.idade || ext.idade || "adulto") === "infantil" ? "infPreta" : "tradPreta",
     tamanho: t.tamanho,
-    menosLonga: t.menosLonga,
+    menosLonga: t.menosLonga && (t.idade || ext.idade || "adulto") !== "infantil",
     faixa: achar(FAIXAS, o.faixa),
     capelo: achar(CAPELOS, o.capelo ? "Capelo " + o.capelo : ""),
     valor: Math.max(
@@ -80,7 +104,7 @@ export function paraDocAluguel(o, ext) {
     contratoZerado: !Number(String(o.valor || "0").replace(/\D/g, "")),
     obs: String(o.obs || "").trim(),
     // célula vazia = pacote padrão do contrato do colégio
-    pacote: lerPacote(o.pacote),
+    pacote: lerPacote(o.pacote).length ? lerPacote(o.pacote) : lerPacote(itensMarcados(o)),
     unidade: String(o.unidade || "").trim(),
     status: "Cadastrado",
     produtos: [],
@@ -124,6 +148,15 @@ export async function importarAlugueis(C, insts) {
       ano.value = String(new Date().getFullYear());
       const r = el("div", "row2");
       r.append(field("Instituição", sInst), field("Ano", ano));
+      // tamanho sem "adulto" ou "infantil" na célula fica com esta beca
+      const sIdade = sel(
+        [
+          ["adulto", "Adulto (tradicional preta)"],
+          ["infantil", "Infantil (preta)"]
+        ],
+        "adulto"
+      );
+      r.append(field("Beca de quem não tem escrito na planilha", sIdade));
       const hist = el("details", "notes");
       hist.append(el("summary", null, "Importações anteriores (desfazer)"));
       const hb = el("div");
@@ -136,6 +169,7 @@ export async function importarAlugueis(C, insts) {
           instId: i ? i.id : "",
           instNome: i ? i.nome : "",
           inst: i || null,
+          idade: sIdade.value,
           ano: ano.value,
           respEmail: (i && donos.get(`${i.id}|${Number(ano.value)}`)) || ""
         };

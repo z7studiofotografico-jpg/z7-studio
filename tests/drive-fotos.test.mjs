@@ -114,14 +114,23 @@ import { lerNomeAluno as _ler } from "../js/drive-fotos.js";
 test("nome do aluno nos formatos novos das prévias", () => {
   assert.deepEqual([_ler("01 - CIEP 225 - LORENA RODRIGUES").num, _ler("01 - CIEP 225 - LORENA RODRIGUES").nome], [1, "LORENA RODRIGUES"]);
   assert.deepEqual([_ler("26 -CIEP336- 07 - SOFIA SOUZA").num, _ler("26 -CIEP336- 07 - SOFIA SOUZA").nome], [7, "SOFIA SOUZA"]);
-  assert.deepEqual([_ler("01 - CIEP 460-2022- JAMILLE DE BRITO.jpg").num, _ler("01 - CIEP 460-2022- JAMILLE DE BRITO.jpg").nome], [1, "JAMILLE DE BRITO"]);
-  assert.deepEqual([_ler("2025 -CEJPII- 002 - (N) FABRICIO LIMA").num, _ler("2025 -CEJPII- 002 - (N) FABRICIO LIMA").nome], [2, "FABRICIO LIMA"]);
+  assert.deepEqual(
+    [_ler("01 - CIEP 460-2022- JAMILLE DE BRITO.jpg").num, _ler("01 - CIEP 460-2022- JAMILLE DE BRITO.jpg").nome],
+    [1, "JAMILLE DE BRITO"]
+  );
+  assert.deepEqual(
+    [_ler("2025 -CEJPII- 002 - (N) FABRICIO LIMA").num, _ler("2025 -CEJPII- 002 - (N) FABRICIO LIMA").nome],
+    [2, "FABRICIO LIMA"]
+  );
   assert.equal(_ler("CEYMS 02 - DOMINGOS JOSE").nome, "DOMINGOS JOSE");
 });
 
 test("nome do aluno: número colado na sigla e sufixo -1", () => {
   assert.deepEqual([_ler("2024 - CEPD 08 - THAIS GUEDES").num, _ler("2024 - CEPD 08 - THAIS GUEDES").nome], [8, "THAIS GUEDES"]);
-  assert.deepEqual([_ler("2025 -CIEP169- 01 - MARIA CLARA ABREU-1").num, _ler("2025 -CIEP169- 01 - MARIA CLARA ABREU-1").nome], [1, "MARIA CLARA ABREU"]);
+  assert.deepEqual(
+    [_ler("2025 -CIEP169- 01 - MARIA CLARA ABREU-1").num, _ler("2025 -CIEP169- 01 - MARIA CLARA ABREU-1").nome],
+    [1, "MARIA CLARA ABREU"]
+  );
 });
 
 import { parecidoColegio as _par } from "../js/drive-fotos.js";
@@ -179,7 +188,13 @@ test("foto: se o download direto falhar, baixa pela miniatura no tamanho origina
     if (/z7studio\.com\.br\/previas/.test(u)) throw new TypeError("Failed to fetch"); // ainda não está no site
     if (/alt=media/.test(u)) throw new TypeError("Failed to fetch");
     if (/fields=thumbnailLink/.test(u))
-      return { ok: true, json: async () => ({ thumbnailLink: "https://lh3.googleusercontent.com/x/AB=s220", imageMediaMetadata: { width: 1080, height: 535 } }) };
+      return {
+        ok: true,
+        json: async () => ({
+          thumbnailLink: "https://lh3.googleusercontent.com/x/AB=s220",
+          imageMediaMetadata: { width: 1080, height: 535 }
+        })
+      };
     return { ok: true, blob: async () => "FOTO" };
   };
   const D = criarDrive("chave", buscar);

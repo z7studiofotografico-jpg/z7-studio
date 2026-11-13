@@ -29,7 +29,10 @@ test("pasta do colégio: mesmo ano e nome igual ou parecido", () => {
 });
 
 test("separa quem está sem foto: com foto · já comprou · sem telefone · falta gerar", () => {
-  const itens = [{ name: "CEPNCP 01 - ANA LIMA", mimeType: F }, { name: "CEPNCP 02 - BRUNO REIS.jpg", mimeType: "image/jpeg" }];
+  const itens = [
+    { name: "CEPNCP 01 - ANA LIMA", mimeType: F },
+    { name: "CEPNCP 02 - BRUNO REIS.jpg", mimeType: "image/jpeg" }
+  ];
   const r = separarFotos(
     [
       { nome: "Ana Lima", codigo: "26CEPNCP-01", etapa: "NA FILA" },
@@ -42,10 +45,22 @@ test("separa quem está sem foto: com foto · já comprou · sem telefone · fal
     ],
     itens
   );
-  assert.deepEqual(r.com.map(x => x.nome), ["Ana Lima", "Bruno Reis"]);
-  assert.deepEqual(r.comprou.map(x => x.nome), ["Carla Dias", "Davi Melo"]);
-  assert.deepEqual(r.semTel.map(x => x.nome), ["Enzo Nunes"]);
-  assert.deepEqual(r.faltam.map(x => x.nome), ["Fabi Rosa", "Zeca Prado"]);
+  assert.deepEqual(
+    r.com.map(x => x.nome),
+    ["Ana Lima", "Bruno Reis"]
+  );
+  assert.deepEqual(
+    r.comprou.map(x => x.nome),
+    ["Carla Dias", "Davi Melo"]
+  );
+  assert.deepEqual(
+    r.semTel.map(x => x.nome),
+    ["Enzo Nunes"]
+  );
+  assert.deepEqual(
+    r.faltam.map(x => x.nome),
+    ["Fabi Rosa", "Zeca Prado"]
+  );
   // colégio sem pasta no Drive: ninguém tem foto
   assert.equal(separarFotos([{ nome: "Ana Lima", etapa: "NA FILA" }], []).faltam.length, 1);
   assert.equal(temFoto(itens, { nome: "Fabi Rosa" }), false);
@@ -53,7 +68,10 @@ test("separa quem está sem foto: com foto · já comprou · sem telefone · fal
 
 test("corpo do envio ao Drive (metadados + foto)", async () => {
   const t = await corpoEnvio({ name: "x.jpg", parents: ["p1"] }, new Blob(["FOTO"]), "image/jpeg", "BB").text();
-  assert.match(t, /^--BB\r\nContent-Type: application\/json; charset=UTF-8\r\n\r\n\{"name":"x.jpg","parents":\["p1"\]\}\r\n--BB\r\nContent-Type: image\/jpeg\r\n\r\nFOTO\r\n--BB--$/);
+  assert.match(
+    t,
+    /^--BB\r\nContent-Type: application\/json; charset=UTF-8\r\n\r\n\{"name":"x.jpg","parents":\["p1"\]\}\r\n--BB\r\nContent-Type: image\/jpeg\r\n\r\nFOTO\r\n--BB--$/
+  );
 });
 
 // Drive falso: guarda as pastas e arquivos criados

@@ -22,7 +22,9 @@ import {
   nomeCapelo,
   usoDosAlunos,
   faltaParaAluno,
-  somarUso
+  somarUso,
+  tamanhoBeca,
+  modeloBeca
 } from "./becas-estoque.js";
 import { carregarCatalogo, reservar, desfazerReserva, baixar, estornar } from "./estoque.js";
 import { DO_ALUGUEL } from "./catalogo.js";
@@ -336,10 +338,7 @@ export function corAluguel(a, hoje = U.todayStr()) {
   if (st === "Pronto para retirada") return "amarelo";
   return "cinza";
 }
-const becaTxt = a =>
-  a.becaTipo
-    ? `👘 ${nomeBeca(a.becaTipo).replace("Beca ", "")}${a.tamanho ? " " + a.tamanho + (a.menosLonga ? "1" : "") : " · sem tamanho"}`
-    : "";
+const becaTxt = a => (a.becaTipo ? `👘 Beca ${tamanhoBeca(a).replace(/^\w/, c => c.toLowerCase())} · ${modeloBeca(a.becaTipo)}` : "");
 function passoAluguel(a, hoje) {
   if (atrasadoAluguel(a, hoje)) return "⚠️ Devolução atrasada desde " + U.fmtDate(a.devolucao);
   const st = a.status || "Cadastrado";
