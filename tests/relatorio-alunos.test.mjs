@@ -27,3 +27,12 @@ test("alunos por colégio: em ordem de ID, nome com maiúscula, contato e endere
   assert.deepEqual(t.linhas[1], ["26CIEP433-10", "Maria Silva", "21999990000", "Centro"]);
   assert.equal(t.linhas[2][0], "");
 });
+
+import { idDaPlanilha } from "../js/aluguel-importar.js";
+test("aluguel: ID da planilha vira o ID do app", () => {
+  const inst = { nome: "Escola Legacy School - Nilópolis" };
+  assert.equal(idDaPlanilha("7", 2026, inst), "26ELSN-07");
+  assert.equal(idDaPlanilha("26ELSN-12", 2026, inst), "26ELSN-12");
+  assert.equal(idDaPlanilha("", 2026, inst), "");
+  assert.equal(idDaPlanilha("abc", 2026, inst), "");
+});

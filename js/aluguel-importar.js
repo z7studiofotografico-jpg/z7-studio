@@ -5,6 +5,8 @@ import * as U from "./util.js";
 import { abrirImportador, ultimasImportacoes } from "./importador.js";
 import { BECAS, FAIXAS, CAPELOS, TAMANHOS } from "./becas-estoque.js";
 import { lerPacote } from "./contrato-colegio-regras.js";
+import { idDoAluno } from "./cadastro-regras.js";
+import { lerCodigo, codigoBusca } from "./aluno-id.js";
 
 const achar = (lista, v) => {
   const k = U.chave(v);
@@ -13,6 +15,7 @@ const achar = (lista, v) => {
   return x ? x[0] : "";
 };
 export const CAMPOS_ALUGUEL = [
+  { k: "codigo", nome: "ID", sinonimos: ["Nº", "Número", "Numero", "Nº do aluno", "Número do aluno"] },
   { k: "nome", nome: "Aluno", sinonimos: ["Nome", "Formando", "Nome do aluno"], obrigatorio: true },
   { k: "tel", nome: "WhatsApp", sinonimos: ["Telefone", "Celular", "Tel", "Telefone 1", "Celular 1"] },
   { k: "responsavel", nome: "Responsável", sinonimos: ["Reponsavel", "Mãe", "Pai"] },
@@ -33,8 +36,16 @@ export function lerTamanho(v) {
   const m = t.match(/^(PPP|PP|P|M|G|GG|XG|XXG|EXG)(1)?$/);
   return m && TAMANHOS.some(([z]) => z === m[1]) ? { tamanho: m[1], menosLonga: !!m[2] } : { tamanho: "", menosLonga: false };
 }
+// ID da planilha: o número do aluno (1, 02) vira 26SIGLA-01; um ID completo (26LSN-01) fica como está
+export function idDaPlanilha(v, ano, inst) {
+  const t = String(v == null ? "" : v).trim();
+  if (!t) return "";
+  if (lerCodigo(t)) return t.toUpperCase().replace(/\s+/g, "");
+  return /^\d{1,4}$/.test(t) ? idDoAluno(ano, inst, t) : "";
+}
 export function paraDocAluguel(o, ext) {
   const t = lerTamanho(o.tamanho);
+  const codigo = idDaPlanilha(o.codigo, ext.ano, ext.inst);
   const falta = [];
   if (!ext.instId) falta.push("instituição (escolha acima)");
   if (String(o.tamanho || "").trim() && !t.tamanho) falta.push(`tamanho “${o.tamanho}” não reconhecido`);
@@ -48,6 +59,8 @@ export function paraDocAluguel(o, ext) {
     serie: String(o.serie || "").trim(),
     nome: String(o.nome || "").trim(),
     nomeBusca: U.chave(o.nome),
+    codigo,
+    codigoBusca: codigo ? codigoBusca(codigo) : "",
     tel: U.digits(o.tel),
     responsavel: String(o.responsavel || "").trim(),
     becaTipo: "tradPreta",
@@ -122,6 +135,7 @@ export async function importarAlugueis(C, insts) {
         return {
           instId: i ? i.id : "",
           instNome: i ? i.nome : "",
+          inst: i || null,
           ano: ano.value,
           respEmail: (i && donos.get(`${i.id}|${Number(ano.value)}`)) || ""
         };

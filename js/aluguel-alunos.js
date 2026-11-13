@@ -308,7 +308,7 @@ function render() {
   const q = U.chave(filtro.q);
   const arr = doCol
     .filter(fn)
-    .filter(a => !q || U.chave(a.nome).includes(q))
+    .filter(a => !q || U.chave([a.nome, a.codigo].join(" ")).includes(q))
     .sort(
       (a, b) =>
         Number(atrasadoAluguel(b, hoje)) - Number(atrasadoAluguel(a, hoje)) ||
@@ -354,6 +354,7 @@ function linha(a) {
   return linhaGenerica({
     id: a.id,
     cor: corAluguel(a, hoje),
+    idAluno: a.codigo,
     titulo: title(a.nome || ""),
     sub: [title(a.instNome || ""), [a.ano, a.serie].filter(Boolean).join(" · "), becaTxt(a)].filter(Boolean).join(" · "),
     passo: passoAluguel(a, hoje),
