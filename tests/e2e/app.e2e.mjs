@@ -370,6 +370,7 @@ for (let i = 0; i < 30; i++)
   };
 // Os dados antigos são atualizados no servidor (scripts/migrar.mjs); aqui aplicamos o mesmo plano antes de abrir o app
 import { planejar, criarEmailDe } from "../../js/migracao.js";
+import { chavePreco, CAMPOS_COLEGIO } from "../../js/precos-colegio.js";
 function migrar(dados) {
   const out = JSON.parse(JSON.stringify(dados)),
     cols = {};
@@ -384,6 +385,22 @@ function migrar(dados) {
     out[k] = o.tipo === "s" ? o.dados : Object.assign({}, out[k], o.dados);
     (o.apagar || []).forEach(c => delete out[k][c]);
   }
+  // preço de cada colégio (13/11/2026): os cenários antigos usam o preço dos Ajustes em todos os colégios
+  if (!out["config/precosColegio"] && !dados.__semPrecoColegio) {
+    const P = out["config/app"] || {};
+    const pega = o => Object.fromEntries(CAMPOS_COLEGIO.map(([k]) => [k, Number((o || {})[k]) || 0]).filter(([, v]) => v));
+    const colegios = {};
+    for (const [k, v] of Object.entries(out)) {
+      const [c] = k.split("/");
+      if (!v || !v.escola || !["repasse", "formaturaAlunos"].includes(c)) continue;
+      const ch = chavePreco(v.escola, v.ano);
+      const x = (colegios[ch] = colegios[ch] || { escola: v.escola, ano: v.ano });
+      if (c === "repasse") Object.assign(x, { pr: pega(P), paspatur: pega(P.paspatur) });
+      else x.formatura = pega(P.formatura);
+    }
+    out["config/precosColegio"] = { colegios };
+  }
+  delete out.__semPrecoColegio;
   return out;
 }
 async function abrir(email, dados, opc = {}) {
@@ -3852,6 +3869,7 @@ await cenario("Contrato do colégio (pacote por aluno, quem recebeu, repasse e p
         recebePadrao: "representante",
         valor: 150,
         parcelas: 1,
+        precos: { paspatur: 150 },
         pacotePadrao: ["paspatur"]
       }
     });
@@ -3917,10 +3935,6 @@ await cenario("Formaturas · abas Linha de Frente / Repasse / Venda Antecipada, 
     "Linha de Frente: o mesmo fluxo do PR (separar alunos)"
   );
   ok(!(await pg.locator("#viewFormaturas #rSegs").isVisible()), "Linha de Frente: sem as abas do PR dentro da Formatura");
-  ok(
-    /Preço da Formatura \(Linha de Frente\) em branco/.test(await pg.textContent("#viewFormaturas")),
-    "preço da Formatura em branco: avisa (não usa o preço do PR)"
-  );
   ok(
     !(await pg.getByRole("button", { name: "🖼️ Prévia e fotos" }).isVisible()),
     "Formatura: sem o Prévia e fotos no topo (fica na janela do aluno)"
@@ -4365,6 +4379,49 @@ await cenario("➕ Cadastrar aluno: colégio primeiro, ID obrigatório, um aluno
   );
   ok(!erros.length, "sem erros" + (erros.length ? ": " + erros.join(" | ") : ""));
 });
+await cenario("Colégio sem preço: aviso vermelho e venda bloqueada", async () => {
+  const Y = new Date().getFullYear();
+  const d = Object.assign({}, base, {
+    __semPrecoColegio: true,
+    "repasse/s1": {
+      nome: "BRUNA SEMPRECO",
+      nomeBusca: "BRUNA SEMPRECO",
+      escola: "COLEGIO BETA",
+      ano: Y,
+      etapa: "INTERESSADO",
+      resp: "Adriano",
+      respEmail: ADRIANO,
+      separadoEm: dia(-1),
+      followup: dia(0),
+      contatos: [{ tipo: "Mãe", nome: "Rosa", tel: "21988881112" }],
+      telefones: ["21988881112"]
+    }
+  });
+  const { pg, erros, store } = await abrir(ADRIANO, migrar(d));
+  await ir(pg, "#pr");
+  await calmo(pg);
+  await pg.locator("#rChips").getByText("Interessados").click();
+  await calmo(pg);
+  const art = pg.locator("article", { hasText: "Bruna" }).first();
+  ok(/está sem preço/.test(await art.textContent()), "cartão do aluno avisa que o colégio está sem preço");
+  await art.getByRole("button", { name: "Pagou 💰" }).click();
+  const sh = pg.locator(".sheet:visible").last();
+  ok((await sh.getByRole("button", { name: "Salvar venda" }).count()) === 0, "sem preço: não registra a venda");
+  await sh.getByRole("button", { name: "💲 Cadastrar preço do colégio" }).click();
+  const fp = pg.locator(".sheet:visible").last();
+  await fp.getByLabel("Linha de Frente · Pix (R$)").fill("297");
+  await fp.getByRole("button", { name: "Salvar preço" }).click();
+  await calmo(pg);
+  const c = ((await store())["config/precosColegio"] || {}).colegios || {};
+  ok(
+    Object.values(c).some(x => x.pr && x.pr.lfPix === 297),
+    "Adriano cadastra o preço do colégio"
+  );
+  await pg.evaluate(() => document.querySelectorAll(".sheet").forEach(x => (x.id ? (x.hidden = true) : x.remove())));
+  await calmo(pg);
+  ok(!/está sem preço/.test(await pg.locator("article", { hasText: "Bruna" }).first().textContent()), "com o preço, o aviso sai");
+  ok(!erros.length, "sem erros" + (erros.length ? ": " + erros.join(" | ") : ""));
+});
 await cenario("Registrar venda: endereço completo obrigatório e CEP preenche a rua", async () => {
   const Y = new Date().getFullYear();
   const d = Object.assign({}, base, {
@@ -4380,7 +4437,8 @@ await cenario("Registrar venda: endereço completo obrigatório e CEP preenche a
       followup: dia(0),
       contatos: [{ tipo: "Mãe", nome: "Rosa", tel: "21988881111" }],
       telefones: ["21988881111"]
-    }
+    },
+    "config/precosColegio": { colegios: { [chavePreco("COLEGIO ALFA", Y - 1)]: { pr: { kitPromo: 297, kitPreco: 350 } } } }
   });
   const { pg, erros, store, ctx } = await abrir(ANA, migrar(d));
   await ctx.route(/viacep\.com\.br\/ws\/26540000\/json/, rt =>
@@ -4412,7 +4470,7 @@ await cenario("Registrar venda: endereço completo obrigatório e CEP preenche a
     "o CEP preenche rua, bairro e cidade"
   );
   await sh.getByLabel("Número").fill("290");
-  await sh.getByPlaceholder("R$").fill("250");
+  // (o valor sai da tabela de preço do colégio: R$ 297 no Pix)
   await sh.getByRole("button", { name: "Salvar venda" }).click();
   await calmo(pg);
   const v = (await store())["repasse/v1"];

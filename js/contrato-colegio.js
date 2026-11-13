@@ -170,8 +170,18 @@ function render(corpo, st, inst, ano, ref) {
   // ---- pagamentos
   const hp = el("div", "vhead");
   hp.append(el("h3", null, "Pagamentos"));
-  if (pode) hp.append(U.mkBtn("+ Pagamento", "btn-primary btn-sm", () => formPagamento(null, st, ref)));
+  // contrato sem preço (cada aluno paga e nenhum item tem valor): não lança pagamento até o Adriano precificar
+  const semPrecoC = c.quemPaga !== "colegio" && !Object.values(c.precos || {}).some(v => Number(v) > 0);
+  if (pode && !semPrecoC) hp.append(U.mkBtn("+ Pagamento", "btn-primary btn-sm", () => formPagamento(null, st, ref)));
   corpo.append(hp);
+  if (semPrecoC)
+    corpo.append(
+      el(
+        "p",
+        "sem-preco",
+        `🚫 Colégio sem preço: ${C.isAdmin ? "toque em “Editar contrato” e coloque o preço de cada item" : "o Adriano precisa colocar o preço de cada item"} para liberar os pagamentos.`
+      )
+    );
   if (!st.pags.length) corpo.append(el("p", "hint", "Nenhum pagamento lançado."));
   st.pags.forEach(pg => corpo.append(linhaPagamento(pg, st, ref, pode)));
   // ---- alunos e pacotes
@@ -777,7 +787,7 @@ function janelaAluno(id, st, ref, pode) {
                 escolherPacote("Pacote de " + U.first(title(a.nome || "")), padrao ? [] : itens, x => gravarPacotes([a.id], x))
               )
             );
-            if (c.quemPaga !== "colegio")
+            if (c.quemPaga !== "colegio" && Object.values(c.precos || {}).some(v => Number(v) > 0))
               ac.append(U.mkBtn("+ Pagamento", "btn-primary btn-sm", () => formPagamento(null, st, ref, { alunoId: a.id })));
           }
           corpo.append(ac, el("h3", null, "Pagamentos"));

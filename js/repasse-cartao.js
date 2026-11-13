@@ -28,8 +28,11 @@ import {
   parcDe,
   assumir,
   save,
-  claim
+  claim,
+  semPreco,
+  NOME_VENDA
 } from "./repasse-estado.js";
+import { avisoSemPreco, travarMensagensSemValor } from "./precos-colegio.js";
 import { passo } from "./repasse-mensagens.js";
 import { openPago, openEntrega, openNotas } from "./repasse-janelas.js";
 import { openDados } from "./repasse-form.js";
@@ -148,6 +151,11 @@ export function card(it) {
   paintNext();
 
   e.append(acoesDoCartao(it, li, e));
+  // colégio sem preço: aviso vermelho no alto e as mensagens com valor travadas
+  if (semPreco(it)) {
+    e.insertBefore(avisoSemPreco(C, it, vendaDe(it), NOME_VENDA[vendaDe(it)]), e.firstChild);
+    travarMensagensSemValor(e);
+  }
   return e;
 }
 

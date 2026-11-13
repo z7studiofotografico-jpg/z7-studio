@@ -33,6 +33,7 @@ import { botaoRelatorio } from "./relatorio.js";
 import { relatorioAluguel, atrasadoAluguel } from "./aluguel-relatorio.js";
 import { ITENS_PACOTE, nomeItem, lerPacote } from "./contrato-colegio-regras.js";
 import { linhaGenerica } from "./lista-compacta.js";
+import { avisoPrecoAluguel } from "./precos-colegio.js";
 import { USO, idUso, ouvirUso, espelhar, donoDoAluguel } from "./becas-uso.js";
 import { abrirJanela } from "./janela.js";
 import { abaColegio, abaHistorico } from "./aluguel-janela.js";
@@ -413,6 +414,7 @@ function card(a) {
       ok => ok && espelhar(C, "aluno", a.id, null) // não conta mais no estoque
     );
   top.append(el("h3", "name", title(a.nome || "")), el("span", "stage", at ? "ATRASADO NA DEVOLUÇÃO" : st.toUpperCase()), bx);
+  avisoPrecoAluguel(C, a).then(av => av && e.insertBefore(av, e.firstChild));
   e.append(top);
   const meta = el("div", "meta");
   [

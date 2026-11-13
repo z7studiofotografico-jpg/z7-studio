@@ -1,7 +1,8 @@
 // PR: janelinhas do contato: registrar a venda, entrega (endereço e data) e notas
 import { el, title, sheet as abrirSheet, field, botoes } from "./ui.js";
 import * as U from "./util.js";
-import { C, segDe, assumir, save, precos } from "./repasse-estado.js";
+import { C, segDe, assumir, save, precos, semPreco, vendaDe, NOME_VENDA } from "./repasse-estado.js";
+import { avisoSemPreco } from "./precos-colegio.js";
 import { lerCep, mostrarCep, buscarCep, faltaEndereco } from "./cep.js";
 
 // Janela do PR: a do app, já com o cursor no primeiro campo
@@ -15,6 +16,11 @@ export { field };
 export const actions = (close, okTxt) => botoes(close, okTxt);
 
 export function openPago(it) {
+  // colégio sem preço: não registra venda (o Adriano cadastra o preço primeiro)
+  if (semPreco(it))
+    return sheet("Registrar venda", (p, close) => {
+      p.append(avisoSemPreco(C, it, vendaDe(it), NOME_VENDA[vendaDe(it)]), U.mkBtn("Fechar", "", close));
+    });
   sheet("Registrar venda", (p, close) => {
     p.append(el("p", "hint", title(it.nome) + " · " + title(it.escola)));
     // Valor sai da tabela de preços (Ajustes); "outro valor" fica marcado para conferência

@@ -3,6 +3,7 @@
 import { comAlteracao } from "./alteracoes.js";
 import { atividadeDoPatch, registrarAtividade } from "./atividades.js";
 import * as U from "./util.js";
+import { comPrecoDoColegio, ouvirPrecosColegio, aoMudarPrecos } from "./precos-colegio.js";
 export let C, FS, db, col;
 export let tab = "hoje",
   seg = "lf",
@@ -51,17 +52,24 @@ export const mudarFiltroPessoa = v => (filtroPessoa = v || "");
 export const vendaDe = it => (ehFormatura() ? "formatura" : it && it.vendaComo === "paspatur" ? "paspatur" : "pr");
 export const NOME_VENDA = { pr: "PR", paspatur: "Paspatur", formatura: "Formatura" };
 export const naVenda = it => filtroVenda === "todos" || ehFormatura() || vendaDe(it) === filtroVenda;
-// tabela de preços de um tipo de venda
+// tabela de preços de um tipo de venda (Ajustes)
 function precosDoTipo(t) {
   const P = (ctx0 && ctx0.P) || {};
   if (t === "paspatur") return Object.assign({}, P, SEM_PRECO, limpo(P.paspatur));
   if (t === "formatura") return Object.assign({}, P, SEM_PRECO, limpo(P.formatura));
   return P;
 }
-// preços do aluno (segue o vendaComo); sem aluno: os da lista aberta (Só Paspatur → Paspatur; senão PR)
-export const precos = it => precosDoTipo(it ? vendaDe(it) : ehFormatura() ? "formatura" : filtroVenda === "paspatur" ? "paspatur" : "pr");
+// preços do aluno: os do colégio dele (cadastrados pelo Adriano na hora do trabalho); sem preço do colégio, os valores
+// ficam zerados e semPrecoColegio = true (bloqueia mensagem com valor e venda). Sem aluno: os da lista aberta.
+export const precos = it => {
+  const t = it ? vendaDe(it) : ehFormatura() ? "formatura" : filtroVenda === "paspatur" ? "paspatur" : "pr";
+  return it ? comPrecoDoColegio(precosDoTipo(t), it, t) : precosDoTipo(t);
+};
+export const semPreco = it => !!(it && precos(it).semPrecoColegio);
 export function iniciar(ctx) {
   ctx0 = ctx;
+  ouvirPrecosColegio(ctx);
+  aoMudarPrecos(() => tela.renderList());
   // C.P: os preços da lista aberta (PR ou Formatura). Para um aluno, use precos(it).
   C = Object.create(ctx, { P: { get: () => precosDoTipo(ehFormatura() ? "formatura" : "pr") } });
   FS = ctx.FS;
@@ -80,15 +88,9 @@ export function iniciar(ctx) {
 export const CAMPOS_PRECO = ["lfPix", "lfCartao", "kitPreco", "kitPromo", "kitCartao", "kitFinal"];
 const SEM_PRECO = Object.fromEntries(CAMPOS_PRECO.map(k => [k, 0]));
 // aviso na tela: preço da aba ainda não cadastrado em Ajustes
+// (13/11/2026: o preço agora é de cada colégio, cadastrado na hora do trabalho; o aviso fica no cartão do aluno)
 export function precoFaltando() {
-  if (!ehFormatura() && filtroVenda === "pr") return "";
-  const P = precosDoTipo(ehFormatura() ? "formatura" : "paspatur");
-  const lf = seg === "lf";
-  const falta = lf ? !P.lfPix : !(P.kitPromo || P.kitPreco);
-  const nome = ehFormatura() ? "da Formatura" : "do Paspatur";
-  return falta
-    ? `⚠️ Preço ${nome} (${lf ? "Linha de Frente" : "Repasse"}) em branco: o Adriano cadastra em Ajustes. As mensagens vão sair com [valor do kit].`
-    : "";
+  return "";
 }
 const limpo = o => Object.fromEntries(Object.entries(o || {}).filter(([, v]) => v !== "" && v != null && v !== 0));
 // Assumir o contato: quem não é admin só assume o que está sem responsável (ou já é seu)

@@ -536,3 +536,8 @@ button.lc-linha[aria-expanded="true"]{border-bottom-left-radius:0;border-bottom-
 .fila-aluno .lc-id{margin-bottom:1px}
 .rel-cols{display:grid;grid-template-columns:repeat(auto-fill,minmax(170px,1fr));gap:4px 12px;margin:6px 0 10px}
 .rel-cols .chk{font-size:.9rem}
+/* colégio sem preço: aviso vermelho e mensagem com valor travada */
+.sem-preco{display:flex;flex-direction:column;gap:4px;background:var(--accent-soft);border:1px solid var(--accent);border-radius:10px;padding:10px 12px;margin-bottom:8px}
+.sem-preco b{color:var(--accent)}
+.sem-preco .btn{align-self:flex-start}
+a.travado{opacity:.45;cursor:not-allowed;text-decoration:line-through}
