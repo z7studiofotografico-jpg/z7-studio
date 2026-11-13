@@ -4,7 +4,7 @@ import { el, field, sel, title } from "./ui.js";
 import * as U from "./util.js";
 import { abrirImportador, ultimasImportacoes } from "./importador.js";
 import { BECAS, FAIXAS, CAPELOS, TAMANHOS } from "./becas-estoque.js";
-import { lerPacote } from "./contrato-colegio-regras.js";
+import { lerPacote, ITENS_PACOTE, idContrato } from "./contrato-colegio-regras.js";
 import { idDoAluno } from "./cadastro-regras.js";
 import { lerCodigo, codigoBusca } from "./aluno-id.js";
 
@@ -66,7 +66,20 @@ export function itensMarcados(o) {
     .filter(([k]) => tem(o[k]))
     .map(([, i]) => i);
 }
+// valor do aluno pelos preços do colégio digitados na importação (soma dos itens do kit dele)
+export function valorPeloKit(itens, precos) {
+  return (itens || []).reduce((t, k) => t + (Number((precos || {})[k]) || 0), 0);
+}
 export function paraDocAluguel(o, ext) {
+  const d = docAluguel(o, ext);
+  // sem coluna de valor e com os preços do colégio na tela: o valor é a soma do kit
+  if (!String(o.valor || "").trim() && ext.precos && Object.values(ext.precos).some(v => v > 0)) {
+    d.valor = valorPeloKit(d.pacote, ext.precos);
+    d.contratoZerado = !d.valor;
+  }
+  return d;
+}
+function docAluguel(o, ext) {
   const t = lerTamanho(o.tamanho);
   const codigo = idDaPlanilha(o.codigo, ext.ano, ext.inst);
   const falta = [];
@@ -137,6 +150,7 @@ export async function importarAlugueis(C, insts) {
     existentes,
     chave: d => `${d.instId}|${d.ano}|${U.chave(d.nome)}`,
     paraDoc: paraDocAluguel,
+    depois: ext => guardarPrecos(C, ext),
     camposExtras: box => {
       const sInst = sel(
         insts.map(i => [i.id, title(i.nome)]),
@@ -157,12 +171,39 @@ export async function importarAlugueis(C, insts) {
         "adulto"
       );
       r.append(field("Beca de quem não tem escrito na planilha", sIdade));
+      // preços deste colégio (cada trabalho tem os seus): vão para o Contrato do colégio e dão o valor de cada aluno
+      const prBox = el("div", "row2");
+      const prIn = ITENS_PACOTE.map(([k, n]) => {
+        const i = el("input");
+        i.inputMode = "decimal";
+        i.placeholder = "0,00";
+        prBox.append(field("Preço " + n, i));
+        return [k, i];
+      });
+      const lerValor = v =>
+        Number(
+          String(v || "")
+            .replace(/\./g, "")
+            .replace(",", ".")
+        ) || 0;
+      const carregarPrecos = async () => {
+        const i = insts.find(x => x.id === sInst.value);
+        if (!i || !ano.value) return;
+        try {
+          const s = await C.FS.getDoc(C.FS.doc(C.db, "contratosColegio", `${i.id}_${Number(ano.value)}`));
+          const pr = (s.exists() && s.data().precos) || {};
+          prIn.forEach(([k, inp]) => (inp.value = Number(pr[k]) ? String(pr[k]).replace(".", ",") : ""));
+        } catch (_) {}
+      };
+      sInst.addEventListener("change", carregarPrecos);
+      ano.addEventListener("change", carregarPrecos);
+      const prTit = el("p", "hint", "Preços deste colégio (o valor de cada aluno é a soma do kit dele; o pai pode comprar um item só):");
       const hist = el("details", "notes");
       hist.append(el("summary", null, "Importações anteriores (desfazer)"));
       const hb = el("div");
       hist.append(hb);
       hist.addEventListener("toggle", () => hist.open && ultimasImportacoes(C, "aluguel", hb));
-      box.append(r, hist);
+      box.append(r, prTit, prBox, hist);
       return () => {
         const i = insts.find(x => x.id === sInst.value);
         return {
@@ -170,6 +211,7 @@ export async function importarAlugueis(C, insts) {
           instNome: i ? i.nome : "",
           inst: i || null,
           idade: sIdade.value,
+          precos: Object.fromEntries(prIn.map(([k, inp]) => [k, lerValor(inp.value)])),
           ano: ano.value,
           respEmail: (i && donos.get(`${i.id}|${Number(ano.value)}`)) || ""
         };
@@ -178,3 +220,45 @@ export async function importarAlugueis(C, insts) {
   });
 }
 export { BECAS };
+
+// os preços digitados na importação vão para o Contrato do colégio (cria o contrato se ainda não existe)
+async function guardarPrecos(C, ext) {
+  if (!ext.instId || !ext.precos || !Object.values(ext.precos).some(v => v > 0)) return;
+  const { FS, db } = C;
+  const ref = FS.doc(db, "contratosColegio", idContrato(ext.instId, Number(ext.ano)));
+  const agora = new Date().toISOString();
+  const reg = o => ({ o, em: agora, por: C.me || C.email || "" });
+  const s = await FS.getDoc(ref);
+  if (s.exists()) {
+    const x = s.data();
+    if (JSON.stringify(x.precos || {}) === JSON.stringify(ext.precos)) return;
+    await FS.updateDoc(ref, {
+      precos: ext.precos,
+      atualizadoEm: agora,
+      historico: [...(x.historico || []), reg("preços dos itens na importação da planilha")].slice(-40)
+    });
+    return;
+  }
+  const inst = ext.inst || {};
+  await FS.setDoc(ref, {
+    instId: ext.instId,
+    instNome: ext.instNome || "",
+    ano: Number(ext.ano),
+    unidade: "",
+    respEmail: ext.respEmail || inst.respEmail || "",
+    respNome: inst.resp || "",
+    quemPaga: "alunos",
+    recebePadrao: "estudio",
+    valor: 0,
+    precos: ext.precos,
+    parcelas: 1,
+    contato: { nome: "", cargo: "", tel: "" },
+    entrega: { data: "", com: "" },
+    pacotePadrao: [],
+    obs: "",
+    criadoEm: agora,
+    atualizadoEm: agora,
+    criadoPor: C.me || "",
+    historico: [reg("criou o contrato na importação da planilha")]
+  });
+}

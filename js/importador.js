@@ -53,7 +53,8 @@ export function statusDaPlanilha(v) {
 
 // cfg = { modulo, titulo, col, campos: [{ k, nome, sinonimos, obrigatorio }], paraDoc(obj, extra) → doc,
 //         chave(doc) → texto p/ achar duplicado, existentes: Set de chaves já no app, extra: {} (ex.: instituição e ano),
-//         camposExtras(p) → função que lê os campos da tela (instituição, ano), antes de gravar }
+//         camposExtras(p) → função que lê os campos da tela (instituição, ano), antes de gravar,
+//         depois(extra, docs) → o que fazer depois de gravar }
 export function abrirImportador(C, cfg) {
   sheet(
     cfg.titulo || "Importar planilha",
@@ -184,6 +185,8 @@ function conferir(C, cfg, out, linhas, lembrado, arquivo, lerExtra, close) {
     ok.disabled = true;
     try {
       const r = await gravar(C, cfg, prontos, arquivo, cab, mapa);
+      // depois de gravar (ex.: Aluguel de becas guarda os preços no contrato do colégio)
+      if (cfg.depois) await Promise.resolve(cfg.depois(lerExtra(), prontos)).catch(e => console.warn("[Z7] depois da importação", e));
       out.innerHTML = "";
       out.append(
         el("p", null, `Pronto! ${r.n} registro${r.n === 1 ? "" : "s"} importado${r.n === 1 ? "" : "s"}.`),

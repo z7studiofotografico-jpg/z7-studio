@@ -703,8 +703,34 @@ export function form(a, pre = {}) {
       cb.checked = lerPacote(x.pacote || []).includes(k);
       l.append(cb, document.createTextNode(" " + n));
       pac.append(l);
-      return [k, cb];
+      return [k, cb, l, n];
     });
+    // preços do contrato deste colégio e ano: aparecem ao lado de cada item, e o valor é a soma do que for marcado
+    // (o pai pode comprar só o Paspatur, só o Canudo, só o aluguel ou o kit inteiro)
+    let precos = null;
+    const somar = () => {
+      if (!precos || zer.disabled) return;
+      const total = pacCx.filter(([, cb]) => cb.checked).reduce((t, [k]) => t + (Number(precos[k]) || 0), 0);
+      zer.checked = false;
+      valor.disabled = false;
+      valor.value = total.toFixed(2).replace(".", ",");
+    };
+    const lerPrecos = async () => {
+      precos = null;
+      pacCx.forEach(([, , l, n]) => (l.lastChild.textContent = " " + n));
+      if (!sInst.value || !ano.value) return;
+      try {
+        const s = await C.FS.getDoc(C.FS.doc(C.db, "contratosColegio", `${sInst.value}_${Number(ano.value)}`));
+        const pr = (s.exists() && s.data().precos) || {};
+        if (!Object.values(pr).some(v => Number(v) > 0)) return;
+        precos = pr;
+        pacCx.forEach(([k, , l, n]) => (l.lastChild.textContent = ` ${n}${Number(pr[k]) ? " · " + brl(pr[k]) : ""}`));
+      } catch (_) {}
+    };
+    pacCx.forEach(([, cb]) => cb.addEventListener("change", somar));
+    sInst.addEventListener("change", lerPrecos);
+    ano.addEventListener("change", lerPrecos);
+    lerPrecos();
     // o admin muda o valor; a equipe só cadastra
     if (a && !C.isAdmin) {
       valor.disabled = true;

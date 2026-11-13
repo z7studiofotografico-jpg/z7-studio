@@ -56,3 +56,13 @@ test("beca: infantil ou adulto sempre escrito", () => {
   assert.equal(paraDocAluguel({ nome: "A", tamanho: "GG" }, ext).becaTipo, "infPreta");
   assert.equal(paraDocAluguel({ nome: "B", tamanho: "P ADULTO" }, ext).becaTipo, "tradPreta");
 });
+test("aluguel: valor pelo kit com os preços do colégio (item avulso também)", () => {
+  const precos = { beca: 35, paspatur: 80, canudo: 15, certificado: 0 };
+  const ext = { instId: "x", inst: { nome: "Escola Legacy School - Nilópolis" }, ano: 2026, precos };
+  assert.equal(paraDocAluguel({ nome: "A", itBeca: "1", itPaspatur: "1", itCanudo: "1" }, ext).valor, 130);
+  assert.equal(paraDocAluguel({ nome: "B", itPaspatur: "1" }, ext).valor, 80);
+  const z = paraDocAluguel({ nome: "C" }, ext);
+  assert.equal(z.valor, 0);
+  assert.equal(z.contratoZerado, true);
+  assert.equal(paraDocAluguel({ nome: "D", valor: "50", itPaspatur: "1" }, ext).valor, 50);
+});
