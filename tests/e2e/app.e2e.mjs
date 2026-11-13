@@ -4379,6 +4379,68 @@ await cenario("➕ Cadastrar aluno: colégio primeiro, ID obrigatório, um aluno
   );
   ok(!erros.length, "sem erros" + (erros.length ? ": " + erros.join(" | ") : ""));
 });
+await cenario("Cadastro automático do Aluguel de becas (beca, tamanho e kit da ficha)", async () => {
+  const Y = new Date().getFullYear();
+  const d = Object.assign({}, base, {
+    "fichas/fa1": {
+      escola: "COLEGIO ALFA",
+      instId: "i1",
+      ano: Y,
+      colNome: "alugueis",
+      pasta: "IMG_0001",
+      img: "data:image/gif;base64,R0lGODlhAQABAAAAACw=",
+      status: "lida",
+      lido: { numero: "7", nome: "Livia Aluguel", mae: "Rosa", celMae: "21 98888-1111", turma: "5º ano" },
+      duvidas: []
+    },
+    [`contratosColegio/i1_${Y}`]: {
+      instId: "i1",
+      instNome: "COLEGIO ALFA",
+      ano: Y,
+      quemPaga: "alunos",
+      respEmail: ANA,
+      precos: { beca: 35, paspatur: 80, canudo: 15, certificado: 0 },
+      pacotePadrao: []
+    }
+  });
+  const { pg, erros, store } = await abrir(ADRIANO, migrar(d));
+  await ir(pg, "#home");
+  await pg.locator("#tileCadastrar").click();
+  await pg.locator(".sheet .cad-fotos").getByRole("button", { name: "🤖 Cadastro automático" }).click();
+  const ca = pg.locator(".sheet").filter({ hasText: "🤖 Cadastro automático" });
+  ok(
+    await ca
+      .getByRole("button", { name: "📤 Fichas do Aluguel de becas" })
+      .waitFor({ timeout: 5000 })
+      .then(() => true)
+      .catch(() => false),
+    "botão para mandar as fichas do aluguel"
+  );
+  const grupo = ca.locator(".cad-parte", { hasText: "Aluguel de becas" });
+  await grupo.getByRole("button", { name: /Conferir \(1\)/ }).click();
+  const cf = pg.locator(".sheet").filter({ hasText: "Conferir fichas" });
+  await cf.getByText("Aluguel de becas").first().waitFor({ timeout: 8000 });
+  await cf.getByLabel("Tamanho").selectOption("G");
+  for (const n of ["Beca", "Paspatur", "Canudo"]) await cf.locator("label.chk", { hasText: n }).locator("input").check();
+  await cf.getByRole("button", { name: "✔ Confirmar" }).click();
+  await cf.getByText(/cadastro novo/).waitFor({ timeout: 8000 });
+  const st = await store();
+  const a = Object.entries(st).find(([k, x]) => k.startsWith("alugueis/") && x && x.nome === "LIVIA ALUGUEL");
+  const v = a && a[1];
+  ok(
+    v &&
+      v.instId === "i1" &&
+      v.codigo === String(Y).slice(2) + "CA-07" &&
+      v.becaTipo === "infPreta" &&
+      v.tamanho === "G" &&
+      v.pacote.join() === "beca,paspatur,canudo" &&
+      v.valor === 130 &&
+      v.responsavel === "Rosa" &&
+      !st["fichas/fa1"],
+    "ficha vira aluno do aluguel: ID, beca infantil G, kit e valor pelo contrato (R$ 130)"
+  );
+  ok(!erros.length, "sem erros" + (erros.length ? ": " + erros.join(" | ") : ""));
+});
 await cenario("Colégio sem preço: aviso vermelho e venda bloqueada", async () => {
   const Y = new Date().getFullYear();
   const d = Object.assign({}, base, {

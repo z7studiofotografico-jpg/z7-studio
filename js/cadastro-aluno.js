@@ -174,7 +174,7 @@ export function abrirCadastroAluno(C, o = {}) {
           el(
             "p",
             "hint",
-            "Gere as prévias (PR, Paspatur ou Formatura: o app acha pelo colégio). Depois, o Cadastro automático lê as fichas."
+            "Gere as prévias (PR, Paspatur ou Formatura: o app acha pelo colégio). Depois, o Cadastro automático lê as fichas. Aluguel de becas: no Cadastro automático, toque em “📤 Fichas do Aluguel de becas”."
           ),
           q
         );

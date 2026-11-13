@@ -45,6 +45,8 @@ const ORDEM_CONF = [
   ["email", 4]
 ];
 export const chaveGrupo = (escola, ano) => U.chave(escola).replace(/[^A-Z0-9]+/g, "-") + "_" + (ano || "");
+// o grupo da tela (e o pedido de leitura): o Aluguel de becas fica separado do PR e da Formatura do mesmo colégio
+export const chaveGrupoCol = (escola, ano, colNome) => chaveGrupo(escola, ano) + (colNome === "alugueis" ? "_ALU" : "");
 const idFicha = (escola, ano, pasta) => (chaveGrupo(escola, ano) + "_" + U.chave(pasta).replace(/[^A-Z0-9]+/g, "-")).slice(0, 140);
 
 // ---------- 1. Prévias de um colégio: guarda a foto da ficha ----------
@@ -297,7 +299,11 @@ export function abrirCadastroAutomatico(C, colNome = "") {
         )
       );
       const lista = el("div");
-      p.append(lista, U.mkBtn("Fechar", "", close));
+      // Aluguel de becas: as fotos das fichas vão direto (uma por aluno), sem as prévias
+      const bAlu = U.mkBtn("📤 Fichas do Aluguel de becas", "btn-sm", () =>
+        import("./fichas-aluguel.js").then(m => m.enviarFichasAluguel(C, montar)).catch(e => C.handleErr(e))
+      );
+      p.append(bAlu, lista, U.mkBtn("Fechar", "", close));
       const { FS, db } = C;
       async function montar() {
         lista.textContent = "Carregando…";
@@ -316,9 +322,17 @@ export function abrirCadastroAutomatico(C, colNome = "") {
         lista.textContent = "";
         const grupos = new Map();
         fichas.forEach(f => {
-          const k = chaveGrupo(f.escola, f.ano);
+          const k = chaveGrupoCol(f.escola, f.ano, f.colNome);
           if (!grupos.has(k))
-            grupos.set(k, { escola: f.escola, ano: f.ano, colNome: f.colNome || colNome || "repasse", nova: 0, lida: 0, fichas: [] });
+            grupos.set(k, {
+              escola: f.escola,
+              ano: f.ano,
+              instId: f.instId || "",
+              colNome: f.colNome || colNome || "repasse",
+              nova: 0,
+              lida: 0,
+              fichas: []
+            });
           const g = grupos.get(k);
           g[f.status] = (g[f.status] || 0) + 1;
           g.fichas.push(f);
@@ -337,7 +351,7 @@ export function abrirCadastroAutomatico(C, colNome = "") {
                 ? "🔒 Lido: falta conferir"
                 : "";
           b.append(
-            el("b", null, (g.ano ? g.ano + " · " : "") + g.escola),
+            el("b", null, (g.ano ? g.ano + " · " : "") + g.escola + (g.colNome === "alugueis" ? " · Aluguel de becas" : "")),
             el("p", "hint", `${g.nova || 0} para ler · ${g.lida || 0} para conferir${st ? " · " + st : ""}`)
           );
           const acoes = el("div", "quick");
@@ -388,8 +402,13 @@ export function abrirCadastroAutomatico(C, colNome = "") {
 async function conferir(C, g, colNome, depois, status = "lida") {
   const { FS, db } = C;
   // alunos que já estão no app (mesmo colégio e ano): para juntar e para achar o número livre
-  const s = await FS.getDocs(FS.query(FS.collection(db, colNome), FS.where("escola", "==", g.escola), FS.where("ano", "==", g.ano)));
-  const existentes = s.docs.map(d => ({ id: d.id, ...d.data() }));
+  const alu = colNome === "alugueis" ? await import("./fichas-aluguel.js") : null;
+  const existentes = alu
+    ? await alu.existentesAluguel(C, g)
+    : (await FS.getDocs(FS.query(FS.collection(db, colNome), FS.where("escola", "==", g.escola), FS.where("ano", "==", g.ano)))).docs.map(
+        d => ({ id: d.id, ...d.data() })
+      );
+  const contrato = alu ? await alu.contratoAluguel(C, g) : null;
   const usados = new Set(existentes.map(x => (lerCodigo(x.codigo || "") || {}).n).filter(Boolean));
   const sigla = (existentes.map(x => lerCodigo(x.codigo || "")).find(x => x && x.sigla) || {}).sigla || siglaDoColegio({ nome: g.escola });
   sheet(
@@ -469,6 +488,8 @@ async function conferir(C, g, colNome, depois, status = "lida") {
         olharCep();
         const aviso = el("p", "hint");
         const ja = acharExistente(existentes, f, f.lido || {});
+        // Aluguel de becas: beca, tamanho, faixa, capelo e kit, como no cartão do aluguel
+        const ex = alu ? alu.camposAluguel(ja, contrato) : null;
         aviso.textContent = ja
           ? `🔗 Junta com o aluno que já está no app: ${title(ja.nome)} (${ja.codigo || "sem ID"})`
           : soNumero((f.lido || {}).numero)
@@ -478,7 +499,9 @@ async function conferir(C, g, colNome, depois, status = "lida") {
           ok.disabled = true;
           try {
             const lido = Object.fromEntries(Object.entries(ins).map(([k, i]) => [k, i.value.trim()]));
-            const r = await confirmar(C, { f, lido, colNome, existentes, usados, sigla });
+            const r = alu
+              ? await alu.confirmarAluguel(C, { f, lido, extra: ex.ler(), existentes, usados, sigla, contrato })
+              : await confirmar(C, { f, lido, colNome, existentes, usados, sigla });
             b.replaceChildren(
               el(
                 "p",
@@ -503,6 +526,7 @@ async function conferir(C, g, colNome, depois, status = "lida") {
             })
           );
         b.append(topo, aviso, foto, campos);
+        if (ex) b.append(el("h4", null, "👘 Aluguel de becas"), ex.box);
         return b;
       }
     },
