@@ -523,6 +523,7 @@ export function openMockup({
     bEsc.setAttribute("aria-pressed", String(m !== "kit"));
     slotsBox.hidden = m !== "kit";
     fPreco.hidden = m !== "kit";
+    fCartao.hidden = m !== "kit"; // a folha de escolha não leva preço: os dois campos somem juntos
     bCopy.hidden = m === "kit";
     dica.textContent =
       m === "kit"
