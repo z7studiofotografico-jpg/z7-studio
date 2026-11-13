@@ -191,7 +191,8 @@ const limites = new WeakMap();
 const FSv = Object.assign({}, FS, {
   limit(n) {
     const c = FS.limit(n);
-    limites.set(c, n);
+    // limit(1) é "existe algum?", não uma lista: não avisa (12/11/2026: aparecia "limite de 1 itens")
+    if (n > 1) limites.set(c, n);
     return c;
   },
   // lista paginada de propósito (a tela já mostra "ver todos"): sem o aviso de lista incompleta
