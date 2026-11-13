@@ -200,6 +200,8 @@ details.guide summary{cursor:pointer;font-family:var(--f-display);font-weight:70
 
 .sheet{position:fixed;inset:0;background:rgba(10,8,10,.55);display:flex;align-items:flex-end;justify-content:center;z-index:20;padding:env(safe-area-inset-top,0px) env(safe-area-inset-right,0px) 0 env(safe-area-inset-left,0px)}
 .panel{background:var(--surface);color:var(--fg);width:100%;max-width:560px;max-height:92%;overflow:auto;border-radius:14px 14px 0 0;padding:18px 18px calc(18px + env(safe-area-inset-bottom,0px));display:flex;flex-direction:column;gap:12px}
+/* nada dentro da janela encolhe: quando o conteúdo é grande, a janela rola (antes as abas ficavam espremidas, sem o nome) */
+.panel > *{flex-shrink:0}
 @media (min-width:700px){.sheet{align-items:center}.panel{border-radius:14px}}
 .panel h2{font-family:var(--f-display);text-transform:uppercase;letter-spacing:.04em;margin:0;font-size:1.4rem}
 .panel h3{font-family:var(--f-display);text-transform:uppercase;letter-spacing:.04em;margin:6px 0 0;font-size:1.05rem;color:var(--muted)}
