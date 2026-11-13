@@ -6,6 +6,7 @@
 // Status: Cadastrado → Beca medida (reserva beca, faixa e capelo) → Produtos em produção (se comprou algum) →
 // Pronto para retirada → Retirou a beca (baixa o estoque dos produtos) → Devolvida (beca volta ao estoque).
 // "Atrasado na devolução": retirou e passou da data de devolução (destaque para o Adriano).
+import { ordemCodigo } from "./aluno-id.js";
 import { bloco, el, title, field, inp, inpReais, sel, sheet, botoes, wa, clicavel } from "./ui.js";
 import * as U from "./util.js";
 import { lerReais, brl } from "./regras.js";
@@ -312,7 +313,7 @@ function render() {
       (a, b) =>
         Number(atrasadoAluguel(b, hoje)) - Number(atrasadoAluguel(a, hoje)) ||
         (a.instNome || "").localeCompare(b.instNome || "") ||
-        (a.nome || "").localeCompare(b.nome || "", "pt-BR")
+        ordemCodigo(a, b)
     );
   corpo.innerHTML = "";
   if (!arr.length) {

@@ -453,8 +453,8 @@ function linha(T, f, candSet) {
   return linhaGenerica({
     id: f.id || f.codigo || f.nome,
     cor: saiu ? "fim" : f.entregueEm ? "verde" : q0 ? "azul" : at ? "vermelho" : sem ? "amarelo" : "cinza",
+    idAluno: f.codigo,
     titulo: title(f.nome),
-    tags: [f.codigo],
     sub: [f.serie, sem ? "" : f.kit || (ehKit01(f) ? "Kit 01" : "Kit"), f.valor && !sem ? brl(f.valor) : "", f.tel]
       .filter(Boolean)
       .join(" · "),

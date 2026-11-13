@@ -23,13 +23,14 @@ export function linhaCompacta(it, o) {
   const l = el("button", "lc-linha lc-" + corDe(it, s));
   l.type = "button";
   const nome = el("div", "lc-nome");
+  // o ID vem em cima do nome, um pouco maior: é ele que separa os alunos (padrão de todas as listas)
+  if (it.codigo) nome.append(el("span", "lc-id", it.codigo));
   const t = el("b", null, title(it.nome) || "Sem nome");
   nome.append(t);
   const selo = o.selo ? o.selo(it) : "";
-  if (it.codigo || selo) {
+  if (selo) {
     const tags = el("span", "lc-tags");
-    if (it.codigo) tags.append(el("span", "tag id", it.codigo));
-    if (selo) tags.append(el("span", "tag pas", selo));
+    tags.append(el("span", "tag pas", selo));
     nome.append(tags);
   }
   nome.append(el("small", null, [title(it.escola), [it.curso, it.turma].filter(Boolean).join(" "), it.ano].filter(Boolean).join(" · ")));
@@ -59,12 +60,13 @@ export function linhaCompacta(it, o) {
 }
 
 // Linha compacta de qualquer lista (Aluguel de becas e as próximas): o mesmo desenho e o mesmo jeito de abrir.
-// o = { id, cor, titulo, tags: [texto], sub, passo, passoCls ("late" | "today" | ""), selo, card(), abrir() }
+// o = { id, cor, idAluno (ID em cima do nome), titulo, tags: [texto], sub, passo, passoCls ("late" | "today" | ""), selo, card(), abrir() }
 export function linhaGenerica(o) {
   const box = el("div", "lc-item");
   const l = el("button", "lc-linha lc-" + (o.cor || "cinza"));
   l.type = "button";
   const nome = el("div", "lc-nome");
+  if (o.idAluno) nome.append(el("span", "lc-id", o.idAluno));
   nome.append(el("b", null, o.titulo || "Sem nome"));
   const tags = (o.tags || []).filter(Boolean);
   if (tags.length) {

@@ -1,5 +1,6 @@
 // PR / Formatura: tocar em "Na fila" abre quem são, separados por colégio (12/11/2026).
 // Cada colégio mostra quantos estão na fila e com quem; o botão passa o colégio inteiro para alguém da equipe.
+import { ordemCodigo } from "./aluno-id.js";
 import { el, title, sheet } from "./ui.js";
 import * as U from "./util.js";
 import { C, FS, col, colNome, ANO, baseSeg, ehFormatura, seg } from "./repasse-estado.js";
@@ -19,7 +20,7 @@ export function gruposDaFila(alunos) {
     o.resp.set(r, (o.resp.get(r) || 0) + 1);
   });
   return [...g.values()]
-    .map(o => ({ ...o, alunos: o.alunos.sort((a, b) => String(a.nome).localeCompare(String(b.nome))) }))
+    .map(o => ({ ...o, alunos: o.alunos.sort(ordemCodigo) }))
     .sort((a, b) => b.alunos.length - a.alunos.length || a.escola.localeCompare(b.escola));
 }
 // "sem representante", "Roberto" ou "Roberto (12) e sem representante (3)"
@@ -80,17 +81,18 @@ export function abrirFilaPorColegio(aoTerminar) {
       let mostrados = 0;
       function mostrar() {
         if (!mostrados) ver.textContent = "Mais alunos";
-        g.alunos
-          .slice(mostrados, mostrados + POR_PAGINA)
-          .forEach(x =>
-            lista.append(
-              el(
-                "div",
-                "fila-aluno",
-                `${title(x.nome || "Sem nome")}${x.turma ? " · " + x.turma : ""}${x.resp ? " · " + U.first(x.resp) : ""}`
-              )
-            )
-          );
+        g.alunos.slice(mostrados, mostrados + POR_PAGINA).forEach(x =>
+          lista.append(
+            (() => {
+              const d = el("div", "fila-aluno");
+              if (x.codigo) d.append(el("span", "lc-id", x.codigo));
+              d.append(
+                el("span", null, `${title(x.nome || "Sem nome")}${x.turma ? " · " + x.turma : ""}${x.resp ? " · " + U.first(x.resp) : ""}`)
+              );
+              return d;
+            })()
+          )
+        );
         mostrados += POR_PAGINA;
         if (mostrados >= g.alunos.length) ver.hidden = true;
       }

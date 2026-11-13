@@ -1,6 +1,7 @@
 // Janela do representante (admin, 12/11/2026): as etapas em cima com quantos alunos há em cada uma, os alunos
 // agrupados por colégio, 50 por página, e a busca em todos os alunos da pessoa. Lê tudo de uma vez (até 3.000,
 // fora os entregues, que vêm só ao tocar em "Entregues"): acabou o limite de 300 da lista.
+import { ordemCodigo } from "./aluno-id.js";
 import { el, title } from "./ui.js";
 import * as U from "./util.js";
 import { C, FS, col, seg, ABERTAS, baseLF, baseSeg, ehFormatura, pessoaAberta, tela } from "./repasse-estado.js";
@@ -27,7 +28,7 @@ export function chipsPessoa(hoje) {
     ["entregues", "Entregues", it => it.etapa === "ENTREGUE"]
   ];
 }
-// colégio por colégio (o maior primeiro); dentro, por nome
+// colégio por colégio (o maior primeiro); dentro, pelo ID (sem ID, por nome no fim)
 export function porColegio(arr) {
   const g = new Map();
   arr.forEach(it => {
@@ -35,9 +36,7 @@ export function porColegio(arr) {
     if (!g.has(k)) g.set(k, []);
     g.get(k).push(it);
   });
-  return [...g.entries()]
-    .map(([k, l]) => [k, l.sort((a, b) => String(a.nome || "").localeCompare(String(b.nome || ""), "pt-BR"))])
-    .sort((a, b) => b[1].length - a[1].length || a[0].localeCompare(b[0]));
+  return [...g.entries()].map(([k, l]) => [k, l.sort(ordemCodigo)]).sort((a, b) => b[1].length - a[1].length || a[0].localeCompare(b[0]));
 }
 
 const st = { email: "", etapa: "hoje", pagina: 0, busca: null, entregues: null, nEntregues: null, carregando: false };

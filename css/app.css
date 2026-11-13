@@ -528,3 +528,9 @@ button.lc-linha[aria-expanded="true"]{border-bottom-left-radius:0;border-bottom-
 .pessoa-paginas{display:flex;justify-content:space-between;align-items:center;gap:8px;margin:8px 0}
 .cad-fotos{border-style:dashed}
 .ficha-cep{font-size:.88rem;display:flex;gap:8px;align-items:center;flex-wrap:wrap;min-height:1.2em}
+
+/* ID do aluno em cima do nome, um pouco maior (padrão de todas as listas) */
+.lc-id{display:block;align-self:flex-start;font-weight:800;font-size:.95rem;letter-spacing:.03em;font-variant-numeric:tabular-nums;color:var(--fg);line-height:1.1}
+.fila-aluno .lc-id{margin-bottom:1px}
+.rel-cols{display:grid;grid-template-columns:repeat(auto-fill,minmax(170px,1fr));gap:4px 12px;margin:6px 0 10px}
+.rel-cols .chk{font-size:.9rem}

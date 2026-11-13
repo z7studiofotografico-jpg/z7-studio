@@ -2056,6 +2056,31 @@ await cenario("Relatórios para imprimir (um por card)", async () => {
         await pg.locator("#relatorio").getByRole("button", { name: "Fechar" }).click();
       }
     });
+    // 📋 Alunos por colégio: escolhe o colégio e as colunas; sai em ordem de ID
+    await etapa(pg, "alunos por colégio", async () => {
+      await ir(pg, "#pr");
+      await pg.getByRole("button", { name: "📋 Alunos por colégio" }).click();
+      const sh = pg.locator(".sheet").filter({ hasText: "Alunos por colégio" }).last();
+      await sh.locator("#relAlunosEscola").waitFor({ timeout: 4000 });
+      const n = await sh.locator("#relAlunosEscola option").count();
+      ok(n > 1, `alunos por colégio: lista os colégios (${n - 1})`);
+      const v = await sh.locator("#relAlunosEscola option").nth(1).getAttribute("value");
+      await sh.locator("#relAlunosEscola").selectOption(v);
+      await sh.locator('input[data-campo="email"]').check();
+      await sh.getByRole("button", { name: "🖨️ Imprimir ou PDF" }).click();
+      await pg.waitForSelector("#relatorio .rel-tab", { timeout: 5000 });
+      const r = await pg.evaluate(() => ({
+        h1: document.querySelector("#relatorio h1").textContent,
+        cols: [...document.querySelectorAll("#relatorio .rel-tab th")].map(x => x.textContent),
+        ids: [...document.querySelectorAll("#relatorio .rel-tab tbody tr td:first-child")].map(x => x.textContent)
+      }));
+      const nums = r.ids.filter(Boolean).map(x => Number(x.split("-").pop()));
+      ok(
+        /^Alunos · /.test(r.h1) && r.cols[0] === "ID" && r.cols.includes("E-mail") && nums.every((x, i) => !i || nums[i - 1] <= x),
+        `alunos por colégio: colunas escolhidas e ordem de ID (${r.cols.join(", ")})`
+      );
+      await pg.locator("#relatorio").getByRole("button", { name: "Fechar" }).click();
+    });
     // ID do aluno e telefone errado no PR
     await etapa(pg, "ID do aluno e telefone no PR", async () => {
       await ir(pg, "#pr");

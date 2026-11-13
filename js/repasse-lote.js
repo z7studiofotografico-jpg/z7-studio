@@ -229,7 +229,7 @@ export async function separarLote() {
 }
 // nome de cada colégio no cadastro de Instituições (chave → nome), para a lista mostrar "C.E. João Cardoso"
 let cadastroNomes = null;
-async function nomesDoCadastro() {
+export async function nomesDoCadastro() {
   if (cadastroNomes) return cadastroNomes;
   cadastroNomes = {};
   try {

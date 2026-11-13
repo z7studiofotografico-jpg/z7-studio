@@ -71,7 +71,16 @@ const linha = it =>
     selo: x => (!ehFormatura() && vendaDe(x) === "paspatur" ? "🎞️ Paspatur" : "")
   });
 import { sheet, field, actions } from "./repasse-janelas.js";
-import { refreshStats, refreshLote, separarLote, loadMeta, pintarEscolas, escolaEscolhida, gruposPR } from "./repasse-lote.js";
+import {
+  refreshStats,
+  refreshLote,
+  separarLote,
+  loadMeta,
+  pintarEscolas,
+  escolaEscolhida,
+  gruposPR,
+  nomesDoCadastro
+} from "./repasse-lote.js";
 export { ETAPAS } from "./repasse-estado.js";
 let unsubList = null,
   mounted = false,
@@ -205,6 +214,24 @@ function mount() {
       )
     );
   hb.append(botaoRelatorio(relatorioPR, () => C.me));
+  // 📋 lista de alunos de um colégio, com as colunas que a pessoa escolher (em ordem de ID)
+  hb.append(
+    U.mkBtn("📋 Alunos por colégio", "btn-sm", async () => {
+      try {
+        const [m, cadastro] = await Promise.all([import("./relatorio-alunos.js"), nomesDoCadastro()]);
+        m.abrirRelatorioAlunos({
+          C,
+          colNome: colNome(),
+          meta,
+          cadastro,
+          escolha: $("rEscola") ? $("rEscola").value : "",
+          nomeTipo: ehFormatura() ? "Formatura" : "PR"
+        });
+      } catch (e) {
+        C.handleErr(e);
+      }
+    })
+  );
   // backup: a lista da aba aberta numa planilha
   hb.append(
     U.mkBtn("⬇️ Planilha", "btn-sm", () =>
