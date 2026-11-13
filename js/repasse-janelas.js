@@ -19,7 +19,7 @@ export function openPago(it) {
   // colégio sem preço: não registra venda (o Adriano cadastra o preço primeiro)
   if (semPreco(it))
     return sheet("Registrar venda", (p, close) => {
-      p.append(avisoSemPreco(C, it, vendaDe(it), NOME_VENDA[vendaDe(it)]), U.mkBtn("Fechar", "", close));
+      p.append(avisoSemPreco(C, it, vendaDe(it), NOME_VENDA[vendaDe(it)], segDe(it)), U.mkBtn("Fechar", "", close));
     });
   sheet("Registrar venda", (p, close) => {
     p.append(el("p", "hint", title(it.nome) + " · " + title(it.escola)));

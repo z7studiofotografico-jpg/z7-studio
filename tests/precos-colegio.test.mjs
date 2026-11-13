@@ -25,3 +25,17 @@ test("preço do colégio: usa o valor do colégio e só mantém o código Pix qu
   const pas = comPrecoDoColegio(base, { escola: "CIEP 433", ano: 2026 }, "paspatur");
   assert.equal(pas.semPrecoColegio, true);
 });
+test("preço do colégio: Linha de Frente e Repasse separados (o Repasse depois da virada) e parcelas até 12x", () => {
+  usarPrecos({ [chavePreco("CIEP 433", 2026)]: { pr: { lfPix: 300, lfCartao: 330, lfParcelas: 10 } } });
+  const lf = comPrecoDoColegio(base, { escola: "CIEP 433", ano: 2026 }, "pr", "lf");
+  assert.equal(lf.semPrecoColegio, undefined);
+  assert.equal(lf.lfParcelas, 10);
+  const rep = comPrecoDoColegio(base, { escola: "CIEP 433", ano: 2026 }, "pr", "rep");
+  assert.equal(rep.semPrecoColegio, true);
+});
+import { parcTxt } from "../js/repasse-estado.js";
+test("parcelas: o número escolhido é sem juros; com juros até 12x (como na maquininha)", () => {
+  assert.equal(parcTxt(10), "até 10x sem juros ou até 12x com juros");
+  assert.equal(parcTxt(12), "até 12x sem juros");
+  assert.equal(parcTxt(1), "até 12x com juros");
+});

@@ -4409,12 +4409,13 @@ await cenario("Colégio sem preço: aviso vermelho e venda bloqueada", async () 
   ok((await sh.getByRole("button", { name: "Salvar venda" }).count()) === 0, "sem preço: não registra a venda");
   await sh.getByRole("button", { name: "💲 Cadastrar preço do colégio" }).click();
   const fp = pg.locator(".sheet:visible").last();
-  await fp.getByLabel("Linha de Frente · Pix (R$)").fill("297");
+  await fp.getByLabel("Pix (à vista) (R$)").fill("297");
+  await fp.getByLabel("Parcelas sem juros no cartão").selectOption("10");
   await fp.getByRole("button", { name: "Salvar preço" }).click();
   await calmo(pg);
   const c = ((await store())["config/precosColegio"] || {}).colegios || {};
   ok(
-    Object.values(c).some(x => x.pr && x.pr.lfPix === 297),
+    Object.values(c).some(x => x.pr && x.pr.lfPix === 297 && x.pr.lfParcelas === 10),
     "Adriano cadastra o preço do colégio"
   );
   await pg.evaluate(() => document.querySelectorAll(".sheet").forEach(x => (x.id ? (x.hidden = true) : x.remove())));

@@ -5,14 +5,22 @@
 import { el, sheet, field, title } from "./ui.js";
 import * as U from "./util.js";
 
-export const CAMPOS_COLEGIO = [
-  ["lfPix", "Linha de Frente · Pix"],
-  ["lfCartao", "Linha de Frente · cartão"],
-  ["kitPreco", "Repasse · preço cheio"],
-  ["kitPromo", "Repasse · Pix"],
-  ["kitCartao", "Repasse · cartão"],
-  ["kitFinal", "Repasse · última oferta"]
-];
+// Linha de Frente e Repasse são precificados separados: o Repasse só depois da virada (o Adriano ajusta o preço lá).
+// Parcelas: até 12x, só no cartão (Pix e dinheiro são à vista).
+export const CAMPOS_SEG = {
+  lf: [
+    ["lfPix", "Pix (à vista)"],
+    ["lfCartao", "Cartão"]
+  ],
+  rep: [
+    ["kitPreco", "Preço cheio"],
+    ["kitPromo", "Pix (à vista)"],
+    ["kitCartao", "Cartão"],
+    ["kitFinal", "Última oferta"]
+  ]
+};
+export const PARCELAS_SEG = { lf: "lfParcelas", rep: "parcelas" };
+export const CAMPOS_COLEGIO = [...CAMPOS_SEG.lf, ...CAMPOS_SEG.rep];
 // código Pix e link de cartão dos Ajustes: só valem quando o valor do colégio é o mesmo dos Ajustes
 const CODIGOS = [
   ["pixLF", "lfPix"],
@@ -62,20 +70,21 @@ export const chavePreco = (escola, ano) =>
     .replace(/[^A-Z0-9 ]/g, " ")
     .replace(/\s+/g, " ")
     .trim()}`;
-const temValor = p => !!p && CAMPOS_COLEGIO.some(([k]) => Number(p[k]) > 0);
-// preços do colégio para o tipo de venda, ou null (sem preço)
-export function precoDoColegio(escola, ano, tipo) {
+// tem preço da etapa (Linha de Frente ou Repasse)? sem etapa: qualquer valor
+const temValor = (p, seg) => !!p && (CAMPOS_SEG[seg] || CAMPOS_COLEGIO).some(([k]) => Number(p[k]) > 0);
+// preços do colégio para o tipo de venda e a etapa, ou null (sem preço)
+export function precoDoColegio(escola, ano, tipo, seg) {
   const x = mapa[chavePreco(escola, ano)];
   const p = x && x[tipo];
-  return temValor(p) ? p : null;
+  return temValor(p, seg) ? p : null;
 }
 // ainda carregando: não bloqueia (usa os Ajustes)
 export const precosProntos = () => pronto;
 
 // junta os Ajustes com o preço do colégio; sem preço do colégio, os valores ficam zerados e marca semPrecoColegio
-export function comPrecoDoColegio(base, it, tipo) {
+export function comPrecoDoColegio(base, it, tipo, seg) {
   if (!it || !pronto) return base;
-  const p = precoDoColegio(it.escola, it.ano, tipo);
+  const p = precoDoColegio(it.escola, it.ano, tipo, seg);
   const zerados = Object.fromEntries(CAMPOS_COLEGIO.map(([k]) => [k, 0]));
   if (!p) {
     const out = Object.assign({}, base, zerados, { semPrecoColegio: true });
@@ -84,15 +93,17 @@ export function comPrecoDoColegio(base, it, tipo) {
   }
   const out = Object.assign({}, base, zerados);
   CAMPOS_COLEGIO.forEach(([k]) => Number(p[k]) > 0 && (out[k] = Number(p[k])));
+  Object.values(PARCELAS_SEG).forEach(k => Number(p[k]) > 0 && (out[k] = Number(p[k])));
   CODIGOS.forEach(([c, v]) => Number(base[v]) !== Number(out[v]) && delete out[c]);
   return out;
 }
 
 // aviso vermelho com o botão de cadastrar (só o admin cadastra)
-export function avisoSemPreco(C, it, tipo, nomeTipo) {
+const NOME_SEG = { lf: "Linha de Frente", rep: "Repasse" };
+export function avisoSemPreco(C, it, tipo, nomeTipo, seg) {
   const box = el("div", "sem-preco");
   box.append(
-    el("b", null, `🚫 ${title(it.escola || "Colégio")} ${it.ano || ""} está sem preço (${nomeTipo})`),
+    el("b", null, `🚫 ${title(it.escola || "Colégio")} ${it.ano || ""} está sem preço (${nomeTipo}${seg ? " · " + NOME_SEG[seg] : ""})`),
     el(
       "small",
       null,
@@ -103,20 +114,27 @@ export function avisoSemPreco(C, it, tipo, nomeTipo) {
   );
   if (C.isAdmin)
     box.append(
-      U.mkBtn("💲 Cadastrar preço do colégio", "btn-sm btn-primary", () => abrirPrecoColegio(C, it.escola, it.ano, tipo, nomeTipo))
+      U.mkBtn("💲 Cadastrar preço do colégio", "btn-sm btn-primary", () => abrirPrecoColegio(C, it.escola, it.ano, tipo, nomeTipo, seg))
     );
   return box;
 }
 
-// janela de preço do colégio (admin): os 6 valores do tipo de venda
-export function abrirPrecoColegio(C, escola, ano, tipo, nomeTipo) {
+// janela de preço do colégio (admin): os valores da etapa (Linha de Frente ou Repasse) e as parcelas no cartão
+export function abrirPrecoColegio(C, escola, ano, tipo, nomeTipo, seg) {
   if (!C.isAdmin) return U.toast("Só o Adriano cadastra o preço do colégio.");
   const k = chavePreco(escola, ano);
   const atual = (mapa[k] && mapa[k][tipo]) || {};
-  sheet(`💲 Preço · ${nomeTipo}`, (p, close) => {
-    p.append(el("p", "hint", `${title(escola)} · ${ano || ""}. Vale só para este colégio e este ano.`));
+  const sg = CAMPOS_SEG[seg] ? seg : "lf";
+  sheet(`💲 Preço · ${nomeTipo} · ${NOME_SEG[sg]}`, (p, close) => {
+    p.append(
+      el(
+        "p",
+        "hint",
+        `${title(escola)} · ${ano || ""}. Vale só para este colégio, este ano e ${sg === "lf" ? "a Linha de Frente (o Repasse você precifica de novo depois da virada)" : "o Repasse"}.`
+      )
+    );
     const grade = el("div", "row2");
-    const ins = CAMPOS_COLEGIO.map(([c, rot]) => {
+    const ins = CAMPOS_SEG[sg].map(([c, rot]) => {
       const i = el("input");
       i.inputMode = "decimal";
       i.placeholder = "0,00";
@@ -124,15 +142,26 @@ export function abrirPrecoColegio(C, escola, ano, tipo, nomeTipo) {
       grade.append(field(rot + " (R$)", i));
       return [c, i];
     });
+    // parcelas sem juros no cartão (com juros o link vai até 12x); Pix e dinheiro são à vista
+    const kp = PARCELAS_SEG[sg];
+    const parc = el("select");
+    for (let n = 1; n <= 12; n++) {
+      const o = el("option", null, n === 1 ? "Só com juros (até 12x)" : n === 12 ? "12x sem juros" : `${n}x sem juros (com juros até 12x)`);
+      o.value = String(n);
+      parc.append(o);
+    }
+    parc.value = String(Number(atual[kp]) || 1);
+    grade.append(field("Parcelas sem juros no cartão", parc));
     const err = el("p", "err");
     err.hidden = true;
     const salvar = U.mkBtn("Salvar preço", "btn-primary", async () => {
       const vals = Object.fromEntries(ins.map(([c, i]) => [c, Number(String(i.value).replace(/\./g, "").replace(",", ".")) || 0]));
-      if (!temValor(vals)) {
+      if (!temValor(vals, sg)) {
         err.textContent = "Coloque pelo menos um valor.";
         err.hidden = false;
         return;
       }
+      vals[kp] = Number(parc.value) || 1;
       try {
         await C.FS.setDoc(
           C.FS.doc(C.db, "config", "precosColegio"),

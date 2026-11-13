@@ -63,7 +63,7 @@ function precosDoTipo(t) {
 // ficam zerados e semPrecoColegio = true (bloqueia mensagem com valor e venda). Sem aluno: os da lista aberta.
 export const precos = it => {
   const t = it ? vendaDe(it) : ehFormatura() ? "formatura" : filtroVenda === "paspatur" ? "paspatur" : "pr";
-  return it ? comPrecoDoColegio(precosDoTipo(t), it, t) : precosDoTipo(t);
+  return it ? comPrecoDoColegio(precosDoTipo(t), it, t, segDe(it)) : precosDoTipo(t);
 };
 export const semPreco = it => !!(it && precos(it).semPrecoColegio);
 export function iniciar(ctx) {
@@ -154,9 +154,7 @@ export function ofertaTxt(it) {
   if (segDe(it) === "lf") {
     const pix = P.lfPix || P.kitPreco;
     if (!pix) return "Tudo por [valor do kit]";
-    return (
-      `${U.money(pix)} no Pix` + (P.lfCartao ? ` ou ${U.money(P.lfCartao)} no cartão${parcDe(it) ? ` (até ${parcDe(it)}x)` : ""}` : "")
-    );
+    return `${U.money(pix)} no Pix` + (P.lfCartao ? ` ou ${U.money(P.lfCartao)} no cartão (${parcTxt(parcDe(it))})` : "");
   }
   const pix = P.kitPromo || P.kitPreco;
   if (!pix) return "Tudo por [valor do kit]";
@@ -164,7 +162,7 @@ export function ofertaTxt(it) {
     P.kitPreco && P.kitPromo && P.kitPreco > P.kitPromo
       ? `De ${U.money(P.kitPreco)} por apenas ${U.money(P.kitPromo)} no Pix`
       : `Tudo por ${U.money(pix)} no Pix`;
-  if (P.kitCartao) t += ` ou ${U.money(P.kitCartao)} no cartão${P.parcelas ? ` (até ${P.parcelas}x)` : ""}`;
+  if (P.kitCartao) t += ` ou ${U.money(P.kitCartao)} no cartão (${parcTxt(P.parcelas)})`;
   return t;
 }
 // Prazo da última oferta: a próxima sexta que esteja a pelo menos 3 dias de hoje.
@@ -172,6 +170,13 @@ export function ofertaTxt(it) {
 export function parcDe(it) {
   const P = precos(it);
   return it && segDe(it) === "lf" && P.lfParcelas ? P.lfParcelas : P.parcelas;
+}
+// parcelas no cartão: o número escolhido é sem juros; com juros o link vai até 12x
+export function parcTxt(n) {
+  n = Number(n) || 0;
+  if (n >= 12) return "até 12x sem juros";
+  if (n >= 2) return `até ${n}x sem juros ou até 12x com juros`;
+  return "até 12x com juros";
 }
 export function sextaTxt() {
   const d = new Date();

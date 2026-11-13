@@ -2,7 +2,7 @@
 import { title } from "./ui.js";
 import { ESTUDIO } from "./mensagens.js";
 import * as U from "./util.js";
-import { C, segDe, eu, ofertaTxt, entregaTxt, sextaTxt, ehFormatura, precos, vendaDe } from "./repasse-estado.js";
+import { C, segDe, eu, ofertaTxt, entregaTxt, sextaTxt, parcTxt, ehFormatura, precos, vendaDe } from "./repasse-estado.js";
 import { passoFormatura } from "./formatura-mensagens.js";
 import { ehRespCadastro } from "./repasse-dados.js";
 
@@ -55,7 +55,7 @@ export function passo(it, c) {
         return precos(it).kitFinal && segDe(it) === "rep"
           ? {
               title: "Última condição (só para quem já viu a prévia)",
-              msg: `Oi${cn ? ", " + cn : ""}! Estamos organizando os kits que ainda estão aqui no estúdio e consegui uma condição especial para o ${c && c.tipo === "Formando" ? "seu kit" : "kit de " + F}: ${U.money(precos(it).kitFinal)} no Pix${precos(it).linkCartaoFinal ? ` ou no cartão${precos(it).parcelas ? ` (até ${precos(it).parcelas}x)` : ""}` : ""}, válida até ${sextaTxt()}. Depois disso volta ao valor normal. Quer que eu separe? 😊`,
+              msg: `Oi${cn ? ", " + cn : ""}! Estamos organizando os kits que ainda estão aqui no estúdio e consegui uma condição especial para o ${c && c.tipo === "Formando" ? "seu kit" : "kit de " + F}: ${U.money(precos(it).kitFinal)} no Pix${precos(it).linkCartaoFinal ? ` ou no cartão (${parcTxt(precos(it).parcelas)})` : ""}, válida até ${sextaTxt()}. Depois disso volta ao valor normal. Quer que eu separe? 😊`,
               then: { etapa: "INTERESSADO", days: 3, countI: true }
             }
           : {

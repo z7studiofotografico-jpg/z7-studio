@@ -30,7 +30,8 @@ import {
   save,
   claim,
   semPreco,
-  NOME_VENDA
+  NOME_VENDA,
+  parcTxt
 } from "./repasse-estado.js";
 import { avisoSemPreco, travarMensagensSemValor } from "./precos-colegio.js";
 import { passo } from "./repasse-mensagens.js";
@@ -153,7 +154,7 @@ export function card(it) {
   e.append(acoesDoCartao(it, li, e));
   // colégio sem preço: aviso vermelho no alto e as mensagens com valor travadas
   if (semPreco(it)) {
-    e.insertBefore(avisoSemPreco(C, it, vendaDe(it), NOME_VENDA[vendaDe(it)]), e.firstChild);
+    e.insertBefore(avisoSemPreco(C, it, vendaDe(it), NOME_VENDA[vendaDe(it)], segDe(it)), e.firstChild);
     travarMensagensSemValor(e);
   }
   return e;
@@ -250,7 +251,7 @@ export function desenharProximo(box, it, escolhido, blocked, li) {
   const valCartao = ultima ? P.kitFinal : segDe(it) === "lf" ? P.lfCartao : P.kitCartao;
   if (it.etapa === "INTERESSADO" && link && d) {
     const pc = parcDe(it);
-    const lm = `Para pagar no cartão${valCartao ? ` (${U.money(valCartao)}` + (pc ? `, em até ${pc}x sem juros)` : ")") : pc ? ` (em até ${pc}x sem juros)` : ""}, é só usar este link seguro da InfinitePay:\n${link}\nDepois me manda o comprovante por aqui 😊${pixCod ? " Se preferir Pix, é só me avisar que te mando o código." : C.P.pix ? ` No Pix${pixVal ? ` (${U.money(pixVal)})` : ""}, a chave é ${C.P.pix}.` : ""}`;
+    const lm = `Para pagar no cartão${valCartao ? ` (${U.money(valCartao)}, ${parcTxt(pc)})` : ` (${parcTxt(pc)})`}, é só usar este link seguro da InfinitePay:\n${link}\nDepois me manda o comprovante por aqui 😊${pixCod ? " Se preferir Pix, é só me avisar que te mando o código." : C.P.pix ? ` No Pix${pixVal ? ` (${U.money(pixVal)})` : ""}, a chave é ${C.P.pix}.` : ""}`;
     const a2 = el("a", "btn btn-sm", ultima ? "💳 Link da última oferta" : "💳 Mandar link de pagamento");
     a2.href = "https://wa.me/" + d + "?text=" + encodeURIComponent(lm);
     a2.target = "_blank";
