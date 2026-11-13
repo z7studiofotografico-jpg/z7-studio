@@ -553,7 +553,8 @@ export function openMockup({
         o.value = k;
         s.append(o);
       });
-      if (st.slots[i] >= st.fotos.length) st.slots[i] = Math.min(i, Math.max(0, st.fotos.length - 1));
+      // (sem fotos ainda não mexe: antes zerava tudo e o quadro e os 2 porta-retratos ficavam com a Foto 1)
+      if (st.fotos.length && st.slots[i] >= st.fotos.length) st.slots[i] = Math.min(i, st.fotos.length - 1);
       s.value = st.slots[i];
       s.disabled = !st.fotos.length;
     });
