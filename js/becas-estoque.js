@@ -73,7 +73,7 @@ export const FORA = ["Retirou a beca"];
 export function usoDosAlunos(alunos) {
   const u = { becas: {}, tamanhos: {}, menosLonga: {}, faixas: {}, capelos: {}, reservado: 0, fora: 0 };
   alunos
-    .filter(a => !a.excluido && (RESERVA.includes(a.status) || FORA.includes(a.status)))
+    .filter(a => !a.excluido && !a.naoParticipa && (RESERVA.includes(a.status) || FORA.includes(a.status)))
     .forEach(a => {
       if (FORA.includes(a.status)) u.fora++;
       else u.reservado++;

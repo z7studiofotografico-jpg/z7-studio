@@ -33,7 +33,7 @@ import { relatorioAluguel, atrasadoAluguel } from "./aluguel-relatorio.js";
 import { ITENS_PACOTE, nomeItem, lerPacote } from "./contrato-colegio-regras.js";
 import { linhaGenerica } from "./lista-compacta.js";
 import { avisoPrecoAluguel } from "./precos-colegio.js";
-import { USO, idUso, ouvirUso, espelhar, donoDoAluguel } from "./becas-uso.js";
+import { ouvirUso, espelhar, donoDoAluguel } from "./becas-uso.js";
 import { abrirJanela } from "./janela.js";
 import { abaColegio, abaHistorico } from "./aluguel-janela.js";
 
@@ -61,7 +61,7 @@ let lista = [],
   insts = [],
   usoAvulsos = { becas: {}, faixas: {}, capelos: {}, tamanhos: {} },
   alunosUso = [], // alunos com beca reservada ou fora, de todos (cópia do estoque)
-  filtro = { ano: String(ANO()), inst: "", status: "ativos", q: "" };
+  filtro = { ano: String(ANO()), inst: "", status: "Cadastrado", q: "" };
 const $ = id => document.getElementById(id);
 
 export function mostrarAlunos(ctx, v, o) {
@@ -170,36 +170,6 @@ export function mostrarAlunos(ctx, v, o) {
     .catch(() => {});
 }
 
-// apaga os alunos do colégio e ano escolhidos; quem tem beca fora ou produto reservado/baixado fica (para não
-// bagunçar o estoque) e o app avisa quantos ficaram
-async function excluirDoColegio(lst) {
-  const presos = lst.filter(
-    a => a.status === "Retirou a beca" || (a.produtos || []).some(p => p.estado === "reservado" || p.estado === "baixado")
-  );
-  const vai = lst.filter(a => !presos.includes(a));
-  if (!vai.length) return U.toast("Todos esses alunos têm beca fora ou produto no estoque: exclua um por um.");
-  const ok = await confirmar(
-    "Excluir os alunos deste colégio?",
-    `Apagar ${vai.length} aluno${vai.length === 1 ? "" : "s"} (${title(lst[0].instNome || "")}, ${filtro.ano || "todos os anos"})?` +
-      (presos.length ? ` ${presos.length} com beca fora ou produto no estoque ficam (exclua um por um).` : "") +
-      " Não dá para desfazer.",
-    { perigo: true, sim: "Sim, excluir" }
-  );
-  if (!ok) return;
-  try {
-    for (let i = 0; i < vai.length; i += 400) {
-      const b = FS.writeBatch(db);
-      vai.slice(i, i + 400).forEach(a => {
-        b.delete(FS.doc(db, "alugueis", a.id));
-        b.delete(FS.doc(db, USO, idUso("aluno", a.id))); // a cópia do estoque
-      });
-      await b.commit();
-    }
-    U.toast(`${vai.length} aluno${vai.length === 1 ? "" : "s"} excluído${vai.length === 1 ? "" : "s"} ✅`);
-  } catch (e) {
-    C.handleErr(e);
-  }
-}
 function render() {
   const corpo = $("alLista");
   if (!corpo) return;
@@ -221,7 +191,7 @@ function render() {
     const c = el("div", "kpi" + (i === 3 && atr.length ? " late" : ""));
     c.append(el("small", null, t), el("b", null, val));
     clicavel(c, () => {
-      filtro.status = ["ativos", "Beca medida", "Retirou a beca", "atrasados"][i];
+      filtro.status = ["todos", "Beca medida", "Retirou a beca", "atrasados"][i];
       render();
     });
     k.append(c);
@@ -285,23 +255,34 @@ function render() {
       " ",
       U.mkBtn("⏩ Avançar o colégio inteiro", "btn-sm", () =>
         import("./aluguel-lote.js").then(m => m.avancarColegio(C, doCol, mudarStatus)).catch(e => C.handleErr(e))
+      ),
+      " ",
+      U.mkBtn("⏪ Voltar o colégio inteiro", "btn-sm", () =>
+        import("./aluguel-lote.js").then(m => m.avancarColegio(C, doCol, mudarStatus, true)).catch(e => C.handleErr(e))
       )
     );
     if (C.isAdmin)
       r.append(
         " ",
-        U.mkBtn("🗑️ Excluir alunos deste colégio", "btn-danger btn-sm", () => excluirDoColegio(doCol))
+        U.mkBtn("🗑️ Excluir alunos deste colégio", "btn-danger btn-sm", () =>
+          import("./aluguel-lote.js").then(m => m.excluirDoColegio(C, doCol, filtro.ano))
+        )
       );
   } else r.hidden = true;
   // status
   const chips = $("alChips");
   chips.innerHTML = "";
+  // abas na ordem das etapas (13/11/2026): quem não vai participar da formatura (só compra o Paspatur) fica à parte
+  const naEtapa = s0 => a => !a.naoParticipa && (a.status || "Cadastrado") === s0;
   const abas = [
-    ["ativos", "Em andamento", a => a.status !== "Devolvida"],
+    ["naoParticipa", "🚫 Não vai participar · só o Paspatur", a => !!a.naoParticipa],
     ["atrasados", "⚠️ Atrasados", a => atrasadoAluguel(a, hoje)],
-    ...STATUS_ALUGUEL.map(s0 => [s0, s0, a => (a.status || "Cadastrado") === s0]),
-    ["todos", "Todos", () => true]
+    ...["Cadastrado", "Beca medida", "Produtos em produção", "Pronto para retirada"].map(s0 => [s0, s0, naEtapa(s0)]),
+    ["Devolvida", "Beca devolvida", naEtapa("Devolvida")],
+    ["todos", "Tudo", () => true]
   ];
+  // sem aba própria (o quadro "Becas fora" lá em cima abre quem está com a beca)
+  const escondidas = [["Retirou a beca", "", naEtapa("Retirou a beca")]];
   abas.forEach(([kk, t, fn]) => {
     const b = el("button", "chip" + (kk === "atrasados" ? " ch-nao" : ""), t);
     b.type = "button";
@@ -313,7 +294,7 @@ function render() {
     };
     chips.append(b);
   });
-  const fn = (abas.find(a => a[0] === filtro.status) || abas[0])[2];
+  const fn = ([...abas, ...escondidas].find(a => a[0] === filtro.status) || abas[2])[2];
   const q = U.chave(filtro.q);
   const arr = doCol
     .filter(fn)
@@ -482,12 +463,25 @@ function card(a) {
   const base = el("div", "acao-base");
   const prox = proximoStatus(a),
     ant = anteriorStatus(a);
-  if (prox) base.append(U.mkBtn("Avançar: " + prox, "btn-ok", () => mudarStatus(a, prox)));
-  if (ant) base.append(U.mkBtn("Voltar: " + ant, "", () => mudarStatus(a, ant)));
+  if (a.naoParticipa) {
+    // não vai participar da formatura: não aluga beca, só compra o Paspatur
+    base.append(el("span", "hint", "🚫 Não vai participar da formatura · só o Paspatur"));
+    base.append(U.mkBtn("↩️ Vai participar", "", () => import("./aluguel-lote.js").then(m => m.naoParticipa(C, a, false, salvar))));
+  } else {
+    if (prox) base.append(U.mkBtn("Avançar: " + prox, "btn-ok", () => mudarStatus(a, prox)));
+    if (ant) base.append(U.mkBtn("Voltar: " + ant, "", () => mudarStatus(a, ant)));
+    if (iStatus(a) < STATUS_ALUGUEL.indexOf("Retirou a beca"))
+      base.append(
+        U.mkBtn("🚫 Não vai participar (só o Paspatur)", "btn-sm", () =>
+          import("./aluguel-lote.js").then(m => m.naoParticipa(C, a, true, salvar))
+        )
+      );
+  }
   e.append(base);
   return e;
 }
 
+const iStatus = a => STATUS_ALUGUEL.indexOf(a.status || "Cadastrado");
 async function salvar(a, patch, msg) {
   try {
     await FS.updateDoc(FS.doc(db, "alugueis", a.id), Object.assign({ atualizadoEm: new Date().toISOString() }, patch));
@@ -532,6 +526,7 @@ export async function mudarStatus(a, para, lote = false) {
     iDe >= STATUS_ALUGUEL.indexOf("Retirou a beca") &&
     iPara < STATUS_ALUGUEL.indexOf("Retirou a beca") &&
     (a.produtos || []).some(p => p.estado === "baixado");
+  if (voltaBaixa && lote) return "produtos já tiveram baixa: volte um por um";
   if (voltaBaixa) {
     motivo =
       (await pedirTexto(

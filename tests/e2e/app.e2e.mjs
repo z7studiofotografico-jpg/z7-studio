@@ -3649,7 +3649,7 @@ await cenario("Aluguel de becas · alunos dos colégios (status, estoque e produ
     /Caio Atrasado/.test(await pg.textContent("#alLista")) && !/Ana Aluguel/.test(await pg.textContent("#alLista")),
     "alerta: atrasado na devolução"
   );
-  await pg.locator("#alChips .chip", { hasText: "Todos" }).click();
+  await pg.locator("#alChips .chip", { hasText: "Tudo" }).click();
   // P1 já está reservado para a Bia (só 1 menos longa): a Ana não consegue reservar
   const cAna = pg.locator("#alLista article", { hasText: "Ana Aluguel" });
   await cAna.getByRole("button", { name: "Avançar: Beca medida" }).click();
@@ -4480,6 +4480,31 @@ await cenario("Aluguel de becas: avançar o colégio inteiro (Cadastrado → Bec
     "passa todos de uma vez; quem está sem tamanho fica em Cadastrado"
   );
   ok(/Caio Semtamanho: sem tamanho/.test(await sh.textContent()), "mostra quem ficou de fora e por quê");
+  await sh.getByRole("button", { name: "Fechar" }).click();
+  // ⏪ voltar o colégio inteiro: os 2 de Beca medida voltam para Cadastrado
+  await pg.getByRole("button", { name: "⏪ Voltar o colégio inteiro" }).click();
+  const sv = pg.locator(".sheet").filter({ hasText: "Voltar o colégio inteiro" });
+  await sv.getByRole("button", { name: "Beca medida (2) → Cadastrado" }).click();
+  await pg.locator(".sheet").last().getByRole("button", { name: "Sim, voltar todos" }).click();
+  await sv.getByText(/2 alunos em/).waitFor({ timeout: 8000 });
+  const sv2 = await store();
+  ok(sv2["alugueis/b1"].status === "Cadastrado" && sv2["alugueis/b2"].status === "Cadastrado", "volta o colégio inteiro uma etapa");
+  await sv.getByRole("button", { name: "Fechar" }).click();
+  // quem não vai participar da formatura: fica só com o Paspatur, numa aba própria
+  await pg.locator("#alChips .chip", { hasText: "Cadastrado" }).click();
+  await pg
+    .locator("#alLista .lc-item", { hasText: "Caio" })
+    .getByRole("button", { name: "🚫 Não vai participar (só o Paspatur)" })
+    .first()
+    .click();
+  await pg.locator(".sheet").last().getByRole("button", { name: "Sim" }).click();
+  let c3 = null;
+  for (let t = 0; t < 25 && !(c3 = (await store())["alugueis/b3"]).naoParticipa; t++) await pg.waitForTimeout(200);
+  ok(
+    c3.naoParticipa === true && c3.pacote.join() === "paspatur",
+    "não vai participar: marcado, só com o Paspatur " + JSON.stringify([c3.naoParticipa, c3.pacote, c3.status])
+  );
+  ok(/Não vai participar · só o Paspatur\s*1/.test(await pg.locator("#alChips").textContent()), "aba própria com 1 aluno");
   ok(!erros.length, "sem erros" + (erros.length ? ": " + erros.join(" | ") : ""));
 });
 await cenario("Colégio sem preço: aviso vermelho e venda bloqueada", async () => {
