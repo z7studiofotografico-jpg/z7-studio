@@ -541,3 +541,5 @@ button.lc-linha[aria-expanded="true"]{border-bottom-left-radius:0;border-bottom-
 .sem-preco b{color:var(--accent)}
 .sem-preco .btn{align-self:flex-start}
 a.travado{opacity:.45;cursor:not-allowed;text-decoration:line-through}
+.lote-etapas{display:flex;flex-direction:column;gap:8px;margin:6px 0 10px}
+.lote-etapas .btn{justify-content:flex-start}

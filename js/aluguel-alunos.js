@@ -17,7 +17,6 @@ import {
   FAIXAS,
   CAPELOS,
   COM_MENOS_LONGA,
-  nomeBeca,
   nomeFaixa,
   nomeCapelo,
   usoDosAlunos,
@@ -281,6 +280,13 @@ function render() {
       )
     );
     // admin: excluir os alunos desse colégio e ano (importou errado, turma duplicada…)
+    // o colégio inteiro de uma vez: medimos todo mundo no colégio, então passa todos para a próxima etapa
+    r.append(
+      " ",
+      U.mkBtn("⏩ Avançar o colégio inteiro", "btn-sm", () =>
+        import("./aluguel-lote.js").then(m => m.avancarColegio(C, doCol, mudarStatus)).catch(e => C.handleErr(e))
+      )
+    );
     if (C.isAdmin)
       r.append(
         " ",
@@ -422,7 +428,7 @@ function card(a) {
     [[a.ano, a.serie].filter(Boolean).join(" · "), ""],
     [
       a.becaTipo
-        ? `👘 ${nomeBeca(a.becaTipo).replace("Beca ", "")}${a.tamanho ? " " + a.tamanho + (a.menosLonga ? "1 (menos longa)" : "") : " · sem tamanho"}`
+        ? `👘 Beca ${tamanhoBeca(a).replace(/^\w/, c => c.toLowerCase())}${a.menosLonga ? " (menos longa)" : ""} · ${modeloBeca(a.becaTipo)}`
         : "",
       ""
     ],
@@ -496,11 +502,13 @@ async function salvar(a, patch, msg) {
 const itensProd = a => (a.produtos || []).filter(p => p.estado === "reservado").map(p => ({ produto: p.produto, qtd: p.qtd }));
 
 // Mudar o status (com a pergunta "Mudar de X para Y?") e o que isso faz no estoque
-export async function mudarStatus(a, para) {
+// lote = true (o colégio inteiro de uma vez): não pergunta nada; devolve "ok" ou o motivo de ter pulado o aluno
+export async function mudarStatus(a, para, lote = false) {
   const de = a.status || "Cadastrado";
   const iDe = STATUS_ALUGUEL.indexOf(de),
     iPara = STATUS_ALUGUEL.indexOf(para);
   if (iPara >= STATUS_ALUGUEL.indexOf("Beca medida") && (!a.becaTipo || !a.tamanho)) {
+    if (lote) return "sem tamanho";
     U.toast("Antes, coloque o tipo e o tamanho da beca (Editar).");
     return form(a);
   }
@@ -509,6 +517,7 @@ export async function mudarStatus(a, para) {
     const uso = somarUso(usoAvulsos, usoDosAlunos(alunosUso.filter(x => x.id !== a.id)));
     const falta = faltaParaAluno(C.P.estoque || {}, uso, a);
     if (falta.length) {
+      if (lote) return "sem estoque: " + falta.join(", ");
       await confirmar(
         "Sem estoque",
         "Não tem livre: " + falta.join(", ") + ". Troque o tamanho/faixa/capelo (Editar) ou confira o estoque.",
@@ -530,7 +539,7 @@ export async function mudarStatus(a, para) {
         "Os produtos já tiveram baixa no estoque. Qual o motivo de voltar? (fica registrado no estorno)"
       )) || "";
     if (!motivo) return;
-  } else if (!(await confirmarStatus(de, para))) return;
+  } else if (!lote && !(await confirmarStatus(de, para))) return;
   const patch = {
     status: para,
     historico: [...(a.historico || []), { de, para, em: new Date().toISOString(), por: C.me || "" }].slice(-30)
@@ -559,8 +568,17 @@ export async function mudarStatus(a, para) {
       tx.update(ref, Object.assign({ atualizadoEm: new Date().toISOString() }, patch));
     });
     espelhar(C, "aluno", a.id, Object.assign({}, a, patch, { status: para }));
+    // no lote o aluno da lista já fica com o novo status (o próximo confere o estoque contando com ele)
+    if (lote) {
+      Object.assign(a, patch);
+      const u = alunosUso.find(x => x.id === a.id);
+      if (u) Object.assign(u, patch);
+      else alunosUso.push(Object.assign({}, a));
+      return "ok";
+    }
     U.toast("Agora: " + para);
   } catch (e) {
+    if (lote) return (e && e.message) || "erro";
     if (e && (e.code === "mudou" || e.code === "sem-estoque")) U.toast(e.message);
     else C.handleErr(e);
   }

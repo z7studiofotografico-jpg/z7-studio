@@ -4441,6 +4441,47 @@ await cenario("Cadastro automático do Aluguel de becas (beca, tamanho e kit da 
   );
   ok(!erros.length, "sem erros" + (erros.length ? ": " + erros.join(" | ") : ""));
 });
+await cenario("Aluguel de becas: avançar o colégio inteiro (Cadastrado → Beca medida)", async () => {
+  const Y = new Date().getFullYear();
+  const al = (nome, extra) =>
+    Object.assign(
+      {
+        instId: "i1",
+        instNome: "COLEGIO ALFA",
+        ano: Y,
+        nome,
+        serie: "3001",
+        status: "Cadastrado",
+        produtos: [],
+        historico: [],
+        becaTipo: "infPreta",
+        tamanho: "M",
+        contratoZerado: true
+      },
+      extra
+    );
+  const d = Object.assign({}, base, {
+    "alugueis/b1": al("Ana Medida"),
+    "alugueis/b2": al("Bia Medida"),
+    "alugueis/b3": al("Caio Semtamanho", { tamanho: "" })
+  });
+  const { pg, erros, store } = await abrir(ADRIANO, migrar(d));
+  await ir(pg, "#becas");
+  await pg.waitForFunction(() => /Ana Medida/i.test(document.getElementById("viewBecas").textContent), null, { timeout: 8000 });
+  await pg.locator("#alFiltros select").nth(1).selectOption("i1");
+  await pg.getByRole("button", { name: "⏩ Avançar o colégio inteiro" }).click();
+  const sh = pg.locator(".sheet").filter({ hasText: "Avançar o colégio inteiro" });
+  await sh.getByRole("button", { name: "Cadastrado (3) → Beca medida" }).click();
+  await pg.locator(".sheet").last().getByRole("button", { name: "Sim, passar todos" }).click();
+  await sh.getByText(/2 alunos em/).waitFor({ timeout: 8000 });
+  const st = await store();
+  ok(
+    st["alugueis/b1"].status === "Beca medida" && st["alugueis/b2"].status === "Beca medida" && st["alugueis/b3"].status === "Cadastrado",
+    "passa todos de uma vez; quem está sem tamanho fica em Cadastrado"
+  );
+  ok(/Caio Semtamanho: sem tamanho/.test(await sh.textContent()), "mostra quem ficou de fora e por quê");
+  ok(!erros.length, "sem erros" + (erros.length ? ": " + erros.join(" | ") : ""));
+});
 await cenario("Colégio sem preço: aviso vermelho e venda bloqueada", async () => {
   const Y = new Date().getFullYear();
   const d = Object.assign({}, base, {
