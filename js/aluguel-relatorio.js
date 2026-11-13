@@ -5,7 +5,8 @@ import * as U from "./util.js";
 import { ocultoParaMim } from "./confirmar.js";
 import { nomeFaixa, nomeCapelo, usoDosAlunos } from "./becas-estoque.js";
 import { pedirFiltros } from "./relatorio.js";
-import { contatoRel } from "./aluno-id.js";
+import { contatoRel, ordemCodigo } from "./aluno-id.js";
+import { pacoteDoAluno, nomeItem } from "./contrato-colegio-regras.js";
 
 export const atrasadoAluguel = (a, hoje = U.todayStr()) => a.status === "Retirou a beca" && !!a.devolucao && a.devolucao < hoje;
 
@@ -76,20 +77,32 @@ export async function relatorioAluguel(C, lista, filtro) {
   if (!f) return null;
   const hoje = U.todayStr();
   const arr = filtrarRelatorio(base, f, hoje);
-  const cols = ["Aluno", "Contato", "Série", "Beca", "Faixa / capelo", "Status", "Devolução"];
+  // contrato de cada colégio e ano (id = instId_ano): o kit do aluno sem pacote próprio é o padrão do contrato
+  const contratos = {};
+  await Promise.all(
+    [...new Set(arr.map(a => `${a.instId}_${a.ano}`))].map(id =>
+      C.FS.getDoc(C.FS.doc(C.db, "contratosColegio", id))
+        .then(s => s.exists() && (contratos[id] = s.data()))
+        .catch(() => {})
+    )
+  );
+  const kit = a => pacoteDoAluno(a, contratos[`${a.instId}_${a.ano}`]).itens.map(nomeItem).join(" + ") || "—";
+  const cols = ["ID", "Aluno", "Contato", "Turma", "Kit", "Beca", "Faixa / capelo", "Status", "Devolução"];
   const linha = a => [
+    a.codigo || "",
     title(a.nome || ""),
     contatoRel(a.tel, ""),
     a.serie || "",
+    kit(a),
     a.tamanho ? a.tamanho + (a.menosLonga ? "1" : "") : "—",
     [a.faixa && nomeFaixa(a.faixa), a.capelo && nomeCapelo(a.capelo)].filter(Boolean).join(" · "),
     atrasadoAluguel(a, hoje) ? "ATRASADO" : a.status || "Cadastrado",
     a.devolucao ? U.fmtDate(a.devolucao) : ""
   ];
-  // separa por colégio, ou por colégio e turma (a coluna Série sai quando cada parte já é uma turma)
+  // separa por colégio, ou por colégio e turma (a turma sai em cada linha também)
   const porTurma = f.por === "turma";
-  const cs = porTurma ? cols.filter(c => c !== "Série") : cols;
-  const ln = porTurma ? a => linha(a).filter((_, i) => i !== 2) : linha;
+  const cs = cols;
+  const ln = linha;
   const porCol = {};
   arr.forEach(a => {
     const k = title(a.instNome || "?") + (porTurma ? " · " + (a.serie || "sem turma") : "");
@@ -117,7 +130,7 @@ export async function relatorioAluguel(C, lista, filtro) {
         .map(([c, l]) => ({
           titulo: title(c),
           nota: `${l.length} aluno${l.length === 1 ? "" : "s"}`,
-          tabela: { cols: cs, linhas: l.sort((a, b) => (a.nome || "").localeCompare(b.nome || "", "pt-BR")).map(ln) }
+          tabela: { cols: cs, linhas: l.sort(ordemCodigo).map(ln) }
         }))
     ]
   };
