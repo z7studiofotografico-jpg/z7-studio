@@ -257,8 +257,21 @@ details.tamtipo{border:1px solid var(--line,#ddd);border-radius:10px;padding:6px
 .rel-tab td{overflow-wrap:break-word}
 .rel-tab td.curto{white-space:nowrap}
 @media (max-width:600px){.rel-folha{padding:16px}.rel-tab{font-size:.78rem}.rel-tab th,.rel-tab td{padding:4px 5px}}
+.rel-paisagem .rel-folha{max-width:1180px}
 @media print{
-  @page{margin:14mm}
+  @page{margin:9mm}
+  /* 17/11/2026: sem buracos em branco: a seção continua na mesma folha (só o título não fica sozinho no fim) */
+  .rel-secao{break-inside:auto;margin-bottom:10px}
+  .rel-secao h2,.rel-nota{break-after:avoid}
+  .rel-kpis{break-inside:avoid;gap:5px;margin-bottom:6px;grid-template-columns:repeat(auto-fit,minmax(110px,1fr))}
+  .rel-kpi{padding:4px 7px}
+  .rel-kpi b{font-size:10.5pt}
+  .rel-cab{padding-bottom:6px;margin-bottom:10px}
+  .rel-cab h1{font-size:17pt}
+  .rel-secao h2{font-size:11.5pt;margin-bottom:4px}
+  .rel-tab{font-size:8.3pt}
+  .rel-tab th,.rel-tab td{padding:2px 5px}
+  .rel-tab thead{display:table-header-group}
   body.imprimindo > *:not(#relatorio){display:none!important}
   body.imprimindo{background:#fff}
   #relatorio{position:static;padding:0;overflow:visible;background:#fff}

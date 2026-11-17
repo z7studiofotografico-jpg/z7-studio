@@ -2182,7 +2182,10 @@ await cenario("Relatórios para imprimir (um por card)", async () => {
       await pg.getByRole("button", { name: "🖨️ Relatório" }).first().click();
       await pg.waitForSelector("#relatorio .rel-copia", { timeout: 5000 });
       ok(/Total de vendas/.test(await pg.textContent("#relatorio")), "Dashboard: relatório traz os números da tela");
-      ok((await pg.$$("#relatorio button")).length === 2, "Dashboard: botões da tela não vão para o papel");
+      ok(
+        (await pg.$$("#relatorio button")).length === 3,
+        "Dashboard: botões da tela não vão para o papel (só os 2 de imprimir e o Fechar)"
+      );
       await pg.locator("#relatorio").getByRole("button", { name: "Fechar" }).click();
     });
     ok(erros.length === 0, "sem erros no console" + (erros.length ? ": " + erros.slice(0, 3).join(" | ") : ""));
@@ -4572,10 +4575,7 @@ await cenario("Aluguel de becas: avançar o colégio inteiro (Cadastrado → Bec
   await pg.getByRole("button", { name: "⏩ Avançar o colégio inteiro" }).click();
   const sp2 = pg.locator(".sheet").filter({ hasText: "Avançar o colégio inteiro" });
   await pg.waitForTimeout(300);
-  ok(
-    /Só o Paspatur \(2\) → Produtos em produção/.test(await sp2.textContent()),
-    "avançando de novo: Só o Paspatur → Produtos em produção"
-  );
+  ok(/Só o Paspatur \(2\) → Produtos em produção/.test(await sp2.textContent()), "avançando de novo: Só o Paspatur → Produtos em produção");
   await sp2.getByRole("button", { name: "Fechar" }).click();
   ok(!erros.length, "sem erros" + (erros.length ? ": " + erros.join(" | ") : ""));
 });

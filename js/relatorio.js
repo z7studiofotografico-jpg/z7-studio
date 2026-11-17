@@ -11,8 +11,16 @@ export function abrirRelatorio(conteudo, quem) {
   r.setAttribute("role", "dialog");
   r.setAttribute("aria-label", "Relatório: " + conteudo.titulo);
   const barra = el("div", "rel-barra");
+  // 17/11/2026: na hora de imprimir (ou salvar em PDF), escolhe a folha: deitada (paisagem) ou em pé (retrato).
+  // A tela já mostra a folha do jeito que vai sair: tabela larga (7 colunas ou mais) começa deitada
+  const largo = (conteudo.secoes || []).some(x => x.tabela && x.tabela.cols && x.tabela.cols.length >= 7);
+  const imprimir = pais => {
+    folhaDeitada(r, pais);
+    setTimeout(() => window.print(), 50);
+  };
   barra.append(
-    U.mkBtn("🖨️ Imprimir ou salvar em PDF", "btn-primary", () => window.print()),
+    U.mkBtn("🖨️ Imprimir · folha deitada", largo ? "btn-primary" : "", () => imprimir(true)),
+    U.mkBtn("🖨️ Imprimir · folha em pé", largo ? "" : "btn-primary", () => imprimir(false)),
     U.mkBtn("Fechar", "", fecharRelatorio)
   );
   const folha = el("div", "rel-folha");
@@ -36,11 +44,25 @@ export function abrirRelatorio(conteudo, quem) {
   folha.append(cab);
   (conteudo.secoes || []).forEach(s => folha.append(secao(s)));
   r.append(barra, folha);
+  folhaDeitada(r, largo);
   document.body.append(r);
   document.body.classList.add("imprimindo");
   return r;
 }
+// a página da impressora: deitada (paisagem) ou em pé, com margem pequena
+function folhaDeitada(r, pais) {
+  r.classList.toggle("rel-paisagem", pais);
+  let st = document.getElementById("relPagina");
+  if (!st) {
+    st = document.createElement("style");
+    st.id = "relPagina";
+    document.head.append(st);
+  }
+  st.textContent = `@media print{@page{size:A4 ${pais ? "landscape" : "portrait"};margin:9mm}}`;
+}
 export function fecharRelatorio() {
+  const s = document.getElementById("relPagina");
+  if (s) s.remove();
   const r = document.getElementById("relatorio");
   if (r) r.remove();
   document.body.classList.remove("imprimindo");
