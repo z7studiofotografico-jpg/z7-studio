@@ -86,6 +86,7 @@ export function paraDocAluguel(o, ext) {
   const kit = kitDaPlanilha(o.pacote, d.serie, ext.contrato);
   if (kit) {
     d.pacote = kit.itens.slice();
+    if (d.pacote.includes("pelerine")) Object.assign(d, { becaTipo: "pelerineAzul", tamanho: "", menosLonga: false });
     d.__falta = d.__falta.filter(f => !/^pacote/.test(f));
     if (!String(o.valor || "").trim()) {
       d.valor = Number(kit.valor) || 0;

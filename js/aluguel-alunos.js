@@ -24,7 +24,9 @@ import {
   faltaParaAluno,
   somarUso,
   tamanhoBeca,
-  modeloBeca
+  modeloBeca,
+  semTamanho,
+  ligarTamanhoUnico
 } from "./becas-estoque.js";
 import { reservar, baixar, estornar } from "./estoque.js";
 import { ESTUDIO, ENDERECO } from "./mensagens.js";
@@ -555,7 +557,7 @@ export async function mudarStatus(a, para, lote = false) {
   const de = a.status || "Cadastrado";
   const iDe = STATUS_ALUGUEL.indexOf(de),
     iPara = STATUS_ALUGUEL.indexOf(para);
-  if (!a.soPaspatur && iPara >= STATUS_ALUGUEL.indexOf("Beca medida") && (!a.becaTipo || !a.tamanho)) {
+  if (!a.soPaspatur && iPara >= STATUS_ALUGUEL.indexOf("Beca medida") && (!a.becaTipo || (!a.tamanho && !semTamanho(a.becaTipo)))) {
     if (lote) return "sem tamanho";
     U.toast("Antes, coloque o tipo e o tamanho da beca (Editar).");
     return form(a);
@@ -668,6 +670,7 @@ export function form(a, pre = {}) {
     r1.append(field("Aluno", nome), field("WhatsApp", tel), field("Responsável", resp));
     const tipo = sel(BECAS, x.becaTipo || "tradPreta");
     const tam = sel(TAMANHOS, x.tamanho || "", "tamanho");
+    ligarTamanhoUnico(tipo, tam); // pelerine: tamanho único
     const ml = el("input");
     ml.type = "checkbox";
     ml.checked = !!x.menosLonga;

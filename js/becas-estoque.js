@@ -14,6 +14,19 @@ export const BECAS = [
   ["tradPreta", "Beca tradicional preta"],
   ["americana", "Beca americana"]
 ];
+// (17/11/2026) a pelerine é de tamanho único: só o total, sem PPP a EXG
+export const SEM_TAMANHO = ["pelerineAzul"];
+export const semTamanho = tipo => SEM_TAMANHO.includes(tipo);
+// no formulário: escolhendo a pelerine, o tamanho fica travado (vazio)
+export function ligarTamanhoUnico(tipoSel, tamSel) {
+  const f = () => {
+    tamSel.disabled = semTamanho(tipoSel.value);
+    if (tamSel.disabled) tamSel.value = "";
+  };
+  tipoSel.addEventListener("change", f);
+  f();
+  return f;
+}
 // só a beca tradicional preta tem a versão "menos longa" (não se aplica à infantil)
 export const COM_MENOS_LONGA = ["tradPreta"];
 export const FAIXAS = [
@@ -55,6 +68,7 @@ export const nomeBeca = k => (BECAS.find(b => b[0] === k) || [k, k])[1];
 export const idadeBeca = k => (String(k || "").startsWith("inf") ? "infantil" : "adulto");
 // "Infantil GG", "Adulto P1" (P1 = P menos longa); sem tamanho: "Adulto · sem tamanho"
 export function tamanhoBeca(a) {
+  if (a && semTamanho(a.becaTipo)) return "Pelerine · tamanho único";
   const i = idadeBeca(a && a.becaTipo);
   const t = a && a.tamanho ? a.tamanho + (a.menosLonga ? "1" : "") : "";
   return (i === "infantil" ? "Infantil" : "Adulto") + (t ? " " + t : " · sem tamanho");
@@ -164,7 +178,8 @@ export function abrirEstoqueBecas(C, uso, aoSalvar) {
     const iF = tab("Faixas (cor e espessura)", FAIXAS, E.faixas, uso.faixas);
     const iC = tab("Capelos", CAPELOS, E.capelos, uso.capelos);
     p.append(el("label", "field-tit", "Tamanhos de cada beca (PPP a EXG)"));
-    const iT = BECAS.map(([tp, nm]) => {
+    p.append(el("p", "hint", "Beca pelerine azul: tamanho único (só o total, lá em cima)."));
+    const iT = BECAS.filter(([tp]) => !semTamanho(tp)).map(([tp, nm]) => {
       const d = el("details", "tamtipo"),
         sm = el("summary");
       d.append(sm);

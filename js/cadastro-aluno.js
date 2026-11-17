@@ -7,7 +7,7 @@ import { el, title, field, inp, inpReais, sel, sheet } from "./ui.js";
 import * as U from "./util.js";
 import { lerReais } from "./regras.js";
 import { codigoBusca } from "./aluno-id.js";
-import { BECAS, TAMANHOS, FAIXAS, CAPELOS, COM_MENOS_LONGA } from "./becas-estoque.js";
+import { BECAS, TAMANHOS, FAIXAS, CAPELOS, COM_MENOS_LONGA, ligarTamanhoUnico } from "./becas-estoque.js";
 import {
   COLUNAS_CONTATOS,
   TEL_ALUNO,
@@ -360,6 +360,7 @@ export function abrirCadastroAluno(C, o = {}) {
         bFaixa = sel(FAIXAS, "", "Sem faixa"),
         bCap = sel(CAPELOS, "", "Sem capelo"),
         bValor = inpReais("");
+      ligarTamanhoUnico(bTipo, bTam); // pelerine: tamanho único
       const bMenos = el("input");
       bMenos.type = "checkbox";
       const lMenos = el("label", "chk");

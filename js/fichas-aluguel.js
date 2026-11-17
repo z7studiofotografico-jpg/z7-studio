@@ -5,7 +5,7 @@ import { el, title, sheet, field, sel } from "./ui.js";
 import * as U from "./util.js";
 import { fotoDaFicha, chaveGrupo, chaveGrupoCol, contatosDaFicha, acharExistente, soNumero, menorLivre } from "./fichas.js";
 import { lerCodigo, fmtCodigo, codigoBusca } from "./aluno-id.js";
-import { TAMANHOS, FAIXAS, CAPELOS } from "./becas-estoque.js";
+import { TAMANHOS, FAIXAS, CAPELOS, ligarTamanhoUnico } from "./becas-estoque.js";
 import { ITENS_PACOTE, kitsDo, valorDoPacote } from "./contrato-colegio-regras.js";
 
 const idFichaAluguel = (escola, ano, nome) => (chaveGrupo(escola, ano) + "_" + U.chave(nome).replace(/[^A-Z0-9]+/g, "-")).slice(0, 140);
@@ -146,11 +146,13 @@ export function camposAluguel(ja, contrato) {
   const idade = sel(
     [
       ["infPreta", "Infantil"],
-      ["tradPreta", "Adulto"]
+      ["tradPreta", "Adulto"],
+      ["pelerineAzul", "Pelerine (tamanho único)"]
     ],
     (ja && ja.becaTipo) || "infPreta"
   );
   const tam = sel(TAMANHOS, (ja && ja.tamanho) || "", "tamanho");
+  const tamUnico = ligarTamanhoUnico(idade, tam); // pelerine: tamanho único
   const faixa = sel(FAIXAS, (ja && ja.faixa) || "", "sem faixa");
   const capelo = sel(CAPELOS, (ja && ja.capelo) || "", "sem capelo");
   [
@@ -177,7 +179,16 @@ export function camposAluguel(ja, contrato) {
   const fk = el("div", "field fc-6");
   fk.append(el("label", null, "Kit (o que o aluno levou)"));
   // os kits do colégio (preço fechado), em botões em cima dos itens
-  if (kitsDo(contrato).length) import("./contrato-kits.js").then(m => kit.before(m.botoesKits(contrato, ja && ja.serie, cx)));
+  if (kitsDo(contrato).length)
+    import("./contrato-kits.js").then(m =>
+      kit.before(
+        m.botoesKits(contrato, ja && ja.serie, cx, k => {
+          if (k.itens.includes("pelerine")) idade.value = "pelerineAzul";
+          else if (idade.value === "pelerineAzul") idade.value = "tradPreta";
+          tamUnico();
+        })
+      )
+    );
   fk.append(kit);
   box.append(fk);
   return {
