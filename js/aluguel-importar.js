@@ -6,6 +6,8 @@ import { abrirImportador, ultimasImportacoes } from "./importador.js";
 import { BECAS, FAIXAS, CAPELOS, TAMANHOS } from "./becas-estoque.js";
 import { lerPacote, ITENS_PACOTE, idContrato, kitDaPlanilha, valorDoPacote, serieDaTurma } from "./contrato-colegio-regras.js";
 import { idDoAluno } from "./cadastro-regras.js";
+import { cartaoDoTipo } from "./instituicoes-dados.js";
+import { TIPOS_FILTRO } from "./aluguel-resumo.js";
 import { lerCodigo, codigoBusca } from "./aluno-id.js";
 
 const achar = (lista, v) => {
@@ -219,11 +221,30 @@ export async function importarAlugueis(C, insts) {
         "",
         "escolha a instituição"
       );
+      // (17/11/2026) primeiro o tipo (particular, público, faculdade e curso), depois a instituição daquele tipo
+      const sTipo = sel(TIPOS_FILTRO, "", "todas (particular, público…)");
+      sTipo.setAttribute("aria-label", "Tipo de instituição");
+      sTipo.addEventListener("change", () => {
+        const v = sInst.value;
+        const lista = insts.filter(i => !sTipo.value || cartaoDoTipo(i.tipo || "") === sTipo.value);
+        const vazio = el("option", null, "escolha a instituição");
+        vazio.value = "";
+        sInst.replaceChildren(
+          vazio,
+          ...lista.map(i => {
+            const o = el("option", null, title(i.nome));
+            o.value = i.id;
+            return o;
+          })
+        );
+        sInst.value = lista.some(i => i.id === v) ? v : "";
+        if (sInst.value !== v) sInst.dispatchEvent(new Event("change", { bubbles: true }));
+      });
       const ano = el("input");
       ano.inputMode = "numeric";
       ano.value = String(new Date().getFullYear());
-      const r = el("div", "row2");
-      r.append(field("Instituição", sInst), field("Ano", ano));
+      const r = el("div", "row3");
+      r.append(field("Tipo", sTipo), field("Instituição", sInst), field("Ano", ano));
       // tamanho sem "adulto" ou "infantil" na célula fica com esta beca
       const sIdade = sel(
         [
