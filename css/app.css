@@ -561,3 +561,12 @@ a.travado{opacity:.45;cursor:not-allowed;text-decoration:line-through}
 body:not(.ver-valores) .vlr{filter:blur(6px);user-select:none;-webkit-user-select:none}
 @media print{body .vlr{filter:none}}
 #btnOlho{font-size:1.05rem;padding:6px 10px}
+
+/* 🔎 procurar nas listas longas (busca-select.js) */
+.sel-busca{position:relative;margin-top:4px}
+.sel-busca input{width:100%;font-size:13px;padding:6px 10px;border-radius:8px}
+.sel-busca-lista{position:absolute;z-index:60;left:0;right:0;top:100%;max-height:260px;overflow:auto;background:var(--card,#fff);border:1px solid var(--line,#ddd);border-radius:10px;box-shadow:0 8px 24px rgba(0,0,0,.15);padding:4px}
+.sel-busca-lista button{display:block;width:100%;text-align:left;background:none;border:0;padding:8px 10px;border-radius:6px;font:inherit;cursor:pointer;color:inherit}
+.sel-busca-lista button:hover,.sel-busca-lista button:focus{background:var(--soft,#f1f1f1)}
+.sel-busca-vazio{padding:8px 10px;opacity:.7;font-size:13px}
+@media print{.sel-busca{display:none}}

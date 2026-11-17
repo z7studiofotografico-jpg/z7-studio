@@ -46,6 +46,7 @@ import { painelNumeros } from "./numeros-tela.js";
 import { painelAtividades } from "./atividades.js";
 import { ligarWhatsCerto } from "./numeros-celular.js";
 import { ligarOlho } from "./olho-valores.js";
+import { ligarBuscaSelect } from "./busca-select.js";
 import * as Equipe from "./equipe.js";
 import { definirExtras as feriadosExtras } from "./feriados.js";
 
@@ -342,6 +343,7 @@ ligarErros(ctx);
 // "Abrir no WhatsApp": abre no app (WhatsApp ou Business) do número em uso nesta tela
 ligarWhatsCerto(ctx);
 ligarOlho(); // 👁 os valores em R$ ficam apagados até tocar no olho
+ligarBuscaSelect(); // 🔎 as listas longas (colégios etc.) ganham um campo para digitar o nome ou o número
 Funil.init(ctx);
 const { renderPushState, renderPushBanner, refreshPushToken } = criarNotificacoes({
   app,
