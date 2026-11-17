@@ -5,6 +5,15 @@ import * as U from "./util.js";
 import { criarDrive, idDaPasta, pastaDoColegio } from "./drive-fotos.js";
 import { openMockup } from "./mockup.js";
 import { contatoAtual } from "./repasse-estado.js";
+import { fotosDoAlunoNoSite, esquecerSite, apagarDoSite } from "./site-previas.js";
+
+// 17/11/2026: as prévias novas ficam no site; as antigas, no Google Drive. Procura primeiro no site.
+// (se o admin trocou as fotos para outra pasta do Drive, vale a troca)
+async function fotosDoAlunoTudo(C, D, raiz, it) {
+  const s = it.fotosDrive && it.fotosDrive.colegioId ? null : await fotosDoAlunoNoSite(C, it);
+  if (s) return s;
+  return D.fotosDoAluno(raiz, it);
+}
 
 let drive = null,
   chaveUsada = "";
@@ -81,6 +90,7 @@ export function abrirDriveEscrita(C) {
 export function esquecerListas() {
   if (drive) drive.esquecer();
   if (driveEscrita) driveEscrita.esquecer();
+  esquecerSite();
 }
 const NOMES = ["Quadro", "Porta-retratos 1", "Porta-retratos 2"];
 const NOMES_PAS = ["Direita", "Esquerda", "Pequenas", "Tirinha", "Calendário"];
@@ -113,7 +123,7 @@ export function abrirFotosDoAluno(C, it, precoTxt, cartaoTxt = "") {
     const D = abrirDrive(C);
     let r;
     try {
-      r = await D.fotosDoAluno(raiz, it);
+      r = await fotosDoAlunoTudo(C, D, raiz, it);
     } catch (e) {
       info.className = "wait";
       info.textContent = e.message || "Não consegui ler o Google Drive agora.";
@@ -125,7 +135,7 @@ export function abrirFotosDoAluno(C, it, precoTxt, cartaoTxt = "") {
     if (r.erro) {
       esquecerListas();
       try {
-        r = await D.fotosDoAluno(raiz, it);
+        r = await fotosDoAlunoTudo(C, D, raiz, it);
       } catch (_) {}
     }
     if (r.erro) {
@@ -289,6 +299,10 @@ export async function excluirFoto(C, it, f, rot, o = {}) {
     { sim: "Sim, excluir", nao: "Cancelar", perigo: true }
   );
   if (!sim) return false;
+  if (f.site) {
+    U.toast("Esta prévia está no site: para mudar, use “🔄 Trocar as fotos”.");
+    return false;
+  }
   const D = abrirDriveEscrita(C);
   if (!D) {
     U.toast("Para excluir fotos, o administrador liga a conta Google em ⚙️ Ajustes (ID do cliente Google).");
@@ -336,7 +350,7 @@ export async function miniaturasDoAluno(C, it, box, o = {}) {
   const trocar = C.isAdmin ? U.mkBtn("🔄 Trocar as fotos", "", () => trocarFotos(C, it, o.salvar)) : null;
   let r;
   try {
-    r = await abrirDrive(C).fotosDoAluno(raiz, it);
+    r = await fotosDoAlunoTudo(C, abrirDrive(C), raiz, it);
   } catch (e) {
     info.className = "wait";
     info.textContent = e.message || "Não consegui ler o Google Drive agora.";
@@ -429,6 +443,32 @@ export function trocarFotos(C, it, salvar) {
         "Escolha de quem são as fotos certas na pasta das prévias. A troca fica guardada só neste aluno; as pastas do Drive não mudam."
       )
     );
+    // a prévia gravada no site: apagar para enviar de novo
+    fotosDoAlunoNoSite(C, it).then(sit => {
+      if (!sit || !C.isAdmin) return;
+      p.prepend(
+        el("p", "hint", "Este aluno tem prévia gravada no site. Para enviar outras fotos, apague a do site e envie de novo."),
+        U.mkBtn("🗑️ Apagar a prévia do site", "btn-danger", async () => {
+          const { confirmar } = await import("./confirmar.js");
+          if (
+            !(await confirmar(
+              `Apagar a prévia de ${U.first(title(it.nome || ""))} do site?`,
+              "As fotos somem do site e o aluno fica sem prévia até você enviar de novo.",
+              { sim: "Sim, apagar", nao: "Cancelar", perigo: true }
+            ))
+          )
+            return;
+          try {
+            await apagarDoSite(C, it);
+            esquecerListas();
+            U.toast("Prévia apagada do site ✅");
+            close();
+          } catch (e) {
+            U.toast(e.message || "Não consegui apagar agora.");
+          }
+        })
+      );
+    });
     const info = el("p", "hint", "Lendo as pastas do Drive…");
     p.append(info);
     let colegios = [];

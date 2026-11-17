@@ -1,0 +1,11 @@
+# a autorização (o crachá do login do app) precisa chegar no PHP
+<IfModule mod_rewrite.c>
+  RewriteEngine On
+  RewriteCond %{HTTP:Authorization} .
+  RewriteRule .* - [E=HTTP_AUTHORIZATION:%{HTTP:Authorization}]
+</IfModule>
+SetEnvIf Authorization "(.*)" HTTP_AUTHORIZATION=$1
+Options -Indexes
+<Files "comum.php">
+  Require all denied
+</Files>

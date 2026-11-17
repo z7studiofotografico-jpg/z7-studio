@@ -3379,7 +3379,7 @@ await cenario("Fotos do aluno direto do Google Drive", async () => {
   ok(!j2.erros.length, "janela sem erros" + (j2.erros.length ? ": " + j2.erros.join(" | ") : ""));
   ok(!erros.length, "sem erros" + (erros.length ? ": " + erros.join(" | ") : ""));
 });
-await cenario("Conferir fotos e 📤 Enviar foto (admin grava a prévia no Drive)", async () => {
+await cenario("Conferir fotos e 📤 Enviar foto (admin grava a prévia no site)", async () => {
   const Y = new Date().getFullYear(),
     yy = String(Y).slice(-2);
   const F = "application/vnd.google-apps.folder";
@@ -3448,6 +3448,27 @@ await cenario("Conferir fotos e 📤 Enviar foto (admin grava a prévia no Drive
     const pai = (u.match(/'([^']+)' in parents/) || [])[1];
     return rt.fulfill({ contentType: "application/json", headers: h, body: JSON.stringify({ files: arvore[pai] || [] }) });
   });
+  // o site (previas-api): guarda o que o app envia, por aluno
+  const site = {};
+  const enviosSite = [];
+  await ctx.route(/z7studio\.com\.br\/previas-api\//, async rt => {
+    const q = rt.request();
+    const h = { "access-control-allow-origin": "*" };
+    if (q.method() === "OPTIONS")
+      return rt.fulfill({ status: 204, headers: Object.assign({ "access-control-allow-headers": "Authorization" }, h) });
+    if (/enviar\.php/.test(q.url())) {
+      const corpo = q.postDataBuffer().toString("latin1");
+      const campo = k => (corpo.match(new RegExp('name="' + k + '"\\r\\n\\r\\n([^\\r]*)')) || [])[1] || "";
+      const ch = campo("chave"),
+        tipo = campo("tipo");
+      const a = (site[ch] = site[ch] || { nome: campo("nome"), codigo: campo("codigo"), folhas: [], fotos: [] });
+      const url = `https://z7studio.com.br/previas/a/x/${ch}/${tipo}-${a[tipo === "folha" ? "folhas" : "fotos"].length + 1}.jpg`;
+      a[tipo === "folha" ? "folhas" : "fotos"].push(url);
+      enviosSite.push({ ch, tipo, auth: (q.headers() || {}).authorization || "" });
+      return rt.fulfill({ contentType: "application/json", headers: h, body: JSON.stringify({ url }) });
+    }
+    return rt.fulfill({ contentType: "application/json", headers: h, body: JSON.stringify({ escola: ESC, ano: String(Y), alunos: site }) });
+  });
   await ir(pg, "#pr");
   await pg.getByRole("button", { name: "🔎 Conferir fotos" }).click();
   await pg.locator(".sheet:visible").getByRole("button", { name: "Conferir", exact: true }).click();
@@ -3475,21 +3496,17 @@ await cenario("Conferir fotos e 📤 Enviar foto (admin grava a prévia no Drive
     .click();
   const [fc] = await Promise.all([pg.waitForEvent("filechooser"), pg.getByRole("button", { name: "Escolher as fotos" }).click()]);
   await fc.setFiles([AQUI + "../../icons/icon-512.png", AQUI + "../../icons/icon-192.png"]);
-  await pg.getByRole("button", { name: "📤 Gravar no Drive" }).waitFor({ timeout: 8000 });
-  await pg.getByRole("button", { name: "📤 Gravar no Drive" }).click();
-  await pg.waitForFunction(() => /gravada em/.test(document.body.textContent), null, { timeout: 15000 });
+  await pg.getByRole("button", { name: "📤 Gravar no site" }).waitFor({ timeout: 8000 });
+  await pg.getByRole("button", { name: "📤 Gravar no site" }).click();
+  await pg.waitForFunction(() => /gravada no site/.test(document.body.textContent), null, { timeout: 15000 });
   if (process.env.FOTOS) await pg.screenshot({ path: process.env.FOTOS + "/enviar-foto.png" });
-  const sub = (arvore.col1 || []).find(f => f.name === "CEYMS 05 - FABIANA FALTA" && f.mimeType === F);
   ok(
-    !!sub &&
-      (arvore[sub.id] || []).map(f => f.name).join() === "CEYMS 05 - FABIANA FALTA - foto 01.jpg,CEYMS 05 - FABIANA FALTA - foto 02.jpg" &&
-      arvore.col1.some(f => f.name === "CEYMS 05 - FABIANA FALTA.jpg"),
-    "grava no Drive a pasta das fotos numeradas e a folha, com o nome no formato do gerador"
+    enviosSite.map(x => x.ch + ":" + x.tipo).join() === `${yy}CEYMS-05:foto,${yy}CEYMS-05:foto,${yy}CEYMS-05:folha`,
+    "grava no site as 2 fotos numeradas e a folha, na chave do aluno"
   );
   ok(
-    pedidos.filter(x => x.metodo === "POST").every(x => x.auth === "Bearer TOK") &&
-      (await pg.evaluate(() => window.__escopos)).includes("https://www.googleapis.com/auth/drive"),
-    "grava com a conta Google do admin (permissão de gravar pedida na hora)"
+    enviosSite.every(x => /^Bearer/.test(x.auth)) && !pedidos.some(x => x.metodo === "POST"),
+    "envia com o login do app e não grava nada no Drive"
   );
   await pg.locator(".sheet:visible").last().getByRole("button", { name: "Fechar" }).click();
   ok(/✅ Fabiana Falta/i.test(await pg.locator(".conf-aluno").first().textContent()), "na lista, o aluno fica marcado como enviado");

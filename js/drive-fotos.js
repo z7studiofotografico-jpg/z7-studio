@@ -223,6 +223,12 @@ export function criarDrive(acesso, buscar = fetch) {
   // (depois da primeira recusa, vai direto pela miniatura: cada foto pedia 3 vezes e demorava)
   let diretoRecusado = false;
   async function baixar(id) {
+    // prévia gravada direto no site (17/11/2026): o "id" já é o endereço da foto
+    if (/^https:\/\//.test(id)) {
+      const r = await buscar(id);
+      if (!r.ok) throw new Error("Não consegui baixar a foto do site (" + r.status + ").");
+      return r.blob();
+    }
     // 11/11/2026: primeiro a cópia no site (feita toda madrugada pelo GitHub); se ainda não estiver lá, o Drive
     try {
       const rs = await buscar(`${SITE_PREVIAS}/${id}.jpg`);

@@ -6,14 +6,16 @@ import * as U from "./util.js";
 import { idDaPasta, pastaDoColegio, temFoto } from "./drive-fotos.js";
 import { abrirDrive, abrirFotosDoAluno } from "./fotos-aluno.js";
 import { gruposEscolas } from "./escolas-pr.js";
+import { listaDoSite, chaveAlunoSite, esquecerSite } from "./site-previas.js";
 
 // as mesmas regras do gerador de prévias
 export const COMPROU = ["PAGO", "ENTREGUE"];
-// separa os alunos de um colégio: { com, comprou, semTel, faltam } (itens = o que há na pasta do colégio no Drive)
-export function separarFotos(alunos, itens) {
+// separa os alunos de um colégio: { com, comprou, semTel, faltam } (itens = o que há na pasta do colégio no Drive;
+// noSite = as chaves dos alunos com prévia gravada no site)
+export function separarFotos(alunos, itens, noSite = new Set()) {
   const r = { com: [], comprou: [], semTel: [], faltam: [] };
   alunos.forEach(it => {
-    if (itens.length && temFoto(itens, it)) r.com.push(it);
+    if (noSite.has(chaveAlunoSite(it)) || (itens.length && temFoto(itens, it))) r.com.push(it);
     else if (COMPROU.includes(it.etapa)) r.comprou.push(it);
     else if (it.etapa === "SEM TELEFONE") r.semTel.push(it);
     else r.faltam.push(it);
@@ -122,6 +124,7 @@ export function abrirConferirFotos(C, colNome = "repasse") {
         try {
           const D = abrirDrive(C);
           D.esquecer();
+          esquecerSite();
           let colegios = await D.pastasColegios(raiz);
           if (!colegios.length) colegios = [{ id: raiz, name: await D.nomeDe(raiz) }];
           for (const [i, g] of gs.entries()) {
@@ -131,7 +134,8 @@ export function abrirConferirFotos(C, colNome = "repasse") {
             const alunos = await alunosDe(g);
             const pasta = pastaDoColegio(colegios, { escola: g.nome, ano: g.ano });
             const itens = pasta ? await D.listar(pasta.id) : [];
-            const r = separarFotos(alunos, itens);
+            const site = await listaDoSite(C, g.ano, g.nome).catch(() => ({}));
+            const r = separarFotos(alunos, itens, new Set(Object.keys(site.alunos || {})));
             soma.alunos += alunos.length;
             ["com", "comprou", "semTel", "faltam"].forEach(k => (soma[k] += r[k].length));
             blocos.push({ g, pasta, r, n: alunos.length });
