@@ -285,7 +285,12 @@ export function desenharProximo(box, it, escolhido, blocked, li) {
     row.append(a2);
   }
   if (it.etapa === "INTERESSADO" && pixCod && d) {
-    const pm = `Para pagar no Pix${pixVal ? ` (${U.money(pixVal)})` : ""}: abra o app do seu banco, escolha *Pix Copia e Cola* e cole o código que vou mandar na próxima mensagem 👇 Depois me manda o comprovante por aqui 😊`;
+    const pm =
+      `Para pagar no Pix${pixVal ? ` (${U.money(pixVal)})` : ""}: abra o app do seu banco, escolha *Pix Copia e Cola* e cole o código que vou mandar na próxima mensagem 👇 Depois me manda o comprovante por aqui 😊` +
+      // com o link da prévia, também dá para pagar pela página do site (o aluno vira Pago sozinho)
+      (it.linkPrevia
+        ? `\nSe preferir, pague pela página das fotos, no Pix ou no cartão: https://z7studio.com.br/previa/?c=${it.linkPrevia}`
+        : "");
     const a4 = el("a", "btn btn-sm", `💠 Pix ${pixVal ? U.money(pixVal) : ""}`.trim());
     a4.href = "https://wa.me/" + d + "?text=" + encodeURIComponent(pm);
     a4.target = "_blank";
