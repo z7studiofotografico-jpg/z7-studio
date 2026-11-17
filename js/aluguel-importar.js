@@ -148,7 +148,10 @@ function docAluguel(o, ext) {
     instNome: ext.instNome || "",
     respEmail: ext.respEmail || "", // quem fechou o contrato do colégio (cada um vê os seus)
     ano: Number(ext.ano) || new Date().getFullYear(),
-    serie: String(o.serie || "").trim() || serieDaTurma(o.turma),
+    serie:
+      String(o.serie || "")
+        .trim()
+        .replace(/°/g, "º") || serieDaTurma(o.turma),
     turma: String(o.turma == null ? "" : o.turma).trim(),
     nome: String(o.nome || "").trim(),
     nomeBusca: U.chave(o.nome),

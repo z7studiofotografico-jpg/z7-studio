@@ -18,6 +18,9 @@ export function abrirRelatorio(conteudo, quem) {
     folhaDeitada(r, pais);
     setTimeout(() => window.print(), 50);
   };
+  // (17/11/2026) a ordem das linhas, escolhida na hora (como a folha): ID, nome (A-Z) ou turma
+  const ordem = ordemDasTabelas(conteudo);
+  if (ordem) barra.append(ordem.caixa);
   barra.append(
     U.mkBtn("🖨️ Imprimir · folha deitada", largo ? "btn-primary" : "", () => imprimir(true)),
     U.mkBtn("🖨️ Imprimir · folha em pé", largo ? "" : "btn-primary", () => imprimir(false)),
@@ -42,7 +45,11 @@ export function abrirRelatorio(conteudo, quem) {
     )
   );
   folha.append(cab);
-  (conteudo.secoes || []).forEach(s => folha.append(secao(s)));
+  const corpo = el("div");
+  const desenhar = () => corpo.replaceChildren(...(conteudo.secoes || []).map(s => secao(ordem ? ordem.aplicar(s) : s)));
+  if (ordem) ordem.mudou = desenhar;
+  desenhar();
+  folha.append(corpo);
   r.append(barra, folha);
   folhaDeitada(r, largo);
   document.body.append(r);
@@ -66,6 +73,60 @@ export function fecharRelatorio() {
   const r = document.getElementById("relatorio");
   if (r) r.remove();
   document.body.classList.remove("imprimindo");
+}
+// As ordens possíveis, pelas colunas das tabelas: ID, nome do aluno (A-Z) e turma (depois o nome)
+const COL_ID = /^(id|c[oó]d(igo)?\.?)$/i;
+const COL_NOME = /^(aluno|nome|formando|cliente)$/i;
+const COL_TURMA = /^(turma|s[eé]rie|turma \/ s[eé]rie)$/i;
+const cmp = (a, b) => String(a == null ? "" : a).localeCompare(String(b == null ? "" : b), "pt-BR", { numeric: true, sensitivity: "base" });
+function ordemDasTabelas(conteudo) {
+  const tabs = (conteudo.secoes || []).filter(s => s.tabela && s.tabela.cols && s.tabela.linhas.length > 1);
+  const tem = re => tabs.some(s => s.tabela.cols.some(c => re.test(String(c).trim())));
+  const ops = [["", "Como veio"]];
+  if (tem(COL_ID)) ops.push(["id", "Número do ID"]);
+  if (tem(COL_NOME)) ops.push(["nome", "Nome (A-Z)"]);
+  if (tem(COL_TURMA)) ops.push(["turma", "Turma, depois o nome"]);
+  if (ops.length < 2) return null;
+  let atual = "";
+  try {
+    atual = localStorage.getItem("z7RelOrdem") || "";
+  } catch (_) {}
+  if (!ops.some(([v]) => v === atual)) atual = "";
+  const s0 = sel(ops, atual);
+  s0.setAttribute("aria-label", "Ordem das linhas");
+  const caixa = el("label", "rel-ordem");
+  caixa.append(document.createTextNode("↕️ Ordem: "), s0);
+  const o = {
+    caixa,
+    mudou: () => {},
+    aplicar: s => {
+      if (!atual || !s.tabela || !s.tabela.linhas) return s;
+      const cols = s.tabela.cols.map(c => String(c).trim());
+      const i = re => cols.findIndex(c => re.test(c));
+      const iId = i(COL_ID),
+        iNome = i(COL_NOME),
+        iTurma = i(COL_TURMA);
+      const chaves = atual === "id" ? [iId, iNome] : atual === "nome" ? [iNome, iId] : [iTurma, iNome, iId];
+      if (chaves[0] < 0) return s;
+      const linhas = s.tabela.linhas.slice().sort((a, b) => {
+        for (const k of chaves) {
+          if (k < 0) continue;
+          const c = cmp(a[k], b[k]);
+          if (c) return c;
+        }
+        return 0;
+      });
+      return Object.assign({}, s, { tabela: Object.assign({}, s.tabela, { linhas }) });
+    }
+  };
+  s0.addEventListener("change", () => {
+    atual = s0.value;
+    try {
+      localStorage.setItem("z7RelOrdem", atual);
+    } catch (_) {}
+    o.mudou();
+  });
+  return o;
 }
 function secao(s) {
   const box = el("section", "rel-secao");

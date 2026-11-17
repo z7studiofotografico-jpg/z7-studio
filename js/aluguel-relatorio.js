@@ -146,7 +146,8 @@ export async function relatorioAluguel(C, lista, filtro, insts = []) {
   const ln = linha;
   const porCol = {};
   arr.forEach(a => {
-    const k = title(a.instNome || "?") + (porTurma ? " · " + (a.serie || "sem turma") : "");
+    // "5° ano" e "5º ano" são a mesma série (17/11/2026)
+    const k = title(a.instNome || "?") + (porTurma ? " · " + (String(a.serie || "").replace(/°/g, "º") || "sem turma") : "");
     (porCol[k] = porCol[k] || []).push(a);
   });
   const u = usoDosAlunos(arr);
