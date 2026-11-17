@@ -135,6 +135,12 @@ export function mostrarAlunos(ctx, v, o) {
       C.isAdmin ? FS.query(col, FS.limit(5000)) : C.carteira("alugueis"),
       s => {
         lista = s.docs.map(d => Object.assign({ id: d.id }, d.data()));
+        // (17/11/2026) quem foi marcado antes como "Não vai participar · só o Paspatur" ficou com o Paspatur e o valor:
+        // agora "Não vai participar" é sem kit e sem valor (o admin realoca quem for só do Paspatur)
+        if (C.isAdmin)
+          lista
+            .filter(a => a.naoParticipa && !a.soPaspatur && ((a.pacote || []).length || Number(a.valor) > 0))
+            .forEach(a => FS.updateDoc(FS.doc(db, "alugueis", a.id), { pacote: [], valor: 0, contratoZerado: true }).catch(() => {}));
         render();
       },
       e => {
