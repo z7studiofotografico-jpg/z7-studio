@@ -1464,7 +1464,7 @@ await cenario("Adriano (admin), com os dados já atualizados no servidor", async
     await sh.getByLabel("M (beca tradicional preta)", { exact: true }).fill("7");
     await sh.getByLabel("G (beca tradicional preta)", { exact: true }).fill("5");
     await sh.getByLabel("Valor total").fill("1.200,00");
-    await sh.getByLabel("Já pago").fill("300");
+    await sh.getByLabel("Valor de entrada").fill("300");
     ok(
       /Beca tradicional preta M: pediu 7, livres 5/.test(await sh.locator(".notes").last().textContent()),
       "avisa que faltam becas tamanho M"

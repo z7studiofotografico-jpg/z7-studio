@@ -567,8 +567,19 @@ export function form(x, pre) {
       cau.disabled = true;
     }
     const mValores = p.children.length;
+    // (17/11/2026) entrada → falta pagar (conta sozinha) → valor total. A caução (depósito de garantia, que
+    // volta na devolução) saiu da tela: quem já tinha continua vendo no cartão.
+    const faltaPg = el("input");
+    faltaPg.disabled = true;
+    faltaPg.setAttribute("aria-label", "Falta pagar");
+    const contaFalta = () => {
+      const f = Math.max(0, lerReais(val.value) - lerReais(pago.value));
+      faltaPg.value = lerReais(val.value) ? brl(f) : "";
+    };
+    [val, pago].forEach(i => i.addEventListener("input", contaFalta));
+    contaFalta();
     const r6 = el("div", "row3");
-    r6.append(field("Valor total", val), field("Já pago", pago), field("Caução", cau));
+    r6.append(field("Valor de entrada", pago), field("Falta pagar", faltaPg), field("Valor total", val));
     p.append(r6);
     const fp = el("select");
     [["", "forma de pagamento"], ...FORMAS.map(f => [f, f])].forEach(([v, t]) => {

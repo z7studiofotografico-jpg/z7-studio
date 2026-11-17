@@ -223,7 +223,7 @@ export function abrirCadastroAluno(C, o = {}) {
         "Escolha a série"
       );
       turma.setAttribute("aria-label", "Série");
-      // (17/11/2026) a turma de verdade (901, 502, "3001"…): obrigatória, junto com a série
+      // (17/11/2026) a turma de verdade (901, 502, "3001"…), junto com a série (essencial, mas não trava o salvar)
       const sala = inp(o.turma || "", "ex.: 901", 20);
       sala.setAttribute("aria-label", "Turma");
       const turmaOutra = inp(TURMAS.includes(o.serie) ? "" : o.serie || "", "ex.: 3º ano A", 40);
@@ -514,7 +514,6 @@ export function abrirCadastroAluno(C, o = {}) {
         const f = ficha();
         const falta = faltaParaSalvar(f);
         if (turma.value === "outra" && !turmaOutra.value.trim()) falta.push("a série");
-        if (!sala.value.trim()) falta.push("a turma (ex.: 901)");
         if (falta.length) return mostrarErro("Falta: " + falta.join(", ") + ".");
         st.achados = await procurar(C, f);
         st.repetido = conferirRepetido(f, st.achados);

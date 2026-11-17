@@ -652,7 +652,6 @@ export function form(a, pre = {}) {
     ano.inputMode = "numeric";
     const serie = sel(SERIES, x.serie || "", "série");
     const sala = inp(x.turma || "", "ex.: 901", 20);
-    sala.required = !a; // (17/11/2026) a turma é obrigatória no aluno novo
     const r0 = el("div", "row3");
     r0.append(field("Instituição", sInst), field("Ano", ano), field("Série", serie), field("Turma", sala));
     const nome = inp(x.nome ? title(x.nome) : "", "nome do aluno");
