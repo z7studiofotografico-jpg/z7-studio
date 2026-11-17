@@ -2964,10 +2964,20 @@ await cenario("Prévias do colégio inteiro direto no site (janela do colégio)"
   await ir(pg, "#inst-publico");
   await calmo(pg);
   await pg.locator("#iChips").getByText("Todas").click();
+  // o colégio tem o botão na janela (aba Alunos); o topo do cartão tem o mesmo, escolhendo o colégio e o ano
   await pg.locator("#iList button.lc-linha").filter({ hasText: /Teste/i }).click();
   const jan = pg.locator(".janela-aluno");
   await jan.locator(".ja-abas").getByText("Alunos").click();
-  await jan.getByRole("button", { name: "📤 Enviar prévias para o site" }).click();
+  ok(await jan.getByRole("button", { name: "📤 Enviar prévias para o site" }).isVisible(), "a janela do colégio tem o envio das prévias");
+  await jan.getByRole("button", { name: "‹ Voltar para a lista" }).click();
+  await pg.locator("#viewInstTipo").getByRole("button", { name: "📤 Enviar prévias para o site" }).click();
+  const esc = pg.locator(".sheet:visible").last();
+  await esc.getByLabel("Colégio e ano").waitFor();
+  ok(
+    /2026 · C\.E\. TESTE · PR/i.test(await esc.getByLabel("Colégio e ano").textContent()),
+    "o topo do cartão lista o colégio e o ano"
+  );
+  await esc.getByRole("button", { name: "Continuar" }).click();
   await pg
     .locator(".sheet:visible")
     .last()
@@ -3056,9 +3066,10 @@ await cenario("Agendamento · Importação: prévias de qualquer pasta, sem muda
     const fila = [origem, dirFalso("")];
     window.showDirectoryPicker = async () => fila.shift();
   });
-  await ir(pg, "#agenda");
+  await ir(pg, "#becas");
   const bt = pg.getByRole("button", { name: "📥 Importação" });
-  ok(await bt.isVisible(), "Agendamento tem o botão 📥 Importação");
+  await bt.waitFor({ timeout: 8000 });
+  ok(await bt.isVisible(), "Aluguel de becas tem o botão 📥 Importação (saiu da Agenda)");
   await bt.click();
   const sh = pg.locator(".sheet:visible").last();
   ok(!/Pular quem já comprou/.test(await sh.textContent()), "importação livre: entram todos (sem pular ninguém)");
@@ -3125,7 +3136,7 @@ await cenario("Agendamento · Importação: folha da turma (20 por página, nome
     const fila = [origem, dirFalso("")];
     window.showDirectoryPicker = async () => fila.shift();
   });
-  await ir(pg, "#agenda");
+  await ir(pg, "#becas");
   await pg.getByRole("button", { name: "📥 Importação" }).click();
   const sh = pg.locator(".sheet:visible").last();
   await sh.getByLabel("Colégio (cabeçalho)").fill("Legacy School Nova Iguaçu");

@@ -49,6 +49,13 @@ export function show(t) {
   const hb = el("div", "quick");
   hb.append(U.mkBtn("+ Nova instituição", "btn-primary", () => openForm(null)));
   if (C.isAdmin) hb.append(U.mkBtn("Importar planilha", "", () => openImport(C, T.tipos, T.nome, items)));
+  // as prévias do colégio inteiro direto no site (escolhe o colégio e o ano)
+  if (C.isAdmin)
+    hb.append(
+      U.mkBtn("📤 Enviar prévias para o site", "btn-azul", () =>
+        import("./previas-escolher.js").then(m => m.abrirEscolherPrevias(C, items, T.nome)).catch(e => C.handleErr(e))
+      )
+    );
   hb.append(botaoRelatorio(relatorioInst, () => C.me));
   hb.append(
     botaoPlanilha(
