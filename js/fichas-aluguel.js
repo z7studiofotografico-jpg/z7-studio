@@ -6,7 +6,7 @@ import * as U from "./util.js";
 import { fotoDaFicha, chaveGrupo, chaveGrupoCol, contatosDaFicha, acharExistente, soNumero, menorLivre } from "./fichas.js";
 import { lerCodigo, fmtCodigo, codigoBusca } from "./aluno-id.js";
 import { TAMANHOS, FAIXAS, CAPELOS } from "./becas-estoque.js";
-import { ITENS_PACOTE } from "./contrato-colegio-regras.js";
+import { ITENS_PACOTE, kitsDo, valorDoPacote } from "./contrato-colegio-regras.js";
 
 const idFichaAluguel = (escola, ano, nome) => (chaveGrupo(escola, ano) + "_" + U.chave(nome).replace(/[^A-Z0-9]+/g, "-")).slice(0, 140);
 
@@ -175,7 +175,10 @@ export function camposAluguel(ja, contrato) {
     return [k, c];
   });
   const fk = el("div", "field fc-6");
-  fk.append(el("label", null, "Kit (o que o aluno levou)"), kit);
+  fk.append(el("label", null, "Kit (o que o aluno levou)"));
+  // os kits do colégio (preço fechado), em botões em cima dos itens
+  if (kitsDo(contrato).length) import("./contrato-kits.js").then(m => kit.before(m.botoesKits(contrato, ja && ja.serie, cx)));
+  fk.append(kit);
   box.append(fk);
   return {
     box,
@@ -201,8 +204,7 @@ export async function confirmarAluguel(C, { f, lido, extra, existentes, usados, 
   const contatos = contatosDaFicha(lido);
   const mae = contatos.find(c => c.tipo === "Mãe") || contatos.find(c => c.tipo !== "Formando") || null;
   const aluno = contatos.find(c => c.tipo === "Formando");
-  const pr = (contrato && contrato.precos) || {};
-  const valor = extra.pacote.reduce((t, k) => t + (Number(pr[k]) || 0), 0);
+  const valor = valorDoPacote(extra.pacote, lido.turma || (achado && achado.serie) || "", contrato);
   const agora = new Date().toISOString();
   const endereco = {
     rua: lido.rua,

@@ -64,7 +64,7 @@ test("produção: totais por item e quem precisa de foto", () => {
     { nome: "Pedro Henrique", serie: "3002" }
   ];
   const p = R.producao(al, c);
-  assert.deepEqual(p.totais, { beca: 1, paspatur: 3, certificado: 4, canudo: 4, quadro3040: 0, pr1510: 0, foto2115: 0, foto1510: 0 });
+  assert.deepEqual(p.totais, { beca: 1, pelerine: 0, paspatur: 3, certificado: 4, canudo: 4, quadro3040: 0, pr1510: 0, foto2115: 0, foto1510: 0 });
   assert.deepEqual(R.lerPacote("Paspatur + Quadro 30x40 + Foto 21x15"), ["paspatur", "quadro3040", "foto2115"]);
   assert.deepEqual(
     p.precisamFoto.map(l => l.aluno.nome),
@@ -147,4 +147,25 @@ test("dashboard: comissão do contrato item por item, com a taxa de cada item", 
   const pes = r.meses["2026-11"].pessoas["ana@x.com"];
   const P = { comissao: { contrato: { paspatur: 20, certificado: 10, canudo: 5 } } };
   assert.equal(comissaoDe(pes, (l, f) => taxa(P, l, f)).total, 1200);
+});
+
+test("kits do colégio: preço fechado por turma, planilha com Kit 1/Kit 2, comissão de 20% do total", () => {
+  const c = {
+    precos: { canudo: 10, certificado: 10, foto2115: 10, paspatur: 130 },
+    comissaoPct: 20,
+    kits: [
+      { nome: "Kit 1", serie: "5º ano", itens: ["pelerine", "canudo", "certificado", "foto2115"], valor: 95 },
+      { nome: "Kit 1", serie: "9º ano", itens: ["beca", "canudo", "certificado", "foto2115"], valor: 100 },
+      { nome: "Kit 2", serie: "9º ano", itens: ["beca", "canudo", "certificado", "foto2115", "paspatur"], valor: 230 }
+    ]
+  };
+  assert.deepEqual(R.lerPacote("Pelerine + Canudo"), ["pelerine", "canudo"]);
+  assert.equal(R.precoAluno({ serie: "5º ano", pacote: ["pelerine", "canudo", "certificado", "foto2115"] }, c), 95);
+  assert.equal(R.precoAluno({ serie: "9° ANO", pacote: ["beca", "canudo", "certificado", "foto2115", "paspatur"] }, c), 230);
+  // fora de kit: a soma dos itens
+  assert.equal(R.precoAluno({ serie: "9º ano", pacote: ["canudo", "certificado"] }, c), 20);
+  assert.deepEqual(R.kitDaPlanilha("KIT 1", "9º ano", c).itens, ["beca", "canudo", "certificado", "foto2115"]);
+  assert.equal(R.kitDaPlanilha("Kit 1", "5º ano", c).valor, 95);
+  assert.equal(R.kitDaPlanilha("Kit 2", "5º ano", c), null);
+  assert.equal(R.comissaoPagamento({ valor: 230, itens: { paspatur: 130 } }, {}, c), 4600);
 });

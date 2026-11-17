@@ -284,7 +284,7 @@ async function gravarPacotes(ids, itens, contrato = (stAtual && stAtual.contrato
         const patch = { pacote: itens, atualizadoEm: agora() };
         const temPreco = Object.values(contrato.precos || {}).some(v => Number(v) > 0);
         if (temPreco && C.isAdmin) {
-          patch.valor = R.precoAluno({ pacote: itens }, contrato);
+          patch.valor = R.precoAluno({ pacote: itens, serie: ((stAtual && stAtual.alunos) || []).find(a => a.id === id)?.serie }, contrato);
           patch.contratoZerado = !patch.valor;
         }
         b.update(FS.doc(db, "alugueis", id), patch);
@@ -297,33 +297,17 @@ async function gravarPacotes(ids, itens, contrato = (stAtual && stAtual.contrato
   }
 }
 
-// Escolher os itens do pacote (nenhum marcado = pacote padrão do contrato)
-function escolherPacote(tit, atual, aoSalvar, { padraoTxt = "Nenhum marcado = pacote padrão do contrato." } = {}) {
-  sheet(tit, (p, close) => {
-    p.append(el("p", "hint", padraoTxt));
-    const caixas = R.ITENS_PACOTE.map(([k, nome]) => {
-      const l = el("label", "chk");
-      const cb = el("input");
-      cb.type = "checkbox";
-      cb.checked = (atual || []).includes(k);
-      l.append(cb, document.createTextNode(" " + nome));
-      p.append(l);
-      return [k, cb];
-    });
-    p.append(botoes(close, "Salvar"));
-    p.addEventListener("submit", async ev => {
-      ev.preventDefault();
-      await aoSalvar(caixas.filter(([, cb]) => cb.checked).map(([k]) => k));
-      close();
-    });
-  });
-}
+// Escolher os itens do pacote (nenhum marcado = pacote padrão do contrato), com os kits do colégio
+const escolherPacote = (tit, atual, aoSalvar, o = {}) =>
+  import("./contrato-kits.js").then(m =>
+    m.escolherPacote(tit, atual, aoSalvar, Object.assign({ contrato: stAtual && stAtual.contrato }, o))
+  );
 
 // Cadastro / edição do contrato
 function formContrato(c, inst, ano, ref) {
   const x = c || {};
   const admin = C.isAdmin;
-  sheet(c ? "Editar contrato" : "Novo contrato do colégio", (p, close) => {
+  sheet(c ? "Editar contrato" : "Novo contrato do colégio", async (p, close) => {
     p.append(el("p", "hint", `${title(inst.nome || "")} · ${ano}`));
     // quem fechou: o admin escolhe; quem é da equipe fecha em nome próprio
     const pessoas = Object.entries(C.usuarios || {})
@@ -400,9 +384,11 @@ function formContrato(c, inst, ano, ref) {
     const b1 = bloco(1, "Quem fechou e quem paga");
     b1.append(r1, r2);
     const b2 = bloco(2, "Preços e pacote", "o aluno paga a soma dos itens do pacote dele");
+    const kitsEd = (await import("./contrato-kits.js")).editorKits(x, admin);
     b2.append(
       field("Preço de cada item, por aluno (também quando o colégio paga: dá o valor de cada aluno)", precos),
-      field("Pacote padrão (quem não tiver PACOTE na planilha)", pacote)
+      field("Pacote padrão (quem não tiver PACOTE na planilha)", pacote),
+      kitsEd.box
     );
     const b3 = bloco(3, "Contato do colégio");
     b3.append(r3, field("Unidade", unidade));
@@ -438,6 +424,7 @@ function formContrato(c, inst, ano, ref) {
           quemPaga: quem.value,
           valor: quem.value === "colegio" ? lerReais(valor.value) || 0 : 0,
           precos: Object.fromEntries(precoCx.map(([k, i]) => [k, lerReais(i.value) || 0])),
+          ...kitsEd.ler(),
           parcelas: Math.max(1, parseInt(parc.value, 10) || 1)
         });
       try {

@@ -17,6 +17,8 @@ import { chave } from "./util.js";
 
 export const ITENS_PACOTE = [
   ["beca", "Beca"],
+  // (17/11/2026) a pelerine (a capinha do 5º ano)
+  ["pelerine", "Pelerine"],
   ["paspatur", "Paspatur"],
   ["certificado", "Certificado"],
   ["canudo", "Canudo"],
@@ -53,6 +55,7 @@ export function lerPacote(v) {
   const achou = new Set();
   partes.forEach(p => {
     if (/^beca/.test(p)) achou.add("beca");
+    else if (/^peler/.test(p)) achou.add("pelerine");
     else if (/^pasp/.test(p)) achou.add("paspatur");
     else if (/^certif/.test(p)) achou.add("certificado");
     else if (/^canud/.test(p)) achou.add("canudo");
@@ -72,10 +75,35 @@ export function pacoteDoAluno(a, contrato) {
   return { itens: lerPacote((contrato && contrato.pacotePadrao) || []), padrao: true };
 }
 
-// Preço do pacote de um aluno (soma dos itens); 0 quando o contrato não tem preço por item
-export function precoAluno(a, contrato) {
+// Kits do colégio (17/11/2026): pacotes com nome e preço fechado, às vezes de uma turma só.
+// contrato.kits = [{ nome: "Kit 1", serie: "9º ano", itens: ["beca","canudo",...], valor: 100 }]
+// O aluno com exatamente os itens de um kit (da turma dele) paga o preço do kit, não a soma dos itens.
+const mesmaSerie = (a, b) => chave(a).replace(/[^A-Z0-9]/g, "") === chave(b).replace(/[^A-Z0-9]/g, "");
+export const kitsDo = contrato => ((contrato && contrato.kits) || []).filter(k => k && k.nome && (k.itens || []).length);
+export const nomeKit = k => k.nome + (k.serie ? " · " + k.serie : "");
+export function kitDosItens(itens, serie, contrato) {
+  const alvo = lerPacote(itens || []).join();
+  if (!alvo) return null;
+  const kits = kitsDo(contrato).filter(k => lerPacote(k.itens).join() === alvo);
+  return kits.find(k => !k.serie || (serie && mesmaSerie(k.serie, serie))) || (serie ? null : kits[0]) || null;
+}
+// "Kit 1" (ou "KIT 2") da planilha + a turma do aluno → o kit do contrato
+export function kitDaPlanilha(txt, serie, contrato) {
+  const m = String(txt || "").match(/kit\s*(\d+)/i);
+  if (!m) return null;
+  const kits = kitsDo(contrato).filter(k => (String(k.nome).match(/kit\s*(\d+)/i) || [])[1] === m[1]);
+  return kits.find(k => !k.serie || mesmaSerie(k.serie, serie)) || null;
+}
+// O valor de um pacote: o preço do kit, se for um kit do colégio; se não, a soma dos itens
+export function valorDoPacote(itens, serie, contrato) {
+  const k = kitDosItens(itens, serie, contrato);
+  if (k) return Number(k.valor) || 0;
   const pr = (contrato && contrato.precos) || {};
-  return reais(pacoteDoAluno(a, contrato).itens.reduce((t, k) => t + centavos(pr[k] || 0), 0));
+  return reais(lerPacote(itens || []).reduce((t, x) => t + centavos(pr[x] || 0), 0));
+}
+// Preço do pacote de um aluno (o kit, ou a soma dos itens); 0 quando o contrato não tem preço
+export function precoAluno(a, contrato) {
+  return valorDoPacote(pacoteDoAluno(a, contrato).itens, a && a.serie, contrato);
 }
 // O que um pagamento paga, item por item ({ item: preço }): do aluno, ou de todos quando o colégio paga
 export function itensDoPagamento(aluno, contrato, alunos) {
@@ -104,8 +132,11 @@ export function baseItens(p) {
   });
   return out;
 }
-// Comissão de um pagamento, em centavos
-export function comissaoPagamento(p, P) {
+// Comissão de um pagamento, em centavos. Contrato com "comissão de quem fechou (% do total)": essa porcentagem
+// sobre o valor do pagamento (17/11/2026); sem ela, item por item, pelas taxas dos Ajustes.
+export function comissaoPagamento(p, P, contrato) {
+  const pct = Number(contrato && contrato.comissaoPct) || 0;
+  if (pct > 0) return Math.round((centavos(p.valor) * pct) / 100);
   const b = baseItens(p);
   if (b) return Object.entries(b).reduce((t, [k, c]) => t + Math.round((c * taxa(P, "contrato", k)) / 100), 0);
   return Math.round((centavos(p.valor) * taxa(P, "form", formaDe(p.forma) || "Dinheiro")) / 100);
@@ -147,7 +178,9 @@ export function resumoDinheiro(pags, contrato, alunos, P) {
         ? reais((alunos || []).reduce((t, a) => t + centavos(precoAluno(a, c)), 0))
         : reais(centavos(c.valor) * nAlunos);
   // comissão item por item, sobre o que está no caixa e conferido
-  const comissao = reais(lst.filter(p => ondeEsta(p) === "caixa" && p.conferido).reduce((t, p) => t + comissaoPagamento(p, P), 0));
+  const comissao = reais(
+    lst.filter(p => ondeEsta(p) === "caixa" && p.conferido).reduce((t, p) => t + comissaoPagamento(p, P, contrato), 0)
+  );
   return {
     recebido,
     caixa,

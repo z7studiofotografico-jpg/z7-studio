@@ -30,7 +30,7 @@ import { reservar, baixar, estornar } from "./estoque.js";
 import { ESTUDIO, ENDERECO } from "./mensagens.js";
 import { botaoRelatorio } from "./relatorio.js";
 import { relatorioAluguel, atrasadoAluguel } from "./aluguel-relatorio.js";
-import { ITENS_PACOTE, nomeItem, lerPacote } from "./contrato-colegio-regras.js";
+import { ITENS_PACOTE, nomeItem, lerPacote, valorDoPacote } from "./contrato-colegio-regras.js";
 import { linhaGenerica } from "./lista-compacta.js";
 import { avisoPrecoAluguel } from "./precos-colegio.js";
 import { ouvirUso, espelhar, donoDoAluguel } from "./becas-uso.js";
@@ -723,10 +723,17 @@ export function form(a, pre = {}) {
     });
     // preços do contrato deste colégio e ano: aparecem ao lado de cada item, e o valor é a soma do que for marcado
     // (o pai pode comprar só o Paspatur, só o Canudo, só o aluguel ou o kit inteiro)
-    let precos = null;
+    // (17/11/2026: os kits do colégio, com preço fechado, aparecem em botões em cima dos itens)
+    let precos = null,
+      contrato = null;
+    const kitsBox = el("div");
     const somar = () => {
       if (!precos || zer.disabled) return;
-      const total = pacCx.filter(([, cb]) => cb.checked).reduce((t, [k]) => t + (Number(precos[k]) || 0), 0);
+      const total = valorDoPacote(
+        pacCx.filter(([, cb]) => cb.checked).map(([k]) => k),
+        serie.value,
+        contrato
+      );
       zer.checked = false;
       valor.disabled = false;
       valor.value = total.toFixed(2).replace(".", ",");
@@ -738,13 +745,17 @@ export function form(a, pre = {}) {
       try {
         const s = await C.FS.getDoc(C.FS.doc(C.db, "contratosColegio", `${sInst.value}_${Number(ano.value)}`));
         const pr = (s.exists() && s.data().precos) || {};
-        if (!Object.values(pr).some(v => Number(v) > 0)) return;
+        contrato = s.exists() ? s.data() : null;
+        const { botoesKits } = await import("./contrato-kits.js");
+        kitsBox.replaceChildren(botoesKits(contrato, serie.value, pacCx, somar));
+        if (!Object.values(pr).some(v => Number(v) > 0) && !kitsBox.textContent) return;
         precos = pr;
         pacCx.forEach(([k, , l, n]) => (l.lastChild.textContent = ` ${n}${Number(pr[k]) ? " · " + brl(pr[k]) : ""}`));
       } catch (_) {}
     };
     pacCx.forEach(([, cb]) => cb.addEventListener("change", somar));
     sInst.addEventListener("change", lerPrecos);
+    serie.addEventListener("change", lerPrecos);
     ano.addEventListener("change", lerPrecos);
     lerPrecos();
     // o admin muda o valor; a equipe só cadastra
@@ -762,7 +773,7 @@ export function form(a, pre = {}) {
     b1.append(r0);
     b2.append(r1);
     b3.append(r2, r3, r4);
-    b4.append(r5, field("Pacote (vazio = padrão do contrato)", pac), field("Observação", obs));
+    b4.append(r5, kitsBox, field("Pacote (vazio = padrão do contrato)", pac), field("Observação", obs));
     p.classList.add("cad");
     p.append(b1, b2, b3, b4, err, botoes(close, a ? "Salvar" : "Cadastrar"));
     p.addEventListener("submit", async ev => {

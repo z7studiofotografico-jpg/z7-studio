@@ -4,7 +4,7 @@ import { el, field, sel, title } from "./ui.js";
 import * as U from "./util.js";
 import { abrirImportador, ultimasImportacoes } from "./importador.js";
 import { BECAS, FAIXAS, CAPELOS, TAMANHOS } from "./becas-estoque.js";
-import { lerPacote, ITENS_PACOTE, idContrato } from "./contrato-colegio-regras.js";
+import { lerPacote, ITENS_PACOTE, idContrato, kitDaPlanilha, valorDoPacote } from "./contrato-colegio-regras.js";
 import { idDoAluno } from "./cadastro-regras.js";
 import { lerCodigo, codigoBusca } from "./aluno-id.js";
 
@@ -27,6 +27,7 @@ export const CAMPOS_ALUGUEL = [
   { k: "pacote", nome: "Pacote", sinonimos: ["Itens", "Kit", "Produtos"] },
   // planilha com uma coluna por item (1 = o aluno tem): Aluguel (a beca), Paspatur, Canudo, Certificado
   { k: "itBeca", nome: "Aluguel (item)", sinonimos: ["Aluguel", "Aluguel da beca"] },
+  { k: "itPelerine", nome: "Pelerine (item)", sinonimos: ["Pelerine"] },
   { k: "itPaspatur", nome: "Paspatur (item)", sinonimos: ["Paspatur"] },
   { k: "itCanudo", nome: "Canudo (item)", sinonimos: ["Canudo"] },
   { k: "itCertificado", nome: "Certificado (item)", sinonimos: ["Certificado"] },
@@ -63,6 +64,7 @@ export function itensMarcados(o) {
     );
   return [
     ["itBeca", "beca"],
+    ["itPelerine", "pelerine"],
     ["itPaspatur", "paspatur"],
     ["itCanudo", "canudo"],
     ["itCertificado", "certificado"],
@@ -80,9 +82,22 @@ export function valorPeloKit(itens, precos) {
 }
 export function paraDocAluguel(o, ext) {
   const d = docAluguel(o, ext);
+  // PACOTE "Kit 1" / "Kit 2": o kit do colégio para a turma do aluno (itens e preço fechado)
+  const kit = kitDaPlanilha(o.pacote, d.serie, ext.contrato);
+  if (kit) {
+    d.pacote = kit.itens.slice();
+    d.__falta = d.__falta.filter(f => !/^pacote/.test(f));
+    if (!String(o.valor || "").trim()) {
+      d.valor = Number(kit.valor) || 0;
+      d.contratoZerado = !d.valor;
+    }
+    return d;
+  }
   // sem coluna de valor e com os preços do colégio na tela: o valor é a soma do kit
   if (!String(o.valor || "").trim() && ext.precos && Object.values(ext.precos).some(v => v > 0)) {
-    d.valor = valorPeloKit(d.pacote, ext.precos);
+    d.valor = ext.contrato
+      ? valorDoPacote(d.pacote, d.serie, Object.assign({}, ext.contrato, { precos: ext.precos }))
+      : valorPeloKit(d.pacote, ext.precos);
     d.contratoZerado = !d.valor;
   }
   return d;
@@ -194,12 +209,14 @@ export async function importarAlugueis(C, insts) {
             .replace(/\./g, "")
             .replace(",", ".")
         ) || 0;
+      let contrato = null;
       const carregarPrecos = async () => {
         const i = insts.find(x => x.id === sInst.value);
         if (!i || !ano.value) return;
         try {
           const s = await C.FS.getDoc(C.FS.doc(C.db, "contratosColegio", `${i.id}_${Number(ano.value)}`));
           const pr = (s.exists() && s.data().precos) || {};
+          contrato = s.exists() ? s.data() : null; // os kits do colégio (PACOTE "Kit 1" na planilha)
           prIn.forEach(([k, inp]) => (inp.value = Number(pr[k]) ? String(pr[k]).replace(".", ",") : ""));
         } catch (_) {}
       };
@@ -220,6 +237,7 @@ export async function importarAlugueis(C, insts) {
           inst: i || null,
           idade: sIdade.value,
           precos: Object.fromEntries(prIn.map(([k, inp]) => [k, lerValor(inp.value)])),
+          contrato,
           ano: ano.value,
           respEmail: (i && donos.get(`${i.id}|${Number(ano.value)}`)) || ""
         };

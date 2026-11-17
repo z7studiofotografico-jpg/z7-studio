@@ -29,6 +29,7 @@ const SHELL = [
   "./js/pagamentos-site.js",
   "./js/previas-escolher.js",
   "./js/drive-site.js",
+  "./js/contrato-kits.js",
   "./js/conferir-fotos.js",
   "./js/backup.js",
   "./js/confirmar.js",

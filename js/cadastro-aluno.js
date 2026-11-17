@@ -369,7 +369,32 @@ export function abrirCadastroAluno(C, o = {}) {
         rb2 = el("div", "cad-g3");
       rb1.append(field("Beca", bTipo), field("Tamanho", bTam), field("Valor do aluguel", bValor));
       rb2.append(field("Faixa", bFaixa), field("Capelo", bCap), lMenos);
-      dBecas.append(el("b", null, "👘 Aluguel de becas"), rb1, rb2);
+      // (17/11/2026) o kit do colégio (Contrato do colégio → Kits): itens e preço fechado, pela turma
+      const bKit = sel([], "", "Kit (vazio = pacote padrão)");
+      bKit.setAttribute("aria-label", "Kit do aluguel");
+      let kitsCol = [];
+      const lerKits = async () => {
+        kitsCol = [];
+        bKit.replaceChildren(el("option", null, "Kit (vazio = pacote padrão)"));
+        bKit.options[0].value = "";
+        if (!sCol.value) return;
+        const R = await import("./contrato-colegio-regras.js");
+        const s = await C.FS.getDoc(C.FS.doc(C.db, "contratosColegio", R.idContrato(sCol.value, Number(ano.value)))).catch(() => null);
+        kitsCol = R.kitsDo(s && s.exists() ? s.data() : null).filter(
+          k => !k.serie || !serieTxt() || U.chave(k.serie).replace(/\W/g, "") === U.chave(serieTxt()).replace(/\W/g, "")
+        );
+        kitsCol.forEach((k, i) => {
+          const op = el("option", null, `${R.nomeKit(k)} · ${U.money(k.valor)} (${R.textoPacote(k.itens)})`);
+          op.value = String(i);
+          bKit.append(op);
+        });
+      };
+      bKit.onchange = () => {
+        const k = kitsCol[Number(bKit.value)];
+        if (k && bKit.value !== "") bValor.value = String(k.valor).replace(".", ",");
+      };
+      [sCol, ano, turma].forEach(x => x.addEventListener("change", lerKits));
+      dBecas.append(el("b", null, "👘 Aluguel de becas"), rb1, field("Kit", bKit), rb2);
       s3.append(grade, fFrente, dBecas);
       const erro = el("p", "err");
       erro.hidden = true;
@@ -530,7 +555,8 @@ export function abrirCadastroAluno(C, o = {}) {
                 menosLonga: COM_MENOS_LONGA.includes(bTipo.value) && bMenos.checked,
                 faixa: bFaixa.value,
                 capelo: bCap.value,
-                valor: lerReais(bValor.value)
+                valor: lerReais(bValor.value),
+                pacote: bKit.value !== "" && kitsCol[Number(bKit.value)] ? kitsCol[Number(bKit.value)].itens.slice() : []
               })
             );
           if (fazer.includes("pr")) feitos.push(await criarPR(C, "repasse", d, "pr"));
@@ -599,7 +625,7 @@ async function criarAluguel(C, d, b) {
     retirada: "",
     devolucao: "",
     obs: "",
-    pacote: [],
+    pacote: b.pacote || [],
     valor: Number(b.valor) || 0,
     contratoZerado: false,
     status: "Cadastrado",
