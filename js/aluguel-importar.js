@@ -83,7 +83,9 @@ export function valorPeloKit(itens, precos) {
 export function paraDocAluguel(o, ext) {
   const d = docAluguel(o, ext);
   // PACOTE "Kit 1" / "Kit 2": o kit do colégio para a turma do aluno (itens e preço fechado)
-  const kit = kitDaPlanilha(o.pacote, d.serie, ext.contrato);
+  // PACOTE vazio e o colégio tem kit para a turma: o Kit 1 da turma (o pacote de quem não escolheu outro)
+  const vazio = !String(o.pacote || "").trim() && !itensMarcados(o).length;
+  const kit = kitDaPlanilha(vazio ? "Kit 1" : o.pacote, d.serie, ext.contrato);
   if (kit) {
     d.pacote = kit.itens.slice();
     if (d.pacote.includes("pelerine")) Object.assign(d, { becaTipo: "pelerineAzul", tamanho: "", menosLonga: false });

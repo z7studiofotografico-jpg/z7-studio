@@ -64,4 +64,11 @@ test("aluguel: 'Beca pelerine azul' no Tamanho = pelerine, tamanho único (sem a
   assert.equal(k.becaTipo, "pelerineAzul");
   assert.equal(k.valor, 95);
   assert.deepEqual(k.pacote, ["pelerine", "canudo"]);
+  // pacote vazio: o Kit 1 da turma
+  const v = paraDocAluguel(
+    { nome: "Caio", tamanho: "PP", serie: "9º ano" },
+    { instId: "i1", ano: 2026, contrato: { kits: [{ nome: "Kit 1", serie: "9º ano", itens: ["beca", "canudo"], valor: 100 }] } }
+  );
+  assert.equal(v.valor, 100);
+  assert.deepEqual(v.pacote, ["beca", "canudo"]);
 });
