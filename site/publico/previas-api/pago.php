@@ -19,6 +19,8 @@ $c = strtolower(preg_replace('/[^a-z0-9]/i', '', (string) ($j['c'] ?? ($_POST['c
 if (preg_match('/^([a-z0-9]{10,16})-[a-z0-9]+$/', $nsu, $m)) $codigo = $m[1];
 elseif (preg_match('/^[a-z0-9]{10,16}$/', $c)) $codigo = $c;
 else $codigo = '';
+// guarda o aviso recebido (só para conferir se algo der errado; a pasta não abre pelo navegador)
+@file_put_contents(z7_pasta_pagamentos() . '/avisos.log', gmdate('c') . ' ' . substr(json_encode(['c' => $codigo, 'nsu' => $nsu, 't' => $transacao, 'via' => $j ? 'aviso' : 'volta']), 0, 400) . "\n", FILE_APPEND | LOCK_EX);
 if (!$codigo || !$transacao) z7_resposta(400, ['erro' => 'Dados incompletos.']);
 
 [$st, $r] = z7_json_post(Z7_API_INFINITE . '/payment_check', [

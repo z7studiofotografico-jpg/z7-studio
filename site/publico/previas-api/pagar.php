@@ -17,7 +17,9 @@ $kit = ($d['kit'] ?? '') === 'paspatur' ? 'Kit Paspatur' : 'Kit Quadro';
 $desc = mb_substr($kit . ' · ' . ($d['nome'] ?? '') . ' · ' . ($d['escola'] ?? ''), 0, 120);
 $nsu = $codigo . '-' . base_convert((string) time(), 10, 36);
 $volta = 'https://z7studio.com.br/previa/?c=' . $codigo . '&pago=1';
-$aviso = 'https://z7studio.com.br/previas-api/pago.php';
+// o aviso da InfinitePay já leva o código da prévia no endereço: mesmo se a família fechar a tela antes de voltar
+// para a página, o site sabe de qual aluno é o pagamento
+$aviso = 'https://z7studio.com.br/previas-api/pago.php?c=' . $codigo;
 $base = ['handle' => Z7_INFINITE_TAG, 'order_nsu' => $nsu, 'redirect_url' => $volta, 'webhook_url' => $aviso];
 
 // parcelas sem juros que você escolheu no app para este colégio ("até 5x sem juros" no texto do cartão):
