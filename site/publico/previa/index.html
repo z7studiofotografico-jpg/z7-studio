@@ -485,6 +485,7 @@
         function confirmarPagamento() {
           var box = document.getElementById("pagoOk");
           var corpo = new URLSearchParams({
+            c: codigo,
             order_nsu: busca.get("order_nsu") || "",
             transaction_nsu: busca.get("transaction_nsu") || "",
             slug: busca.get("slug") || "",

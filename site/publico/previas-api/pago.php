@@ -13,8 +13,13 @@ $pega = function ($k, $alt = null) use ($j) {
 $nsu = $pega('order_nsu');
 $transacao = $pega('transaction_nsu');
 $slug = $pega('slug', 'invoice_slug');
-if (!preg_match('/^([a-z0-9]{10,16})-[a-z0-9]+$/', $nsu, $m) || !$transacao) z7_resposta(400, ['erro' => 'Dados incompletos.']);
-$codigo = $m[1];
+// o código da prévia: vem no nosso order_nsu ("<código>-<hora>") ou, quando a InfinitePay troca o order_nsu pelo
+// dela (17/11/2026, com a chave da API), no endereço de volta da página (?c=<código>)
+$c = strtolower(preg_replace('/[^a-z0-9]/i', '', (string) ($j['c'] ?? ($_POST['c'] ?? ($_GET['c'] ?? '')))));
+if (preg_match('/^([a-z0-9]{10,16})-[a-z0-9]+$/', $nsu, $m)) $codigo = $m[1];
+elseif (preg_match('/^[a-z0-9]{10,16}$/', $c)) $codigo = $c;
+else $codigo = '';
+if (!$codigo || !$transacao) z7_resposta(400, ['erro' => 'Dados incompletos.']);
 
 [$st, $r] = z7_json_post(Z7_API_INFINITE . '/payment_check', [
   'handle' => Z7_INFINITE_TAG,
