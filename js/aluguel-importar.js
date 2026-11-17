@@ -25,6 +25,7 @@ export const CAMPOS_ALUGUEL = [
   { k: "capelo", nome: "Capelo", sinonimos: ["Cor do capelo"] },
   { k: "valor", nome: "Valor", sinonimos: ["Valor do aluguel", "Preço"] },
   // (17/11/2026) a coluna é o KIT do aluno ("Kit 1", "Kit 2"…, os kits desta tela); "Pacote" ainda vale
+  { k: "situacao", nome: "Situação", sinonimos: ["Status"] },
   { k: "pacote", nome: "Kit", sinonimos: ["Pacote", "Itens", "Produtos"] },
   // planilha com uma coluna por item (1 = o aluno tem): Aluguel (a beca), Paspatur, Canudo, Certificado
   { k: "itBeca", nome: "Aluguel (item)", sinonimos: ["Aluguel", "Aluguel da beca"] },
@@ -93,7 +94,11 @@ const semItem = v =>
   );
 export function paraDocAluguel(o, ext) {
   const d = docAluguel(o, ext);
-  if (semItem(o.pacote) || semItem(o.tamanho)) {
+  // também: Status "Não vai" / "Desistiu", e a linha sem kit e com as colunas de item todas vazias
+  const naoVai = /^(nao vai|desist|cancel)/.test(U.chave(o.situacao).toLowerCase());
+  const colunasItem = Object.keys(o).some(k => /^it[A-Z]/.test(k));
+  const nenhumItem = colunasItem && !String(o.pacote || "").trim() && !itensMarcados(o).length;
+  if (semItem(o.pacote) || semItem(o.tamanho) || naoVai || nenhumItem) {
     d.__falta = d.__falta.filter(f => !/^(pacote|tamanho)/.test(f));
     const nada = { pacote: [], valor: 0, contratoZerado: true, tamanho: "", menosLonga: false };
     return Object.assign(d, { naoParticipa: true, soPaspatur: false }, nada);

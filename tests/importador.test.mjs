@@ -84,3 +84,17 @@ test("Kit “Sem item” entra em Não vai participar, sem kit e sem valor", asy
     assert.deepEqual(d.__falta, []);
   }
 });
+
+test("turma 501 acha o kit do 5º ano; Status Não vai e linha sem nenhum item entram em Não vai participar", () => {
+  const kits = [
+    { itens: ["pelerine", "canudo"], nome: "Kit 1", serie: "5º ano", valor: 95 },
+    { itens: ["beca", "canudo"], nome: "Kit 1", serie: "9º ano", valor: 100 }
+  ];
+  const ext = { instId: "x", instNome: "X", ano: 2026, contrato: { kits } };
+  const d = paraDocAluguel({ nome: "A", serie: "501", pacote: "KIT 1", itCanudo: "1" }, ext);
+  assert.equal(d.valor, 95);
+  assert.equal(d.becaTipo, "pelerineAzul");
+  assert.equal(paraDocAluguel({ nome: "B", serie: "902", pacote: "KIT 1", situacao: "NAO VAI" }, ext).naoParticipa, true);
+  assert.equal(paraDocAluguel({ nome: "C", serie: "902", pacote: "", itCanudo: "" }, ext).naoParticipa, true);
+  assert.equal(paraDocAluguel({ nome: "D", serie: "902", pacote: "" }, ext).valor, 100);
+});

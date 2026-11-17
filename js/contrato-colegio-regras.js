@@ -79,7 +79,17 @@ export function pacoteDoAluno(a, contrato) {
 // Kits do colégio (17/11/2026): pacotes com nome e preço fechado, às vezes de uma turma só.
 // contrato.kits = [{ nome: "Kit 1", serie: "9º ano", itens: ["beca","canudo",...], valor: 100 }]
 // O aluno com exatamente os itens de um kit (da turma dele) paga o preço do kit, não a soma dos itens.
-const mesmaSerie = (a, b) => chave(a).replace(/[^A-Z0-9]/g, "") === chave(b).replace(/[^A-Z0-9]/g, "");
+// turma da planilha: "5º ano", "5° ano", "5 ANO" e o código da turma "501"/"502" são o mesmo ano (17/11/2026)
+const anoDaSerie = v => {
+  const t = chave(v).replace(/[^A-Z0-9]/g, "");
+  const m = t.match(/^(\d{1,2})ANO$/) || t.match(/^(\d)\d{2}$/);
+  return m ? m[1] : "";
+};
+const mesmaSerie = (a, b) => {
+  const x = chave(a).replace(/[^A-Z0-9]/g, "");
+  const y = chave(b).replace(/[^A-Z0-9]/g, "");
+  return x === y || (!!anoDaSerie(a) && anoDaSerie(a) === anoDaSerie(b));
+};
 export const kitsDo = contrato => ((contrato && contrato.kits) || []).filter(k => k && k.nome && (k.itens || []).length);
 export const nomeKit = k => k.nome + (k.serie ? " · " + k.serie : "");
 export function kitDosItens(itens, serie, contrato) {
