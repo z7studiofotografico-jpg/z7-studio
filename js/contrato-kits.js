@@ -27,6 +27,7 @@ export function editorKits(x, admin, o = {}) {
   if (!o.semComissao) box.append(field("Comissão do representante (% do total; vazio = as taxas dos Ajustes)", pct));
   const lista = el("div", "kits-lista");
   const linhas = [];
+  const somas = [];
   const add = (k = {}) => {
     const r = el("div", "kit-linha");
     const nome = el("input");
@@ -58,7 +59,27 @@ export function editorKits(x, admin, o = {}) {
       r.remove();
       linhas.splice(linhas.indexOf(item), 1);
     });
-    r.append(topo, chips, tirar);
+    // as duas frentes (17/11/2026): com os preços avulsos na tela, o kit mostra a soma dos itens marcados
+    // e "Usar a soma" põe essa soma no preço do kit (dá para mudar depois, ex.: um desconto no kit)
+    const soma = el("div", "kit-soma hint");
+    const somar = () => {
+      const pr = o.precos ? o.precos() : {};
+      return reais(cx.filter(([, c]) => c.checked).reduce((t, [id]) => t + (Number(pr[id]) || 0), 0));
+    };
+    const usar = U.mkBtn("= Usar a soma no preço do kit", "btn-sm", () => {
+      valor.value = String(somar().toFixed(2)).replace(".", ",");
+    });
+    const mostrarSoma = () => {
+      const v = somar();
+      soma.replaceChildren(
+        document.createTextNode(v ? `Soma dos itens avulsos: R$ ${v.toFixed(2).replace(".", ",")} ` : ""),
+        ...(v && admin ? [usar] : [])
+      );
+    };
+    cx.forEach(([, c]) => c.addEventListener("change", mostrarSoma));
+    somas.push(mostrarSoma);
+    if (o.precos) mostrarSoma();
+    r.append(topo, chips, ...(o.precos ? [soma] : []), tirar);
     [nome, serie, valor, ...cx.map(([, c]) => c), tirar].forEach(i => (i.disabled = !admin));
     const item = { nome, serie, valor, cx };
     linhas.push(item);
@@ -69,6 +90,7 @@ export function editorKits(x, admin, o = {}) {
   if (admin) box.append(U.mkBtn("+ Kit", "btn-sm", () => add()));
   return {
     box,
+    atualizarSomas: () => somas.forEach(f => f()),
     ler: () => ({
       ...(o.semComissao ? {} : { comissaoPct: reais(pct.value) || 0 }),
       kits: linhas

@@ -81,8 +81,21 @@ export function itensMarcados(o) {
 export function valorPeloKit(itens, precos) {
   return (itens || []).reduce((t, k) => t + (Number((precos || {})[k]) || 0), 0);
 }
+// "Sem item", "Nenhum", "Não vai participar" no Kit: entra em 🚫 Não vai participar, sem kit e sem valor
+const SEM_ITEM = /^(sem\s*(item|itens|kit|pacote)|nenhum|nada|nao\s*(vai\s*)?particip\w*)$/;
 export function paraDocAluguel(o, ext) {
   const d = docAluguel(o, ext);
+  if (
+    SEM_ITEM.test(
+      U.chave(o.pacote)
+        .toLowerCase()
+        .replace(/[^a-z ]/g, "")
+        .trim()
+    )
+  ) {
+    d.__falta = d.__falta.filter(f => !/^pacote/.test(f));
+    return Object.assign(d, { naoParticipa: true, soPaspatur: false, pacote: [], valor: 0, contratoZerado: true });
+  }
   // PACOTE "Kit 1" / "Kit 2": o kit do colégio para a turma do aluno (itens e preço fechado)
   // PACOTE vazio e o colégio tem kit para a turma: o Kit 1 da turma (o pacote de quem não escolheu outro)
   const vazio = !String(o.pacote || "").trim() && !itensMarcados(o).length;
@@ -214,6 +227,7 @@ export async function importarAlugueis(C, insts) {
         i.inputMode = "decimal";
         i.placeholder = "0,00";
         prBox.append(field("Preço " + n, i));
+        i.addEventListener("input", () => kitsEd && kitsEd.atualizarSomas());
         return [k, i];
       });
       const lerValor = v =>
@@ -224,7 +238,10 @@ export async function importarAlugueis(C, insts) {
         ) || 0;
       const montarKits = async () => {
         const { editorKits } = await import("./contrato-kits.js");
-        kitsEd = editorKits(contrato || {}, true, { semComissao: true });
+        kitsEd = editorKits(contrato || {}, true, {
+          semComissao: true,
+          precos: () => Object.fromEntries(prIn.map(([k, inp]) => [k, lerValor(inp.value)]))
+        });
         kitsBox.replaceChildren(kitsEd.box);
       };
       const carregarPrecos = async () => {
@@ -248,14 +265,19 @@ export async function importarAlugueis(C, insts) {
         "hint",
         "Kits deste colégio: o que cada kit leva e o valor total. Na planilha, a coluna Kit diz o de cada aluno (vazia = o Kit 1 da turma)."
       );
-      const avulso = el("details");
-      avulso.append(el("summary", null, "Preço por item (só se vender item avulso, fora dos kits)"), prBox);
+      // as duas frentes: preço de cada item (para vender avulso e para somar e formar os kits) e os kits
+      const avulso = el("div");
+      avulso.append(
+        el("b", null, "Preço de cada item (avulso)"),
+        el("p", "hint", "Aluno com itens soltos paga a soma deles; aluno com os itens de um kit paga o preço do kit."),
+        prBox
+      );
       const hist = el("details", "notes");
       hist.append(el("summary", null, "Importações anteriores (desfazer)"));
       const hb = el("div");
       hist.append(hb);
       hist.addEventListener("toggle", () => hist.open && ultimasImportacoes(C, "aluguel", hb));
-      box.append(r, prTit, kitsBox, avulso, hist);
+      box.append(r, avulso, prTit, kitsBox, hist);
       return () => {
         const i = insts.find(x => x.id === sInst.value);
         return {
@@ -265,7 +287,10 @@ export async function importarAlugueis(C, insts) {
           idade: sIdade.value,
           precos: Object.fromEntries(prIn.map(([k, inp]) => [k, lerValor(inp.value)])),
           kits: kitsEd ? kitsEd.ler().kits : [],
-          contrato: Object.assign({}, contrato || {}, { kits: kitsEd ? kitsEd.ler().kits : (contrato && contrato.kits) || [] }),
+          contrato: Object.assign({}, contrato || {}, {
+            precos: Object.fromEntries(prIn.map(([k, inp]) => [k, lerValor(inp.value)])),
+            kits: kitsEd ? kitsEd.ler().kits : (contrato && contrato.kits) || []
+          }),
           ano: ano.value,
           respEmail: (i && donos.get(`${i.id}|${Number(ano.value)}`)) || ""
         };
