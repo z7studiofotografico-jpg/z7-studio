@@ -302,10 +302,12 @@ function render() {
   chips.innerHTML = "";
   // abas na ordem das etapas: quem não vai participar da formatura fica à parte; quem é só do Paspatur tem a aba
   // dele e também anda pelas etapas (Cadastrado → Produtos em produção → Pronto para retirada)
-  const naEtapa = s0 => a => !a.naoParticipa && (a.status || "Cadastrado") === s0;
+  // (17/11/2026) "Só o Paspatur" é a etapa antes da produção: depois de avançar, sai de lá (como as becas)
+  const cad = a => (a.status || "Cadastrado") === "Cadastrado";
+  const naEtapa = s0 => a => !a.naoParticipa && (a.status || "Cadastrado") === s0 && !(s0 === "Cadastrado" && a.soPaspatur);
   const abas = [
     ["naoParticipa", "🚫 Não vai participar", a => !!a.naoParticipa],
-    ["soPaspatur", "📒 Só o Paspatur", a => !!a.soPaspatur && !a.naoParticipa],
+    ["soPaspatur", "📒 Só o Paspatur", a => !!a.soPaspatur && !a.naoParticipa && cad(a)],
     ["atrasados", "⚠️ Atrasados", a => atrasadoAluguel(a, hoje)],
     ...["Cadastrado", "Beca medida", "Produtos em produção", "Pronto para retirada"].map(s0 => [s0, s0, naEtapa(s0)]),
     ["Devolvida", "Beca devolvida", naEtapa("Devolvida")],
