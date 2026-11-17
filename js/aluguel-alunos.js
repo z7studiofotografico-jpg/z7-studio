@@ -91,7 +91,7 @@ export function mostrarAlunos(ctx, v, o) {
       import("./aluguel-importar.js").then(m => m.importarAlugueis(C, insts)).catch(e => C.handleErr(e))
     ),
     botaoRelatorio(
-      () => relatorioAluguel(C, lista, filtro),
+      () => relatorioAluguel(C, lista, filtro, insts),
       () => C.me
     ),
     U.mkBtn("⬇️ Planilha", "btn-sm", () =>

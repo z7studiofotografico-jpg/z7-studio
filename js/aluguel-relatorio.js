@@ -7,6 +7,8 @@ import { nomeFaixa, nomeCapelo, usoDosAlunos, tamanhoBeca, idadeBeca, TAMANHOS }
 import { pedirFiltros } from "./relatorio.js";
 import { contatoRel, ordemCodigo } from "./aluno-id.js";
 import { pacoteDoAluno, nomeItem } from "./contrato-colegio-regras.js";
+import { cartaoDoTipo } from "./instituicoes-dados.js";
+import { brl } from "./regras.js";
 
 export const atrasadoAluguel = (a, hoje = U.todayStr()) =>
   !a.soPaspatur && a.status === "Retirou a beca" && !!a.devolucao && a.devolucao < hoje;
@@ -14,16 +16,21 @@ export const atrasadoAluguel = (a, hoje = U.todayStr()) =>
 // Relatório: antes de gerar, escolhe ano, colégio, turma, situação e se separa por colégio ou por turma
 const SIT_REL = [
   ["", "todas"],
-  ["andamento", "em andamento"],
-  ["atrasados", "atrasados na devolução"],
-  ["Cadastrado", "cadastrado"],
   ["naoParticipa", "não vai participar"],
   ["soPaspatur", "só o Paspatur"],
+  ["atrasados", "atrasados na devolução"],
+  ["Cadastrado", "cadastrado"],
   ["Beca medida", "beca medida"],
   ["Produtos em produção", "produtos em produção"],
   ["Pronto para retirada", "pronto para retirada"],
-  ["Retirou a beca", "retirou a beca"],
-  ["Devolvida", "devolvida"]
+  ["Retirou a beca", "retirou a beca (becas fora)"],
+  ["Devolvida", "beca devolvida"],
+  ["andamento", "em andamento (todos menos devolvida)"]
+];
+const TIPOS_REL = [
+  ["particular", "Particular"],
+  ["publico", "Público"],
+  ["superior", "Faculdade e curso"]
 ];
 // a situação do aluno no relatório (a mesma do app): não vai participar, só o Paspatur, atrasado ou a etapa
 export function situacaoAluguel(a, hoje = U.todayStr()) {
@@ -36,6 +43,7 @@ export function filtrarRelatorio(arr, f, hoje = U.todayStr()) {
   return arr.filter(
     a =>
       (!f.ano || String(a.ano) === String(f.ano)) &&
+      (!f.tipo || (f.tipoDe && f.tipoDe(a) === f.tipo)) &&
       (!f.inst || a.instId === f.inst) &&
       (!f.turma || (a.serie || "") === f.turma) &&
       (!f.sit ||
@@ -50,8 +58,10 @@ export function filtrarRelatorio(arr, f, hoje = U.todayStr()) {
                 : !a.naoParticipa && (a.status || "Cadastrado") === f.sit))
   );
 }
-export async function relatorioAluguel(C, lista, filtro) {
+// insts: as instituições (para o tipo: particular, público, faculdade e curso)
+export async function relatorioAluguel(C, lista, filtro, insts = []) {
   const base = lista.filter(a => !ocultoParaMim(C, a));
+  const tipoDe = a => cartaoDoTipo((insts.find(i => i.id === a.instId) || {}).tipo || "");
   const unicos = xs => [...new Set(xs.filter(Boolean))].sort((a, b) => String(a).localeCompare(String(b), "pt-BR", { numeric: true }));
   const f = await pedirFiltros("🖨️ Relatório do Aluguel de becas", [
     {
@@ -62,13 +72,22 @@ export async function relatorioAluguel(C, lista, filtro) {
       opcoes: () => unicos(base.map(a => String(a.ano || ""))).map(x => [x, x])
     },
     {
+      k: "tipo",
+      rotulo: "Instituição",
+      vazio: "todas (particular, público, faculdade…)",
+      padrao: filtro.tipo || "",
+      opcoes: () => TIPOS_REL
+    },
+    {
       k: "inst",
       rotulo: "Colégio",
       vazio: "todos os colégios",
       padrao: filtro.inst,
       opcoes: v => {
         const m = {};
-        base.filter(a => !v.ano || String(a.ano) === v.ano).forEach(a => a.instId && (m[a.instId] = title(a.instNome || "")));
+        base
+          .filter(a => (!v.ano || String(a.ano) === v.ano) && (!v.tipo || tipoDe(a) === v.tipo))
+          .forEach(a => a.instId && (m[a.instId] = title(a.instNome || "")));
         return Object.entries(m).sort((a, b) => a[1].localeCompare(b[1], "pt-BR"));
       }
     },
@@ -76,7 +95,8 @@ export async function relatorioAluguel(C, lista, filtro) {
       k: "turma",
       rotulo: "Turma",
       vazio: "todas as turmas",
-      opcoes: v => unicos(filtrarRelatorio(base, { ano: v.ano, inst: v.inst }).map(a => a.serie || "")).map(x => [x, x])
+      opcoes: v =>
+        unicos(filtrarRelatorio(base, { ano: v.ano, inst: v.inst, tipo: v.tipo, tipoDe }).map(a => a.serie || "")).map(x => [x, x])
     },
     { k: "sit", rotulo: "Situação", opcoes: () => SIT_REL },
     {
@@ -91,7 +111,7 @@ export async function relatorioAluguel(C, lista, filtro) {
   ]);
   if (!f) return null;
   const hoje = U.todayStr();
-  const arr = filtrarRelatorio(base, f, hoje);
+  const arr = filtrarRelatorio(base, Object.assign({}, f, { tipoDe }), hoje);
   // contrato de cada colégio e ano (id = instId_ano): o kit do aluno sem pacote próprio é o padrão do contrato
   const contratos = {};
   await Promise.all(
@@ -134,7 +154,14 @@ export async function relatorioAluguel(C, lista, filtro) {
   const sit = (SIT_REL.find(x => x[0] === f.sit) || [])[1];
   return {
     titulo: "Aluguel de becas · alunos" + (f.ano ? " · " + f.ano : ""),
-    subtitulo: [nomeInst, f.turma ? "turma " + f.turma : "", f.sit ? "situação: " + sit : ""].filter(Boolean).join(" · "),
+    subtitulo: [
+      f.tipo ? (TIPOS_REL.find(x => x[0] === f.tipo) || [])[1] : "",
+      nomeInst,
+      f.turma ? "turma " + f.turma : "",
+      f.sit ? "situação: " + sit : ""
+    ]
+      .filter(Boolean)
+      .join(" · "),
     secoes: [
       {
         titulo: "Resumo",
@@ -142,7 +169,10 @@ export async function relatorioAluguel(C, lista, filtro) {
           ["Alunos", arr.length],
           ["Becas reservadas", u.reservado],
           ["Becas fora", u.fora],
-          ["Atrasados", arr.filter(a => atrasadoAluguel(a, hoje)).length]
+          ["Atrasados", arr.filter(a => atrasadoAluguel(a, hoje)).length],
+          ["Não vai participar", arr.filter(a => a.naoParticipa).length],
+          ["Só o Paspatur", arr.filter(a => a.soPaspatur && !a.naoParticipa).length],
+          ["Valor total", brl(arr.filter(a => !a.naoParticipa).reduce((t, a) => t + (Number(a.valor) || 0), 0))]
         ]
       },
       // quantas becas de cada tamanho, infantil e adulto separados
