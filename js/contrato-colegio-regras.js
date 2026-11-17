@@ -85,6 +85,13 @@ const anoDaSerie = v => {
   const m = t.match(/^(\d{1,2})ANO$/) || t.match(/^(\d)\d{2}$/);
   return m ? m[1] : "";
 };
+// "901" → "9º ano", "502" → "5º ano" (a série pelo código da turma; vazio se não for um código assim)
+export const serieDaTurma = t => {
+  const m = String(t == null ? "" : t)
+    .trim()
+    .match(/^(\d)\d{2}$/);
+  return m ? m[1] + "º ano" : "";
+};
 const mesmaSerie = (a, b) => {
   const x = chave(a).replace(/[^A-Z0-9]/g, "");
   const y = chave(b).replace(/[^A-Z0-9]/g, "");

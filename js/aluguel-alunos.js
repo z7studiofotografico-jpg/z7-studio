@@ -40,6 +40,8 @@ import { abrirJanela } from "./janela.js";
 import { abaColegio, abaHistorico } from "./aluguel-janela.js";
 
 export const STATUS_ALUGUEL = ["Cadastrado", "Beca medida", "Produtos em produção", "Pronto para retirada", "Retirou a beca", "Devolvida"];
+// ano · série · turma (ex.: "2026 · 9º ano · turma 901")
+const anoSerie = a => [a.ano, a.serie, a.turma && "turma " + a.turma].filter(Boolean).join(" · ");
 const SERIES = ["Pré", "5º ano", "9º ano", "Ensino médio", "Faculdade", "Curso", "Outra"];
 const ANO = () => new Date().getFullYear();
 // atrasadoAluguel fica em aluguel-relatorio.js (o relatório também usa); continua exportado daqui
@@ -145,12 +147,6 @@ export function mostrarAlunos(ctx, v, o) {
       C.isAdmin ? FS.query(col, FS.limit(5000)) : C.carteira("alugueis"),
       s => {
         lista = s.docs.map(d => Object.assign({ id: d.id }, d.data()));
-        // (17/11/2026) quem foi marcado antes como "Não vai participar · só o Paspatur" ficou com o Paspatur e o valor:
-        // agora "Não vai participar" é sem kit e sem valor (o admin realoca quem for só do Paspatur)
-        if (C.isAdmin)
-          lista
-            .filter(a => a.naoParticipa && !a.soPaspatur && ((a.pacote || []).length || Number(a.valor) > 0))
-            .forEach(a => FS.updateDoc(FS.doc(db, "alugueis", a.id), { pacote: [], valor: 0, contratoZerado: true }).catch(() => {}));
         render();
       },
       e => {
@@ -377,11 +373,7 @@ function linha(a) {
     cor: corAluguel(a, hoje),
     idAluno: a.codigo,
     titulo: title(a.nome || ""),
-    sub: [
-      title(a.instNome || ""),
-      [a.ano, a.serie].filter(Boolean).join(" · "),
-      a.naoParticipa ? "🚫 Não vai participar" : a.soPaspatur ? "📒 Só o Paspatur" : becaTxt(a)
-    ]
+    sub: [title(a.instNome || ""), anoSerie(a), a.naoParticipa ? "🚫 Não vai participar" : a.soPaspatur ? "📒 Só o Paspatur" : becaTxt(a)]
       .filter(Boolean)
       .join(" · "),
     passo: a.naoParticipa ? "" : passoAluguel(a, hoje),
@@ -414,7 +406,7 @@ function janela(a0) {
     topo: a => ({
       id: a.codigo,
       titulo: title(a.nome || ""),
-      sub: [title(a.instNome || ""), [a.ano, a.serie].filter(Boolean).join(" · ")].filter(Boolean).join(" · "),
+      sub: [title(a.instNome || ""), anoSerie(a)].filter(Boolean).join(" · "),
       info: infoAluguel(a),
       selo: atrasadoAluguel(a) ? "ATRASADO" : (a.status || "Cadastrado").toUpperCase()
     }),
@@ -462,7 +454,7 @@ function card(a) {
   const meta = el("div", "meta");
   [
     [`🏫 ${title(a.instNome || "")}`, "svc"],
-    [[a.ano, a.serie].filter(Boolean).join(" · "), ""],
+    [anoSerie(a), ""],
     [
       a.becaTipo
         ? `👘 Beca ${tamanhoBeca(a).replace(/^\w/, c => c.toLowerCase())}${a.menosLonga ? " (menos longa)" : ""} · ${modeloBeca(a.becaTipo)}`
@@ -659,8 +651,10 @@ export function form(a, pre = {}) {
     const ano = inp(String(x.ano || filtro.ano || ANO()), "ano", 4);
     ano.inputMode = "numeric";
     const serie = sel(SERIES, x.serie || "", "série");
+    const sala = inp(x.turma || "", "ex.: 901", 20);
+    sala.required = !a; // (17/11/2026) a turma é obrigatória no aluno novo
     const r0 = el("div", "row3");
-    r0.append(field("Instituição", sInst), field("Ano", ano), field("Série", serie));
+    r0.append(field("Instituição", sInst), field("Ano", ano), field("Série", serie), field("Turma", sala));
     const nome = inp(x.nome ? title(x.nome) : "", "nome do aluno");
     nome.required = true;
     const tel = inp(x.tel || "", "(21) 9…", 30);
@@ -794,6 +788,7 @@ export function form(a, pre = {}) {
         instNome: inst.nome || "",
         ano: anoN,
         serie: serie.value,
+        turma: sala.value.trim(),
         nome: nome.value.trim(),
         nomeBusca: U.chave(nome.value),
         tel: U.digits(tel.value),

@@ -36,10 +36,14 @@ test("aluguel: linha da planilha vira aluno (P1 = P menos longa; faixa e capelo 
   assert.equal(d.capelo, "preto");
   assert.equal(d.contratoZerado, true);
   assert.deepEqual(d.__falta, []);
-  assert.deepEqual(paraDocAluguel({ nome: "B", tamanho: "ZZ" }, {}).__falta, [
-    "instituição (escolha acima)",
-    "tamanho “ZZ” não reconhecido"
-  ]);
+  // tamanho errado e sem turma: entra, com aviso; só a instituição impede de gravar
+  const z = paraDocAluguel({ nome: "B", tamanho: "ZZ" }, {});
+  assert.deepEqual(z.__falta, ["instituição (escolha acima)"]);
+  assert.deepEqual(z.__aviso, ["sem turma (ex.: 901)", "tamanho “ZZ” não reconhecido"]);
+  // turma 901 sem série: série 9º ano
+  const t = paraDocAluguel({ nome: "C", turma: 901 }, { instId: "x" });
+  assert.equal(t.serie, "9º ano");
+  assert.equal(t.turma, "901");
 });
 
 test("mudar ano: ID e código do aluno trocam de ano; Linha de Frente vira Repasse no ano passado", () => {

@@ -550,7 +550,8 @@ async function incluirAluno(pg, { nome, colegio, tel, contato, numero = "31" }) 
     [fa.getByLabel("Número do ID do aluno"), numero],
     [fa.getByLabel("Nome do aluno"), nome],
     [fa.getByLabel("WhatsApp", { exact: true }), tel],
-    [fa.getByLabel("Nome do responsável"), contato]
+    [fa.getByLabel("Nome do responsável"), contato],
+    [fa.getByLabel("Turma", { exact: true }), "901"]
   ];
   for (let tentativa = 0; tentativa < 3; tentativa++) {
     for (const [c, v] of campos) if ((await c.inputValue()) !== v) await c.fill(v);
@@ -4393,6 +4394,7 @@ await cenario("PR lista única: filtro PR/Paspatur, pessoa da equipe e chave na 
     for (let t = 0; t < 3; t++) {
       await f.getByLabel("Número do ID do aluno").fill("77");
       await f.getByLabel("Nome do aluno").fill("Pedro Novo Paspatur");
+      await f.getByLabel("Turma", { exact: true }).fill("901");
       if ((await f.getByLabel("Nome do aluno").inputValue()) === "Pedro Novo Paspatur") break;
     }
     await f.locator(".cad-op", { hasText: "Paspatur" }).click();
@@ -4426,12 +4428,13 @@ await cenario("➕ Cadastrar aluno: colégio primeiro, ID obrigatório, um aluno
   await escolherColegio(f, "Colegio Alfa");
   ok((await f.locator(".cad-pref").textContent()) === String(Y).slice(2) + "CA-", "o começo do ID vem pronto (ano + sigla)");
   ok(
-    (await f.getByLabel("Turma", { exact: true }).evaluate(s => [...s.options].map(o => o.textContent).join("|"))).includes(
+    (await f.getByLabel("Série", { exact: true }).evaluate(s => [...s.options].map(o => o.textContent).join("|"))).includes(
       "Pré|5º ano|9º ano|Ensino Médio|Profissionalizante"
     ),
     "turmas prontas"
   );
-  await f.getByLabel("Turma", { exact: true }).selectOption("9º ano");
+  await f.getByLabel("Série", { exact: true }).selectOption("9º ano");
+  await f.getByLabel("Turma", { exact: true }).fill("901");
   await f.getByLabel("Nome do aluno").fill("Bianca Teste");
   await f.locator(".cad-op", { hasText: "Aluguel de becas" }).click();
   await f.locator(".cad-op", { hasText: "Kit Quadro" }).click();

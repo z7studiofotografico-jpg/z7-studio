@@ -137,17 +137,21 @@ function conferir(C, cfg, out, linhas, lembrado, arquivo, lerExtra, close) {
     const ext = lerExtra();
     const vistos = new Set();
     const erros = [],
-      dup = [];
+      dup = [],
+      avisos = [];
     prontos = [];
     objs.forEach((o, i) => {
       const d = cfg.paraDoc(o, ext);
       const falta = cfg.campos.filter(f => f.obrigatorio && !String(d[f.k] ?? o[f.k] ?? "").trim()).map(f => f.nome);
       if (d.__falta) falta.push(...d.__falta);
       delete d.__falta;
+      const aviso = d.__aviso || [];
+      delete d.__aviso;
       const k = cfg.chave ? cfg.chave(d) : "";
       if (falta.length) return erros.push(`Linha ${hi + 2 + i}: falta ${falta.join(", ")}`);
       if (k && (vistos.has(k) || (cfg.existentes && cfg.existentes.has(k)))) return dup.push(`Linha ${hi + 2 + i}: ${d.nome || k}`);
       if (k) vistos.add(k);
+      if (aviso.length) avisos.push(`Linha ${hi + 2 + i}: ${d.nome || ""}: ${aviso.join(", ")}`);
       prontos.push(d);
     });
     if (faltaCampo.length)
@@ -168,7 +172,8 @@ function conferir(C, cfg, out, linhas, lembrado, arquivo, lerExtra, close) {
       l.slice(0, 200).forEach(x => d.append(el("div", null, x)));
       resumo.append(d);
     };
-    lista("⚠️ Falta no cadastro", erros);
+    lista("⚠️ Falta no cadastro (não entram)", erros);
+    lista("🟡 Entram, mas confira depois", avisos);
     lista("Duplicados", dup);
     ok.disabled = !prontos.length || !!faltaCampo.length;
   };

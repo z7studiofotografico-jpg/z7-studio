@@ -220,14 +220,17 @@ export function abrirCadastroAluno(C, o = {}) {
       const turma = sel(
         [...TURMAS.map(t => [t, t]), ["outra", "Outra…"]],
         TURMAS.includes(o.serie) ? o.serie : o.serie ? "outra" : "",
-        "Escolha a turma"
+        "Escolha a série"
       );
-      turma.setAttribute("aria-label", "Turma");
+      turma.setAttribute("aria-label", "Série");
+      // (17/11/2026) a turma de verdade (901, 502, "3001"…): obrigatória, junto com a série
+      const sala = inp(o.turma || "", "ex.: 901", 20);
+      sala.setAttribute("aria-label", "Turma");
       const turmaOutra = inp(TURMAS.includes(o.serie) ? "" : o.serie || "", "ex.: 3º ano A", 40);
       turmaOutra.setAttribute("aria-label", "Outra turma");
       const r1 = el("div", "cad-g3");
-      r1.append(field("Colégio", sCol), field("Ano", ano), field("Turma", turma));
-      const fOutra = field("Qual turma?", turmaOutra);
+      r1.append(field("Colégio", sCol), field("Ano", ano), field("Série", turma), field("Turma", sala));
+      const fOutra = field("Qual série?", turmaOutra);
       const trava = el("p", "cad-trava");
       const novoCol = U.mkBtn("🏫 Não está na lista? Cadastrar o colégio", "btn-sm", () => {
         close();
@@ -510,7 +513,8 @@ export function abrirCadastroAluno(C, o = {}) {
         erro.hidden = true;
         const f = ficha();
         const falta = faltaParaSalvar(f);
-        if (turma.value === "outra" && !turmaOutra.value.trim()) falta.push("a turma");
+        if (turma.value === "outra" && !turmaOutra.value.trim()) falta.push("a série");
+        if (!sala.value.trim()) falta.push("a turma (ex.: 901)");
         if (falta.length) return mostrarErro("Falta: " + falta.join(", ") + ".");
         st.achados = await procurar(C, f);
         st.repetido = conferirRepetido(f, st.achados);
@@ -538,6 +542,7 @@ export function abrirCadastroAluno(C, o = {}) {
           inst: f.inst,
           ano: f.ano,
           serie: serieTxt(),
+          turma: sala.value.trim(),
           codigo: f.codigo,
           nome: f.nome,
           contatos,
@@ -584,6 +589,7 @@ export function abrirCadastroAluno(C, o = {}) {
             instId: f.inst.id,
             ano: f.ano,
             serie: serieTxt(),
+            turma: sala.value.trim(),
             modulo: f.modulos.length === 1 ? f.modulos[0] : o.modulo,
             numero: String((parseInt(num.value, 10) || 0) + 1).padStart(2, "0")
           });
@@ -610,6 +616,7 @@ async function criarAluguel(C, d, b) {
     instNome: d.inst.nome || "",
     ano: d.ano,
     serie: d.serie,
+    turma: d.turma || "",
     nome: d.nome,
     nomeBusca: U.chave(d.nome),
     codigo: d.codigo,
@@ -665,6 +672,7 @@ async function criarPR(C, colecao, d, kit) {
     codigoBusca: codigoBusca(d.codigo),
     curso: "",
     turma: d.serie,
+    sala: d.turma || "", // a turma de verdade (901…); aqui "turma" é a série
     responsavel: d.resp,
     contatos,
     telefones: contatos.map(c => c.tel),

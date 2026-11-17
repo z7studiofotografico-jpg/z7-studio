@@ -4,7 +4,7 @@ import { el, field, sel, title } from "./ui.js";
 import * as U from "./util.js";
 import { abrirImportador, ultimasImportacoes } from "./importador.js";
 import { BECAS, FAIXAS, CAPELOS, TAMANHOS } from "./becas-estoque.js";
-import { lerPacote, ITENS_PACOTE, idContrato, kitDaPlanilha, valorDoPacote } from "./contrato-colegio-regras.js";
+import { lerPacote, ITENS_PACOTE, idContrato, kitDaPlanilha, valorDoPacote, serieDaTurma } from "./contrato-colegio-regras.js";
 import { idDoAluno } from "./cadastro-regras.js";
 import { lerCodigo, codigoBusca } from "./aluno-id.js";
 
@@ -19,7 +19,9 @@ export const CAMPOS_ALUGUEL = [
   { k: "nome", nome: "Aluno", sinonimos: ["Nome", "Formando", "Nome do aluno"], obrigatorio: true },
   { k: "tel", nome: "WhatsApp", sinonimos: ["Telefone", "Celular", "Tel", "Telefone 1", "Celular 1"] },
   { k: "responsavel", nome: "Responsável", sinonimos: ["Reponsavel", "Mãe", "Pai"] },
-  { k: "serie", nome: "Série", sinonimos: ["Turma", "Curso", "Ano escolar"] },
+  { k: "serie", nome: "Série", sinonimos: ["Curso", "Ano escolar"] },
+  // (17/11/2026) a turma de verdade (901, 502…), obrigatória; sem série, a série sai dela (901 = 9º ano)
+  { k: "turma", nome: "Turma", sinonimos: ["Sala", "Classe"] },
   { k: "tamanho", nome: "Tamanho", sinonimos: ["Tamanho da beca", "Beca"] },
   { k: "faixa", nome: "Faixa", sinonimos: ["Cor da faixa"] },
   { k: "capelo", nome: "Capelo", sinonimos: ["Cor do capelo"] },
@@ -99,7 +101,7 @@ export function paraDocAluguel(o, ext) {
   const colunasItem = Object.keys(o).some(k => /^it[A-Z]/.test(k));
   const nenhumItem = colunasItem && !String(o.pacote || "").trim() && !itensMarcados(o).length;
   if (semItem(o.pacote) || semItem(o.tamanho) || naoVai || nenhumItem) {
-    d.__falta = d.__falta.filter(f => !/^(pacote|tamanho)/.test(f));
+    d.__aviso = d.__aviso.filter(f => !/^(pacote|tamanho)/.test(f));
     const nada = { pacote: [], valor: 0, contratoZerado: true, tamanho: "", menosLonga: false };
     return Object.assign(d, { naoParticipa: true, soPaspatur: false }, nada);
   }
@@ -110,7 +112,7 @@ export function paraDocAluguel(o, ext) {
   if (kit) {
     d.pacote = kit.itens.slice();
     if (d.pacote.includes("pelerine")) Object.assign(d, { becaTipo: "pelerineAzul", tamanho: "", menosLonga: false });
-    d.__falta = d.__falta.filter(f => !/^pacote/.test(f));
+    d.__aviso = d.__aviso.filter(f => !/^pacote/.test(f));
     if (!String(o.valor || "").trim()) {
       d.valor = Number(kit.valor) || 0;
       d.contratoZerado = !d.valor;
@@ -130,18 +132,24 @@ function docAluguel(o, ext) {
   const t = lerTamanho(o.tamanho);
   const codigo = idDaPlanilha(o.codigo, ext.ano, ext.inst);
   const falta = [];
+  // (17/11/2026) todo aluno da planilha entra (pode querer só o Paspatur ou só um kit): o que não bate vira
+  // aviso ("Entram, mas confira") e se acerta depois no aluno; só a instituição impede de gravar
+  const aviso = [];
   if (!ext.instId) falta.push("instituição (escolha acima)");
+  if (!String(o.turma == null ? "" : o.turma).trim()) aviso.push("sem turma (ex.: 901)");
   // "Beca pelerine azul" (no Tamanho ou no Pacote): pelerine, tamanho único
   const peler = /peler/i.test(String(o.tamanho || "") + " " + String(o.pacote || ""));
-  if (String(o.tamanho || "").trim() && !t.tamanho && !peler) falta.push(`tamanho “${o.tamanho}” não reconhecido`);
-  if (String(o.pacote || "").trim() && !lerPacote(o.pacote).length) falta.push(`pacote: kit “${o.pacote}” não está nos kits deste colégio`);
+  if (String(o.tamanho || "").trim() && !t.tamanho && !peler) aviso.push(`tamanho “${o.tamanho}” não reconhecido`);
+  if (String(o.pacote || "").trim() && !lerPacote(o.pacote).length) aviso.push(`pacote: kit “${o.pacote}” não está nos kits deste colégio`);
   const d = {
     __falta: falta,
+    __aviso: aviso,
     instId: ext.instId || "",
     instNome: ext.instNome || "",
     respEmail: ext.respEmail || "", // quem fechou o contrato do colégio (cada um vê os seus)
     ano: Number(ext.ano) || new Date().getFullYear(),
-    serie: String(o.serie || "").trim(),
+    serie: String(o.serie || "").trim() || serieDaTurma(o.turma),
+    turma: String(o.turma == null ? "" : o.turma).trim(),
     nome: String(o.nome || "").trim(),
     nomeBusca: U.chave(o.nome),
     codigo,
