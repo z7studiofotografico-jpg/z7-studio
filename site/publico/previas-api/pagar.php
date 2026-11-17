@@ -20,13 +20,17 @@ $volta = 'https://z7studio.com.br/previa/?c=' . $codigo . '&pago=1';
 $aviso = 'https://z7studio.com.br/previas-api/pago.php';
 $base = ['handle' => Z7_INFINITE_TAG, 'order_nsu' => $nsu, 'redirect_url' => $volta, 'webhook_url' => $aviso];
 
+// parcelas sem juros que você escolheu no app para este colégio ("até 5x sem juros" no texto do cartão):
+// dessas para cima, os juros ficam por conta de quem paga
+$semJuros = preg_match('/(\d{1,2})\s*x\s*sem juros/i', (string) ($d['cartao'] ?? ''), $pm) ? max(1, min(12, (int) $pm[1])) : 1;
 $r = null;
-// com a chave da API: um link só, no valor do cartão, com o desconto do Pix (a pessoa escolhe lá)
-if (defined('Z7_INFINITE_KEY') && $cartao > $pix) {
-  $pct = round((1 - $pix / $cartao) * 100, 2);
+// com a chave da API: um link só, no valor do cartão, com o desconto do Pix e as parcelas sem juros do app
+if (defined('Z7_INFINITE_KEY')) {
+  $opcoes = ['assured_installments' => $semJuros];
+  if ($cartao > $pix) $opcoes['discounts'] = ['pix' => round((1 - $pix / $cartao) * 100, 2)];
   [$st, $r] = z7_json_post(Z7_API_INFINITE . '/links', $base + [
     'items' => [['quantity' => 1, 'price' => $cartao, 'description' => $desc]],
-    'options' => ['discounts' => ['pix' => $pct]],
+    'options' => $opcoes,
   ], true);
   if ($st >= 300 || empty($r['url'])) $r = null; // se recusar, faz o link simples abaixo
 }
