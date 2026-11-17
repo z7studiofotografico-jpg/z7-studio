@@ -59,7 +59,7 @@ export const mensagemLink = (it, codigo) =>
 export async function mandarLinkPrevia(C, it, r, o = {}) {
   const FS = C.FS;
   const d = dadosLink(it, r, o.precoTxt, C.me, new Date(), o.cartaoTxt);
-  if (!d.fotos.length) return U.toast("Este aluno ainda não tem fotos no Drive.");
+  if (!d.fotos.length) return U.toast("Este aluno ainda não tem prévia.");
   let codigo = it.linkPrevia;
   if (codigo) {
     // já tem link: atualiza as fotos e o preço, e renova o prazo de 30 dias (os números de visitas continuam)

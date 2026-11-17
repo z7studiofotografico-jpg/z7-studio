@@ -177,7 +177,9 @@ export const SITE_PREVIAS = "https://z7studio.com.br/previas";
 // link da miniatura do Drive ("…=s220") no tamanho pedido (lado maior em pixels)
 export const miniaturaGrande = (link, lado) => String(link).replace(/=s\d+(-c)?$/, "") + "=s" + Math.round(lado);
 // acesso = a chave do Google (texto) ou uma função que devolve o token da conta Google da pessoa (pasta fechada)
-export function criarDrive(acesso, buscar = fetch) {
+// site = { listar(id), nome(id) }: a lista das pastas guardada no site (17/11/2026); o Google só é chamado quando a
+// pasta ainda não está lá
+export function criarDrive(acesso, buscar = fetch, site = null) {
   const cache = {};
   const comToken = typeof acesso === "function";
   const pedir = async (url, o = {}) =>
@@ -186,6 +188,10 @@ export function criarDrive(acesso, buscar = fetch) {
       : buscar(url + (url.includes("?") ? "&" : "?") + "key=" + acesso, o);
   async function listar(pai) {
     if (cache[pai]) return cache[pai];
+    if (site) {
+      const x = await site.listar(pai).catch(() => null);
+      if (x) return (cache[pai] = x);
+    }
     let out = [],
       token = "";
     do {
@@ -214,6 +220,7 @@ export function criarDrive(acesso, buscar = fetch) {
     return (cache[pai] = out);
   }
   async function nomeDe(id) {
+    if (site && site.nome(id)) return site.nome(id);
     const r = await pedir(`${API}/${id}?fields=name&supportsAllDrives=true`);
     return r.ok ? (await r.json()).name || "" : "";
   }

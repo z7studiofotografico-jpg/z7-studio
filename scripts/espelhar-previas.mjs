@@ -4,6 +4,8 @@
 // O nome é o id do arquivo no Drive (33 letras e números ao acaso): ninguém adivinha a foto de outro aluno, e a
 // pasta não lista os arquivos (.htaccess). Só copia o que é novo ou mudou (previas/indice.json guarda o que já foi).
 // Precisa: FIREBASE_SERVICE_ACCOUNT (lê a pasta do Drive em config/app), FTP_HOST, FTP_USER, FTP_PASS.
+// 17/11/2026: grava também a lista das pastas (quem é quem) em previas/drive/, para o app achar as prévias antigas
+// só pelo site, sem perguntar ao Google Drive (previas-api/drive.php entrega essa lista à equipe logada).
 // SIMULAR=true só conta o que copiaria. LIMITE = máximo de fotos por vez (o resto vai na próxima noite).
 import { readFileSync } from "node:fs";
 import { Readable, Writable } from "node:stream";
@@ -42,9 +44,14 @@ async function drive(url, tentativas = 4) {
     await new Promise(res => setTimeout(res, 2000 * 2 ** i));
   }
 }
+// o que tem em cada pasta (pastas e fotos), para a lista que vai para o site
+const pastas = {},
+  paiDe = {},
+  nomes = {};
 // todas as imagens da pasta e das subpastas
 async function listar(raiz) {
   const fotos = [];
+  pastas[raiz] = pastas[raiz] || [];
   const fila = [raiz];
   while (fila.length) {
     const pai = fila.shift();
@@ -58,8 +65,14 @@ async function listar(raiz) {
       if (!r.ok) throw new Error(`Drive recusou a lista (${r.status}): ${(await r.text()).slice(0, 200)}`);
       const j = await r.json();
       for (const f of j.files || []) {
-        if (f.mimeType === "application/vnd.google-apps.folder") fila.push(f.id);
-        else if (/^image\/(jpeg|png|webp)$/.test(f.mimeType)) fotos.push(f);
+        const pasta = f.mimeType === "application/vnd.google-apps.folder";
+        if (pasta) {
+          fila.push(f.id);
+          pastas[f.id] = pastas[f.id] || [];
+          paiDe[f.id] = pai;
+          nomes[f.id] = f.name;
+        } else if (/^image\/(jpeg|png|webp)$/.test(f.mimeType)) fotos.push(f);
+        if (pasta || /^image\/(jpeg|png|webp)$/.test(f.mimeType)) pastas[pai].push({ id: f.id, name: f.name, mimeType: f.mimeType });
       }
       token = j.nextPageToken || "";
     } while (token);
@@ -190,5 +203,48 @@ if (!SIMULAR) {
     fim.close();
   }
   console.log(`Copiadas: ${ok} · com erro: ${erro} · faltam: ${Math.max(0, novas.length - ok - erro)} (vão na próxima vez)`);
+}
+if (!SIMULAR) await gravarListas(raiz);
+
+// A lista das pastas no site, em pedaços: "topo" (a pasta das prévias e as pastas por ano) e um arquivo por colégio
+// (a pasta do colégio e as dos alunos dentro). mapa.json diz em qual arquivo está cada pasta.
+// Só sobe o pedaço que mudou (hashes.json guarda a impressão de cada um).
+async function gravarListas(raiz) {
+  const { createHash } = await import("node:crypto");
+  const ehAno = n => /^pr[ée]vias(\s+20\d\d)?$/i.test(String(n || "").trim());
+  const topo = new Set([raiz, ...Object.keys(pastas).filter(id => paiDe[id] === raiz && ehAno(nomes[id]))]);
+  const grupoDe = id => {
+    if (topo.has(id)) return "topo";
+    let x = id;
+    while (paiDe[x] && !topo.has(paiDe[x])) x = paiDe[x];
+    return x;
+  };
+  const grupos = {},
+    mapa = {};
+  for (const id of Object.keys(pastas)) {
+    const g = grupoDe(id);
+    mapa[id] = g;
+    (grupos[g] = grupos[g] || { pastas: {}, nomes: {} }).pastas[id] = pastas[id].slice().sort((a, b) => (a.name < b.name ? -1 : a.name > b.name ? 1 : 0));
+    grupos[g].nomes[id] = nomes[id] || "";
+  }
+  const c = new Client(60000);
+  await c.access({ host: process.env.FTP_HOST, user: process.env.FTP_USER, password: process.env.FTP_PASS, secure: false });
+  const raizFtp = (await c.list()).some(x => x.name === "public_html") ? "public_html/previas" : "previas";
+  await c.ensureDir(raizFtp + "/drive");
+  await c.uploadFrom(Readable.from([Buffer.from("Require all denied\n")]), ".htaccess");
+  const antes = JSON.parse((await lerTexto(c, "hashes.json")) || "{}");
+  const depois = {};
+  let subiram = 0;
+  for (const [g, d] of Object.entries(grupos)) {
+    const txt = JSON.stringify(d);
+    depois[g] = createHash("sha1").update(txt).digest("hex");
+    if (antes[g] === depois[g]) continue;
+    await c.uploadFrom(Readable.from([Buffer.from(txt)]), g + ".json");
+    subiram++;
+  }
+  await c.uploadFrom(Readable.from([Buffer.from(JSON.stringify({ raiz, mapa }))]), "mapa.json");
+  await c.uploadFrom(Readable.from([Buffer.from(JSON.stringify(depois))]), "hashes.json");
+  c.close();
+  console.log(`Lista das pastas no site: ${Object.keys(grupos).length} pedaços (${subiram} atualizados)`);
 }
 ftp.close();

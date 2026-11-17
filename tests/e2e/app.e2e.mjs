@@ -3289,6 +3289,63 @@ await cenario("Juntar colégio que veio errado da planilha (G e M → C.E. Rober
   ok(!ops.some(o => /Roberto Lyra/.test(o)), "a lista do lote já não mostra o colégio excluído");
   ok(!erros.length, "sem erros" + (erros.length ? ": " + erros.join(" | ") : ""));
 });
+await cenario("Fotos do aluno pela lista guardada no site (sem chamar o Google Drive)", async () => {
+  const Y = new Date().getFullYear();
+  const F = "application/vnd.google-apps.folder";
+  const grupo = {
+    pastas: {
+      col1: [
+        { id: "folha1", name: "CEYMS 02 - DOMINGOS JOSE.jpg", mimeType: "image/jpeg" },
+        { id: "pasta1", name: "CEYMS 02 - DOMINGOS JOSE", mimeType: F }
+      ],
+      pasta1: [1, 2, 3].map(n => ({ id: "foto" + n, name: `CEYMS 02 - DOMINGOS JOSE - foto 0${n}.jpg`, mimeType: "image/jpeg" }))
+    },
+    nomes: { col1: `Prévias - ${Y} - C.E. YONNE MARIA SIQUEIRA` }
+  };
+  const topo = { pastas: { RAIZ123456789: [{ id: "col1", name: `Prévias - ${Y} - C.E. YONNE MARIA SIQUEIRA`, mimeType: F }] }, nomes: {} };
+  const d = Object.assign({}, base, {
+    "config/app": Object.assign({}, base["config/app"] || {}, {
+      drivePrevias: "https://drive.google.com/drive/folders/RAIZ123456789?usp=sharing"
+    }),
+    "repasse/dj": {
+      nome: "DOMINGOS JOSE",
+      nomeBusca: "DOMINGOS JOSE",
+      escola: "C.E YONNE MARIA SIQUEIRA DE ANDRADE",
+      ano: Y,
+      codigoOrig: "02",
+      etapa: "SEPARADO",
+      resp: "Adriano Vinicius",
+      respEmail: ADRIANO,
+      separadoEm: dia(0),
+      separadoSeg: "lf",
+      followup: dia(0),
+      contatos: [{ tipo: "Mãe", nome: "Mãe", tel: "21999990000" }],
+      telefones: ["21999990000"]
+    }
+  });
+  const { pg, erros, ctx } = await abrir(ADRIANO, d);
+  let google = 0;
+  const h = { "access-control-allow-origin": "*" };
+  await ctx.route(/googleapis\.com\/drive/, rt => (google++, rt.fulfill({ status: 500, body: "" })));
+  await ctx.route(/z7studio\.com\.br\/previas\/[^/]+\.jpg/, rt =>
+    rt.fulfill({ path: AQUI + "../../icons/icon-192.png", contentType: "image/png", headers: h })
+  );
+  await ctx.route(/z7studio\.com\.br\/previas-api\//, rt => {
+    const u = rt.request().url();
+    if (/lista\.php/.test(u)) return rt.fulfill({ contentType: "application/json", headers: h, body: JSON.stringify({ alunos: {} }) });
+    const id = new URL(u).searchParams.get("id");
+    const g = id === "RAIZ123456789" ? topo : grupo.pastas[id] ? grupo : null;
+    return g
+      ? rt.fulfill({ contentType: "application/json", headers: h, body: JSON.stringify(g) })
+      : rt.fulfill({ status: 404, contentType: "application/json", headers: h, body: "{}" });
+  });
+  await ir(pg, "#pr");
+  await pg.locator("article", { hasText: "DOMINGOS JOSE" }).first().getByRole("button", { name: "🖼️ Fotos do aluno" }).click();
+  await pg.waitForFunction(() => document.querySelectorAll(".fotos-grade .foto-item img").length === 3, null, { timeout: 8000 });
+  ok(google === 0, "acha a folha e as 3 fotos só pelo site, sem chamar o Google Drive");
+  ok(!/Google Drive/.test(await pg.locator(".sheet:visible").last().textContent()), "a tela não fala mais em Google Drive");
+  ok(!erros.length, "sem erros" + (erros.length ? ": " + erros.join(" | ") : ""));
+});
 await cenario("Fotos do aluno direto do Google Drive", async () => {
   const Y = new Date().getFullYear();
   const F = "application/vnd.google-apps.folder";

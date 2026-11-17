@@ -37,7 +37,7 @@ export function abrirConferirFotos(C, colNome = "repasse") {
         el(
           "p",
           "hint",
-          "Compara os alunos do app com as prévias do Google Drive. Sem foto e já comprou é normal (o gerador pula quem comprou). " +
+          "Compara os alunos do app com as prévias (as do site e as antigas). Sem foto e já comprou é normal (o gerador pula quem comprou). " +
             "Quem falta gerar tem o botão 📤 Enviar foto: escolha as fotos do aluno no computador e o app grava a prévia na pasta do colégio."
         )
       );
@@ -144,7 +144,7 @@ export function abrirConferirFotos(C, colNome = "repasse") {
         } catch (e) {
           console.warn("[Z7] conferir fotos", e);
           info.className = "wait";
-          info.textContent = (e && e.message) || "Não consegui ler o Google Drive agora.";
+          info.textContent = (e && e.message) || "Não consegui conferir as prévias agora. Verifique a internet e tente de novo.";
         } finally {
           ir.disabled = selAno.disabled = selCol.disabled = false;
           parar.hidden = true;

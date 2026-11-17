@@ -254,7 +254,23 @@ export function desenharProximo(box, it, escolhido, blocked, li) {
   const pixVal = segDe(it) === "lf" ? P.lfPix || P.kitPreco : ultimaOferta ? P.kitFinal : P.kitPromo || P.kitPreco;
   const link = ultima ? P.linkCartaoFinal : segDe(it) === "lf" ? P.linkCartaoLF || P.linkCartao : P.linkCartao;
   const valCartao = ultima ? P.kitFinal : segDe(it) === "lf" ? P.lfCartao : P.kitCartao;
-  if (it.etapa === "INTERESSADO" && link && d) {
+  // 17/11/2026: com o link da prévia, o pagamento é pela página do site (Pix ou cartão na InfinitePay): a visita
+  // conta para o site e o aluno vira Pago sozinho. Sem o link da prévia, continua o link fixo da InfinitePay.
+  if (it.etapa === "INTERESSADO" && it.linkPrevia && d) {
+    const pc = parcDe(it);
+    const lm =
+      `Para pagar, é só abrir a página das fotos e tocar em *Pagar*` +
+      (pixVal || valCartao
+        ? ` (${[pixVal ? U.money(pixVal) + " no Pix" : "", valCartao ? U.money(valCartao) + " no cartão, " + parcTxt(pc) : ""].filter(Boolean).join(" ou ")})`
+        : "") +
+      `:\nhttps://z7studio.com.br/previa/?c=${it.linkPrevia}\nO pagamento é pela InfinitePay, seguro, e a confirmação chega para a gente na hora 😊`;
+    const a2 = el("a", "btn btn-sm", "💳 Mandar link de pagamento");
+    a2.title = "Manda a página das fotos no site, com o botão de pagar";
+    a2.href = "https://wa.me/" + d + "?text=" + encodeURIComponent(lm);
+    a2.target = "_blank";
+    a2.rel = "noopener";
+    row.append(a2);
+  } else if (it.etapa === "INTERESSADO" && link && d) {
     const pc = parcDe(it);
     const lm = `Para pagar no cartão${valCartao ? ` (${U.money(valCartao)}, ${parcTxt(pc)})` : ` (${parcTxt(pc)})`}, é só usar este link seguro da InfinitePay:\n${link}\nDepois me manda o comprovante por aqui 😊${pixCod ? " Se preferir Pix, é só me avisar que te mando o código." : C.P.pix ? ` No Pix${pixVal ? ` (${U.money(pixVal)})` : ""}, a chave é ${C.P.pix}.` : ""}`;
     const a2 = el("a", "btn btn-sm", ultima ? "💳 Link da última oferta" : "💳 Mandar link de pagamento");

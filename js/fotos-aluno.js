@@ -6,6 +6,7 @@ import { criarDrive, idDaPasta, pastaDoColegio } from "./drive-fotos.js";
 import { openMockup } from "./mockup.js";
 import { contatoAtual } from "./repasse-estado.js";
 import { fotosDoAlunoNoSite, esquecerSite, apagarDoSite } from "./site-previas.js";
+import { fonteSite, tirarDoSite, esquecerDriveSite } from "./drive-site.js";
 
 // 17/11/2026: as prévias novas ficam no site; as antigas, no Google Drive. Procura primeiro no site.
 // (se o admin trocou as fotos para outra pasta do Drive, vale a troca)
@@ -66,7 +67,7 @@ export function abrirDrive(C) {
   const cliente = leComConta(C) ? C.P.driveCliente : "";
   const k = cliente ? "oauth:" + cliente : C.P.driveChave || ((self.Z7_CONFIG || {}).firebase || {}).apiKey || "";
   if (!drive || chaveUsada !== k) {
-    drive = criarDrive(cliente ? () => tokenGoogle(cliente, C.email) : k, (u, o) => fetch(u, o));
+    drive = criarDrive(cliente ? () => tokenGoogle(cliente, C.email) : k, (u, o) => fetch(u, o), fonteSite(C));
     chaveUsada = k;
   }
   return drive;
@@ -91,6 +92,7 @@ export function esquecerListas() {
   if (drive) drive.esquecer();
   if (driveEscrita) driveEscrita.esquecer();
   esquecerSite();
+  esquecerDriveSite();
 }
 const NOMES = ["Quadro", "Porta-retratos 1", "Porta-retratos 2"];
 const NOMES_PAS = ["Direita", "Esquerda", "Pequenas", "Tirinha", "Calendário"];
@@ -118,7 +120,7 @@ export function abrirFotosDoAluno(C, it, precoTxt, cartaoTxt = "") {
       );
       return;
     }
-    const info = el("p", "hint", "Procurando as fotos no Google Drive…");
+    const info = el("p", "hint", "Procurando as fotos…");
     p.append(info);
     const D = abrirDrive(C);
     let r;
@@ -126,7 +128,7 @@ export function abrirFotosDoAluno(C, it, precoTxt, cartaoTxt = "") {
       r = await fotosDoAlunoTudo(C, D, raiz, it);
     } catch (e) {
       info.className = "wait";
-      info.textContent = e.message || "Não consegui ler o Google Drive agora.";
+      info.textContent = e.message || "Não consegui procurar as fotos agora. Verifique a internet e tente de novo.";
       p.append(U.mkBtn("Fechar", "", close));
       return;
     }
@@ -295,12 +297,34 @@ export async function excluirFoto(C, it, f, rot, o = {}) {
   const { confirmar } = await import("./confirmar.js");
   const sim = await confirmar(
     `Excluir ${/^\d+$/.test(rot) ? "a foto " + rot : "a " + rot.toLowerCase()} de ${U.first(title(it.nome || ""))}?`,
-    "A foto vai para a lixeira do Google Drive (dá para recuperar por 30 dias) e não aparece mais para o aluno.",
+    "A foto não aparece mais para o aluno.",
     { sim: "Sim, excluir", nao: "Cancelar", perigo: true }
   );
   if (!sim) return false;
   if (f.site) {
     U.toast("Esta prévia está no site: para mudar, use “🔄 Trocar as fotos”.");
+    return false;
+  }
+  // prévia antiga guardada no site: só sai da lista (o Google Drive não precisa entrar)
+  try {
+    if (await tirarDoSite(C, f.id)) {
+      abrirDrive(C).esquecer();
+      jaBaixadas.delete(f.id);
+      const msg = "Foto excluída ✅";
+      if (o.salvar)
+        await o.salvar(
+          {
+            fotosExcluidas: (it.fotosExcluidas || [])
+              .concat([{ nome: f.name || rot, por: C.me || "", porEmail: C.email || "", em: new Date().toISOString() }])
+              .slice(-50)
+          },
+          msg
+        );
+      else U.toast(msg);
+      return true;
+    }
+  } catch (e) {
+    U.toast(e.message || "Não consegui excluir a foto agora.");
     return false;
   }
   const D = abrirDriveEscrita(C);
@@ -343,7 +367,7 @@ export async function miniaturasDoAluno(C, it, box, o = {}) {
     box.append(el("p", "hint", "Para ver as fotos do Drive aqui, o administrador liga a pasta das prévias em ⚙️ Ajustes."));
     return;
   }
-  const info = el("p", "hint", "Procurando as fotos no Google Drive…");
+  const info = el("p", "hint", "Procurando as fotos…");
   box.append(info);
   const acoes = el("div", "actions");
   // trocar e enviar fotos: só o administrador
@@ -353,7 +377,7 @@ export async function miniaturasDoAluno(C, it, box, o = {}) {
     r = await fotosDoAlunoTudo(C, abrirDrive(C), raiz, it);
   } catch (e) {
     info.className = "wait";
-    info.textContent = e.message || "Não consegui ler o Google Drive agora.";
+    info.textContent = e.message || "Não consegui procurar as fotos agora. Verifique a internet e tente de novo.";
     return;
   }
   if (r.erro) {
@@ -469,7 +493,7 @@ export function trocarFotos(C, it, salvar) {
         })
       );
     });
-    const info = el("p", "hint", "Lendo as pastas do Drive…");
+    const info = el("p", "hint", "Lendo as pastas das prévias…");
     p.append(info);
     let colegios = [];
     try {
@@ -477,7 +501,7 @@ export function trocarFotos(C, it, salvar) {
       if (!colegios.length) colegios = [{ id: raiz, name: await D.nomeDe(raiz) }];
     } catch (e) {
       info.className = "wait";
-      info.textContent = e.message || "Não consegui ler o Google Drive agora.";
+      info.textContent = e.message || "Não consegui procurar as fotos agora. Verifique a internet e tente de novo.";
       p.append(U.mkBtn("Fechar", "", close));
       return;
     }
