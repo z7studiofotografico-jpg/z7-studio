@@ -163,7 +163,7 @@ function previa(box, it) {
   box.append(g);
   // as fotos do aluno no Drive, em miniatura (tocar amplia), com "🔄 Trocar as fotos"
   const fotos = el("div", "ja-fotos");
-  box.append(el("h3", null, "Fotos do aluno no Drive"));
+  box.append(el("h3", null, "Fotos do aluno"));
   if (it.linkPrevia) box.append(linhaVisitas(C, it)); // quantas vezes a família abriu o link da prévia
   box.append(fotos);
   const o = {

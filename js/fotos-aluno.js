@@ -559,7 +559,7 @@ export function trocarFotos(C, it, salvar) {
     };
     sCol.onchange = carregar;
     busca.oninput = pintar;
-    p.append(field("Colégio no Drive", sCol), busca, lista, err);
+    p.append(field("Colégio (pasta das prévias)", sCol), busca, lista, err);
     const acoes = el("div", "panel-actions");
     acoes.append(
       U.mkBtn("Cancelar", "", close),
