@@ -29,10 +29,25 @@ function escolher(sel, valor) {
   sel.dispatchEvent(new Event("change", { bubbles: true }));
 }
 
+// 17/11/2026: lista de colégio ou instituição ganha o campo mesmo curta (todo lugar que escolhe o colégio)
+const COLEGIO = /col[ée]gio|institui|escola|faculdade/i;
+export function ehDeColegio(sel) {
+  const rotulos = [sel.getAttribute("aria-label"), sel.id, sel.name, sel.options[0] && sel.options[0].textContent];
+  (sel.labels ? [...sel.labels] : []).forEach(l => rotulos.push(l.textContent));
+  const campo = sel.closest(".field, label");
+  if (campo) {
+    const l = campo.tagName === "LABEL" ? campo : campo.querySelector("label");
+    if (l) rotulos.push(l.textContent);
+  }
+  const ant = sel.previousElementSibling;
+  if (ant && /^(LABEL|SPAN|B|SMALL|H\d)$/.test(ant.tagName)) rotulos.push(ant.textContent);
+  return rotulos.some(t => COLEGIO.test(String(t || "")));
+}
+
 function enfeitar(sel) {
   if (!sel) return;
   if (sel.dataset.busca || sel.multiple || sel.dataset.semBusca !== undefined) return;
-  if (sel.options.length < MINIMO) return;
+  if (sel.options.length < MINIMO && !(sel.options.length >= 2 && ehDeColegio(sel))) return;
   sel.dataset.busca = "1";
   const caixa = document.createElement("div");
   caixa.className = "sel-busca";
