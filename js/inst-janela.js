@@ -173,6 +173,19 @@ async function alunos(box, it, C, fechar) {
             irParaAlunos(C, { formatura: k === "formatura", seg: segPR, valor: g.valor, rotulo: g.rotulo }, fechar)
           )
         );
+      // admin, no computador: as prévias do colégio inteiro direto no site, já ligadas aos alunos deste ano
+      if (C.isAdmin)
+        linha.append(
+          U.mkBtn("📤 Enviar prévias para o site", "btn-sm", () =>
+            import("./previas-lote.js")
+              .then(m =>
+                m.abrirPreviasLote(C, {
+                  site: { colNome: k === "formatura" ? "formaturaAlunos" : "repasse", col: { nome: g.nome || it.nome, ano: g.ano } }
+                })
+              )
+              .catch(e => C.handleErr(e))
+          )
+        );
       lista.append(linha);
       n++;
     });

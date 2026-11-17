@@ -25,6 +25,8 @@ const SHELL = [
   "./js/cep.js",
   "./js/enviar-foto.js",
   "./js/site-previas.js",
+  "./js/previas-site-lote.js",
+  "./js/pagamentos-site.js",
   "./js/conferir-fotos.js",
   "./js/backup.js",
   "./js/confirmar.js",

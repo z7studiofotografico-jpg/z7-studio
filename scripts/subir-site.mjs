@@ -26,4 +26,13 @@ for (const a of arquivos) {
   await ftp.uploadFrom(path.join(RAIZ, a), path.basename(a));
   console.log("Subiu:", a);
 }
+// a chave da API da InfinitePay (segredo do GitHub INFINITEPAY_KEY, opcional): vai só para o site, nunca para o repositório
+if (process.env.INFINITEPAY_KEY) {
+  const { Readable } = await import("node:stream");
+  const k = process.env.INFINITEPAY_KEY.replace(/[^A-Za-z0-9._-]/g, "");
+  await ftp.cd(raizSite);
+  await ftp.ensureDir("previas-api");
+  await ftp.uploadFrom(Readable.from([Buffer.from(`<?php\nconst Z7_INFINITE_KEY = '${k}';\n`)]), "segredo.php");
+  console.log("Subiu: previas-api/segredo.php (chave da InfinitePay)");
+}
 ftp.close();

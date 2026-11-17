@@ -2873,16 +2873,31 @@ await cenario("Para hoje de cada um · botão da pessoa · atividades da equipe"
   );
   ok(!erros.length, "sem erros (aviso)" + (erros.length ? ": " + erros.join(" | ") : ""));
 });
-await cenario("Prévias de um colégio (lote, no computador)", async () => {
-  // MARIA já comprou (PAGO no app): não precisa de prévia; JOAO ainda vai ser trabalhado
-  const { pg, erros } = await abrir(
+await cenario("Prévias do colégio inteiro direto no site (janela do colégio)", async () => {
+  // MARIA já comprou (PAGO no app): não precisa de prévia; JOAO e PEDRO vão; a pasta 04 não tem aluno no app
+  const { pg, erros, ctx } = await abrir(
     ADRIANO,
     Object.assign({}, base, {
       "config/repasse_meta": { escolas: { "C.E. TESTE": 2 }, anos: { 2026: 2 }, escolasAno: { "C.E. TESTE|2026": 2 } },
       "repasse/t1": { nome: "MARIA", escola: "C.E. TESTE", ano: 2026, etapa: "PAGO", valor: 297, pagoEm: "2026-10-01" },
-      "repasse/t2": { nome: "JOAO", escola: "C.E. TESTE", ano: 2026, etapa: "NA FILA" }
+      "repasse/t2": { nome: "JOAO", escola: "C.E. TESTE", ano: 2026, etapa: "NA FILA" },
+      "repasse/t3": { nome: "PEDRO", escola: "C.E. TESTE", ano: 2026, etapa: "NA FILA" },
+      "instituicoes/ct": { nome: "C.E. TESTE", tipo: "publico", etapa: "FECHADO", contatos: [], visitas: [] }
     })
   );
+  // o site (previas-api): guarda cada envio (aluno · tipo)
+  const envios = [];
+  await ctx.route(/z7studio\.com\.br\/previas-api\//, async rt => {
+    const q = rt.request();
+    const h = { "access-control-allow-origin": "*" };
+    if (/enviar\.php/.test(q.url())) {
+      const corpo = q.postDataBuffer().toString("latin1");
+      const campo = k => (corpo.match(new RegExp('name="' + k + '"\\r\\n\\r\\n([^\\r]*)')) || [])[1] || "";
+      envios.push(campo("chave") + ":" + campo("tipo"));
+      return rt.fulfill({ contentType: "application/json", headers: h, body: JSON.stringify({ url: "https://z7studio.com.br/x.jpg" }) });
+    }
+    return rt.fulfill({ contentType: "application/json", headers: h, body: JSON.stringify({ alunos: {} }) });
+  });
   await pg.evaluate(async () => {
     // fotos de verdade (geradas aqui) e pastas falsas no formato do Chrome (showDirectoryPicker)
     const foto = async cor => {
@@ -2918,7 +2933,8 @@ await cenario("Prévias de um colégio (lote, no computador)", async () => {
             return foto("#999");
           }
         }
-      ])
+      ]),
+      pasta("04 - SEM CADASTRO", [await arq("1.jpg", "#3cc")])
     ]);
     window.__gravados = {};
     window.__falha = true;
@@ -2941,13 +2957,17 @@ await cenario("Prévias de um colégio (lote, no computador)", async () => {
       }
     });
     const destino = dirFalso("");
-    const fila = [origem, destino];
+    const fila = [origem, destino]; // (no modo site, o destino não é pedido)
     window.showDirectoryPicker = async () => fila.shift();
   });
-  // (12/11/2026: as prévias ficam no ➕ Cadastrar aluno, em Fotos; estas pastas não têm ficha na 1ª foto)
-  await ir(pg, "#home");
-  await pg.locator("#tileCadastrar").click();
-  await pg.locator(".sheet .cad-fotos").getByRole("button", { name: "🗂️ Prévias de um colégio" }).click();
+  // (17/11/2026: as prévias vão pela janela do colégio, aba Alunos; estas pastas não têm ficha na 1ª foto)
+  await ir(pg, "#inst-publico");
+  await calmo(pg);
+  await pg.locator("#iChips").getByText("Todas").click();
+  await pg.locator("#iList button.lc-linha").filter({ hasText: /Teste/i }).click();
+  const jan = pg.locator(".janela-aluno");
+  await jan.locator(".ja-abas").getByText("Alunos").click();
+  await jan.getByRole("button", { name: "📤 Enviar prévias para o site" }).click();
   await pg
     .locator(".sheet:visible")
     .last()
@@ -2957,17 +2977,13 @@ await cenario("Prévias de um colégio (lote, no computador)", async () => {
   await pg.waitForFunction(() => /Pronto!/.test(document.querySelector(".sheet:last-of-type")?.textContent || ""), null, {
     timeout: 15000
   });
-  const g = await pg.evaluate(() => window.__gravados);
-  const nomes = Object.keys(g).sort();
-  const P = "Prévias - C.E. TESTE 2026/";
   ok(
-    [P + "02 - JOAO.jpg", P + "02 - JOAO/02 - JOAO - foto 01.jpg"].every(n => nomes.includes(n)) &&
-      nomes.length === 2 &&
-      Object.values(g).every(t => t > 3000 && t < 600000),
-    "só quem vai ser trabalhado (quem já comprou fica de fora): folha e fotos separadas numeradas: " + nomes.join(" | ")
+    envios.join() === "JOAO:foto,JOAO:folha" && !Object.keys(await pg.evaluate(() => window.__gravados)).length,
+    "só quem vai ser trabalhado vai para o site (fotos numeradas e folha), nada no computador: " + envios.join()
   );
   const fim = await pg.locator(".sheet:last-of-type").textContent();
-  ok(/1 de 3 ficaram de fora/.test(fim), "avisa quantos ficaram de fora");
+  ok(/1 de 4 ficaram de fora/.test(fim), "avisa quantos ficaram de fora");
+  ok(/1 pasta sem aluno no app \(não enviada\): 04 - SEM CADASTRO/.test(fim), "avisa a pasta que não tem aluno no app");
   ok(
     /1 aluno com foto que não saiu/.test(fim) && /03 - PEDRO — 0 de 1 foto gerada/.test(fim) && /limite de 260 letras do Windows/.test(fim),
     "arquivo que não abre: lista o aluno, quantas fotos saíram e o motivo: " + fim.slice(-400)
@@ -2986,8 +3002,7 @@ await cenario("Prévias de um colégio (lote, no computador)", async () => {
   await pg.waitForFunction(() => /Tudo certo agora/.test(document.querySelector(".sheet:last-of-type")?.textContent || ""), null, {
     timeout: 15000
   });
-  const g2 = Object.keys(await pg.evaluate(() => window.__gravados));
-  ok(g2.includes(P + "03 - PEDRO.jpg") && g2.length === 4, "gera de novo só o que deu erro: " + g2.join(" | "));
+  ok(envios.slice(2).join() === "PEDRO:foto,PEDRO:folha", "gera de novo só o que deu erro: " + envios.join());
   ok(
     /Tentei de novo 1 aluno: 1 ficou completo/.test(await pg.locator(".sheet:last-of-type").textContent()) &&
       /geradas: 2 · não geradas: 0/.test(await pg.locator(".sheet:last-of-type").textContent()),

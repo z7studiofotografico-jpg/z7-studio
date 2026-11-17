@@ -137,6 +137,9 @@ function applyProfile() {
   }
   renderMe();
   if (me !== prev && !verComo) refreshPushToken();
+  // 💳 pagamentos do kit feitos pela página da prévia: o aluno vira Pago sozinho (só com o admin logado)
+  if (isAdmin && !/localhost|127\.0\.0\.1/.test(location.hostname))
+    import("./pagamentos-site.js").then(m => m.ligarPagamentosSite(ctx)).catch(e => console.warn("[Z7] pagamentos do site", e));
 }
 
 function handleErr(e) {

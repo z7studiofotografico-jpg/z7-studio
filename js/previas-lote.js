@@ -1,6 +1,7 @@
-// Prévias em lote (só admin, no computador): lê a pasta de um colégio no servidor (uma subpasta por aluno),
-// e grava numa pasta escolhida uma prévia por aluno: todas as fotos reduzidas, com marca d'água e o nome do aluno.
-// Nada sobe para a internet: depois é só arrastar a pasta de prévias para o Google Drive e compartilhar como Leitor.
+// Prévias em lote (só admin, no computador): lê a pasta de um colégio no servidor (uma subpasta por aluno) e faz
+// uma prévia por aluno: todas as fotos reduzidas, com marca d'água e o nome do aluno.
+// 17/11/2026: abre pela janela do colégio (aba Alunos, "📤 Enviar prévias para o site") e grava direto no site,
+// ligada ao aluno do app (previas-site-lote.js). A Importação (Agenda, botão azul) continua salvando no computador.
 // Precisa do Chrome ou Edge no computador (acesso a pastas). As fotos originais nunca são alteradas.
 import { el, sheet } from "./ui.js";
 import * as U from "./util.js";
@@ -10,6 +11,7 @@ import { acharAluno } from "./drive-fotos.js";
 import { chaveColegio } from "./historico-dados.js";
 import { gruposEscolas } from "./escolas-pr.js";
 import { nomeDaFoto } from "./foto-nome.js";
+import { ligarPastas, jaNoSite, pastaNoSite } from "./previas-site-lote.js";
 
 // Quem já comprou (venda no app ou "VENDIDO" na planilha) não precisa de prévia: só conta no Dashboard
 export const COMPROU = ["PAGO", "ENTREGUE"];
@@ -241,21 +243,21 @@ export function escolherPastaComum() {
     i.click();
   });
 }
-// o = { col: "repasse" | "paspatur" | "formaturaAlunos" | "auto" } (a lista onde procurar quem já comprou;
-//     "auto" = PR ou Formatura, o app escolhe pelo colégio da pasta)
+// o = { site: { colNome: "repasse" | "formaturaAlunos", col: { nome, ano } } } (janela do colégio: grava no site)
 //     livre: true (Agendamento → Importação): qualquer pasta; nomes dos alunos e das fotos ficam exatamente como estão
 export function abrirPreviasLote(C, o = {}) {
-  let colNome = o.col && o.col !== "auto" ? o.col : "repasse";
-  const auto = o.col === "auto",
-    livre = !!o.livre;
-  sheet(livre ? "📥 Importação · prévias de uma pasta" : "🖼️ Gerar prévias de um colégio", (p, close) => {
+  const site = !o.livre && o.site ? o.site : null,
+    livre = !site;
+  const colNome = (site && site.colNome) || "repasse";
+  const titSite = site ? `📤 Prévias para o site · ${site.col.nome}${site.col.ano ? " · " + site.col.ano : ""}` : "";
+  sheet(livre ? "📥 Importação · prévias de uma pasta" : titSite, (p, close) => {
     p.append(
       el(
         "p",
         "hint",
         livre
           ? "Só a conversão, no seu computador: coloque o colégio e a turma, escolha a pasta com as fotos (uma foto por aluno, com o nome do aluno no arquivo) e onde salvar. Sai a folha da turma, 20 alunos por página, com o nome e sobrenome embaixo de cada foto, marca d'água e o site no rodapé, pronta para mandar pelo WhatsApp. Os nomes ficam como estão nos arquivos. Nada vai para a internet."
-          : "No computador: escolha a pasta do colégio no servidor (com uma pasta por aluno) e depois a pasta onde salvar. Para cada aluno sai uma imagem leve (~200 KB) com todas as fotos dele, a marca d'água e o nome. Depois, arraste a pasta de prévias para o Google Drive e compartilhe com o representante como Leitor."
+          : "No computador: escolha a pasta do colégio no servidor (com uma pasta por aluno). Para cada aluno sai a folha com todas as fotos dele, a marca d'água e o nome, mais as fotos separadas e numeradas, e tudo vai direto para o site, já no aluno do app. O representante vê as fotos na hora."
       )
     );
     if (!window.showDirectoryPicker) {
@@ -270,7 +272,12 @@ export function abrirPreviasLote(C, o = {}) {
       separadas,
       document.createTextNode(" Também salvar as fotos separadas, numeradas (para montar o quadro e os porta-retratos)")
     );
-    p.append(lSep);
+    if (livre) p.append(lSep);
+    // quem já tem prévia no site fica de fora, a não ser que marque para enviar de novo
+    const deNovo = el("input");
+    deNovo.type = "checkbox";
+    const lNovo = el("label", "chk");
+    lNovo.append(deNovo, document.createTextNode(" Enviar de novo quem já tem prévia no site (substitui as fotos)"));
     // só quem vai ser trabalhado: quem já comprou fica de fora (o sistema fica mais leve)
     const soTrabalho = el("input");
     soTrabalho.type = "checkbox";
@@ -297,7 +304,7 @@ export function abrirPreviasLote(C, o = {}) {
     const lSoF = el("label", "chk");
     lSoF.append(soFichas, document.createTextNode(" Só guardar as fichas (as prévias desse colégio já estão prontas)"));
     soFichas.onchange = () => soFichas.checked && (ficha.checked = true);
-    if (!livre) p.append(lTrab, lSem, lFicha, lSoF);
+    if (!livre) p.append(lTrab, lSem, lNovo, lFicha, lSoF);
     else separadas.parentNode.lastChild.textContent = " Também salvar as fotos separadas (com o mesmo nome do arquivo original)";
     // Importação: colégio e turma (vão no cabeçalho da folha) e, se quiser, as fotos individuais também
     const iCol = el("input"),
@@ -478,19 +485,7 @@ export function abrirPreviasLote(C, o = {}) {
         if (!alunos.length) return (info.textContent = "Não achei fotos nessa pasta (nem nas pastas de dentro).");
         const titulo = tituloImp();
         if (livre) alunos = montarImportacao(alunos, { individuais: porFoto.checked, titulo });
-        const col = nomeDoColegio(origem.name);
-        // PR e Formatura num lugar só: a lista onde o colégio tem mais alunos
-        if (auto && !livre) {
-          info.textContent = "Procurando o colégio no app…";
-          const [pr, fo] = await Promise.all(
-            ["repasse", "formaturaAlunos"].map(n =>
-              alunosDoColegio(C, n, col)
-                .then(l => l.length)
-                .catch(() => 0)
-            )
-          );
-          colNome = fo > pr ? "formaturaAlunos" : "repasse";
-        }
+        const col = site ? site.col : nomeDoColegio(origem.name);
         let resumoFora = "";
         if (!livre && (soTrabalho.checked || semTel.checked)) {
           info.textContent = "Conferindo no app quem já comprou…";
@@ -545,18 +540,37 @@ export function abrirPreviasLote(C, o = {}) {
           info.textContent = `Pronto! 🤖 ${ok} de ${alunos.length} fichas guardadas para o Cadastro automático.`;
           return;
         }
-        info.textContent = `${alunos.length} aluno${alunos.length > 1 ? "s" : ""} para trabalhar em “${origem.name}”.${resumoFora} Agora escolha onde salvar as prévias.`;
-        destino = await window.showDirectoryPicker({ id: "z7-previas", mode: "readwrite" });
-        // salvar dentro da pasta das fotos mistura as prévias com as fotos (na próxima vez elas viram "alunos")
-        if (origem.resolve && (await origem.resolve(destino).catch(() => null)))
-          return (info.textContent =
-            "Escolha outro lugar para salvar: não pode ser a pasta das fotos nem uma pasta dentro dela (senão as prévias se misturam com as fotos dos alunos). Ex.: a Área de Trabalho ou a pasta das prévias no Drive.");
-        const pasta = await destino.getDirectoryHandle(
-          limpo(livre ? tituloImp() || `Prévias - ${origem.name}` : `Prévias - ${col.ano ? col.ano + " - " : ""}${col.nome}`),
-          { create: true }
-        );
+        let pasta, nomes;
+        if (site) {
+          // cada pasta do servidor vira o aluno do app; quem não está no app (ou já tem prévia no site) fica de fora
+          info.textContent = "Ligando as pastas aos alunos do app…";
+          const doApp = await alunosDoColegio(C, colNome, col);
+          const porAluno = ligarPastas(alunos, doApp);
+          const semCadastro = alunos.filter(a => !porAluno.has(a));
+          const tem = deNovo.checked ? () => false : await jaNoSite(C, doApp);
+          const jaTinham = alunos.filter(a => porAluno.has(a) && tem(porAluno.get(a))).length;
+          alunos = alunos.filter(a => porAluno.has(a) && !tem(porAluno.get(a)));
+          if (jaTinham) resumoFora += ` ${jaTinham} já tinha${jaTinham > 1 ? "m" : ""} prévia no site.`;
+          if (semCadastro.length) {
+            resumoFora += ` ⚠️ ${semCadastro.length} pasta${semCadastro.length > 1 ? "s" : ""} sem aluno no app (não enviada${semCadastro.length > 1 ? "s" : ""}): ${semCadastro
+              .slice(0, 6)
+              .map(a => a.nome)
+              .join(", ")}${semCadastro.length > 6 ? "…" : ""}.`;
+          }
+          if (!alunos.length) return (info.textContent = "Nada a enviar." + resumoFora);
+          nomes = nomesDeSaida(alunos, false);
+          pasta = pastaNoSite(C, alunos, nomes, porAluno, deNovo.checked);
+        } else {
+          info.textContent = `${alunos.length} aluno${alunos.length > 1 ? "s" : ""} para trabalhar em “${origem.name}”. Agora escolha onde salvar as prévias.`;
+          destino = await window.showDirectoryPicker({ id: "z7-previas", mode: "readwrite" });
+          // salvar dentro da pasta das fotos mistura as prévias com as fotos (na próxima vez elas viram "alunos")
+          if (origem.resolve && (await origem.resolve(destino).catch(() => null)))
+            return (info.textContent =
+              "Escolha outro lugar para salvar: não pode ser a pasta das fotos nem uma pasta dentro dela (senão as prévias se misturam com as fotos dos alunos). Ex.: a Área de Trabalho.");
+          pasta = await destino.getDirectoryHandle(limpo(tituloImp() || `Prévias - ${origem.name}`), { create: true });
+          nomes = nomesDeSaida(alunos, true);
+        }
         await prep();
-        const nomes = nomesDeSaida(alunos, livre);
         cancelar = false;
         ir.disabled = true;
         parar.hidden = false;
@@ -572,6 +586,7 @@ export function abrirPreviasLote(C, o = {}) {
         });
         let fichasOk = 0;
         const fazer = async (a, i) => {
+          if (pasta.novaVez) pasta.novaVez(nomes[i]);
           // a ficha (o app acha o papel nas primeiras fotos) sai da prévia e vai para o Cadastro automático
           if (!livre && ficha.checked && !a.fichaOk && a.arquivos.length > 1)
             try {
@@ -657,7 +672,7 @@ export function abrirPreviasLote(C, o = {}) {
           // as fotos separadas (pequenas, com marca e número): o representante monta o quadro e os porta-retratos
           // no app ("🖼️ Prévia e fotos") com as que a família escolher
           // (foto solta = uma prévia por foto: não precisa da pasta com a mesma foto separada)
-          if (separadas.checked && !a.soltA && !a.folha) {
+          if ((separadas.checked || site) && !a.soltA && !a.folha) {
             const sub = await pasta.getDirectoryHandle(nomes[i], { create: true });
             let salvas = 0;
             for (const [k, f] of fotos.entries()) {
@@ -741,7 +756,9 @@ export function abrirPreviasLote(C, o = {}) {
         if (falharam.length) mostrarErros(falharam, fazer, pasta.name, resumoFotos);
         info.textContent =
           (cancelar ? `Parado. ` : "Pronto! ") +
-          `${feitos} prévia${feitos === 1 ? "" : "s"} salva${feitos === 1 ? "" : "s"} em “${pasta.name}”.` +
+          (site
+            ? `${feitos} prévia${feitos === 1 ? "" : "s"} gravada${feitos === 1 ? "" : "s"} no site.`
+            : `${feitos} prévia${feitos === 1 ? "" : "s"} salva${feitos === 1 ? "" : "s"} em “${pasta.name}”.`) +
           resumoFora +
           " " +
           resumoFotos() +
@@ -749,7 +766,7 @@ export function abrirPreviasLote(C, o = {}) {
           (falharam.length ? ` ⚠️ ${falharam.length} aluno${falharam.length > 1 ? "s" : ""} com foto que não saiu (motivo abaixo).` : "") +
           (livre
             ? " As prévias ficam só no seu computador, nessa pasta: é só mandar pelo WhatsApp para quem vai vender."
-            : " Agora arraste essa pasta para o Google Drive.");
+            : " O representante já vê as fotos em “🖼️ Fotos do aluno”.");
       } catch (e) {
         if (e && e.name === "AbortError") info.textContent = "Nenhuma pasta escolhida.";
         else {

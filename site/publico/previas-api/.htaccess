@@ -6,6 +6,6 @@
 </IfModule>
 SetEnvIf Authorization "(.*)" HTTP_AUTHORIZATION=$1
 Options -Indexes
-<Files "comum.php">
+<FilesMatch "^(comum|pagamento-comum|segredo)\.php$">
   Require all denied
-</Files>
+</FilesMatch>

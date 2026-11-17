@@ -163,6 +163,45 @@
       .zap:hover {
         filter: brightness(1.05);
       }
+      /* pagamento do kit (InfinitePay) */
+      .pagar {
+        display: grid;
+        gap: 8px;
+        margin-top: 16px;
+      }
+      .pagar button {
+        font: inherit;
+        font-weight: 700;
+        font-size: 17px;
+        border: 0;
+        border-radius: 999px;
+        padding: 14px 18px;
+        cursor: pointer;
+        background: var(--escuro, #2b2d31);
+        color: #fff;
+      }
+      .pagar button.pix {
+        background: #1f7a5a;
+      }
+      .pagar button:disabled {
+        opacity: 0.6;
+        cursor: wait;
+      }
+      .pagar small {
+        display: block;
+        font-weight: 400;
+        font-size: 13px;
+        opacity: 0.85;
+      }
+      .pago-ok {
+        background: #e8f6ef;
+        border: 1px solid #1f7a5a;
+        color: #14513b;
+        border-radius: 12px;
+        padding: 16px;
+        margin: 0 0 18px;
+        font-weight: 600;
+      }
       .barra {
         position: fixed;
         left: 0;
@@ -367,6 +406,48 @@
           );
         }
 
+        // "R$ 1.350,50 no Pix" → 1350.5 (o primeiro valor em reais do texto)
+        function reais(t) {
+          var m = String(t || "").match(/R\$\s*([\d.]+(?:,\d{1,2})?)/);
+          return m ? Number(m[1].replace(/\./g, "").replace(",", ".")) : 0;
+        }
+        function dinheiro(v) {
+          return (
+            "R$ " +
+            v
+              .toFixed(2)
+              .replace(".", ",")
+              .replace(/\B(?=(\d{3})+(?!\d))/g, ".")
+          );
+        }
+        // a volta da InfinitePay (?pago=1&order_nsu=…&transaction_nsu=…&slug=…): o site confere e guarda
+        var busca = new URLSearchParams(location.search);
+        var voltouPago = busca.get("pago") === "1" && !!busca.get("transaction_nsu");
+        function confirmarPagamento() {
+          var box = document.getElementById("pagoOk");
+          var corpo = new URLSearchParams({
+            order_nsu: busca.get("order_nsu") || "",
+            transaction_nsu: busca.get("transaction_nsu") || "",
+            slug: busca.get("slug") || "",
+            receipt_url: busca.get("receipt_url") || ""
+          });
+          fetch("/previas-api/pago.php", { method: "POST", body: corpo })
+            .then(function (r) {
+              return r.json();
+            })
+            .then(function (j) {
+              box.textContent = j.pago
+                ? "✅ Pagamento recebido! Obrigado. Vamos chamar você no WhatsApp para escolher as fotos do kit."
+                : "Ainda não recebemos a confirmação do pagamento. Se você pagou, ela chega em instantes. Qualquer dúvida, chame no WhatsApp.";
+              var pg = document.getElementById("pagar");
+              if (j.pago && pg) pg.hidden = true;
+            })
+            .catch(function () {
+              box.textContent =
+                "Não consegui conferir o pagamento agora. Se você pagou, fique tranquilo: a confirmação chega para a gente.";
+            });
+        }
+
         if (!/^[a-z0-9]{10,16}$/.test(codigo))
           return aviso("Link incompleto", "Confira se o link foi copiado inteiro, ou chame a gente no WhatsApp.");
 
@@ -415,18 +496,21 @@
           var linkZap = "https://wa.me/" + ZAP + "?text=" + encodeURIComponent(texto);
           document.title = "Fotos de " + (d.nome || "formatura") + " · Z7 Studio Fotográfico";
           var h = "";
+          if (voltouPago) h += '<div class="pago-ok" id="pagoOk">Conferindo o pagamento…</div>';
           h += '<section class="topo"><h1>As fotos de ' + esc(primeiro || "formatura") + "</h1>";
           h += "<p>" + esc([d.nome, d.escola].filter(Boolean).join(" · ")) + "</p></section>";
           h += '<div class="grade" id="grade">';
           fotos.forEach(function (id, i) {
+            // prévias novas: o endereço inteiro (gravadas direto no site); antigas: a cópia do Drive em /previas/
+            var src = /^https:\/\/z7studio\.com\.br\//.test(id) ? id : "/previas/" + id + ".jpg";
             h +=
               '<button type="button" data-i="' +
               i +
               '"><img loading="lazy" alt="Foto ' +
               (i + 1) +
-              '" src="/previas/' +
-              esc(id) +
-              '.jpg" data-id="' +
+              '" src="' +
+              esc(src) +
+              '" data-id="' +
               esc(id) +
               '"><span>' +
               (i + 1) +
@@ -441,17 +525,79 @@
           h += "</ul>";
           if (d.preco) h += '<p class="preco">' + esc(d.preco) + " <small>no Pix · o kit completo</small></p>";
           if (d.preco && d.cartao) h += '<p class="cartao-pag">' + esc(d.cartao) + "</p>";
+          var pix = reais(d.preco),
+            cart = reais(d.cartao);
+          if (pix) {
+            h +=
+              '<div class="pagar" id="pagar"><button type="button" class="pix" data-forma="pix">💳 Pagar no Pix · ' +
+              esc(dinheiro(pix)) +
+              "</button>";
+            if (cart && cart !== pix)
+              h +=
+                '<button type="button" data-forma="cartao">💳 Pagar no cartão · ' +
+                esc(dinheiro(cart)) +
+                "<small>" +
+                esc(String(d.cartao).replace(/^.*?·\s*/, "")) +
+                "</small></button>";
+            h += "</div>";
+          }
           h +=
-            '<p class="nota" style="margin:6px 0 0">Pagamento no Pix ou no cartão. Você escolhe as fotos pelo WhatsApp, pelo número de cada uma.</p>';
-          h += '<a class="zap" data-zap href="' + linkZap + '">💬 Quero o ' + esc(kit.nome) + "</a></section>";
+            '<p class="nota" style="margin:10px 0 0">' +
+            (pix
+              ? "O pagamento abre na tela segura da InfinitePay. Depois, você escolhe as fotos pelo WhatsApp, pelo número de cada uma."
+              : "Pagamento no Pix ou no cartão. Você escolhe as fotos pelo WhatsApp, pelo número de cada uma.") +
+            "</p>";
+          h +=
+            '<a class="zap" data-zap href="' +
+            linkZap +
+            '">💬 ' +
+            (pix ? "Tirar dúvidas no WhatsApp" : "Quero o " + esc(kit.nome)) +
+            "</a></section>";
           h += '<section class="cartao"><h2>Veja como fica</h2>';
           h +=
             '<div class="abas"><button type="button" data-idade="infantil">Infantil</button><button type="button" data-idade="adulto">Ensino médio e adulto</button></div>';
           h += '<video id="video" controls muted playsinline loop preload="metadata"></video></section>';
           main.innerHTML = h;
-          document.getElementById("barra").innerHTML =
-            '<a class="zap" data-zap href="' + linkZap + '">💬 Quero o ' + esc(kit.nome) + "</a>";
+          // a barra de baixo: com valor, leva até o pagamento; sem valor, o WhatsApp
+          document.getElementById("barra").innerHTML = pix
+            ? '<a class="zap" href="#pagar" id="irPagar" style="background:#1f7a5a">💳 Pagar o ' + esc(kit.nome) + "</a>"
+            : '<a class="zap" data-zap href="' + linkZap + '">💬 Quero o ' + esc(kit.nome) + "</a>";
           document.getElementById("barra").hidden = false;
+          var irPagar = document.getElementById("irPagar");
+          if (irPagar)
+            irPagar.addEventListener("click", function (e) {
+              e.preventDefault();
+              document.getElementById("pagar").scrollIntoView({ behavior: "smooth", block: "center" });
+            });
+          // pagar: o site cria o link da InfinitePay com o valor deste link e abre a tela de pagamento
+          document.querySelectorAll("#pagar button").forEach(function (b) {
+            b.addEventListener("click", function () {
+              var todos = document.querySelectorAll("#pagar button");
+              todos.forEach(function (x) {
+                x.disabled = true;
+              });
+              var orig = b.innerHTML;
+              b.textContent = "Abrindo o pagamento…";
+              somar("cliques", "cliqueEm");
+              var corpo = new URLSearchParams({ c: codigo, forma: b.dataset.forma });
+              fetch("/previas-api/pagar.php", { method: "POST", body: corpo })
+                .then(function (r) {
+                  return r.json();
+                })
+                .then(function (j) {
+                  if (!j.url) throw new Error(j.erro || "");
+                  location.href = j.url;
+                })
+                .catch(function (e) {
+                  alert((e && e.message) || "Não consegui abrir o pagamento agora. Tente de novo ou chame a gente no WhatsApp.");
+                  b.innerHTML = orig;
+                  todos.forEach(function (x) {
+                    x.disabled = false;
+                  });
+                });
+            });
+          });
+          if (voltouPago) confirmarPagamento();
           document.querySelectorAll("[data-zap]").forEach(function (a) {
             a.addEventListener("click", function () {
               somar("cliques", "cliqueEm");
@@ -460,7 +606,7 @@
           // a foto ainda não chegou ao site: a miniatura do Google Drive
           document.querySelectorAll("#grade img").forEach(function (img) {
             img.addEventListener("error", function () {
-              if (img.dataset.drive) return;
+              if (img.dataset.drive || /^https:/.test(img.dataset.id)) return;
               img.dataset.drive = "1";
               img.src = "https://drive.google.com/thumbnail?id=" + encodeURIComponent(img.dataset.id) + "&sz=w1200";
             });
