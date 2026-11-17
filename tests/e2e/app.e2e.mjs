@@ -4525,6 +4525,34 @@ await cenario("Cadastro automático do Aluguel de becas (beca, tamanho e kit da 
       .catch(() => false),
     "botão para mandar as fichas do aluguel"
   );
+  // a pasta do colégio inteira: só a 1ª foto de cada aluno vira ficha
+  const dirCol = fs.mkdtempSync("/tmp/z7col-") + "/2026 - Aluguel - TESTE";
+  for (const [al, fotos] of [
+    ["01 - ANA SOUZA", ["0001.jpg", "0002.jpg", "0003.jpg"]],
+    ["02 - BRUNO LIMA", ["a.jpg", "b.jpg"]]
+  ]) {
+    fs.mkdirSync(dirCol + "/" + al, { recursive: true });
+    fotos.forEach(f => fs.copyFileSync(AQUI + "../../icons/icon-192.png", dirCol + "/" + al + "/" + f));
+  }
+  await ca.getByRole("button", { name: "📤 Fichas do Aluguel de becas" }).click();
+  const fa = pg.locator(".sheet").filter({ hasText: "Fichas do Aluguel de becas" }).last();
+  await fa.locator("select").first().selectOption("i1");
+  await fa.locator("input[webkitdirectory]").setInputFiles(dirCol);
+  await fa.getByText(/2 alunos: vai a 1ª foto de cada um/).waitFor({ timeout: 5000 });
+  await fa.getByRole("button", { name: "Guardar as fichas" }).click();
+  await pg.waitForFunction(() => !document.body.textContent.includes("Guardando"), null, { timeout: 15000 });
+  await pg.waitForTimeout(800);
+  const fichasPasta = Object.entries(await store()).filter(
+    ([k, x]) => k.startsWith("fichas/") && x && x.colNome === "alugueis" && /SOUZA|LIMA/.test(x.pasta)
+  );
+  ok(
+    fichasPasta.length === 2 &&
+      fichasPasta
+        .map(([, x]) => x.arquivo)
+        .sort()
+        .join() === "0001.jpg,a.jpg",
+    "pasta do colégio: uma ficha por aluno, com a 1ª foto de cada um: " + fichasPasta.map(([, x]) => x.pasta + "/" + x.arquivo).join(" | ")
+  );
   const grupo = ca.locator(".cad-parte", { hasText: "Aluguel de becas" });
   await grupo.getByRole("button", { name: /Conferir \(1\)/ }).click();
   const cf = pg.locator(".sheet").filter({ hasText: "Conferir fichas" });

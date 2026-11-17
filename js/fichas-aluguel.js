@@ -13,7 +13,14 @@ const idFichaAluguel = (escola, ano, nome) => (chaveGrupo(escola, ano) + "_" + U
 // 1) enviar as fotos das fichas: escolhe o colégio e o ano, e as fotos (uma ficha por aluno)
 export function enviarFichasAluguel(C, depois) {
   sheet("📤 Fichas do Aluguel de becas", async (p, close) => {
-    p.append(el("p", "hint", "Escolha o colégio e as fotos das fichas (uma foto por aluno). Depois toque em Pedir a leitura."));
+    p.append(
+      el(
+        "p",
+        "hint",
+        "Escolha o colégio e a pasta do colégio no computador (uma pasta por aluno): o app pega só a 1ª foto de cada aluno, que é a ficha. " +
+          "Depois toque em Pedir a leitura. As fichas servem só para o cadastro: depois de confirmadas, são apagadas."
+      )
+    );
     const insts = [];
     try {
       (await C.FS.getDocs(C.FS.collection(C.db, "instituicoes"))).forEach(d => insts.push({ id: d.id, ...d.data() }));
@@ -33,20 +40,58 @@ export function enviarFichasAluguel(C, depois) {
     arq.type = "file";
     arq.accept = "image/*";
     arq.multiple = true;
+    // 17/11/2026: a pasta do colégio inteira (uma subpasta por aluno): só a 1ª foto de cada aluno vira ficha
+    const pastaCol = el("input");
+    pastaCol.type = "file";
+    pastaCol.webkitdirectory = true;
+    pastaCol.multiple = true;
+    let escolhidas = [];
+    const resumo = el("p", "hint", "");
+    const FOTO = /\.(jpe?g|png|webp)$/i;
+    const primeiraDeCada = files => {
+      const por = new Map();
+      [...files]
+        .filter(f => FOTO.test(f.name))
+        .forEach(f => {
+          const partes = (f.webkitRelativePath || f.name).split("/");
+          // a pasta do aluno é a que tem a foto (a de cima é a do colégio)
+          const aluno = partes.length > 2 ? partes[partes.length - 2] : partes.length === 2 ? f.name.replace(/\.[^.]+$/, "") : f.name;
+          (por.get(aluno) || por.set(aluno, []).get(aluno)).push(f);
+        });
+      return [...por.entries()]
+        .sort((a, b) => a[0].localeCompare(b[0], "pt-BR", { numeric: true }))
+        .map(([aluno, fs]) => ({ aluno, file: fs.sort((a, b) => a.name.localeCompare(b.name, "pt-BR", { numeric: true }))[0] }));
+    };
+    pastaCol.onchange = () => {
+      escolhidas = primeiraDeCada(pastaCol.files);
+      arq.value = "";
+      resumo.textContent = escolhidas.length
+        ? `${escolhidas.length} alunos: vai a 1ª foto de cada um (${escolhidas
+            .slice(0, 3)
+            .map(x => x.aluno)
+            .join(", ")}${escolhidas.length > 3 ? "…" : ""}).`
+        : "Nenhuma foto nessa pasta.";
+    };
+    arq.onchange = () => {
+      escolhidas = [...arq.files].map(f => ({ aluno: f.name.replace(/\.[^.]+$/, ""), file: f }));
+      pastaCol.value = "";
+      resumo.textContent = escolhidas.length ? `${escolhidas.length} fotos escolhidas.` : "";
+    };
+    const bPasta = U.mkBtn("📁 Escolher a pasta do colégio", "btn-primary", () => pastaCol.click());
     const r = el("div", "row2");
     r.append(field("Colégio", sInst), field("Ano", ano));
     const msg = el("p", "hint");
     const ok = U.mkBtn("Guardar as fichas", "btn-primary", async () => {
       const inst = insts.find(i => i.id === sInst.value);
       if (!inst) return U.toast("Escolha o colégio.");
-      if (!arq.files.length) return U.toast("Escolha as fotos das fichas.");
+      if (!escolhidas.length) return U.toast("Escolha a pasta do colégio (ou as fotos das fichas).");
       ok.disabled = true;
       let n = 0;
-      for (const file of arq.files) {
-        msg.textContent = `Guardando ${++n} de ${arq.files.length}…`;
+      for (const { aluno, file } of escolhidas) {
+        msg.textContent = `Guardando ${++n} de ${escolhidas.length}…`;
         try {
           const foto = await fotoDaFicha(file);
-          const pasta = file.name.replace(/\.[^.]+$/, "");
+          const pasta = aluno;
           await C.FS.setDoc(C.FS.doc(C.db, "fichas", idFichaAluguel(inst.nome, ano.value, pasta)), {
             escola: inst.nome,
             instId: inst.id,
@@ -68,7 +113,11 @@ export function enviarFichasAluguel(C, depois) {
       close();
       if (depois) depois();
     });
-    p.append(r, field("Fotos das fichas", arq), msg);
+    const outras = el("details");
+    outras.append(el("summary", null, "ou escolher as fotos das fichas, uma a uma"), field("Fotos das fichas", arq));
+    pastaCol.hidden = true;
+    pastaCol.setAttribute("aria-label", "Pasta do colégio");
+    p.append(r, bPasta, pastaCol, resumo, outras, msg);
     const a = el("div", "actions");
     a.append(ok, U.mkBtn("Cancelar", "", close));
     p.append(a);
