@@ -16,7 +16,7 @@ const reais = v => {
 };
 
 // o bloco do formulário: comissão + kits. Devolve { box, ler() → { comissaoPct, kits } }
-export function editorKits(x, admin) {
+export function editorKits(x, admin, o = {}) {
   const box = el("div", "kits-editor");
   const pct = el("input");
   pct.inputMode = "decimal";
@@ -24,7 +24,7 @@ export function editorKits(x, admin) {
   pct.value = x && x.comissaoPct ? String(x.comissaoPct).replace(".", ",") : "";
   pct.disabled = !admin;
   pct.setAttribute("aria-label", "Comissão %");
-  box.append(field("Comissão do representante (% do total; vazio = as taxas dos Ajustes)", pct));
+  if (!o.semComissao) box.append(field("Comissão do representante (% do total; vazio = as taxas dos Ajustes)", pct));
   const lista = el("div", "kits-lista");
   const linhas = [];
   const add = (k = {}) => {
@@ -70,7 +70,7 @@ export function editorKits(x, admin) {
   return {
     box,
     ler: () => ({
-      comissaoPct: reais(pct.value) || 0,
+      ...(o.semComissao ? {} : { comissaoPct: reais(pct.value) || 0 }),
       kits: linhas
         .map(l => ({
           nome: l.nome.value.trim(),

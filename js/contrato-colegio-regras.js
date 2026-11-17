@@ -90,6 +90,12 @@ export function kitDosItens(itens, serie, contrato) {
 }
 // "Kit 1" (ou "KIT 2") da planilha + a turma do aluno → o kit do contrato
 export function kitDaPlanilha(txt, serie, contrato) {
+  // o nome igual ao do kit ("Kit 3", "Kit festa"), da turma do aluno ou sem turma
+  const nome = chave(txt).replace(/[^A-Z0-9]/g, "");
+  if (!nome) return null;
+  const iguais = kitsDo(contrato).filter(k => chave(k.nome).replace(/[^A-Z0-9]/g, "") === nome);
+  const ig = iguais.find(k => k.serie && mesmaSerie(k.serie, serie)) || iguais.find(k => !k.serie);
+  if (ig) return ig;
   const m = String(txt || "").match(/kit\s*(\d+)/i);
   if (!m) return null;
   const kits = kitsDo(contrato).filter(k => (String(k.nome).match(/kit\s*(\d+)/i) || [])[1] === m[1]);

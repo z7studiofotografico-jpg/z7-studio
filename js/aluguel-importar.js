@@ -24,7 +24,8 @@ export const CAMPOS_ALUGUEL = [
   { k: "faixa", nome: "Faixa", sinonimos: ["Cor da faixa"] },
   { k: "capelo", nome: "Capelo", sinonimos: ["Cor do capelo"] },
   { k: "valor", nome: "Valor", sinonimos: ["Valor do aluguel", "Preço"] },
-  { k: "pacote", nome: "Pacote", sinonimos: ["Itens", "Kit", "Produtos"] },
+  // (17/11/2026) a coluna é o KIT do aluno ("Kit 1", "Kit 2"…, os kits desta tela); "Pacote" ainda vale
+  { k: "pacote", nome: "Kit", sinonimos: ["Pacote", "Itens", "Produtos"] },
   // planilha com uma coluna por item (1 = o aluno tem): Aluguel (a beca), Paspatur, Canudo, Certificado
   { k: "itBeca", nome: "Aluguel (item)", sinonimos: ["Aluguel", "Aluguel da beca"] },
   { k: "itPelerine", nome: "Pelerine (item)", sinonimos: ["Pelerine"] },
@@ -113,7 +114,7 @@ function docAluguel(o, ext) {
   // "Beca pelerine azul" (no Tamanho ou no Pacote): pelerine, tamanho único
   const peler = /peler/i.test(String(o.tamanho || "") + " " + String(o.pacote || ""));
   if (String(o.tamanho || "").trim() && !t.tamanho && !peler) falta.push(`tamanho “${o.tamanho}” não reconhecido`);
-  if (String(o.pacote || "").trim() && !lerPacote(o.pacote).length) falta.push(`pacote “${o.pacote}” não reconhecido`);
+  if (String(o.pacote || "").trim() && !lerPacote(o.pacote).length) falta.push(`pacote: kit “${o.pacote}” não está nos kits deste colégio`);
   const d = {
     __falta: falta,
     instId: ext.instId || "",
@@ -201,7 +202,12 @@ export async function importarAlugueis(C, insts) {
         "adulto"
       );
       r.append(field("Beca de quem não tem escrito na planilha", sIdade));
-      // preços deste colégio (cada trabalho tem os seus): vão para o Contrato do colégio e dão o valor de cada aluno
+      // os KITS deste colégio (17/11/2026): cada kit com o que leva e o valor total (Kit 1 = beca, Kit 2 = beca +
+      // certificado…); na planilha, a coluna Kit diz qual é o de cada aluno. Vão para o Contrato do colégio.
+      // O preço por item ficou guardado em "Preço por item", para quem ainda vende avulso.
+      let contrato = null,
+        kitsEd = null;
+      const kitsBox = el("div");
       const prBox = el("div", "row2");
       const prIn = ITENS_PACOTE.map(([k, n]) => {
         const i = el("input");
@@ -216,26 +222,40 @@ export async function importarAlugueis(C, insts) {
             .replace(/\./g, "")
             .replace(",", ".")
         ) || 0;
-      let contrato = null;
+      const montarKits = async () => {
+        const { editorKits } = await import("./contrato-kits.js");
+        kitsEd = editorKits(contrato || {}, true, { semComissao: true });
+        kitsBox.replaceChildren(kitsEd.box);
+      };
       const carregarPrecos = async () => {
+        contrato = null;
         const i = insts.find(x => x.id === sInst.value);
-        if (!i || !ano.value) return;
-        try {
-          const s = await C.FS.getDoc(C.FS.doc(C.db, "contratosColegio", `${i.id}_${Number(ano.value)}`));
-          const pr = (s.exists() && s.data().precos) || {};
-          contrato = s.exists() ? s.data() : null; // os kits do colégio (PACOTE "Kit 1" na planilha)
-          prIn.forEach(([k, inp]) => (inp.value = Number(pr[k]) ? String(pr[k]).replace(".", ",") : ""));
-        } catch (_) {}
+        if (i && ano.value) {
+          try {
+            const s = await C.FS.getDoc(C.FS.doc(C.db, "contratosColegio", `${i.id}_${Number(ano.value)}`));
+            contrato = s.exists() ? s.data() : null;
+          } catch (_) {}
+        }
+        const pr = (contrato && contrato.precos) || {};
+        prIn.forEach(([k, inp]) => (inp.value = Number(pr[k]) ? String(pr[k]).replace(".", ",") : ""));
+        await montarKits();
       };
       sInst.addEventListener("change", carregarPrecos);
       ano.addEventListener("change", carregarPrecos);
-      const prTit = el("p", "hint", "Preços deste colégio (o valor de cada aluno é a soma do kit dele; o pai pode comprar um item só):");
+      montarKits();
+      const prTit = el(
+        "p",
+        "hint",
+        "Kits deste colégio: o que cada kit leva e o valor total. Na planilha, a coluna Kit diz o de cada aluno (vazia = o Kit 1 da turma)."
+      );
+      const avulso = el("details");
+      avulso.append(el("summary", null, "Preço por item (só se vender item avulso, fora dos kits)"), prBox);
       const hist = el("details", "notes");
       hist.append(el("summary", null, "Importações anteriores (desfazer)"));
       const hb = el("div");
       hist.append(hb);
       hist.addEventListener("toggle", () => hist.open && ultimasImportacoes(C, "aluguel", hb));
-      box.append(r, prTit, prBox, hist);
+      box.append(r, prTit, kitsBox, avulso, hist);
       return () => {
         const i = insts.find(x => x.id === sInst.value);
         return {
@@ -244,7 +264,8 @@ export async function importarAlugueis(C, insts) {
           inst: i || null,
           idade: sIdade.value,
           precos: Object.fromEntries(prIn.map(([k, inp]) => [k, lerValor(inp.value)])),
-          contrato,
+          kits: kitsEd ? kitsEd.ler().kits : [],
+          contrato: Object.assign({}, contrato || {}, { kits: kitsEd ? kitsEd.ler().kits : (contrato && contrato.kits) || [] }),
           ano: ano.value,
           respEmail: (i && donos.get(`${i.id}|${Number(ano.value)}`)) || ""
         };
@@ -256,7 +277,8 @@ export { BECAS };
 
 // os preços digitados na importação vão para o Contrato do colégio (cria o contrato se ainda não existe)
 async function guardarPrecos(C, ext) {
-  if (!ext.instId || !ext.precos || !Object.values(ext.precos).some(v => v > 0)) return;
+  const temKits = (ext.kits || []).length > 0;
+  if (!ext.instId || ((!ext.precos || !Object.values(ext.precos).some(v => v > 0)) && !temKits)) return;
   const { FS, db } = C;
   const ref = FS.doc(db, "contratosColegio", idContrato(ext.instId, Number(ext.ano)));
   const agora = new Date().toISOString();
@@ -264,11 +286,14 @@ async function guardarPrecos(C, ext) {
   const s = await FS.getDoc(ref);
   if (s.exists()) {
     const x = s.data();
-    if (JSON.stringify(x.precos || {}) === JSON.stringify(ext.precos)) return;
+    const mudouPreco = JSON.stringify(x.precos || {}) !== JSON.stringify(ext.precos || {});
+    const mudouKits = temKits && JSON.stringify(x.kits || []) !== JSON.stringify(ext.kits);
+    if (!mudouPreco && !mudouKits) return;
     await FS.updateDoc(ref, {
-      precos: ext.precos,
+      ...(mudouPreco ? { precos: ext.precos } : {}),
+      ...(mudouKits ? { kits: ext.kits } : {}),
       atualizadoEm: agora,
-      historico: [...(x.historico || []), reg("preços dos itens na importação da planilha")].slice(-40)
+      historico: [...(x.historico || []), reg((mudouKits ? "kits" : "preços dos itens") + " na importação da planilha")].slice(-40)
     });
     return;
   }
@@ -283,7 +308,8 @@ async function guardarPrecos(C, ext) {
     quemPaga: "alunos",
     recebePadrao: "estudio",
     valor: 0,
-    precos: ext.precos,
+    precos: ext.precos || {},
+    kits: ext.kits || [],
     parcelas: 1,
     contato: { nome: "", cargo: "", tel: "" },
     entrega: { data: "", com: "" },
