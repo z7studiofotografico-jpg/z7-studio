@@ -26,7 +26,8 @@ $semJuros = preg_match('/(\d{1,2})\s*x\s*sem juros/i', (string) ($d['cartao'] ??
 $r = null;
 // com a chave da API: um link só, no valor do cartão, com o desconto do Pix e as parcelas sem juros do app
 if (defined('Z7_INFINITE_KEY')) {
-  $opcoes = ['assured_installments' => $semJuros];
+  // sem o passo "Entrega" (o kit é retirado ou combinado pelo WhatsApp): a família só põe o contato e paga
+  $opcoes = ['assured_installments' => $semJuros, 'require_delivery_address' => false];
   if ($cartao > $pix) $opcoes['discounts'] = ['pix' => round((1 - $pix / $cartao) * 100, 2)];
   [$st, $r] = z7_json_post(Z7_API_INFINITE . '/links', $base + [
     'items' => [['quantity' => 1, 'price' => $cartao, 'description' => $desc]],
