@@ -56,6 +56,7 @@ export function editorKits(x, admin, o = {}) {
       const q = el("input", "kit-qtd");
       q.type = "number";
       q.min = "1";
+      q.max = "999";
       q.value = String(Number((k.qtd || {})[id]) || 1);
       q.setAttribute("aria-label", "Quantidade de " + n);
       q.hidden = !c.checked;
