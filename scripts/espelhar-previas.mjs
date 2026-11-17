@@ -224,7 +224,9 @@ async function gravarListas(raiz) {
   for (const id of Object.keys(pastas)) {
     const g = grupoDe(id);
     mapa[id] = g;
-    (grupos[g] = grupos[g] || { pastas: {}, nomes: {} }).pastas[id] = pastas[id].slice().sort((a, b) => (a.name < b.name ? -1 : a.name > b.name ? 1 : 0));
+    (grupos[g] = grupos[g] || { pastas: {}, nomes: {} }).pastas[id] = pastas[id]
+      .slice()
+      .sort((a, b) => (a.name < b.name ? -1 : a.name > b.name ? 1 : 0));
     grupos[g].nomes[id] = nomes[id] || "";
   }
   const c = new Client(60000);
