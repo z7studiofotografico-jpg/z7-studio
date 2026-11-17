@@ -6,6 +6,7 @@ import { criarDrive, idDaPasta, pastaDoColegio } from "./drive-fotos.js";
 import { openMockup } from "./mockup.js";
 import { contatoAtual } from "./repasse-estado.js";
 import { fotosDoAlunoNoSite, esquecerSite, apagarDoSite } from "./site-previas.js";
+import { prazoParaMandar } from "./prazo-atendimento.js";
 import { fonteSite, tirarDoSite, esquecerDriveSite } from "./drive-site.js";
 
 // 17/11/2026: as prévias novas ficam no site; as antigas, no Google Drive. Procura primeiro no site.
@@ -212,6 +213,7 @@ export function abrirFotosDoAluno(C, it, precoTxt, cartaoTxt = "") {
           escola: title(it.escola || ""),
           preco: precoTxt,
           cartao: cartaoTxt,
+          prazo: prazoParaMandar(it).prazo,
           toast: U.toast,
           fotos: escolha.map(i => blobs[i]),
           kit: pas ? "paspatur" : "pr",

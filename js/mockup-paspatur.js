@@ -8,6 +8,7 @@
 // 4 = a foto do calendário ou a foto da turma (A4 deitada, já pronta). st.anoCal = ano do calendário.
 export const ehTurma = st => st.encarte === "turma";
 import { cover, marca, prep, logoAtual, loadImg, exemplo, blocoPreco } from "./mockup.js";
+import { parcelaDoCartao, seloPrazo } from "./mockup-preco.js";
 
 export const W = 1080,
   H = 1350;
@@ -350,30 +351,38 @@ export async function desenharPaspatur(cv, st) {
   rodape(ctx);
 }
 // o preço na mesa grafite, embaixo do livro: o Pix à esquerda e o cartão à direita (mesmas cores, em claro)
+// o preço na mesa escura, em duas colunas (a mesa é baixa): a parcela à esquerda; o Pix e o prazo à direita
 function precoNaMesa(ctx, st, y) {
+  const p = parcelaDoCartao(st.cartao);
+  if (!p) return blocoPreco(ctx, st, 60, y, W - 120, CORES_MESA);
   ctx.textAlign = "left";
   ctx.textBaseline = "alphabetic";
   ctx.fillStyle = "rgba(255,255,255,.12)";
   ctx.fillRect(60, y, W - 120, 2);
-  ctx.fillStyle = "#e0525b";
-  ctx.font = "700 60px 'Barlow Condensed', sans-serif";
-  ctx.fillText(st.preco, 60, y + 68);
-  const lp = ctx.measureText(st.preco).width;
   ctx.fillStyle = "#a39fa6";
-  ctx.font = "600 22px 'Source Sans 3', sans-serif";
-  ctx.fillText("no Pix", 60 + lp + 12, y + 66);
-  if (!st.cartao) return;
-  const [valor, parc] = String(st.cartao).split(" · ");
+  ctx.font = "600 24px 'Source Sans 3', sans-serif";
+  ctx.fillText(p.vezes + "x de", 60, y + 62);
+  const l = ctx.measureText(p.vezes + "x de ").width;
+  ctx.fillStyle = "#e0525b";
+  ctx.font = "700 64px 'Barlow Condensed', sans-serif";
+  ctx.fillText("R$ " + p.parcela.toFixed(2).replace(".", ","), 60 + l, y + 64);
+  ctx.fillStyle = "#a39fa6";
+  ctx.font = "600 21px 'Source Sans 3', sans-serif";
+  ctx.fillText("sem juros no cartão", 60, y + 96);
   const xc = W / 2 + 20;
   ctx.fillStyle = "#f0eef0";
-  ctx.font = "700 28px 'Source Sans 3', sans-serif";
-  ctx.fillText("ou " + valor, xc, y + 42);
-  if (parc) {
-    ctx.fillStyle = "#a39fa6";
-    ctx.font = "600 21px 'Source Sans 3', sans-serif";
-    ctx.fillText(parc.replace(" ou até ", " · "), xc, y + 72);
-  }
+  ctx.font = "700 27px 'Source Sans 3', sans-serif";
+  ctx.fillText("ou " + st.preco + " à vista no Pix", xc, y + 44);
+  if (st.prazo) seloPrazo(ctx, st.prazo, xc, y + 62, 380, { seloFundo: "#b3202a" });
 }
+const CORES_MESA = {
+  forte: "#e0525b",
+  texto: "#f0eef0",
+  fraco: "#a39fa6",
+  linha: "rgba(255,255,255,.12)",
+  selo: "#e0525b",
+  seloTxt: "#fff"
+};
 
 // ---------- o vídeo ----------
 export const DURACAO = 11; // segundos

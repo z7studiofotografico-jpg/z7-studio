@@ -39,6 +39,7 @@ import { passo } from "./repasse-mensagens.js";
 import { openPago, openEntrega, openNotas } from "./repasse-janelas.js";
 import { openDados } from "./repasse-form.js";
 import { passarAluno } from "./passar-pr.js";
+import { prazoParaMandar, linhaPrazo } from "./prazo-atendimento.js";
 import { abrirFotosDoAluno } from "./fotos-aluno.js";
 
 // aviso dos telefones que com certeza estão errados (DDD que não existe, celular sem o 9...)
@@ -203,6 +204,8 @@ export function desenharProximo(box, it, escolhido, blocked, li) {
       }
     })
   );
+  // ⏳ até quando vai o atendimento da família (o representante pode dar mais dias)
+  if (it.etapa === "INTERESSADO" && it.prazoAtendimento) box.append(linhaPrazo(C, it, (patch, msg) => save(it, patch, msg)));
   // fotos do aluno direto do Google Drive (quando a pasta das prévias está ligada em Ajustes)
   if (C.P.drivePrevias) row.append(U.mkBtn("🖼️ Fotos do aluno", "", () => abrirFotosDoAluno(C, it, precoTxt(it), cartaoTxt(it))));
   // a prévia fica sempre à mão (desde o 1º contato); com o Drive ligado, o "Fotos do aluno" já abre a prévia
@@ -216,6 +219,7 @@ export function desenharProximo(box, it, escolhido, blocked, li) {
           nome: title(it.nome),
           escola: title(it.escola),
           preco: precoTxt(it),
+          prazo: prazoParaMandar(it).prazo,
           cartao: cartaoTxt(it),
           toast: U.toast,
           maxFotos: ehFormatura() ? 70 : 15,
@@ -231,6 +235,7 @@ export function desenharProximo(box, it, escolhido, blocked, li) {
           nome: title(it.nome),
           escola: title(it.escola),
           preco: precoTxt(it),
+          prazo: prazoParaMandar(it).prazo,
           cartao: cartaoTxt(it),
           modo: "escolha",
           maxFotos: ehFormatura() ? 70 : 15,
@@ -367,7 +372,11 @@ function acoesDoCartao(it, li, e) {
   if (it.etapa === "SEPARADO" || it.etapa === "CONTATADO")
     act.append(
       U.mkBtn("Quer ver a prévia ✓", "btn-ok", () =>
-        save(it, { etapa: "INTERESSADO", followup: U.todayStr(), tentInteresse: 0 }, "Ótimo! Agora mande a prévia")
+        save(
+          it,
+          Object.assign({ etapa: "INTERESSADO", followup: U.todayStr(), tentInteresse: 0 }, prazoParaMandar(it).patch || {}),
+          "Ótimo! Agora mande a prévia"
+        )
       )
     );
   if (ABERTAS.includes(it.etapa)) {

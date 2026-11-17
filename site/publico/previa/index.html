@@ -141,6 +141,59 @@
         font-weight: 700;
         margin: 0 0 4px;
       }
+      /* 17/11/2026: a parcela em destaque, o Pix à vista e o prazo da condição */
+      .parcela {
+        margin: 14px 0 2px;
+        line-height: 1.05;
+      }
+      .parcela span {
+        display: block;
+        font-size: 16px;
+        color: var(--suave);
+        font-weight: 600;
+      }
+      .parcela b {
+        font-size: 44px;
+        color: #b3202a;
+      }
+      .parcela small {
+        display: block;
+        font-size: 15px;
+        color: var(--suave);
+        margin-top: 2px;
+      }
+      .avista {
+        font-size: 18px;
+        font-weight: 700;
+        margin: 6px 0 0;
+      }
+      /* o prazo do atendimento: grafite (como o topo), com o filete vermelho do Z7 e a data grande */
+      .prazo {
+        display: block;
+        margin: 14px 0 0;
+        background: var(--grafite);
+        color: #fff;
+        border-left: 6px solid var(--vermelho);
+        border-radius: 14px;
+        padding: 12px 16px;
+        font-weight: 600;
+        font-size: 15px;
+        line-height: 1.2;
+      }
+      .prazo b {
+        display: block;
+        font-size: 32px;
+        letter-spacing: 0.5px;
+        text-transform: uppercase;
+        margin-top: 2px;
+      }
+      .prazo small {
+        display: block;
+        font-weight: 400;
+        font-size: 14px;
+        color: #cfd1d4;
+        margin-top: 2px;
+      }
       .preco small {
         font-size: 15px;
         font-weight: 400;
@@ -151,8 +204,9 @@
         align-items: center;
         justify-content: center;
         gap: 8px;
-        background: var(--verde);
-        color: #fff;
+        background: transparent;
+        border: 2px solid var(--verde);
+        color: #178a45;
         text-decoration: none;
         font-weight: 700;
         font-size: 18px;
@@ -177,11 +231,16 @@
         border-radius: 999px;
         padding: 14px 18px;
         cursor: pointer;
-        background: var(--escuro, #2b2d31);
+        background: var(--vermelho);
         color: #fff;
+        box-shadow: 0 6px 16px rgba(208, 32, 43, 0.25);
       }
+      /* o Pix, neutro: branco com contorno cinza (o cartão, em vermelho, é o destaque) */
       .pagar button.pix {
-        background: #1f7a5a;
+        background: #fff;
+        color: var(--grafite);
+        border: 2px solid var(--cinza2);
+        box-shadow: none;
       }
       .pagar button:disabled {
         opacity: 0.6;
@@ -523,22 +582,54 @@
             h += "<li>" + esc(x) + "</li>";
           });
           h += "</ul>";
-          if (d.preco) h += '<p class="preco">' + esc(d.preco) + " <small>no Pix · o kit completo</small></p>";
-          if (d.preco && d.cartao) h += '<p class="cartao-pag">' + esc(d.cartao) + "</p>";
           var pix = reais(d.preco),
             cart = reais(d.cartao);
-          if (pix) {
+          // a parcela do cartão em destaque (cabe no bolso), o Pix à vista logo abaixo
+          var vz = (String(d.cartao || "").match(/(\d{1,2})\s*x\s*sem juros/i) || [])[1];
+          vz = Number(vz) || 0;
+          var parc = cart && vz > 1 ? Math.ceil(Math.round(cart * 100) / vz) / 100 : 0;
+          if (parc) {
             h +=
-              '<div class="pagar" id="pagar"><button type="button" class="pix" data-forma="pix">💳 Pagar no Pix · ' +
-              esc(dinheiro(pix)) +
-              "</button>";
+              '<p class="parcela"><span>' +
+              vz +
+              "x de</span><b>" +
+              esc(dinheiro(parc)) +
+              "</b><small>sem juros no cartão · o kit completo</small></p>";
+            h += '<p class="avista">ou ' + esc(dinheiro(pix)) + " à vista no Pix</p>";
+          } else {
+            if (d.preco) h += '<p class="preco">' + esc(d.preco) + " <small>no Pix · o kit completo</small></p>";
+            if (d.preco && d.cartao) h += '<p class="cartao-pag">' + esc(d.cartao) + "</p>";
+          }
+          // o prazo da condição: 3 dias desde que o link foi mandado (o tempo do representante com o aluno)
+          // (o representante pode aumentar: vem em d.prazo; sem ele, 3 dias desde o envio, até o fim do dia)
+          var prazo = d.prazo ? new Date(d.prazo) : d.criadoEm ? new Date(new Date(d.criadoEm).getTime() + 2 * 864e5) : null;
+          if (prazo && !d.prazo) prazo.setHours(23, 59, 0, 0);
+          if (pix && prazo && prazo > new Date()) {
+            var faltam = prazo - new Date(),
+              dd = Math.floor(faltam / 864e5),
+              hh = Math.floor((faltam % 864e5) / 36e5);
+            h +=
+              '<p class="prazo">⏳ Seu atendimento vai até<b>' +
+              ["dom", "seg", "ter", "qua", "qui", "sex", "sáb"][prazo.getDay()] +
+              ", " +
+              String(prazo.getDate()).padStart(2, "0") +
+              "/" +
+              String(prazo.getMonth() + 1).padStart(2, "0") +
+              "</b><small>faltam " +
+              (dd ? dd + (dd > 1 ? " dias" : " dia") + " e " : "") +
+              hh +
+              "h</small></p>";
+          }
+          if (pix) {
+            h += '<div class="pagar" id="pagar">';
             if (cart && cart !== pix)
               h +=
-                '<button type="button" data-forma="cartao">💳 Pagar no cartão · ' +
-                esc(dinheiro(cart)) +
+                '<button type="button" data-forma="cartao">💳 Pagar no cartão' +
+                (parc ? " · " + vz + "x de " + esc(dinheiro(parc)) : " · " + esc(dinheiro(cart))) +
                 "<small>" +
                 esc(String(d.cartao).replace(/^.*?·\s*/, "")) +
                 "</small></button>";
+            h += '<button type="button" class="pix" data-forma="pix">💠 Pagar no Pix · ' + esc(dinheiro(pix)) + "</button>";
             h += "</div>";
           }
           h +=
@@ -560,7 +651,9 @@
           main.innerHTML = h;
           // a barra de baixo: com valor, leva até o pagamento; sem valor, o WhatsApp
           document.getElementById("barra").innerHTML = pix
-            ? '<a class="zap" href="#pagar" id="irPagar" style="background:#1f7a5a">💳 Pagar o ' + esc(kit.nome) + "</a>"
+            ? '<a class="zap" href="#pagar" id="irPagar" style="background:var(--vermelho);border-color:var(--vermelho);color:#fff">💳 Pagar o ' +
+              esc(kit.nome) +
+              "</a>"
             : '<a class="zap" data-zap href="' + linkZap + '">💬 Quero o ' + esc(kit.nome) + "</a>";
           document.getElementById("barra").hidden = false;
           var irPagar = document.getElementById("irPagar");

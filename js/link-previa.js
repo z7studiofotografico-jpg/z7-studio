@@ -5,6 +5,7 @@
 // quantas vezes a família abriu e se tocou no WhatsApp (a página soma +1 nos campos "vistos" e "cliques").
 import { el } from "./ui.js";
 import * as U from "./util.js";
+import { prazoParaMandar, prazoCurto } from "./prazo-atendimento.js";
 import { noComputador, abrirWhatsAppWeb } from "./enviar-computador.js";
 
 export const SITE_LINK = "https://z7studio.com.br/previa/?c=";
@@ -60,16 +61,20 @@ export async function mandarLinkPrevia(C, it, r, o = {}) {
   const FS = C.FS;
   const d = dadosLink(it, r, o.precoTxt, C.me, new Date(), o.cartaoTxt);
   if (!d.fotos.length) return U.toast("Este aluno ainda não tem prévia.");
+  // ⏳ o prazo do atendimento (3 dias; o representante pode aumentar): vai para a página da prévia
+  const { prazo, patch: patchPrazo } = prazoParaMandar(it);
   let codigo = it.linkPrevia;
   if (codigo) {
     // já tem link: atualiza as fotos e o preço, e renova o prazo de 30 dias (os números de visitas continuam)
     const { nome, escola, kit, fotos, preco, cartao, ate } = d;
-    await FS.updateDoc(FS.doc(C.db, COLECAO, codigo), { nome, escola, kit, fotos, preco, cartao, ate });
+    await FS.updateDoc(FS.doc(C.db, COLECAO, codigo), { nome, escola, kit, fotos, preco, cartao, ate, prazo: prazo.toISOString() });
   } else {
     codigo = codigoNovo();
     await FS.setDoc(FS.doc(C.db, COLECAO, codigo), Object.assign(d, { vistos: 0, cliques: 0, vistoEm: null, cliqueEm: null }));
-    if (o.salvar) await o.salvar({ linkPrevia: codigo }, "Link da prévia criado");
+    await FS.updateDoc(FS.doc(C.db, COLECAO, codigo), { prazo: prazo.toISOString() }).catch(() => {});
+    if (o.salvar) await o.salvar(Object.assign({ linkPrevia: codigo }, patchPrazo || {}), "Link da prévia criado");
   }
+  if (it.linkPrevia && patchPrazo && o.salvar) await o.salvar(patchPrazo, "Atendimento até " + prazoCurto(prazo));
   const texto = mensagemLink(it, codigo);
   const tel = U.digits(o.tel || ""); // já com o 55
   try {

@@ -28,6 +28,7 @@ import {
 } from "./repasse-estado.js";
 import { chaveVenda } from "./venda-como.js";
 import { card, desenharProximo } from "./repasse-cartao.js";
+import { prazoParaMandar } from "./prazo-atendimento.js";
 import { openPago, openEntrega, openFormaPag } from "./repasse-janelas.js";
 
 const ABAS = [
@@ -138,6 +139,7 @@ function previa(box, it) {
         nome: title(it.nome),
         escola: title(it.escola),
         preco: precoTxt(it),
+        prazo: prazoParaMandar(it).prazo,
         cartao: cartaoTxt(it),
         toast: U.toast,
         maxFotos: max,
@@ -151,6 +153,7 @@ function previa(box, it) {
       nome: title(it.nome),
       escola: title(it.escola),
       preco: precoTxt(it),
+      prazo: prazoParaMandar(it).prazo,
       cartao: cartaoTxt(it),
       modo: "escolha",
       maxFotos: max,

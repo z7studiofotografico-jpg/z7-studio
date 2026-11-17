@@ -4,6 +4,8 @@
 // Toda imagem sai com marca d'água repetida (um print não serve como foto final).
 import { el, avisoErro } from "./ui.js";
 import { exemplo } from "./mockup-exemplo.js";
+import { blocoPreco, prazoTxt, wrap } from "./mockup-preco.js";
+export { blocoPreco };
 import { noComputador, copiarImagem, abrirWhatsAppWeb } from "./enviar-computador.js";
 const W = 1080,
   H = 1350;
@@ -116,20 +118,6 @@ function moldura(ctx, x, y, w, h, b, img, opts = {}) {
   ctx.fillStyle = gl;
   ctx.fillRect(ix, iy, iw, ih);
 }
-function wrap(ctx, text, x, y, maxW, lh) {
-  const words = String(text).split(/\s+/);
-  let line = "",
-    yy = y;
-  for (const w of words) {
-    const t = line ? line + " " + w : w;
-    if (ctx.measureText(t).width > maxW && line) {
-      ctx.fillText(line, x, yy);
-      line = w;
-      yy += lh;
-    } else line = t;
-  }
-  if (line) ctx.fillText(line, x, yy);
-}
 async function prep() {
   try {
     await document.fonts.load("700 40px 'Barlow Condensed'");
@@ -151,28 +139,6 @@ function rodape(ctx, cor) {
 
 // o preço da prévia: uma linha fina, o Pix grande em vermelho com "no Pix" ao lado, e o cartão embaixo
 // (valor em negrito e as parcelas em cinza). Usado no kit PR e no Kit Paspatur.
-export function blocoPreco(ctx, st, x, y, maxW) {
-  ctx.textAlign = "left";
-  ctx.textBaseline = "alphabetic";
-  ctx.fillStyle = "rgba(28,27,29,.15)";
-  ctx.fillRect(x, y, Math.min(maxW, 300), 2);
-  ctx.fillStyle = "#b3202a";
-  ctx.font = "700 66px 'Barlow Condensed', sans-serif";
-  ctx.fillText(st.preco, x, y + 72);
-  const lp = ctx.measureText(st.preco).width;
-  ctx.fillStyle = "#6b6670";
-  ctx.font = "600 24px 'Source Sans 3', sans-serif";
-  ctx.fillText("no Pix", x + lp + 12, y + 70);
-  if (!st.cartao) return y + 72;
-  const [valor, parc] = String(st.cartao).split(" · ");
-  ctx.fillStyle = "#1c1b1d";
-  ctx.font = "700 28px 'Source Sans 3', sans-serif";
-  ctx.fillText("ou " + valor, x, y + 114);
-  if (!parc) return y + 114;
-  ctx.fillStyle = "#6b6670";
-  ctx.font = "600 21px 'Source Sans 3', sans-serif";
-  return wrap(ctx, parc.replace(" ou até ", " · "), x, y + 146, maxW, 26);
-}
 async function desenharKit(cv, st) {
   await prep();
   const ctx = cv.getContext("2d");
@@ -214,20 +180,23 @@ async function desenharKit(cv, st) {
     wrap(ctx, st.escola, x, 460, 360, 26);
   }
   if (st.preco) blocoPreco(ctx, st, x, 530, 360);
+  // 17/11/2026: a logo vai para a mesa grafite, embaixo à esquerda (o lado direito fica para o preço e o prazo)
+  const ly = 1150;
   if (logoImg) {
     ctx.save();
     ctx.beginPath();
-    ctx.arc(x + 40, 830, 40, 0, Math.PI * 2);
+    ctx.arc(80 + 50, ly + 50, 50, 0, Math.PI * 2);
     ctx.clip();
-    ctx.drawImage(logoImg, x, 790, 80, 80);
+    ctx.drawImage(logoImg, 80, ly, 100, 100);
     ctx.restore();
   }
-  ctx.fillStyle = "#1c1b1d";
-  ctx.font = "700 30px 'Barlow Condensed', sans-serif";
-  ctx.fillText("Z7 STUDIO", x + 96, 825);
-  ctx.fillStyle = "#6b6670";
-  ctx.font = "400 20px 'Source Sans 3', sans-serif";
-  ctx.fillText("Fotográfico", x + 96, 852);
+  ctx.textAlign = "left";
+  ctx.fillStyle = "#f0eef0";
+  ctx.font = "700 40px 'Barlow Condensed', sans-serif";
+  ctx.fillText("Z7 STUDIO", 200, ly + 48);
+  ctx.fillStyle = "#a39fa6";
+  ctx.font = "400 24px 'Source Sans 3', sans-serif";
+  ctx.fillText("Fotográfico", 200, ly + 82);
   // porta-retratos 15x10 em pé sobre o aparador
   moldura(ctx, 560, 900, 220, 330, 16, f(1), { blur: 24, off: 12 });
   moldura(ctx, 810, 930, 210, 315, 16, f(2), { blur: 24, off: 12 });
@@ -329,7 +298,8 @@ export function openMockup({
   maxFotos = 15,
   kit = "pr",
   encarte = "calendario",
-  tel = ""
+  tel = "",
+  prazo = null // Date: até quando vale a condição (padrão: daqui a 3 dias, o tempo do representante com o aluno)
 } = {}) {
   const pas = kit === "paspatur";
   const st = {
@@ -341,7 +311,8 @@ export function openMockup({
     // a linha do cartão, embaixo do Pix: "R$ 377,00 no cartão · até 10x sem juros ou até 12x com juros"
     cartao: /\[/.test(preco) ? "" : cartao,
     modo,
-    encarte: encarte === "turma" ? "turma" : "calendario"
+    encarte: encarte === "turma" ? "turma" : "calendario",
+    prazo: prazoTxt(prazo instanceof Date ? prazo : new Date(Date.now() + 3 * 864e5))
   };
   let pasMod = null; // o desenho do Paspatur (carregado só quando precisa)
   const sh = el("div", "sheet");
