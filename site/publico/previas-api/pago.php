@@ -32,7 +32,7 @@ if ($st !== 200 || empty($r['success']) || empty($r['paid'])) z7_resposta(200, [
 $pasta = z7_pasta_pagamentos();
 $arq = $pasta . '/' . substr(preg_replace('/[^A-Za-z0-9-]/', '', $transacao), 0, 60) . '.json';
 if (!is_file($arq) && !is_file($arq . '.feito')) {
-  $recibo = (string) ($j['receipt_url'] ?? ($_GET['receipt_url'] ?? ''));
+  $recibo = (string) ($j['receipt_url'] ?? ($_POST['receipt_url'] ?? ($_GET['receipt_url'] ?? '')));
   file_put_contents($arq, json_encode([
     'codigo' => $codigo,
     'order_nsu' => $nsu,
