@@ -51,3 +51,17 @@ test("mudar ano: ID e código do aluno trocam de ano; Linha de Frente vira Repas
   assert.equal(d.seg, "rep");
   assert.equal(d.nome, "Ana");
 });
+
+test("aluguel: 'Beca pelerine azul' no Tamanho = pelerine, tamanho único (sem aviso)", () => {
+  const d = paraDocAluguel({ nome: "Ana", tamanho: "Beca pelerine azul", serie: "5º ano" }, { instId: "i1", ano: 2026 });
+  assert.equal(d.becaTipo, "pelerineAzul");
+  assert.equal(d.tamanho, "");
+  assert.deepEqual(d.__falta, []);
+  const k = paraDocAluguel(
+    { nome: "Bia", pacote: "Kit 1", serie: "5º ano" },
+    { instId: "i1", ano: 2026, contrato: { kits: [{ nome: "Kit 1", serie: "5º ano", itens: ["pelerine", "canudo"], valor: 95 }] } }
+  );
+  assert.equal(k.becaTipo, "pelerineAzul");
+  assert.equal(k.valor, 95);
+  assert.deepEqual(k.pacote, ["pelerine", "canudo"]);
+});

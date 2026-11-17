@@ -54,8 +54,9 @@ export function lerPacote(v) {
     .filter(Boolean);
   const achou = new Set();
   partes.forEach(p => {
-    if (/^beca/.test(p)) achou.add("beca");
-    else if (/^peler/.test(p)) achou.add("pelerine");
+    if (/peler/.test(p))
+      achou.add("pelerine"); // "Pelerine", "Beca pelerine azul"
+    else if (/^beca/.test(p)) achou.add("beca");
     else if (/^pasp/.test(p)) achou.add("paspatur");
     else if (/^certif/.test(p)) achou.add("certificado");
     else if (/^canud/.test(p)) achou.add("canudo");

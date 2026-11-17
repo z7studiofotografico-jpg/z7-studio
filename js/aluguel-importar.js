@@ -108,9 +108,11 @@ function docAluguel(o, ext) {
   const codigo = idDaPlanilha(o.codigo, ext.ano, ext.inst);
   const falta = [];
   if (!ext.instId) falta.push("instituição (escolha acima)");
-  if (String(o.tamanho || "").trim() && !t.tamanho) falta.push(`tamanho “${o.tamanho}” não reconhecido`);
+  // "Beca pelerine azul" (no Tamanho ou no Pacote): pelerine, tamanho único
+  const peler = /peler/i.test(String(o.tamanho || "") + " " + String(o.pacote || ""));
+  if (String(o.tamanho || "").trim() && !t.tamanho && !peler) falta.push(`tamanho “${o.tamanho}” não reconhecido`);
   if (String(o.pacote || "").trim() && !lerPacote(o.pacote).length) falta.push(`pacote “${o.pacote}” não reconhecido`);
-  return {
+  const d = {
     __falta: falta,
     instId: ext.instId || "",
     instNome: ext.instNome || "",
@@ -148,6 +150,8 @@ function docAluguel(o, ext) {
     historico: [],
     criadoEm: new Date().toISOString()
   };
+  if (peler) Object.assign(d, { becaTipo: "pelerineAzul", tamanho: "", menosLonga: false });
+  return d;
 }
 export async function importarAlugueis(C, insts) {
   if (!C.isAdmin) return U.toast("Só o administrador importa planilha.");

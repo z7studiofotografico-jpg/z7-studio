@@ -64,7 +64,17 @@ test("produção: totais por item e quem precisa de foto", () => {
     { nome: "Pedro Henrique", serie: "3002" }
   ];
   const p = R.producao(al, c);
-  assert.deepEqual(p.totais, { beca: 1, pelerine: 0, paspatur: 3, certificado: 4, canudo: 4, quadro3040: 0, pr1510: 0, foto2115: 0, foto1510: 0 });
+  assert.deepEqual(p.totais, {
+    beca: 1,
+    pelerine: 0,
+    paspatur: 3,
+    certificado: 4,
+    canudo: 4,
+    quadro3040: 0,
+    pr1510: 0,
+    foto2115: 0,
+    foto1510: 0
+  });
   assert.deepEqual(R.lerPacote("Paspatur + Quadro 30x40 + Foto 21x15"), ["paspatur", "quadro3040", "foto2115"]);
   assert.deepEqual(
     p.precisamFoto.map(l => l.aluno.nome),
@@ -160,6 +170,7 @@ test("kits do colégio: preço fechado por turma, planilha com Kit 1/Kit 2, comi
     ]
   };
   assert.deepEqual(R.lerPacote("Pelerine + Canudo"), ["pelerine", "canudo"]);
+  assert.deepEqual(R.lerPacote("Beca pelerine azul"), ["pelerine"]);
   assert.equal(R.precoAluno({ serie: "5º ano", pacote: ["pelerine", "canudo", "certificado", "foto2115"] }, c), 95);
   assert.equal(R.precoAluno({ serie: "9° ANO", pacote: ["beca", "canudo", "certificado", "foto2115", "paspatur"] }, c), 230);
   // fora de kit: a soma dos itens
