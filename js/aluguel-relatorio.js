@@ -8,7 +8,8 @@ import { pedirFiltros } from "./relatorio.js";
 import { contatoRel, ordemCodigo } from "./aluno-id.js";
 import { pacoteDoAluno, nomeItem } from "./contrato-colegio-regras.js";
 
-export const atrasadoAluguel = (a, hoje = U.todayStr()) => a.status === "Retirou a beca" && !!a.devolucao && a.devolucao < hoje;
+export const atrasadoAluguel = (a, hoje = U.todayStr()) =>
+  !a.soPaspatur && a.status === "Retirou a beca" && !!a.devolucao && a.devolucao < hoje;
 
 // Relatório: antes de gerar, escolhe ano, colégio, turma, situação e se separa por colégio ou por turma
 const SIT_REL = [
@@ -16,11 +17,21 @@ const SIT_REL = [
   ["andamento", "em andamento"],
   ["atrasados", "atrasados na devolução"],
   ["Cadastrado", "cadastrado"],
+  ["naoParticipa", "não vai participar"],
+  ["soPaspatur", "só o Paspatur"],
   ["Beca medida", "beca medida"],
+  ["Produtos em produção", "produtos em produção"],
   ["Pronto para retirada", "pronto para retirada"],
   ["Retirou a beca", "retirou a beca"],
   ["Devolvida", "devolvida"]
 ];
+// a situação do aluno no relatório (a mesma do app): não vai participar, só o Paspatur, atrasado ou a etapa
+export function situacaoAluguel(a, hoje = U.todayStr()) {
+  if (a.naoParticipa) return "Não vai participar da formatura";
+  if (atrasadoAluguel(a, hoje)) return "ATRASADO";
+  const st = a.status || "Cadastrado";
+  return a.soPaspatur ? "Só o Paspatur · " + (st === "Retirou a beca" ? "entregue" : st) : st;
+}
 export function filtrarRelatorio(arr, f, hoje = U.todayStr()) {
   return arr.filter(
     a =>
@@ -30,9 +41,13 @@ export function filtrarRelatorio(arr, f, hoje = U.todayStr()) {
       (!f.sit ||
         (f.sit === "atrasados"
           ? atrasadoAluguel(a, hoje)
-          : f.sit === "andamento"
-            ? (a.status || "Cadastrado") !== "Devolvida"
-            : (a.status || "Cadastrado") === f.sit))
+          : f.sit === "naoParticipa"
+            ? !!a.naoParticipa
+            : f.sit === "soPaspatur"
+              ? !!a.soPaspatur && !a.naoParticipa
+              : f.sit === "andamento"
+                ? !a.naoParticipa && (a.status || "Cadastrado") !== "Devolvida"
+                : !a.naoParticipa && (a.status || "Cadastrado") === f.sit))
   );
 }
 export async function relatorioAluguel(C, lista, filtro) {
@@ -86,7 +101,13 @@ export async function relatorioAluguel(C, lista, filtro) {
         .catch(() => {})
     )
   );
-  const kit = a => pacoteDoAluno(a, contratos[`${a.instId}_${a.ano}`]).itens.map(nomeItem).join(" + ") || "—";
+  // o kit: quem não vai participar não tem kit (não usa o padrão do contrato); só o Paspatur é o Paspatur
+  const kit = a =>
+    a.naoParticipa
+      ? "Sem kit"
+      : a.soPaspatur
+        ? "Só o Paspatur"
+        : pacoteDoAluno(a, contratos[`${a.instId}_${a.ano}`]).itens.map(nomeItem).join(" + ") || "Sem kit";
   const cols = ["ID", "Aluno", "Contato", "Turma", "Kit", "Beca", "Faixa / capelo", "Status", "Devolução"];
   const linha = a => [
     a.codigo || "",
@@ -96,7 +117,7 @@ export async function relatorioAluguel(C, lista, filtro) {
     kit(a),
     a.becaTipo ? tamanhoBeca(a).replace(" · sem tamanho", " (sem tamanho)") : "—",
     [a.faixa && nomeFaixa(a.faixa), a.capelo && nomeCapelo(a.capelo)].filter(Boolean).join(" · "),
-    atrasadoAluguel(a, hoje) ? "ATRASADO" : a.status || "Cadastrado",
+    situacaoAluguel(a, hoje),
     a.devolucao ? U.fmtDate(a.devolucao) : ""
   ];
   // separa por colégio, ou por colégio e turma (a turma sai em cada linha também)

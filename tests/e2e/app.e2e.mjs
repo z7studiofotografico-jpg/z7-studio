@@ -23,6 +23,12 @@ const srv = http
       return r.end();
     }
     r.writeHead(200, { "content-type": tipos[path.extname(f)] || "application/octet-stream" });
+    // config.js: no teste, o dono principal (o 1º da lista de donos) vira a conta de teste ADRIANO
+    if (path.basename(f) === "config.js" && path.dirname(f) === path.resolve(RAIZ)) {
+      const t = fs.readFileSync(f, "utf8");
+      const dono = (t.match(/donos:\s*\[\s*\{\s*email:\s*"([^"]+)"/) || [])[1];
+      return r.end(dono ? t.split(dono).join(ADRIANO) : t);
+    }
     fs.createReadStream(f).pipe(r);
   })
   .listen(8790);
@@ -35,7 +41,7 @@ const ok = (cond, msg) => {
   console.log((cond ? "  ✓ " : "  ✗ ") + msg);
   if (!cond) falhas++;
 };
-const ADRIANO = "z7studiofotografico@gmail.com",
+const ADRIANO = "adriano@teste.z7", // conta de teste (no app de verdade o dono vem de config)
   PEDRO = "pedro@vendas.com",
   NOVO = "novo@equipe.com",
   ANA = "ana@equipe.com",
@@ -2816,10 +2822,10 @@ await cenario("Para hoje de cada um · botão da pessoa · atividades da equipe"
   await calmo(pg);
   ok(/👥 Pedro \(\d+\) ▾/.test(await pg.textContent("#rChips .chip-pessoa")), "o botão mostra quem está aberto");
   lista = await pg.textContent("#rList");
-  const [, nh, nt] = lista.match(/(\d+) para hoje · (\d+) a trabalhar/) || [];
+  const [, nh, nt] = lista.match(/(\d+) negociando · (\d+) a trabalhar/) || [];
   ok(nChip >= 2 && nChip === Number(nh) + Number(nt), "botão da pessoa com quantos alunos ela tem em andamento");
   ok(
-    /Para hoje \(1\)/.test(lista) && /A trabalhar \(\d+\)/.test(lista) && /Caídos \(1\)/.test(lista) && /Do Pedro Hoje/i.test(lista),
+    /Negociando \(1\)/.test(lista) && /A trabalhar \(\d+\)/.test(lista) && /Caídos \(1\)/.test(lista) && /Do Pedro Hoje/i.test(lista),
     "janela da pessoa: as etapas com os números, abre no Para hoje"
   );
   // outra etapa: por colégio; a busca procura em todos os alunos dela
@@ -3769,7 +3775,7 @@ await cenario("Contrato do colégio (pacote por aluno, quem recebeu, repasse e p
     const { pg, erros, store } = await abrir(ADRIANO, d);
     await ir(pg, "#becas");
     await pg.waitForFunction(() => /Joao Lucas/i.test(document.getElementById("viewBecas").textContent), null, { timeout: 8000 });
-    await pg.locator("#alFiltros select").nth(1).selectOption("i1");
+    await pg.locator("#alFiltros select").nth(2).selectOption("i1");
     await pg.getByRole("button", { name: "📄 Contrato do colégio" }).click();
     await pg.getByRole("button", { name: "+ Criar contrato" }).click();
     const f = pg.locator(".sheet").last();
@@ -3823,7 +3829,10 @@ await cenario("Contrato do colégio (pacote por aluno, quem recebeu, repasse e p
     await fpac.locator("button[type=submit]").click();
     await calmo(pg);
     st = await store();
-    ok(st["alugueis/c3"].pacote.join() === "beca,paspatur", "aplicar pacote a vários grava o pacote do aluno");
+    ok(
+      st["alugueis/c3"].pacote.join() === "beca,paspatur" && st["alugueis/c3"].valor > 0,
+      "aplicar pacote a vários grava o pacote e o valor do aluno " + st["alugueis/c3"].valor
+    );
     // janela do aluno do contrato
     await painel.locator("button.lc-abrir", { hasText: "Miguel Augusto" }).click();
     const ja = pg.locator(".panel.janela-aluno");
@@ -3876,7 +3885,7 @@ await cenario("Contrato do colégio (pacote por aluno, quem recebeu, repasse e p
     const { pg, erros, store } = await abrir(ANA, d2);
     await ir(pg, "#becas");
     await pg.waitForFunction(() => /Joao Lucas/i.test(document.getElementById("viewBecas").textContent), null, { timeout: 8000 });
-    await pg.locator("#alFiltros select").nth(1).selectOption("i1");
+    await pg.locator("#alFiltros select").nth(2).selectOption("i1");
     await pg.getByRole("button", { name: "📄 Contrato do colégio" }).click();
     await pg.getByRole("button", { name: "+ Pagamento" }).click();
     const fp = pg.locator(".sheet").last();
@@ -4468,7 +4477,7 @@ await cenario("Aluguel de becas: avançar o colégio inteiro (Cadastrado → Bec
   const { pg, erros, store } = await abrir(ADRIANO, migrar(d));
   await ir(pg, "#becas");
   await pg.waitForFunction(() => /Ana Medida/i.test(document.getElementById("viewBecas").textContent), null, { timeout: 8000 });
-  await pg.locator("#alFiltros select").nth(1).selectOption("i1");
+  await pg.locator("#alFiltros select").nth(2).selectOption("i1");
   await pg.getByRole("button", { name: "⏩ Avançar o colégio inteiro" }).click();
   const sh = pg.locator(".sheet").filter({ hasText: "Avançar o colégio inteiro" });
   await sh.getByRole("button", { name: "Cadastrado (3) → Beca medida" }).click();
@@ -4490,21 +4499,27 @@ await cenario("Aluguel de becas: avançar o colégio inteiro (Cadastrado → Bec
   const sv2 = await store();
   ok(sv2["alugueis/b1"].status === "Cadastrado" && sv2["alugueis/b2"].status === "Cadastrado", "volta o colégio inteiro uma etapa");
   await sv.getByRole("button", { name: "Fechar" }).click();
-  // quem não vai participar da formatura: fica só com o Paspatur, numa aba própria
-  await pg.locator("#alChips .chip", { hasText: "Cadastrado" }).click();
-  await pg
-    .locator("#alLista .lc-item", { hasText: "Caio" })
-    .getByRole("button", { name: "🚫 Não vai participar (só o Paspatur)" })
-    .first()
-    .click();
-  await pg.locator(".sheet").last().getByRole("button", { name: "Sim" }).click();
-  let c3 = null;
-  for (let t = 0; t < 25 && !(c3 = (await store())["alugueis/b3"]).naoParticipa; t++) await pg.waitForTimeout(200);
+  // dois botões separados: não vai participar (sem kit) e só o Paspatur (vai direto para a produção)
+  const marcar = async (nome, btn, id, campo) => {
+    await pg.locator("#alChips .chip", { hasText: "Tudo" }).click();
+    await pg.locator("#alLista .lc-item", { hasText: nome }).getByRole("button", { name: btn }).first().click();
+    await pg.locator(".sheet").last().getByRole("button", { name: "Sim" }).click();
+    let x = null;
+    for (let t = 0; t < 25 && !(x = (await store())["alugueis/" + id])[campo]; t++) await pg.waitForTimeout(200);
+    return x;
+  };
+  const c3 = await marcar("Caio", "🚫 Não vai participar", "b3", "naoParticipa");
+  ok(c3.naoParticipa === true && c3.pacote.length === 0 && c3.valor === 0, "não vai participar: marcado, sem kit");
+  const c2 = await marcar("Bia", "📒 Só o Paspatur", "b2", "soPaspatur");
+  ok(c2.soPaspatur === true && c2.pacote.join() === "paspatur", "só o Paspatur: marcado, kit só o Paspatur");
+  const chips = await pg.locator("#alChips").textContent();
+  ok(/Não vai participar\s*1/.test(chips) && /Só o Paspatur\s*1/.test(chips), "uma aba para cada um");
+  await pg.locator("#alChips .chip", { hasText: "Só o Paspatur" }).click();
   ok(
-    c3.naoParticipa === true && c3.pacote.join() === "paspatur",
-    "não vai participar: marcado, só com o Paspatur " + JSON.stringify([c3.naoParticipa, c3.pacote, c3.status])
+    (await pg.locator("#alLista .lc-item", { hasText: "Bia" }).getByRole("button", { name: "Avançar: Produtos em produção" }).count()) ===
+      1,
+    "só o Paspatur: o próximo passo é a produção (sem medir beca)"
   );
-  ok(/Não vai participar · só o Paspatur\s*1/.test(await pg.locator("#alChips").textContent()), "aba própria com 1 aluno");
   ok(!erros.length, "sem erros" + (erros.length ? ": " + erros.join(" | ") : ""));
 });
 await cenario("Colégio sem preço: aviso vermelho e venda bloqueada", async () => {

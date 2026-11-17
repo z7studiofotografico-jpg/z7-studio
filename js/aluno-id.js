@@ -132,6 +132,15 @@ export async function reservarCodigo(FS, db, ano, sigla, codigos) {
     return fmtCodigo(ano, sigla, max + 1);
   }
 }
+// Só o número do aluno ("71", "id 71", "nº 71"), para buscar dentro do colégio escolhido; senão null
+export function numeroDaBusca(t) {
+  const m = String(t || "")
+    .trim()
+    .match(/^(?:id|n[º°o]?\.?|n[uú]mero)?\s*(\d{1,4})$/i);
+  return m ? Number(m[1]) : null;
+}
+// o aluno tem esse número no ID? (26CIEP225-71 → 71)
+export const temNumero = (it, n) => (lerCodigo((it && it.codigo) || "") || {}).n === n;
 // Ordem da lista por ID (ano, sigla, número); quem não tem ID vai para o fim, por nome
 export function ordemCodigo(a, b) {
   const x = lerCodigo(a.codigo),

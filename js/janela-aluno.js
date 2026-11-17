@@ -28,7 +28,7 @@ import {
 } from "./repasse-estado.js";
 import { chaveVenda } from "./venda-como.js";
 import { card, desenharProximo } from "./repasse-cartao.js";
-import { openPago, openEntrega } from "./repasse-janelas.js";
+import { openPago, openEntrega, openFormaPag } from "./repasse-janelas.js";
 
 const ABAS = [
   ["resumo", "Resumo"],
@@ -59,6 +59,7 @@ export function abrirJanela(it0) {
         topo.innerHTML = "";
         const volta = U.mkBtn("‹ Voltar para a lista", "btn-sm", close);
         const nome = el("div", "ja-nome");
+        if (it.codigo) nome.append(el("span", "lc-id", it.codigo)); // o ID em cima do nome, como nas listas
         nome.append(
           el("h2", null, title(it.nome) || "Sem nome"),
           el(
@@ -274,7 +275,8 @@ function venda(box, it) {
   linha("Situação", situacaoTxt(it, s));
   linha("Preço", precoTxt(it));
   linha("Valor pago", it.valor && ["PAGO", "ENTREGUE"].includes(it.etapa) ? U.money(it.valor) : "");
-  linha("Forma de pagamento", it.formaPag || "");
+  const vendido = ["PAGO", "ENTREGUE"].includes(it.etapa);
+  linha("Forma de pagamento", it.formaPag || (vendido ? "⚠️ falta informar (Pix, cartão ou dinheiro)" : ""));
   linha("Pago em", dataBR(it.pagoEm));
   linha("Comprovante", it.comprovante || "");
   linha("Conferida", it.conferido === false ? "falta conferir" : ["PAGO", "ENTREGUE"].includes(it.etapa) ? "sim" : "");
@@ -287,6 +289,12 @@ function venda(box, it) {
   const ac = el("div", "actions");
   if (ABERTAS.includes(it.etapa)) ac.append(U.mkBtn("Pagou 💰", "btn-ok", () => openPago(it)));
   if (it.etapa === "PAGO") ac.append(U.mkBtn("📍 Endereço e data", "", () => openEntrega(it)));
+  if (vendido)
+    ac.append(
+      U.mkBtn(it.formaPag ? "✏️ Forma de pagamento" : "💳 Informar a forma de pagamento", it.formaPag ? "" : "btn-primary", () =>
+        openFormaPag(it)
+      )
+    );
   if (ac.childNodes.length) box.append(ac);
   if (!lista.childNodes.length) box.append(el("p", "hint", "Ainda sem venda."));
 }

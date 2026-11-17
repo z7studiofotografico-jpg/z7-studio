@@ -120,11 +120,26 @@ export function abrirFotosDoAluno(C, it, precoTxt, cartaoTxt = "") {
       p.append(U.mkBtn("Fechar", "", close));
       return;
     }
+    // não achou: a lista do Drive fica guardada enquanto o app está aberto; foto enviada há pouco (arrastada para o
+    // Drive) só aparece lendo de novo. Procura mais uma vez, sem a lista guardada, antes de dizer que não tem.
+    if (r.erro) {
+      esquecerListas();
+      try {
+        r = await D.fotosDoAluno(raiz, it);
+      } catch (_) {}
+    }
     if (r.erro) {
       info.className = "wait";
       info.textContent = r.erro;
       botaoEnviar(C, it, p, close, precoTxt, cartaoTxt);
-      p.append(U.mkBtn("Fechar", "", close));
+      p.append(
+        U.mkBtn("🔄 Procurar de novo", "", () => {
+          esquecerListas();
+          close();
+          abrirFotosDoAluno(C, it, precoTxt, cartaoTxt);
+        }),
+        U.mkBtn("Fechar", "", close)
+      );
       return;
     }
     info.textContent = `${r.fotos.length} foto${r.fotos.length === 1 ? "" : "s"} · ${r.colegio.replace(/^Pr[ée]vias\s*-\s*/i, "")}`;

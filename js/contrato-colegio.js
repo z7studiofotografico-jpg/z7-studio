@@ -8,10 +8,11 @@ import * as U from "./util.js";
 import { lerReais, brl } from "./regras.js";
 import { confirmar } from "./confirmar.js";
 import { abrirRelatorio } from "./relatorio.js";
-import { contatoRel } from "./aluno-id.js";
+import { contatoRel, ordemCodigo } from "./aluno-id.js";
 import * as R from "./contrato-colegio-regras.js";
 
 let C, FS, db;
+let stAtual = null; // o contrato aberto (os preços para o valor do pacote)
 const agora = () => new Date().toISOString();
 const reg = o => ({ o, em: agora(), por: C.me || C.email || "" });
 const histMais = (h, o) => [...(h || []), reg(o)].slice(-40);
@@ -25,6 +26,7 @@ export function abrirContrato(ctx, inst, ano) {
   const id = R.idContrato(inst.id, ano);
   const ref = FS.doc(db, "contratosColegio", id);
   const st = { contrato: null, carregou: false, pags: [], alunos: [], marcados: new Set() };
+  stAtual = st;
   const unsubs = [];
   sheet(
     "📄 Contrato do colégio",
@@ -85,10 +87,7 @@ export function abrirContrato(ctx, inst, ano) {
             st.alunos = s.docs
               .map(d => Object.assign({ id: d.id }, d.data()))
               .filter(a => String(a.ano) === String(ano) && !(a.excluido && a.excluido.em))
-              .sort(
-                (a, b) =>
-                  String(a.serie || "").localeCompare(String(b.serie || ""), "pt-BR") || (a.nome || "").localeCompare(b.nome || "", "pt-BR")
-              );
+              .sort((a, b) => String(a.serie || "").localeCompare(String(b.serie || ""), "pt-BR") || ordemCodigo(a, b));
             if (st.carregou) desenhar();
           },
           () => {}
@@ -127,7 +126,13 @@ function render(corpo, st, inst, ano, ref) {
         .map(([k, n]) => `${n} ${brl(c.precos[k])}`)
         .join(" · ") + (Number(c.parcelas) > 1 ? ` · em ${c.parcelas}x` : "")
     ),
-    ...(c.quemPaga === "colegio" ? [linha("Valor combinado (total)", c.valor ? brl(c.valor) : "")] : []),
+    ...(c.quemPaga === "colegio"
+      ? [
+          linha("Valor combinado (total)", c.valor ? brl(c.valor) : ""),
+          // mesmo com o colégio pagando, o valor de cada aluno (para ter os valores certos)
+          linha("Valor por aluno", valorPorAluno(c, st.alunos))
+        ]
+      : []),
     linha("Quem costuma receber", c.quemPaga === "colegio" ? "—" : (R.RECEBE.find(([k]) => k === c.recebePadrao) || [, "Estúdio"])[1]),
     linha("Contato do colégio", [ct.nome, ct.cargo && ct.cargo.replace("(a)", "").toLowerCase(), ct.tel].filter(Boolean).join(" · ")),
     linha("Entrega combinada", ent.data ? `${dataBR(ent.data)}${ent.com ? " com " + ent.com : ""}` : ""),
@@ -234,6 +239,7 @@ function render(corpo, st, inst, ano, ref) {
       const n = el("button", "lc-nome lc-abrir");
       n.type = "button";
       n.onclick = () => janelaAluno(a.id, st, ref, pode);
+      if (a.codigo) n.append(el("span", "lc-id", a.codigo));
       n.append(
         el("b", null, title(a.nome || "")),
         el(
@@ -261,11 +267,28 @@ function render(corpo, st, inst, ano, ref) {
   }
 }
 
-async function gravarPacotes(ids, itens) {
+// colégio paga: o valor de cada aluno pelos preços dos itens; sem preço, o total dividido pelos alunos que participam
+function valorPorAluno(c, alunos) {
+  const vai = (alunos || []).filter(a => !a.naoParticipa);
+  if (!vai.length) return "";
+  const soma = vai.reduce((t, a) => t + (R.precoAluno(a, c) || 0), 0);
+  if (soma) return `${brl(soma / vai.length)} em média (${vai.length} alunos, pelos itens de cada um)`;
+  return c.valor ? `${brl(c.valor / vai.length)} (${brl(c.valor)} ÷ ${vai.length} alunos)` : "";
+}
+// o pacote (um aluno ou vários marcados) e o valor de cada um pela tabela de preço do contrato
+async function gravarPacotes(ids, itens, contrato = (stAtual && stAtual.contrato) || {}) {
   try {
     for (let i = 0; i < ids.length; i += 400) {
       const b = FS.writeBatch(db);
-      ids.slice(i, i + 400).forEach(id => b.update(FS.doc(db, "alugueis", id), { pacote: itens, atualizadoEm: agora() }));
+      ids.slice(i, i + 400).forEach(id => {
+        const patch = { pacote: itens, atualizadoEm: agora() };
+        const temPreco = Object.values(contrato.precos || {}).some(v => Number(v) > 0);
+        if (temPreco && C.isAdmin) {
+          patch.valor = R.precoAluno({ pacote: itens }, contrato);
+          patch.contratoZerado = !patch.valor;
+        }
+        b.update(FS.doc(db, "alugueis", id), patch);
+      });
       await b.commit();
     }
     U.toast(itens.length ? "Pacote salvo" : "Voltou para o pacote padrão");
@@ -377,7 +400,10 @@ function formContrato(c, inst, ano, ref) {
     const b1 = bloco(1, "Quem fechou e quem paga");
     b1.append(r1, r2);
     const b2 = bloco(2, "Preços e pacote", "o aluno paga a soma dos itens do pacote dele");
-    b2.append(field("Preço de cada item", precos), field("Pacote padrão (quem não tiver PACOTE na planilha)", pacote));
+    b2.append(
+      field("Preço de cada item, por aluno (também quando o colégio paga: dá o valor de cada aluno)", precos),
+      field("Pacote padrão (quem não tiver PACOTE na planilha)", pacote)
+    );
     const b3 = bloco(3, "Contato do colégio");
     b3.append(r3, field("Unidade", unidade));
     const b4 = bloco(4, "Entrega e observações");
@@ -532,7 +558,7 @@ function formPagamento(pg, st, ref, pre = {}) {
   sheet(pg ? "Editar pagamento" : "Novo pagamento", (p, close) => {
     const porAluno = c.quemPaga !== "colegio";
     const sAluno = sel(
-      st.alunos.map(a => [a.id, `${title(a.nome || "")}${a.serie ? " · " + a.serie : ""}`]),
+      st.alunos.map(a => [a.id, `${a.codigo ? a.codigo + " · " : ""}${title(a.nome || "")}${a.serie ? " · " + a.serie : ""}`]),
       x.alunoId || "",
       "escolha o aluno"
     );
@@ -671,8 +697,9 @@ function relProducao(st, inst, ano) {
         {
           titulo: "Alunos",
           tabela: {
-            cols: ["Aluno", "Turma", "Colégio", "Unidade", "Itens", "Foto", "Contato"],
+            cols: ["ID", "Aluno", "Turma", "Colégio", "Unidade", "Itens", "Foto", "Contato"],
             linhas: pr.linhas.map(l => [
+              l.aluno.codigo || "",
               title(l.aluno.nome || ""),
               l.aluno.serie || "",
               title(inst.nome || ""),
@@ -687,7 +714,7 @@ function relProducao(st, inst, ano) {
           ? [
               {
                 titulo: `Precisam de foto (paspatur): ${pr.precisamFoto.length}`,
-                nota: pr.precisamFoto.map(l => title(l.aluno.nome || "")).join(", ")
+                nota: pr.precisamFoto.map(l => (l.aluno.codigo ? l.aluno.codigo + " " : "") + title(l.aluno.nome || "")).join(", ")
               }
             ]
           : [])
@@ -721,6 +748,7 @@ function janelaAluno(id, st, ref, pode) {
         const pags = st.pags.filter(x => x.alunoId === id);
         topo.innerHTML = "";
         const nome = el("div", "ja-nome");
+        if (a.codigo) nome.append(el("span", "lc-id", a.codigo));
         nome.append(
           el("h2", null, title(a.nome || "")),
           el("small", null, [title(a.instNome || ""), a.unidade || c.unidade, a.serie, a.ano].filter(Boolean).join(" · "))

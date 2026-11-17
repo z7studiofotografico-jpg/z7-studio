@@ -45,6 +45,7 @@ import { telaCriarSenha } from "./criar-senha.js";
 import { painelNumeros } from "./numeros-tela.js";
 import { painelAtividades } from "./atividades.js";
 import { ligarWhatsCerto } from "./numeros-celular.js";
+import { ligarOlho } from "./olho-valores.js";
 import * as Equipe from "./equipe.js";
 import { definirExtras as feriadosExtras } from "./feriados.js";
 
@@ -335,6 +336,7 @@ const ctx = {
 ligarErros(ctx);
 // "Abrir no WhatsApp": abre no app (WhatsApp ou Business) do número em uso nesta tela
 ligarWhatsCerto(ctx);
+ligarOlho(); // 👁 os valores em R$ ficam apagados até tocar no olho
 Funil.init(ctx);
 const { renderPushState, renderPushBanner, refreshPushToken } = criarNotificacoes({
   app,

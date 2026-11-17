@@ -13,7 +13,7 @@ import { linhaCompacta } from "./lista-compacta.js";
 import { abrirJanela } from "./janela-aluno.js";
 import { openImport } from "./repasse-import.js";
 import { botaoRelatorio, contar } from "./relatorio.js";
-import { codigoBusca, pareceCodigo, codigosDaBusca, ordemCodigo, telRelatorio } from "./aluno-id.js";
+import { codigoBusca, pareceCodigo, codigosDaBusca, ordemCodigo, telRelatorio, numeroDaBusca, temNumero } from "./aluno-id.js";
 import { painelPedidos } from "./pedidos.js";
 import {
   C,
@@ -275,7 +275,7 @@ function mount() {
   v.append(g);
 
   const st = el("section", "stats");
-  st.innerHTML = `<div class="stat today"><b id="rsHoje">–</b><small>Para hoje</small></div>
+  st.innerHTML = `<div class="stat today"><b id="rsHoje">–</b><small>Negociando</small></div>
     <div class="stat"><b id="rsFila">–</b><small>Na fila</small></div>
     <div class="stat"><b id="rsInt">–</b><small>Interessados</small></div>
     <div class="stat won"><b id="rsMes">–</b><small>Vendido no mês</small></div>`;
@@ -501,7 +501,7 @@ function renderChips() {
     ["incompletos", C.isAdmin ? "Incompletos" : "Meus incompletos"],
     ["buscar", "Buscar"],
     ["trabalhar", "A trabalhar"],
-    ["hoje", "Para hoje"],
+    ["hoje", "Negociando"],
     ["interessados", "Interessados"]
   ];
   // (ordem de 10/11; depois vêm A conferir · Vendido/Entregar · Entregues · botões da equipe)
@@ -579,6 +579,7 @@ async function buscar() {
     esc = $("rEscola").value,
     escE = escolaEscolhida(esc); // { ano, nomes } do colégio escolhido (uma linha por colégio e ano)
   const daEscola = it => !escE || ((!escE.ano || it.ano === escE.ano) && escE.nomes.includes(it.escola));
+  const num = escE && numeroDaBusca(txt); // colégio escolhido + só o número ("71", "id 71"): busca pelo número do ID
   if (!C.pode("rep") && !ehFormatura()) {
     // Só Linha de Frente: carrega os ensaios do ano (uma vez a cada 10 min) e filtra aqui.
     if (!txt && !esc) {
@@ -601,6 +602,7 @@ async function buscar() {
             it =>
               daEscola(it) &&
               (!txt ||
+                (num && temNumero(it, num)) ||
                 (cods.length && cods.includes(codigoBusca(it.codigo))) ||
                 (dg.length >= 8 ? (it.telefones || []).some(t => t.includes(dg.slice(-8))) : (it.nomeBusca || "").includes(n)))
           )
@@ -633,7 +635,8 @@ async function buscar() {
   else if (txt.length >= 2) {
     const n = norm(txt);
     q = FS.query(col, FS.orderBy("nomeBusca"), FS.startAt(n), FS.endAt(n + ""), FS.limit(30));
-  } else if (escE)
+  }
+  if (escE && (num || !txt))
     q = FS.query(
       col,
       escE.nomes.length > 1 ? FS.where("escola", "in", escE.nomes) : FS.where("escola", "==", escE.nomes[0]),
@@ -648,7 +651,8 @@ async function buscar() {
   try {
     const s = await FS.getDocs(q);
     if (minha !== buscaN) return;
-    mudarItems(s.docs.map(d => Object.assign({ id: d.id }, d.data())).sort(ordemBusca(esc && !txt)));
+    const docs = s.docs.map(d => Object.assign({ id: d.id }, d.data()));
+    mudarItems((num ? docs.filter(it => temNumero(it, num)) : docs).sort(ordemBusca(esc && (!txt || num))));
     renderList();
   } catch (e) {
     console.warn(e);
@@ -733,7 +737,7 @@ function renderList(loading, emptyMsg) {
       caidos: ["Nenhum caído", "Quem não quer mais (com o motivo) aparece aqui."],
       vendidos: ["Nenhuma venda entregue ainda", "Quem comprou e já recebeu o kit aparece aqui, só para consulta."],
       conferir: ["Nenhuma venda para conferir ✓", "As vendas registradas pela equipe aparecem aqui até você conferir o comprovante."],
-      hoje: ["Nada para hoje", 'Separe o seu lote do dia no quadro acima, ou toque em "Trabalhar hoje" na aba A trabalhar.'],
+      hoje: ["Nada em negociação hoje", 'Separe o seu lote do dia no quadro acima, ou toque em "Trabalhar hoje" na aba A trabalhar.'],
       trabalhar: ["Nada a trabalhar", "Os alunos passados para você, sem data para hoje, aparecem aqui."],
       equipe: [`Nada com ${U.first(title(pessoaAberta.nome))}`, "Ninguém em andamento nem caído com essa pessoa nesta lista."],
       interessados: ["Nenhum interessado ainda", "Quem responder que quer ver a prévia aparece aqui."],
@@ -780,7 +784,7 @@ function renderList(loading, emptyMsg) {
 
 // ---------- relatório para imprimir (a aba aberta, com os números do topo) ----------
 const NOMES_ABA = {
-  hoje: "Para hoje",
+  hoje: "Negociando",
   trabalhar: "A trabalhar",
   equipe: "Equipe",
   interessados: "Interessados",
@@ -813,7 +817,7 @@ export function relatorioPR() {
       {
         titulo: "Números",
         kpis: [
-          ["Para hoje", txt("rsHoje")],
+          ["Negociando", txt("rsHoje")],
           ["Na fila", txt("rsFila")],
           ["Interessados", txt("rsInt")],
           ["Vendido no mês", txt("rsMes")]

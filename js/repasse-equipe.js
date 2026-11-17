@@ -17,7 +17,7 @@ export function renderTrabalhar(list, arr, linha) {
     const box = linha(it);
     const b = U.mkBtn("📅 Trabalhar hoje", "btn-sm btn-hoje", () => {
       b.disabled = true;
-      save(it, { followup: U.todayStr() }, "Está no seu Para hoje ✅").finally(() => (b.disabled = false));
+      save(it, { followup: U.todayStr() }, "Está no seu Negociando ✅").finally(() => (b.disabled = false));
     });
     box.append(b);
     return box;
@@ -32,10 +32,10 @@ export function gruposEquipe(arr, hoje) {
 export function renderEquipe(list, arr, linha) {
   const nome = U.first(title(pessoaAberta.nome));
   const g = gruposEquipe(arr, U.todayStr());
-  const topo = el("p", "notes", `${nome}: ${g[0].length} para hoje · ${g[1].length} a trabalhar · ${g[2].length} caídos`);
+  const topo = el("p", "notes", `${nome}: ${g[0].length} negociando · ${g[1].length} a trabalhar · ${g[2].length} caídos`);
   topo.style.gridColumn = "1/-1";
   list.append(topo);
-  [`Para hoje de ${nome}`, "A trabalhar", "Caídos"].forEach((t, i) => {
+  [`Negociando · ${nome}`, "A trabalhar", "Caídos"].forEach((t, i) => {
     if (!g[i].length) return;
     const h = el("h3", "grp", `${t} (${g[i].length})`);
     h.style.gridColumn = "1/-1";
@@ -97,7 +97,7 @@ export function botoesEquipe(c, abrir) {
     b.setAttribute("aria-pressed", String(!!aberta()));
   };
   b.onclick = () =>
-    escolherRepresentante(pessoas, aberta(), abrir, { dica: "Toque para ver os alunos da pessoa: para hoje, a trabalhar e caídos." });
+    escolherRepresentante(pessoas, aberta(), abrir, { dica: "Toque para ver os alunos da pessoa: negociando, a trabalhar e caídos." });
   c.append(b);
   desenhar(contas.chave === colNome() + "|" + seg ? contas.lista : []);
   contarEquipe()

@@ -291,3 +291,31 @@ export function openNotas(it) {
     });
   });
 }
+
+// venda já registrada sem a forma de pagamento (ou para corrigir): Pix, cartão, dinheiro… e o comprovante
+export function openFormaPag(it) {
+  sheet("Forma de pagamento", (p, close) => {
+    p.append(el("p", "hint", title(it.nome) + (it.valor ? " · " + U.money(it.valor) : "")));
+    const fp = el("select");
+    ["Pix", "Cartão", "Dinheiro", "Link", "Recorrente", "Boleto", "Outro"].forEach(x => {
+      const o = el("option", null, x);
+      o.value = x;
+      fp.append(o);
+    });
+    fp.value = it.formaPag || "Pix";
+    const comp = el("input");
+    comp.maxLength = 120;
+    comp.value = it.comprovante || "";
+    comp.placeholder = "ex.: Pix de Maria às 14h, ou nº do comprovante";
+    p.append(field("Pagamento", fp), field("Comprovante", comp));
+    const a = el("div", "actions");
+    a.append(
+      U.mkBtn("Salvar", "btn-primary", async () => {
+        await save(it, { formaPag: fp.value, comprovante: comp.value.trim() }, "Forma de pagamento salva ✅");
+        close();
+      }),
+      U.mkBtn("Cancelar", "", close)
+    );
+    p.append(a);
+  });
+}

@@ -64,7 +64,8 @@ test("produção: totais por item e quem precisa de foto", () => {
     { nome: "Pedro Henrique", serie: "3002" }
   ];
   const p = R.producao(al, c);
-  assert.deepEqual(p.totais, { beca: 1, paspatur: 3, certificado: 4, canudo: 4 });
+  assert.deepEqual(p.totais, { beca: 1, paspatur: 3, certificado: 4, canudo: 4, quadro3040: 0, pr1510: 0, foto2115: 0, foto1510: 0 });
+  assert.deepEqual(R.lerPacote("Paspatur + Quadro 30x40 + Foto 21x15"), ["paspatur", "quadro3040", "foto2115"]);
   assert.deepEqual(
     p.precisamFoto.map(l => l.aluno.nome),
     ["Miguel Augusto", "Ana Beatriz", "Pedro Henrique"]

@@ -156,6 +156,7 @@ if (!SIMULAR) {
         }
       }
       const f = fila.shift();
+      if (!f) break; // outra conexão pegou a última foto enquanto esta reconectava
       try {
         const b = await baixar(f);
         await c.uploadFrom(Readable.from([b]), f.id + ".jpg");

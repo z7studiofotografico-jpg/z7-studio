@@ -30,6 +30,10 @@ export const CAMPOS_ALUGUEL = [
   { k: "itPaspatur", nome: "Paspatur (item)", sinonimos: ["Paspatur"] },
   { k: "itCanudo", nome: "Canudo (item)", sinonimos: ["Canudo"] },
   { k: "itCertificado", nome: "Certificado (item)", sinonimos: ["Certificado"] },
+  { k: "itQuadro", nome: "Quadro 30x40 (item)", sinonimos: ["Quadro", "Quadro 30x40", "Quadro 30 x 40"] },
+  { k: "itPR", nome: "PR 15x10 (item)", sinonimos: ["PR", "PR 15x10", "2 PR 10X15", "Porta-retrato", "Porta retrato"] },
+  { k: "itFoto2115", nome: "Foto 21x15 (item)", sinonimos: ["Foto 21x15", "Foto 21 x 15"] },
+  { k: "itFoto1510", nome: "Foto 15x10 (item)", sinonimos: ["Foto 15x10", "Foto 15 x 10"] },
   { k: "unidade", nome: "Unidade", sinonimos: ["Unidade do colégio", "Filial"] },
   { k: "obs", nome: "Observação", sinonimos: ["Obs", "Observações"] }
 ];
@@ -61,7 +65,11 @@ export function itensMarcados(o) {
     ["itBeca", "beca"],
     ["itPaspatur", "paspatur"],
     ["itCanudo", "canudo"],
-    ["itCertificado", "certificado"]
+    ["itCertificado", "certificado"],
+    ["itQuadro", "quadro3040"],
+    ["itPR", "pr1510"],
+    ["itFoto2115", "foto2115"],
+    ["itFoto1510", "foto1510"]
   ]
     .filter(([k]) => tem(o[k]))
     .map(([, i]) => i);

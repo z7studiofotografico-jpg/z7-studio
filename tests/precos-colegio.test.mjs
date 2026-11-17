@@ -39,3 +39,12 @@ test("parcelas: o número escolhido é sem juros; com juros até 12x (como na ma
   assert.equal(parcTxt(12), "até 12x sem juros");
   assert.equal(parcTxt(1), "até 12x com juros");
 });
+import { numeroDaBusca, temNumero } from "../js/aluno-id.js";
+test("busca pelo número do aluno dentro do colégio: 71, id 71, nº 71", () => {
+  assert.equal(numeroDaBusca("71"), 71);
+  assert.equal(numeroDaBusca("id 71"), 71);
+  assert.equal(numeroDaBusca("Nº 7"), 7);
+  assert.equal(numeroDaBusca("Ana"), null);
+  assert.equal(numeroDaBusca("21999990000"), null);
+  assert.ok(temNumero({ codigo: "26CIEP225-71" }, 71));
+});

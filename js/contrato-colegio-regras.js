@@ -19,7 +19,12 @@ export const ITENS_PACOTE = [
   ["beca", "Beca"],
   ["paspatur", "Paspatur"],
   ["certificado", "Certificado"],
-  ["canudo", "Canudo"]
+  ["canudo", "Canudo"],
+  // (17/11/2026) também vendidos junto no kit
+  ["quadro3040", "Quadro 30x40 cm"],
+  ["pr1510", "PR 15x10 cm"],
+  ["foto2115", "Foto 21x15 cm"],
+  ["foto1510", "Foto 15x10 cm"]
 ];
 export const nomeItem = id => (ITENS_PACOTE.find(([k]) => k === id) || [id, id])[1];
 export const QUEM_PAGA = [
@@ -51,6 +56,10 @@ export function lerPacote(v) {
     else if (/^pasp/.test(p)) achou.add("paspatur");
     else if (/^certif/.test(p)) achou.add("certificado");
     else if (/^canud/.test(p)) achou.add("canudo");
+    else if (/^quadro/.test(p)) achou.add("quadro3040");
+    else if (/^(pr|porta)/.test(p)) achou.add("pr1510");
+    else if (/^foto.*21/.test(p)) achou.add("foto2115");
+    else if (/^foto.*1[05]/.test(p)) achou.add("foto1510");
   });
   return ITENS_PACOTE.map(([k]) => k).filter(k => achou.has(k));
 }
@@ -163,17 +172,22 @@ export function pagoPorAluno(pags) {
 // Relatório de produção: totais por item e quem precisa de foto (tem paspatur)
 export function producao(alunos, contrato) {
   const tot = Object.fromEntries(ITENS_PACOTE.map(([k]) => [k, 0]));
+  // por turma e, dentro, pelo ID; quem não vai participar fica fora; a foto já tirada (perguntada ao ir para a
+  // produção) não aparece mais como "precisa de foto"
+  const num = a => (String(a.codigo || "").match(/-(\d+)$/) || [])[1];
   const linhas = (alunos || [])
+    .filter(a => !a.naoParticipa)
     .slice()
     .sort(
       (a, b) =>
         String(a.serie || "").localeCompare(String(b.serie || ""), "pt-BR") ||
+        (Number(num(a)) || 1e9) - (Number(num(b)) || 1e9) ||
         String(a.nome || "").localeCompare(String(b.nome || ""), "pt-BR")
     )
     .map(a => {
       const { itens, padrao } = pacoteDoAluno(a, contrato);
       itens.forEach(k => tot[k]++);
-      return { aluno: a, itens, padrao, foto: itens.includes("paspatur") };
+      return { aluno: a, itens, padrao, foto: itens.includes("paspatur") && !a.fotoTirada };
     });
   return { totais: tot, linhas, precisamFoto: linhas.filter(l => l.foto) };
 }

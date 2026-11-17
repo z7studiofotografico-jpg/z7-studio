@@ -21,7 +21,7 @@ export function chipsPessoa(hoje) {
     ["caidos", "Caídos", it => it.etapa === "CAÍDO"],
     ["incompletos", "Incompletos", it => it.etapa === "INCOMPLETO"],
     ["trabalhar", "A trabalhar", it => aberto(it) && !deHoje(it)],
-    ["hoje", "Para hoje", deHoje],
+    ["hoje", "Negociando", deHoje],
     ["interessados", "Interessados", it => it.etapa === "INTERESSADO"],
     ["conferir", "A conferir", it => ["PAGO", "ENTREGUE"].includes(it.etapa) && it.conferido === false],
     ["vender", "Vendido/entregar", it => it.etapa === "PAGO"],
@@ -87,7 +87,7 @@ export function renderPessoa(list, arr, linha) {
     el(
       "p",
       "notes",
-      `${nome}: ${n("hoje")} para hoje · ${n("trabalhar")} a trabalhar · ${n("caidos")} caídos · ${todos.length + (st.entregues ? 0 : st.nEntregues || 0)} no total`
+      `${nome}: ${n("hoje")} negociando · ${n("trabalhar")} a trabalhar · ${n("caidos")} caídos · ${todos.length + (st.entregues ? 0 : st.nEntregues || 0)} no total`
     )
   );
   // busca em todos os alunos da pessoa (fica a mesma caixa entre um desenho e outro: não perde o que foi digitado)

@@ -46,6 +46,14 @@ export function avancarColegio(C, alunos, mudarStatus, voltar = false) {
           nao: "Não"
         });
         if (!ok) return;
+        if (
+          para === "Produtos em produção" &&
+          !(await confirmar("As fotos já foram tiradas?", `Os ${als.length} alunos vão para a produção. As fotos deles já foram tiradas?`, {
+            sim: "Sim, já tiramos",
+            nao: "Ainda não"
+          }))
+        )
+          return U.toast("Tire as fotos antes de mandar para a produção.");
         lista.querySelectorAll("button").forEach(x => (x.disabled = true));
         const pulados = [];
         let feitos = 0;
@@ -72,27 +80,32 @@ export function avancarColegio(C, alunos, mudarStatus, voltar = false) {
   });
 }
 
-// marca (ou desmarca) quem não vai participar da formatura: fica só com o Paspatur, sem beca reservada
-export async function naoParticipa(C, a, sim, salvar) {
-  const titulo = sim ? "Não vai participar da formatura?" : "Vai participar da formatura?";
-  const texto = sim
-    ? `${title(a.nome)} não aluga a beca e fica só com o Paspatur (a beca reservada volta para o estoque).`
-    : `${title(a.nome)} volta para Cadastrado, para medir a beca.`;
-  if (!(await confirmar(titulo, texto, { sim: "Sim", nao: "Não" }))) return;
-  let preco = 0;
+// Não vai participar (fez a foto, não vai à formatura) · Só o Paspatur (os pais só querem o Paspatur) · Vai participar
+// (aluga a beca). Os dois primeiros não reservam beca; a beca reservada volta para o estoque.
+const MODOS = {
+  nao: ["Não vai participar da formatura?", "não vai à formatura: fica sem kit (se depois quiser o Paspatur, toque em Só o Paspatur)."],
+  paspatur: ["Só o Paspatur?", "fica só com o Paspatur, sem beca: vai direto para a produção quando avançar."],
+  vai: ["Vai participar da formatura?", "volta para Cadastrado, para medir a beca."]
+};
+export async function participacao(C, a, modo, salvar) {
+  const [titulo, texto] = MODOS[modo];
+  if (!(await confirmar(titulo, `${title(a.nome)} ${texto}`, { sim: "Sim", nao: "Não" }))) return;
+  let pr = {};
   try {
     const c = await C.FS.getDoc(C.FS.doc(C.db, "contratosColegio", `${a.instId}_${Number(a.ano)}`));
-    preco = Number(((c.exists() && c.data().precos) || {}).paspatur) || 0;
+    pr = (c.exists() && c.data().precos) || {};
   } catch (_) {}
   const de = a.status || "Cadastrado";
-  const patch = sim
-    ? { naoParticipa: true, status: "Cadastrado", pacote: ["paspatur"], valor: preco || a.valor || 0, contratoZerado: false }
-    : { naoParticipa: false, status: "Cadastrado" };
-  patch.historico = [
-    ...(a.historico || []),
-    { de, para: sim ? "Não vai participar (só o Paspatur)" : "Vai participar", em: new Date().toISOString(), por: C.me || "" }
-  ].slice(-30);
-  return salvar(a, patch, sim ? "Marcado: só o Paspatur" : "Voltou para Cadastrado");
+  const vPas = Number(pr.paspatur) || 0;
+  const patch =
+    modo === "nao"
+      ? { naoParticipa: true, soPaspatur: false, status: "Cadastrado", pacote: [], valor: 0, contratoZerado: true }
+      : modo === "paspatur"
+        ? { naoParticipa: false, soPaspatur: true, status: "Cadastrado", pacote: ["paspatur"], valor: vPas, contratoZerado: !vPas }
+        : { naoParticipa: false, soPaspatur: false, status: "Cadastrado" };
+  const nome = { nao: "Não vai participar", paspatur: "Só o Paspatur", vai: "Vai participar" }[modo];
+  patch.historico = [...(a.historico || []), { de, para: nome, em: new Date().toISOString(), por: C.me || "" }].slice(-30);
+  return salvar(a, patch, "Marcado: " + nome);
 }
 
 // apaga os alunos do colégio e ano escolhidos; quem tem beca fora ou produto reservado/baixado fica (para não

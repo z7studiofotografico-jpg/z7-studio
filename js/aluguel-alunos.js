@@ -6,7 +6,8 @@
 // Status: Cadastrado → Beca medida (reserva beca, faixa e capelo) → Produtos em produção (se comprou algum) →
 // Pronto para retirada → Retirou a beca (baixa o estoque dos produtos) → Devolvida (beca volta ao estoque).
 // "Atrasado na devolução": retirou e passou da data de devolução (destaque para o Adriano).
-import { ordemCodigo } from "./aluno-id.js";
+import { ordemCodigo, telRelatorio } from "./aluno-id.js";
+import { kpisValores, TIPOS_FILTRO, tipoDoAluno, botaoNovaInstituicao } from "./aluguel-resumo.js";
 import { bloco, el, title, field, inp, inpReais, sel, sheet, botoes, wa, clicavel } from "./ui.js";
 import * as U from "./util.js";
 import { lerReais, brl } from "./regras.js";
@@ -25,8 +26,7 @@ import {
   tamanhoBeca,
   modeloBeca
 } from "./becas-estoque.js";
-import { carregarCatalogo, reservar, desfazerReserva, baixar, estornar } from "./estoque.js";
-import { DO_ALUGUEL } from "./catalogo.js";
+import { reservar, baixar, estornar } from "./estoque.js";
 import { ESTUDIO, ENDERECO } from "./mensagens.js";
 import { botaoRelatorio } from "./relatorio.js";
 import { relatorioAluguel, atrasadoAluguel } from "./aluguel-relatorio.js";
@@ -42,26 +42,34 @@ const SERIES = ["Pré", "5º ano", "9º ano", "Ensino médio", "Faculdade", "Cur
 const ANO = () => new Date().getFullYear();
 // atrasadoAluguel fica em aluguel-relatorio.js (o relatório também usa); continua exportado daqui
 export { atrasadoAluguel };
-// próximo e anterior (Produtos em produção só para quem comprou produto)
+// as etapas de cada aluno (17/11/2026): Produtos em produção para quem tem Paspatur, Canudo, Certificado, quadro ou
+// fotos (no kit ou nos produtos); só a beca vai direto para Pronto para retirada. Só o Paspatur não tem beca:
+// Cadastrado → Produtos em produção → Pronto para retirada → Paspatur entregue. Quem não vai participar não anda.
+export const temProducao = a => (a.pacote || []).some(k => k !== "beca") || (a.produtos || []).some(x => x.estado !== "estornado");
+export function etapasDe(a) {
+  if (a.naoParticipa) return ["Cadastrado"];
+  if (a.soPaspatur) return ["Cadastrado", "Produtos em produção", "Pronto para retirada", "Retirou a beca"];
+  return STATUS_ALUGUEL.filter(s => s !== "Produtos em produção" || temProducao(a));
+}
 export function proximoStatus(a) {
-  const i = STATUS_ALUGUEL.indexOf(a.status || "Cadastrado");
-  let p = STATUS_ALUGUEL[i + 1];
-  if (p === "Produtos em produção" && !(a.produtos || []).some(x => x.estado !== "estornado")) p = "Pronto para retirada";
-  return p || null;
+  const e = etapasDe(a);
+  const i = e.indexOf(a.status || "Cadastrado");
+  return (i < 0 ? e[0] : e[i + 1]) || null;
 }
 export function anteriorStatus(a) {
-  const i = STATUS_ALUGUEL.indexOf(a.status || "Cadastrado");
-  let p = STATUS_ALUGUEL[i - 1];
-  if (p === "Produtos em produção" && !(a.produtos || []).some(x => x.estado !== "estornado")) p = "Beca medida";
-  return i > 0 ? p : null;
+  const e = etapasDe(a);
+  const i = e.indexOf(a.status || "Cadastrado");
+  return i > 0 ? e[i - 1] : null;
 }
+// "Retirou a beca" do aluno só do Paspatur é a entrega do Paspatur
+export const nomeEtapa = (a, s) => (a.soPaspatur && s === "Retirou a beca" ? "Paspatur entregue" : s);
 
 let C, FS, db, col;
 let lista = [],
   insts = [],
   usoAvulsos = { becas: {}, faixas: {}, capelos: {}, tamanhos: {} },
   alunosUso = [], // alunos com beca reservada ou fora, de todos (cópia do estoque)
-  filtro = { ano: String(ANO()), inst: "", status: "Cadastrado", q: "" };
+  filtro = { ano: String(ANO()), tipo: "", inst: "", status: "Cadastrado", q: "" };
 const $ = id => document.getElementById(id);
 
 export function mostrarAlunos(ctx, v, o) {
@@ -77,6 +85,7 @@ export function mostrarAlunos(ctx, v, o) {
     U.mkBtn("+ Aluno", "btn-primary btn-sm", () =>
       import("./cadastro-aluno.js").then(m => m.abrirCadastroAluno(C, { modulo: "becas" })).catch(e => C.handleErr(e))
     ),
+    botaoNovaInstituicao(C),
     U.mkBtn("📦 Estoque", "btn-sm", () => o.abrirEstoque()),
     U.mkBtn("Importar planilha", "btn-sm", () =>
       import("./aluguel-importar.js").then(m => m.importarAlugueis(C, insts)).catch(e => C.handleErr(e))
@@ -175,7 +184,7 @@ function render() {
   if (!corpo) return;
   const hoje = U.todayStr();
   const vis = lista.filter(a => !ocultoParaMim(C, a));
-  const doAno = vis.filter(a => !filtro.ano || String(a.ano) === filtro.ano);
+  const doAno = vis.filter(a => (!filtro.ano || String(a.ano) === filtro.ano) && (!filtro.tipo || tipoDoAluno(a, insts) === filtro.tipo));
   const doCol = doAno.filter(a => !filtro.inst || a.instId === filtro.inst);
   // números do topo
   const k = $("alKpis");
@@ -196,7 +205,8 @@ function render() {
     });
     k.append(c);
   });
-  // filtros: ano e colégio
+  kpisValores(C, k, doCol); // Valor total e A receber (apagados até tocar no olho)
+  // filtros: ano, tipo de instituição e colégio
   const f = $("alFiltros");
   f.innerHTML = "";
   const anos = [...new Set([String(ANO()), ...vis.map(a => String(a.ano || ""))].filter(Boolean))].sort().reverse();
@@ -221,7 +231,13 @@ function render() {
     filtro.inst = sInst.value;
     render();
   };
-  f.append(field("Ano", sAno), field("Colégio", sInst));
+  const sTipo = sel(TIPOS_FILTRO, filtro.tipo, "todas (particular, público…)");
+  sTipo.onchange = () => {
+    filtro.tipo = sTipo.value;
+    filtro.inst = "";
+    render();
+  };
+  f.append(field("Ano", sAno), field("Instituição", sTipo), field("Colégio", sInst));
   // resumo do colégio: quantos alugaram, situação na instituição
   const r = $("alResumo");
   if (filtro.inst) {
@@ -272,10 +288,12 @@ function render() {
   // status
   const chips = $("alChips");
   chips.innerHTML = "";
-  // abas na ordem das etapas (13/11/2026): quem não vai participar da formatura (só compra o Paspatur) fica à parte
+  // abas na ordem das etapas: quem não vai participar da formatura fica à parte; quem é só do Paspatur tem a aba
+  // dele e também anda pelas etapas (Cadastrado → Produtos em produção → Pronto para retirada)
   const naEtapa = s0 => a => !a.naoParticipa && (a.status || "Cadastrado") === s0;
   const abas = [
-    ["naoParticipa", "🚫 Não vai participar · só o Paspatur", a => !!a.naoParticipa],
+    ["naoParticipa", "🚫 Não vai participar", a => !!a.naoParticipa],
+    ["soPaspatur", "📒 Só o Paspatur", a => !!a.soPaspatur && !a.naoParticipa],
     ["atrasados", "⚠️ Atrasados", a => atrasadoAluguel(a, hoje)],
     ...["Cadastrado", "Beca medida", "Produtos em produção", "Pronto para retirada"].map(s0 => [s0, s0, naEtapa(s0)]),
     ["Devolvida", "Beca devolvida", naEtapa("Devolvida")],
@@ -333,7 +351,7 @@ function passoAluguel(a, hoje) {
   if (st === "Retirou a beca" && a.devolucao) return "Devolver até " + U.fmtDate(a.devolucao);
   if (st === "Pronto para retirada") return "Retirar" + (a.retirada ? " dia " + U.fmtDate(a.retirada) : "");
   const prox = proximoStatus(a);
-  return prox ? "Próximo: " + prox : "";
+  return prox ? "Próximo: " + nomeEtapa(a, prox) : "";
 }
 function linha(a) {
   const hoje = U.todayStr();
@@ -343,13 +361,33 @@ function linha(a) {
     cor: corAluguel(a, hoje),
     idAluno: a.codigo,
     titulo: title(a.nome || ""),
-    sub: [title(a.instNome || ""), [a.ano, a.serie].filter(Boolean).join(" · "), becaTxt(a)].filter(Boolean).join(" · "),
-    passo: passoAluguel(a, hoje),
+    sub: [
+      title(a.instNome || ""),
+      [a.ano, a.serie].filter(Boolean).join(" · "),
+      a.naoParticipa ? "🚫 Não vai participar" : a.soPaspatur ? "📒 Só o Paspatur" : becaTxt(a)
+    ]
+      .filter(Boolean)
+      .join(" · "),
+    passo: a.naoParticipa ? "" : passoAluguel(a, hoje),
     passoCls: at ? "late" : (a.status || "") === "Pronto para retirada" ? "today" : "",
-    selo: at ? "ATRASADO" : (a.status || "Cadastrado").toUpperCase(),
+    selo: at ? "ATRASADO" : a.naoParticipa ? "NÃO VAI PARTICIPAR" : nomeEtapa(a, a.status || "Cadastrado").toUpperCase(),
     card: () => card(a),
     abrir: () => janela(a)
   });
+}
+// a linha completa do aluno na janela: beca, kit e contato
+function infoAluguel(a) {
+  const kit = (a.pacote || []).map(nomeItem).join(" + ");
+  const beca = a.becaTipo ? "👘 Beca " + tamanhoBeca(a).toLowerCase() : "";
+  const p = a.naoParticipa ? "🚫 Não vai participar da formatura" : a.soPaspatur ? "📒 Só o Paspatur" : beca;
+  return [
+    p,
+    kit ? "Kit: " + kit : "",
+    a.responsavel ? "Responsável: " + title(a.responsavel) : "",
+    a.tel ? "📱 " + telRelatorio(a.tel) : ""
+  ]
+    .filter(Boolean)
+    .join(" · ");
 }
 // janela do aluno do aluguel: Resumo (o cartão completo) · Colégio (informações e o Contrato do colégio) · Histórico
 function janela(a0) {
@@ -358,8 +396,10 @@ function janela(a0) {
     colecao: "alugueis",
     item: a0,
     topo: a => ({
+      id: a.codigo,
       titulo: title(a.nome || ""),
       sub: [title(a.instNome || ""), [a.ano, a.serie].filter(Boolean).join(" · ")].filter(Boolean).join(" · "),
+      info: infoAluguel(a),
       selo: atrasadoAluguel(a) ? "ATRASADO" : (a.status || "Cadastrado").toUpperCase()
     }),
     abas: [
@@ -429,7 +469,7 @@ function card(a) {
   if (a.obs) e.append(el("p", "notes", a.obs));
   const act = el("div", "actions");
   act.append(
-    U.mkBtn("🛍️ Produtos", "", () => produtos(a)),
+    U.mkBtn("🛍️ Produtos", "", () => import("./aluguel-produtos.js").then(m => m.produtos(C, a, salvar))),
     U.mkBtn("Editar", "", () => form(a)),
     U.mkBtn("🆘 Ajuda de vendas", "", () =>
       import("./ajuda-vendas.js")
@@ -463,19 +503,19 @@ function card(a) {
   const base = el("div", "acao-base");
   const prox = proximoStatus(a),
     ant = anteriorStatus(a);
-  if (a.naoParticipa) {
-    // não vai participar da formatura: não aluga beca, só compra o Paspatur
-    base.append(el("span", "hint", "🚫 Não vai participar da formatura · só o Paspatur"));
-    base.append(U.mkBtn("↩️ Vai participar", "", () => import("./aluguel-lote.js").then(m => m.naoParticipa(C, a, false, salvar))));
-  } else {
-    if (prox) base.append(U.mkBtn("Avançar: " + prox, "btn-ok", () => mudarStatus(a, prox)));
-    if (ant) base.append(U.mkBtn("Voltar: " + ant, "", () => mudarStatus(a, ant)));
-    if (iStatus(a) < STATUS_ALUGUEL.indexOf("Retirou a beca"))
-      base.append(
-        U.mkBtn("🚫 Não vai participar (só o Paspatur)", "btn-sm", () =>
-          import("./aluguel-lote.js").then(m => m.naoParticipa(C, a, true, salvar))
-        )
-      );
+  // não vai participar (fez a foto, mas não vai à formatura) e só o Paspatur (os pais só querem o Paspatur) são
+  // dois botões separados; quem é só do Paspatur anda pelas etapas dele
+  const marcar = modo => import("./aluguel-lote.js").then(m => m.participacao(C, a, modo, salvar));
+  if (a.naoParticipa) base.append(el("span", "hint", "🚫 Não vai participar da formatura"));
+  else {
+    if (a.soPaspatur) base.append(el("span", "hint", "📒 Só o Paspatur"));
+    if (prox) base.append(U.mkBtn("Avançar: " + nomeEtapa(a, prox), "btn-ok", () => mudarStatus(a, prox)));
+    if (ant) base.append(U.mkBtn("Voltar: " + nomeEtapa(a, ant), "", () => mudarStatus(a, ant)));
+  }
+  if (iStatus(a) < STATUS_ALUGUEL.indexOf("Retirou a beca")) {
+    if (!a.naoParticipa) base.append(U.mkBtn("🚫 Não vai participar", "btn-sm", () => marcar("nao")));
+    if (!a.soPaspatur || a.naoParticipa) base.append(U.mkBtn("📒 Só o Paspatur", "btn-sm", () => marcar("paspatur")));
+    if (a.naoParticipa || a.soPaspatur) base.append(U.mkBtn("↩️ Vai participar (aluga a beca)", "btn-sm", () => marcar("vai")));
   }
   e.append(base);
   return e;
@@ -501,13 +541,13 @@ export async function mudarStatus(a, para, lote = false) {
   const de = a.status || "Cadastrado";
   const iDe = STATUS_ALUGUEL.indexOf(de),
     iPara = STATUS_ALUGUEL.indexOf(para);
-  if (iPara >= STATUS_ALUGUEL.indexOf("Beca medida") && (!a.becaTipo || !a.tamanho)) {
+  if (!a.soPaspatur && iPara >= STATUS_ALUGUEL.indexOf("Beca medida") && (!a.becaTipo || !a.tamanho)) {
     if (lote) return "sem tamanho";
     U.toast("Antes, coloque o tipo e o tamanho da beca (Editar).");
     return form(a);
   }
   // reservar a beca: confere se tem livre (sem contar o próprio aluno)
-  if (iDe < 1 && iPara >= 1) {
+  if (!a.soPaspatur && iDe < 1 && iPara >= 1) {
     const uso = somarUso(usoAvulsos, usoDosAlunos(alunosUso.filter(x => x.id !== a.id)));
     const falta = faltaParaAluno(C.P.estoque || {}, uso, a);
     if (falta.length) {
@@ -519,6 +559,16 @@ export async function mudarStatus(a, para, lote = false) {
       );
       return;
     }
+  }
+  // indo para a produção: a foto do aluno já foi tirada? (as fotos não vêm para o app; é o acordo com o colégio)
+  const paraProducao = para === "Produtos em produção" && iDe < iPara;
+  if (paraProducao && !lote) {
+    const ok = await confirmar(
+      "A foto do aluno já foi tirada?",
+      `${title(a.nome)} vai para a produção (${(a.pacote || []).map(nomeItem).join(", ") || "produtos"}). A foto já foi tirada?`,
+      { sim: "Sim, já tiramos", nao: "Ainda não" }
+    );
+    if (!ok) return U.toast("Tire a foto antes de mandar para a produção.");
   }
   let motivo = "";
   // voltar de "Retirou a beca": os produtos já baixados voltam por estorno, com motivo
@@ -534,8 +584,9 @@ export async function mudarStatus(a, para, lote = false) {
         "Os produtos já tiveram baixa no estoque. Qual o motivo de voltar? (fica registrado no estorno)"
       )) || "";
     if (!motivo) return;
-  } else if (!lote && !(await confirmarStatus(de, para))) return;
+  } else if (!lote && !paraProducao && !(await confirmarStatus(de, para))) return;
   const patch = {
+    ...(paraProducao ? { fotoTirada: true } : {}),
     status: para,
     historico: [...(a.historico || []), { de, para, em: new Date().toISOString(), por: C.me || "" }].slice(-30)
   };
@@ -577,70 +628,6 @@ export async function mudarStatus(a, para, lote = false) {
     if (e && (e.code === "mudou" || e.code === "sem-estoque")) U.toast(e.message);
     else C.handleErr(e);
   }
-}
-
-// Produtos vendidos junto com o aluguel (item 3.4): reserva no estoque ao incluir; baixa quando retira
-async function produtos(a) {
-  let cat;
-  try {
-    cat = await carregarCatalogo(C);
-  } catch (e) {
-    return C.handleErr(e);
-  }
-  sheet("🛍️ Produtos de " + U.first(title(a.nome || "")), (p, close) => {
-    p.append(
-      el(
-        "p",
-        "hint",
-        "O que o aluno levou junto com o aluguel (a foto é tirada no dia de medir a beca). Os preços vêm de Produtos e estoque."
-      )
-    );
-    const atual = {};
-    (a.produtos || []).filter(x => x.estado !== "estornado").forEach(x => (atual[x.produto] = (atual[x.produto] || 0) + x.qtd));
-    const linhas = DO_ALUGUEL.map(id => cat.find(x => x.id === id))
-      .filter(Boolean)
-      .map(pr => {
-        const r = el("div", "prow");
-        const q = el("input");
-        q.inputMode = "numeric";
-        q.className = "preco";
-        q.value = atual[pr.id] || "";
-        q.placeholder = "0";
-        q.setAttribute("aria-label", "Quantidade de " + pr.nome);
-        const baixado = (a.produtos || []).some(x => x.produto === pr.id && x.estado === "baixado");
-        q.disabled = baixado;
-        r.append(el("span", null, `${pr.nome}${pr.preco ? " · " + brl(pr.preco) : ""}${baixado ? " (já entregue)" : ""}`), q);
-        p.append(r);
-        return [pr, q];
-      });
-    const err = el("p", "err");
-    err.hidden = true;
-    p.append(err, botoes(close, "Salvar produtos"));
-    p.addEventListener("submit", async ev => {
-      ev.preventDefault();
-      const novos = [],
-        tirar = [],
-        poe = [];
-      linhas.forEach(([pr, q]) => {
-        if (q.disabled) return;
-        const n = Math.max(0, parseInt(q.value, 10) || 0),
-          antes = (a.produtos || []).filter(x => x.produto === pr.id && x.estado === "reservado").reduce((t, x) => t + x.qtd, 0);
-        if (n > antes) poe.push({ produto: pr.id, qtd: n - antes });
-        if (n < antes) tirar.push({ produto: pr.id, qtd: antes - n });
-        if (n) novos.push({ produto: pr.id, nome: pr.nome, qtd: n, valor: Number(pr.preco) || 0, estado: "reservado", origem: "Aluguel" });
-      });
-      try {
-        if (tirar.length) await desfazerReserva(C, tirar, { ref: "alugueis/" + a.id, modulo: "aluguel" });
-        if (poe.length) await reservar(C, poe, { ref: "alugueis/" + a.id, modulo: "aluguel" });
-        const ficam = (a.produtos || []).filter(x => x.estado !== "reservado");
-        await salvar(a, { produtos: [...ficam, ...novos] }, "Produtos salvos");
-        close();
-      } catch (e) {
-        err.textContent = e.message || String(e);
-        err.hidden = false;
-      }
-    });
-  });
 }
 
 // Cadastro / edição do aluno de aluguel

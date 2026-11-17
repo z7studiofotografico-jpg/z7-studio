@@ -127,7 +127,7 @@ export function openDados(it) {
         el(
           "p",
           "hint",
-          "O aluno entra na sua lista (Para hoje). Se ele já estiver no PR, o Adriano ou a Luciana decidem se passa para você."
+          "O aluno entra na sua lista (Negociando). Se ele já estiver no PR, o Adriano ou a Luciana decidem se passa para você."
         )
       );
     const erro = el("p", "err");

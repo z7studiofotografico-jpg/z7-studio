@@ -1,5 +1,5 @@
 // Janela com abas (o mesmo formato da janela do aluno do PR e da janela do colégio), para qualquer lista.
-// o = { C, colecao, item, topo(it) → { titulo, sub, selo }, abas: [[chave, nome, desenhar(box, it, fechar)]], lembrar }
+// o = { C, colecao, item, topo(it) → { id, titulo, sub, info, selo }, abas: [[chave, nome, desenhar(box, it, fechar)]], lembrar }
 // Ouve o documento no banco: o que mudar (aqui ou em outro aparelho) aparece na hora.
 import { el, sheet } from "./ui.js";
 import * as U from "./util.js";
@@ -24,8 +24,10 @@ export function abrirJanela(o) {
         const t = o.topo(it);
         topo.innerHTML = "";
         const nome = el("div", "ja-nome");
+        if (t.id) nome.append(el("span", "lc-id", t.id)); // o ID do aluno em cima do nome, como nas listas
         nome.append(el("h2", null, t.titulo || "Sem nome"));
         if (t.sub) nome.append(el("small", null, t.sub));
+        if (t.info) nome.append(el("small", "ja-info", t.info));
         topo.append(U.mkBtn("‹ Voltar para a lista", "btn-sm", close), nome, el("span", "lc-selo ja-selo", t.selo || ""));
         abas.innerHTML = "";
         o.abas.forEach(([k, nm]) => {
