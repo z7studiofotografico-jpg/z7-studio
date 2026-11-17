@@ -13,8 +13,14 @@ test("pacote: lê a coluna PACOTE da planilha em qualquer ordem e grafia", () =>
 
 test("pacote: célula vazia usa o pacote padrão do contrato", () => {
   const c = { pacotePadrao: ["paspatur", "certificado", "canudo"] };
-  assert.deepEqual(R.pacoteDoAluno({ pacote: [] }, c), { itens: ["paspatur", "certificado", "canudo"], padrao: true });
-  assert.deepEqual(R.pacoteDoAluno({ pacote: ["canudo", "certificado"] }, c), { itens: ["certificado", "canudo"], padrao: false });
+  assert.deepEqual(R.pacoteDoAluno({ pacote: [] }, c), { itens: ["paspatur", "certificado", "canudo"], padrao: true, qtd: {} });
+  assert.deepEqual(R.pacoteDoAluno({ pacote: ["canudo", "certificado"] }, c), { itens: ["certificado", "canudo"], padrao: false, qtd: {} });
+  // quantidade (17/11/2026): 2 PR no pacote padrão; na soma dos avulsos, preço × quantidade
+  const c2 = { pacotePadrao: ["canudo", "pr1510"], pacotePadraoQtd: { pr1510: 2 }, precos: { canudo: 10, pr1510: 15 } };
+  assert.deepEqual(R.pacoteDoAluno({}, c2).qtd, { pr1510: 2 });
+  assert.equal(R.precoAluno({}, c2), 40);
+  assert.equal(R.precoAluno({ pacote: ["pr1510"], pacoteQtd: { pr1510: 3 } }, c2), 45);
+  assert.equal(R.textoPacote(["canudo", "pr1510"], { pr1510: 2 }), "Canudo + 2× PR 15x10 cm");
 });
 
 test("pagamento: onde o dinheiro está", () => {

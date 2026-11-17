@@ -7,6 +7,7 @@ import { fotoDaFicha, chaveGrupo, chaveGrupoCol, contatosDaFicha, acharExistente
 import { lerCodigo, fmtCodigo, codigoBusca } from "./aluno-id.js";
 import { TAMANHOS, FAIXAS, CAPELOS, ligarTamanhoUnico } from "./becas-estoque.js";
 import { ITENS_PACOTE, kitsDo, valorDoPacote } from "./contrato-colegio-regras.js";
+import { chipItem, lerQtd } from "./itens-qtd.js";
 
 const idFichaAluguel = (escola, ano, nome) => (chaveGrupo(escola, ano) + "_" + U.chave(nome).replace(/[^A-Z0-9]+/g, "-")).slice(0, 140);
 
@@ -168,13 +169,14 @@ export function camposAluguel(ja, contrato) {
   const pr = (contrato && contrato.precos) || {};
   const kit = el("div", "chips fc-6");
   const cx = ITENS_PACOTE.map(([k, n]) => {
-    const l = el("label", "chk");
-    const c = el("input");
-    c.type = "checkbox";
-    c.checked = ((ja && ja.pacote) || []).includes(k);
-    l.append(c, document.createTextNode(` ${n}${Number(pr[k]) ? " · " + U.money(pr[k]) : ""}`));
-    kit.append(l);
-    return [k, c];
+    const it = chipItem(
+      k,
+      `${n}${Number(pr[k]) ? " · " + U.money(pr[k]) : ""}`,
+      ((ja && ja.pacote) || []).includes(k),
+      ((ja && ja.pacoteQtd) || {})[k]
+    );
+    kit.append(it.l);
+    return [k, it.cb];
   });
   const fk = el("div", "field fc-6");
   fk.append(el("label", null, "Kit (o que o aluno levou)"));
@@ -198,7 +200,8 @@ export function camposAluguel(ja, contrato) {
       tamanho: tam.value,
       faixa: faixa.value,
       capelo: capelo.value,
-      pacote: cx.filter(([, c]) => c.checked).map(([k]) => k)
+      pacote: cx.filter(([, c]) => c.checked).map(([k]) => k),
+      pacoteQtd: lerQtd(cx)
     })
   };
 }
@@ -215,7 +218,7 @@ export async function confirmarAluguel(C, { f, lido, extra, existentes, usados, 
   const contatos = contatosDaFicha(lido);
   const mae = contatos.find(c => c.tipo === "Mãe") || contatos.find(c => c.tipo !== "Formando") || null;
   const aluno = contatos.find(c => c.tipo === "Formando");
-  const valor = valorDoPacote(extra.pacote, lido.turma || (achado && achado.serie) || "", contrato);
+  const valor = valorDoPacote(extra.pacote, lido.turma || (achado && achado.serie) || "", contrato, extra.pacoteQtd);
   const agora = new Date().toISOString();
   const endereco = {
     rua: lido.rua,
@@ -239,6 +242,7 @@ export async function confirmarAluguel(C, { f, lido, extra, existentes, usados, 
     faixa: extra.faixa,
     capelo: extra.capelo,
     pacote: extra.pacote,
+    pacoteQtd: extra.pacoteQtd || {},
     valor,
     contratoZerado: !valor,
     atualizadoEm: agora,

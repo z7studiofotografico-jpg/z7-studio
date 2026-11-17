@@ -4,7 +4,8 @@
 // Comissão: % do total, para quem fechou (ex.: 20%); vazia = as taxas por item dos Ajustes.
 import { el, field, sheet, botoes } from "./ui.js";
 import * as U from "./util.js";
-import { ITENS_PACOTE, kitsDo, nomeKit, textoPacote } from "./contrato-colegio-regras.js";
+import { ITENS_PACOTE, kitsDo, nomeKit, textoPacote, precoAluno } from "./contrato-colegio-regras.js";
+import { chipItem, qtdDe as qtdDaCaixa, lerQtd, porQtd } from "./itens-qtd.js";
 
 const reais = v => {
   const n = Number(
@@ -49,24 +50,12 @@ export function editorKits(x, admin, o = {}) {
     // cada item com a quantidade (ex.: 2 PR 15x10), que aparece quando o item está marcado (17/11/2026)
     const qs = {};
     const cx = ITENS_PACOTE.map(([id, n]) => {
-      const l = el("label", "chk");
-      const c = el("input");
-      c.type = "checkbox";
-      c.checked = (k.itens || []).includes(id);
-      const q = el("input", "kit-qtd");
-      q.type = "number";
-      q.min = "1";
-      q.max = "999";
-      q.value = String(Number((k.qtd || {})[id]) || 1);
-      q.setAttribute("aria-label", "Quantidade de " + n);
-      q.hidden = !c.checked;
-      c.addEventListener("change", () => (q.hidden = !c.checked));
-      qs[id] = q;
-      l.append(c, document.createTextNode(" " + n), q);
-      chips.append(l);
-      return [id, c];
+      const it = chipItem(id, n, (k.itens || []).includes(id), (k.qtd || {})[id]);
+      qs[id] = it.q;
+      chips.append(it.l);
+      return [id, it.cb];
     });
-    const qtdDe = id => Math.max(1, parseInt(qs[id].value, 10) || 1);
+    const qtdDe = id => qtdDaCaixa(cx.find(([i]) => i === id)[1]);
     const tirar = U.mkBtn("✕ Tirar este kit", "btn-sm", () => {
       r.remove();
       linhas.splice(linhas.indexOf(item), 1);
@@ -127,7 +116,10 @@ export function botoesKits(contrato, serie, caixas, depois) {
   const box = el("div", "chips kits-botoes");
   kits.forEach(k => {
     const b = U.mkBtn(`📦 ${nomeKit(k)} · ${U.money(k.valor)}`, "btn-sm", () => {
-      caixas.forEach(([id, c]) => (c.checked = k.itens.includes(id)));
+      caixas.forEach(([id, c]) => {
+        c.checked = k.itens.includes(id);
+        porQtd(c, (k.qtd || {})[id]);
+      });
       if (depois) depois(k);
     });
     b.title = textoPacote(k.itens, k.qtd);
@@ -137,24 +129,47 @@ export function botoesKits(contrato, serie, caixas, depois) {
 }
 
 // Escolher os itens do pacote de um aluno (ou de vários), com os botões dos kits do colégio em cima
-export function escolherPacote(tit, atual, aoSalvar, { padraoTxt = "Nenhum marcado = pacote padrão do contrato.", contrato = null } = {}) {
+export function escolherPacote(
+  tit,
+  atual,
+  aoSalvar,
+  { padraoTxt = "Nenhum marcado = pacote padrão do contrato.", contrato = null, atualQtd = {} } = {}
+) {
   sheet(tit, (p, close) => {
     p.append(el("p", "hint", padraoTxt));
     const caixas = ITENS_PACOTE.map(([k, nome]) => {
-      const l = el("label", "chk");
-      const cb = el("input");
-      cb.type = "checkbox";
-      cb.checked = (atual || []).includes(k);
-      l.append(cb, document.createTextNode(" " + nome));
-      return [k, cb, l];
+      const it = chipItem(k, nome, (atual || []).includes(k), (atualQtd || {})[k]);
+      return [k, it.cb, it.l];
     });
     if (kitsDo(contrato).length) p.append(botoesKits(contrato, "", caixas));
     caixas.forEach(([, , l]) => p.append(l));
     p.append(botoes(close, "Salvar"));
     p.addEventListener("submit", async ev => {
       ev.preventDefault();
-      await aoSalvar(caixas.filter(([, cb]) => cb.checked).map(([k]) => k));
+      await aoSalvar(
+        caixas.filter(([, cb]) => cb.checked).map(([k]) => k),
+        lerQtd(caixas)
+      );
       close();
     });
   });
+}
+
+// Depois de salvar o contrato (17/11/2026): os alunos do colégio/ano que estavam sem valor (o colégio ainda não
+// tinha preço) ganham o valor do kit deles ou a soma dos itens. Quem já tem valor não muda.
+export async function valorDosZerados(C, instId, ano, contrato) {
+  if (!contrato || contrato.quemPaga === "colegio") return 0;
+  const { FS, db } = C;
+  const s = await FS.getDocs(FS.query(FS.collection(db, "alugueis"), FS.where("instId", "==", instId), FS.where("ano", "==", Number(ano))));
+  let n = 0;
+  for (const d of s.docs) {
+    const a = d.data();
+    if (a.naoParticipa || Number(a.valor) > 0) continue;
+    const v = precoAluno(a, contrato);
+    if (!v) continue;
+    await FS.updateDoc(d.ref, { valor: v, contratoZerado: false, atualizadoEm: new Date().toISOString() });
+    n++;
+  }
+  if (n) U.toast(`${n} aluno${n > 1 ? "s" : ""} sem valor ganharam o valor do kit`);
+  return n;
 }

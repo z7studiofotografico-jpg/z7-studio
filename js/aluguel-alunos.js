@@ -34,6 +34,7 @@ import { botaoRelatorio } from "./relatorio.js";
 import { relatorioAluguel, atrasadoAluguel } from "./aluguel-relatorio.js";
 import { ITENS_PACOTE, nomeItem, lerPacote, valorDoPacote } from "./contrato-colegio-regras.js";
 import { linhaGenerica } from "./lista-compacta.js";
+import { chipItem, lerQtd } from "./itens-qtd.js";
 import { avisoPrecoAluguel } from "./precos-colegio.js";
 import { ouvirUso, espelhar, donoDoAluguel } from "./becas-uso.js";
 import { abrirJanela } from "./janela.js";
@@ -711,27 +712,23 @@ export function form(a, pre = {}) {
     // pacote do contrato do colégio (nenhum marcado = pacote padrão do contrato)
     const pac = el("div", "chips");
     const pacCx = ITENS_PACOTE.map(([k, n]) => {
-      const l = el("label", "chk");
-      const cb = el("input");
-      cb.type = "checkbox";
-      cb.checked = lerPacote(x.pacote || []).includes(k);
-      l.append(cb, document.createTextNode(" " + n));
-      pac.append(l);
-      return [k, cb, l, n];
+      const it = chipItem(k, n, lerPacote(x.pacote || []).includes(k), (x.pacoteQtd || {})[k]); // com a quantidade
+      pac.append(it.l);
+      return [k, it.cb, it.t, n, it.q];
     });
     // preços do contrato deste colégio e ano: aparecem ao lado de cada item, e o valor é a soma do que for marcado
     // (o pai pode comprar só o Paspatur, só o Canudo, só o aluguel ou o kit inteiro)
     // (17/11/2026: os kits do colégio, com preço fechado, aparecem em botões em cima dos itens)
     let precos = null,
-      contrato = null,
-      qtdKit = x.pacoteQtd || {}; // quantidade de cada item do kit (ex.: 2 PR 15x10)
+      contrato = null;
     const kitsBox = el("div");
     const somar = () => {
       if (!precos || zer.disabled) return;
       const total = valorDoPacote(
         pacCx.filter(([, cb]) => cb.checked).map(([k]) => k),
         serie.value,
-        contrato
+        contrato,
+        lerQtd(pacCx)
       );
       zer.checked = false;
       valor.disabled = false;
@@ -739,20 +736,20 @@ export function form(a, pre = {}) {
     };
     const lerPrecos = async () => {
       precos = null;
-      pacCx.forEach(([, , l, n]) => (l.lastChild.textContent = " " + n));
+      pacCx.forEach(([, , t, n]) => (t.textContent = " " + n));
       if (!sInst.value || !ano.value) return;
       try {
         const s = await C.FS.getDoc(C.FS.doc(C.db, "contratosColegio", `${sInst.value}_${Number(ano.value)}`));
         const pr = (s.exists() && s.data().precos) || {};
         contrato = s.exists() ? s.data() : null;
         const { botoesKits } = await import("./contrato-kits.js");
-        kitsBox.replaceChildren(botoesKits(contrato, serie.value, pacCx, k => ((qtdKit = k.qtd || {}), somar())));
+        kitsBox.replaceChildren(botoesKits(contrato, serie.value, pacCx, somar));
         if (!Object.values(pr).some(v => Number(v) > 0) && !kitsBox.textContent) return;
         precos = pr;
-        pacCx.forEach(([k, , l, n]) => (l.lastChild.textContent = ` ${n}${Number(pr[k]) ? " · " + brl(pr[k]) : ""}`));
+        pacCx.forEach(([k, , t, n]) => (t.textContent = ` ${n}${Number(pr[k]) ? " · " + brl(pr[k]) : ""}`));
       } catch (_) {}
     };
-    pacCx.forEach(([, cb]) => cb.addEventListener("change", somar));
+    pacCx.forEach(([, cb, , , q]) => [cb, q].forEach(i => i.addEventListener("change", somar)));
     sInst.addEventListener("change", lerPrecos);
     serie.addEventListener("change", lerPrecos);
     ano.addEventListener("change", lerPrecos);
@@ -804,7 +801,7 @@ export function form(a, pre = {}) {
         devolucao: dev.value,
         obs: obs.value.trim(),
         pacote: pacCx.filter(([, cb]) => cb.checked).map(([k]) => k),
-        pacoteQtd: Object.fromEntries(pacCx.filter(([k, cb]) => cb.checked && qtdKit[k] > 1).map(([k]) => [k, qtdKit[k]])),
+        pacoteQtd: lerQtd(pacCx),
         atualizadoEm: new Date().toISOString()
       };
       if (!a || C.isAdmin) Object.assign(body, { valor: zer.checked ? 0 : lerReais(valor.value), contratoZerado: zer.checked });

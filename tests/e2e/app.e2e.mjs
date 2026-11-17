@@ -3925,8 +3925,8 @@ await cenario("Contrato do colégio (pacote por aluno, quem recebeu, repasse e p
     await painel.getByLabel("Marcar Pedro Henrique").check();
     await painel.getByRole("button", { name: "Aplicar pacote a 1" }).click();
     const fpac = pg.locator(".sheet").last();
-    await fpac.getByLabel("Beca").check();
-    await fpac.getByLabel("Paspatur").check();
+    await fpac.getByLabel("Beca", { exact: true }).check();
+    await fpac.getByLabel("Paspatur", { exact: true }).check();
     await fpac.locator("button[type=submit]").click();
     await calmo(pg);
     st = await store();
@@ -4561,7 +4561,7 @@ await cenario("Cadastro automático do Aluguel de becas (beca, tamanho e kit da 
   const cf = pg.locator(".sheet").filter({ hasText: "Conferir fichas" });
   await cf.getByText("Aluguel de becas").first().waitFor({ timeout: 8000 });
   await cf.getByLabel("Tamanho").selectOption("G");
-  for (const n of ["Beca", "Paspatur", "Canudo"]) await cf.locator("label.chk", { hasText: n }).locator("input").check();
+  for (const n of ["Beca", "Paspatur", "Canudo"]) await cf.locator("label.chk", { hasText: n }).locator("input[type=checkbox]").check();
   await cf.getByRole("button", { name: "✔ Confirmar" }).click();
   await cf.getByText(/cadastro novo/).waitFor({ timeout: 8000 });
   const st = await store();

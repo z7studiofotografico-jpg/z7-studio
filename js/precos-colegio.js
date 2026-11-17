@@ -4,6 +4,7 @@
 // Colégio sem preço = bloqueio: a equipe não manda mensagem com valor nem registra venda até o preço ser cadastrado.
 import { el, sheet, field, title } from "./ui.js";
 import * as U from "./util.js";
+import { temPreco } from "./contrato-colegio-regras.js";
 
 // Linha de Frente e Repasse são precificados separados: o Repasse só depois da virada (o Adriano ajusta o preço lá).
 // Parcelas: até 12x, só no cartão (Pix e dinheiro são à vista).
@@ -223,7 +224,7 @@ export async function avisoPrecoAluguel(C, a) {
     );
   const c = await precosLidos.get(id);
   if (c === undefined) return null;
-  if (c && (c.quemPaga === "colegio" || Object.values(c.precos || {}).some(v => Number(v) > 0))) return null;
+  if (c && (c.quemPaga === "colegio" || temPreco(c))) return null;
   const box = el("div", "sem-preco");
   box.append(
     el("b", null, `🚫 ${title(a.instNome || "Colégio")} ${a.ano} está sem preço`),

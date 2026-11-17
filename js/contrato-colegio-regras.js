@@ -74,8 +74,8 @@ export const textoPacote = (itens, qtd) =>
 // Pacote do aluno: o dele (se tiver) ou o padrão do contrato
 export function pacoteDoAluno(a, contrato) {
   const proprio = lerPacote((a && a.pacote) || []);
-  if (proprio.length) return { itens: proprio, padrao: false };
-  return { itens: lerPacote((contrato && contrato.pacotePadrao) || []), padrao: true };
+  if (proprio.length) return { itens: proprio, padrao: false, qtd: (a && a.pacoteQtd) || {} };
+  return { itens: lerPacote((contrato && contrato.pacotePadrao) || []), padrao: true, qtd: (contrato && contrato.pacotePadraoQtd) || {} };
 }
 
 // Kits do colégio (17/11/2026): pacotes com nome e preço fechado, às vezes de uma turma só.
@@ -121,15 +121,19 @@ export function kitDaPlanilha(txt, serie, contrato) {
   return kits.find(k => !k.serie || mesmaSerie(k.serie, serie)) || null;
 }
 // O valor de um pacote: o preço do kit, se for um kit do colégio; se não, a soma dos itens
-export function valorDoPacote(itens, serie, contrato) {
+// qtd = { item: quantidade } (ex.: 2 PR): na soma dos avulsos, o preço do item vezes a quantidade
+// o contrato tem preço: algum item com valor ou algum kit com valor (17/11/2026: só com kits também vale)
+export const temPreco = c => !!c && (Object.values(c.precos || {}).some(v => Number(v) > 0) || kitsDo(c).some(k => Number(k.valor) > 0));
+export function valorDoPacote(itens, serie, contrato, qtd) {
   const k = kitDosItens(itens, serie, contrato);
   if (k) return Number(k.valor) || 0;
   const pr = (contrato && contrato.precos) || {};
-  return reais(lerPacote(itens || []).reduce((t, x) => t + centavos(pr[x] || 0), 0));
+  return reais(lerPacote(itens || []).reduce((t, x) => t + centavos(pr[x] || 0) * (Number((qtd || {})[x]) || 1), 0));
 }
 // Preço do pacote de um aluno (o kit, ou a soma dos itens); 0 quando o contrato não tem preço
 export function precoAluno(a, contrato) {
-  return valorDoPacote(pacoteDoAluno(a, contrato).itens, a && a.serie, contrato);
+  const p = pacoteDoAluno(a, contrato);
+  return valorDoPacote(p.itens, a && a.serie, contrato, p.qtd);
 }
 // O que um pagamento paga, item por item ({ item: preço }): do aluno, ou de todos quando o colégio paga
 export function itensDoPagamento(aluno, contrato, alunos) {
@@ -196,7 +200,7 @@ export function resumoDinheiro(pags, contrato, alunos, P) {
   const recebido = soma(() => true);
   const c = contrato || {};
   const nAlunos = (alunos || []).length;
-  const temPrecos = Object.values(c.precos || {}).some(v => centavos(v));
+  const temPrecos = temPreco(c);
   const combinado =
     c.quemPaga === "colegio"
       ? Number(c.valor) || 0

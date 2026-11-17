@@ -10,6 +10,7 @@ import { confirmar } from "./confirmar.js";
 import { abrirRelatorio } from "./relatorio.js";
 import { contatoRel, ordemCodigo } from "./aluno-id.js";
 import * as R from "./contrato-colegio-regras.js";
+import { chipItem, lerQtd } from "./itens-qtd.js";
 
 let C, FS, db;
 let stAtual = null; // o contrato aberto (os preços para o valor do pacote)
@@ -136,7 +137,7 @@ function render(corpo, st, inst, ano, ref) {
     linha("Quem costuma receber", c.quemPaga === "colegio" ? "—" : (R.RECEBE.find(([k]) => k === c.recebePadrao) || [, "Estúdio"])[1]),
     linha("Contato do colégio", [ct.nome, ct.cargo && ct.cargo.replace("(a)", "").toLowerCase(), ct.tel].filter(Boolean).join(" · ")),
     linha("Entrega combinada", ent.data ? `${dataBR(ent.data)}${ent.com ? " com " + ent.com : ""}` : ""),
-    linha("Pacote padrão", R.textoPacote(c.pacotePadrao) || "—"),
+    linha("Pacote padrão", R.textoPacote(c.pacotePadrao, c.pacotePadraoQtd) || "—"),
     linha("Unidade", c.unidade || "")
   );
   dados.append(grade);
@@ -176,7 +177,7 @@ function render(corpo, st, inst, ano, ref) {
   const hp = el("div", "vhead");
   hp.append(el("h3", null, "Pagamentos"));
   // contrato sem preço (cada aluno paga e nenhum item tem valor): não lança pagamento até o Adriano precificar
-  const semPrecoC = c.quemPaga !== "colegio" && !Object.values(c.precos || {}).some(v => Number(v) > 0);
+  const semPrecoC = c.quemPaga !== "colegio" && !R.temPreco(c);
   if (pode && !semPrecoC) hp.append(U.mkBtn("+ Pagamento", "btn-primary btn-sm", () => formPagamento(null, st, ref)));
   corpo.append(hp);
   if (semPrecoC)
@@ -196,8 +197,8 @@ function render(corpo, st, inst, ano, ref) {
     ha.append(
       U.mkBtn(st.marcados.size ? `Aplicar pacote a ${st.marcados.size}` : "Aplicar pacote a vários", "btn-sm", () => {
         if (!st.marcados.size) return U.toast("Marque os alunos na lista (ou “Marcar todos”).");
-        escolherPacote(`Pacote para ${st.marcados.size} aluno${st.marcados.size > 1 ? "s" : ""}`, [], async itens => {
-          await gravarPacotes([...st.marcados], itens);
+        escolherPacote(`Pacote para ${st.marcados.size} aluno${st.marcados.size > 1 ? "s" : ""}`, [], async (itens, qtd) => {
+          await gravarPacotes([...st.marcados], itens, qtd);
           st.marcados.clear();
         });
       })
@@ -258,7 +259,9 @@ function render(corpo, st, inst, ano, ref) {
       if (pode)
         l.append(
           U.mkBtn("✏️", "btn-sm", () =>
-            escolherPacote("Pacote de " + U.first(title(a.nome || "")), padrao ? [] : itens, x => gravarPacotes([a.id], x))
+            escolherPacote("Pacote de " + U.first(title(a.nome || "")), padrao ? [] : itens, (x, q) => gravarPacotes([a.id], x, q), {
+              atualQtd: padrao ? {} : a.pacoteQtd
+            })
           )
         );
       lst.append(l);
@@ -276,15 +279,18 @@ function valorPorAluno(c, alunos) {
   return c.valor ? `${brl(c.valor / vai.length)} (${brl(c.valor)} ÷ ${vai.length} alunos)` : "";
 }
 // o pacote (um aluno ou vários marcados) e o valor de cada um pela tabela de preço do contrato
-async function gravarPacotes(ids, itens, contrato = (stAtual && stAtual.contrato) || {}) {
+async function gravarPacotes(ids, itens, qtd = {}, contrato = (stAtual && stAtual.contrato) || {}) {
   try {
     for (let i = 0; i < ids.length; i += 400) {
       const b = FS.writeBatch(db);
       ids.slice(i, i + 400).forEach(id => {
-        const patch = { pacote: itens, atualizadoEm: agora() };
-        const temPreco = Object.values(contrato.precos || {}).some(v => Number(v) > 0);
+        const patch = { pacote: itens, pacoteQtd: qtd || {}, atualizadoEm: agora() };
+        const temPreco = R.temPreco(contrato);
         if (temPreco && C.isAdmin) {
-          patch.valor = R.precoAluno({ pacote: itens, serie: ((stAtual && stAtual.alunos) || []).find(a => a.id === id)?.serie }, contrato);
+          patch.valor = R.precoAluno(
+            { pacote: itens, pacoteQtd: qtd, serie: ((stAtual && stAtual.alunos) || []).find(a => a.id === id)?.serie },
+            contrato
+          );
           patch.contratoZerado = !patch.valor;
         }
         b.update(FS.doc(db, "alugueis", id), patch);
@@ -368,14 +374,11 @@ function formContrato(c, inst, ano, ref) {
     obs.maxLength = 600;
     obs.value = x.obs || "";
     const pacote = el("div", "chips");
+    // cada item com a quantidade (ex.: 2 PR 15x10) (17/11/2026)
     const caixas = R.ITENS_PACOTE.map(([k, nome]) => {
-      const l = el("label", "chk");
-      const cb = el("input");
-      cb.type = "checkbox";
-      cb.checked = (x.pacotePadrao || ["paspatur", "certificado", "canudo"]).includes(k);
-      l.append(cb, document.createTextNode(" " + nome));
-      pacote.append(l);
-      return [k, cb];
+      const it = chipItem(k, nome, (x.pacotePadrao || ["paspatur", "certificado", "canudo"]).includes(k), (x.pacotePadraoQtd || {})[k]);
+      pacote.append(it.l);
+      return [k, it.cb];
     });
     const err = el("p", "err");
     err.hidden = true;
@@ -384,7 +387,8 @@ function formContrato(c, inst, ano, ref) {
     const b1 = bloco(1, "Quem fechou e quem paga");
     b1.append(r1, r2);
     const b2 = bloco(2, "Preços e pacote", "o aluno paga a soma dos itens do pacote dele");
-    const kitsEd = (await import("./contrato-kits.js")).editorKits(x, admin);
+    const kitsMod = await import("./contrato-kits.js");
+    const kitsEd = kitsMod.editorKits(x, admin);
     b2.append(
       field("Preço de cada item, por aluno (também quando o colégio paga: dá o valor de cada aluno)", precos),
       field("Pacote padrão (quem não tiver PACOTE na planilha)", pacote),
@@ -413,6 +417,7 @@ function formContrato(c, inst, ano, ref) {
         contato: { nome: cNome.value.trim(), cargo: cCargo.value, tel: U.digits(cTel.value) },
         entrega: { data: eData.value, com: eCom.value.trim() },
         pacotePadrao: caixas.filter(([, cb]) => cb.checked).map(([k]) => k),
+        pacotePadraoQtd: lerQtd(caixas),
         unidade: unidade.value.trim(),
         obs: obs.value.trim(),
         atualizadoEm: agora()
@@ -437,7 +442,8 @@ function formContrato(c, inst, ano, ref) {
           if (body.quemPaga && body.quemPaga !== x.quemPaga) mud.push("quem paga");
           if (body.respEmail && body.respEmail !== x.respEmail) mud.push("quem fechou: " + nomeResp);
           if (body.contato.nome !== (ct.nome || "") || body.contato.tel !== (ct.tel || "")) mud.push("contato");
-          if (R.textoPacote(body.pacotePadrao) !== R.textoPacote(x.pacotePadrao)) mud.push("pacote padrão");
+          if (R.textoPacote(body.pacotePadrao, body.pacotePadraoQtd) !== R.textoPacote(x.pacotePadrao, x.pacotePadraoQtd))
+            mud.push("pacote padrão");
           body.historico = histMais(x.historico, "editou o contrato" + (mud.length ? " (" + mud.join(", ") + ")" : ""));
           await FS.updateDoc(ref, body);
         } else
@@ -455,6 +461,8 @@ function formContrato(c, inst, ano, ref) {
         // os alunos de aluguel do colégio/ano ficam com quem fechou o contrato
         if (body.respEmail && (!c || body.respEmail !== x.respEmail))
           await (await import("./becas-uso.js")).passarAlugueis(C, inst.id, ano, body.respEmail).catch(e => console.warn("[Z7] donos", e));
+        // alunos que ficaram sem valor (colégio ainda sem preço) ganham o valor do kit ou dos itens
+        if (C.isAdmin) await kitsMod.valorDosZerados(C, inst.id, ano, Object.assign({}, x, body)).catch(e => console.warn(e));
         U.toast(c ? "Contrato salvo" : "Contrato criado ✅");
         close();
       } catch (e) {
@@ -762,11 +770,11 @@ function janelaAluno(id, st, ref, pode) {
           d.append(el("small", null, rot), el("span", null, val));
           dados.append(d);
         };
-        const { itens, padrao } = R.pacoteDoAluno(a, c);
+        const { itens, padrao, qtd } = R.pacoteDoAluno(a, c);
         if (abaCt === "resumo") {
           linha("WhatsApp", a.tel ? a.tel.replace(/^(\d{2})(\d{4,5})(\d{4})$/, "($1) $2-$3") : "sem telefone");
           linha("Responsável", a.responsavel || "");
-          linha("Pacote", (R.textoPacote(itens) || "sem pacote") + (padrao && itens.length ? " (padrão)" : ""));
+          linha("Pacote", (R.textoPacote(itens, qtd) || "sem pacote") + (padrao && itens.length ? " (padrão)" : ""));
           linha(
             "Beca",
             [a.tamanho ? "tamanho " + a.tamanho + (a.menosLonga ? "1" : "") : "", a.faixa ? "faixa" : "", a.capelo ? "capelo" : ""]
@@ -790,7 +798,7 @@ function janelaAluno(id, st, ref, pode) {
         } else if (abaCt === "pacote") {
           const r0 = R.precoAluno(a, c);
           const pago = pags.reduce((t, x) => t + Math.round(Number(x.valor || 0) * 100), 0) / 100;
-          linha("Itens", (R.textoPacote(itens) || "sem pacote") + (padrao && itens.length ? " (padrão do contrato)" : ""));
+          linha("Itens", (R.textoPacote(itens, qtd) || "sem pacote") + (padrao && itens.length ? " (padrão do contrato)" : ""));
           linha("Valor do pacote", r0 ? brl(r0) : "");
           linha("Já pagou", brl(pago));
           linha("Falta", r0 ? brl(Math.max(0, r0 - pago)) : "");
@@ -799,10 +807,12 @@ function janelaAluno(id, st, ref, pode) {
           if (pode) {
             ac.append(
               U.mkBtn("✏️ Mudar pacote", "btn-sm", () =>
-                escolherPacote("Pacote de " + U.first(title(a.nome || "")), padrao ? [] : itens, x => gravarPacotes([a.id], x))
+                escolherPacote("Pacote de " + U.first(title(a.nome || "")), padrao ? [] : itens, (x, q) => gravarPacotes([a.id], x, q), {
+                  atualQtd: padrao ? {} : a.pacoteQtd
+                })
               )
             );
-            if (c.quemPaga !== "colegio" && Object.values(c.precos || {}).some(v => Number(v) > 0))
+            if (c.quemPaga !== "colegio" && R.temPreco(c))
               ac.append(U.mkBtn("+ Pagamento", "btn-primary btn-sm", () => formPagamento(null, st, ref, { alunoId: a.id })));
           }
           corpo.append(ac, el("h3", null, "Pagamentos"));
