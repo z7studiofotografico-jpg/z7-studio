@@ -133,7 +133,7 @@ export async function relatorioAluguel(C, lista, filtro, insts = []) {
     a.codigo || "",
     title(a.nome || ""),
     contatoRel(a.tel, ""),
-    a.serie || "",
+    [a.serie, a.turma].filter(Boolean).join(" · "),
     kit(a),
     a.becaTipo ? tamanhoBeca(a).replace(" · sem tamanho", " (sem tamanho)") : "—",
     [a.faixa && nomeFaixa(a.faixa), a.capelo && nomeCapelo(a.capelo)].filter(Boolean).join(" · "),
@@ -176,7 +176,8 @@ export async function relatorioAluguel(C, lista, filtro, insts = []) {
         ]
       },
       // quantas becas de cada tamanho, infantil e adulto separados
-      ...(arr.some(a => a.tamanho)
+      // (17/11/2026) a pelerine (tamanho único) entra também; quem não vai participar não conta
+      ...(arr.some(a => a.tamanho || a.becaTipo === "pelerineAzul")
         ? [
             {
               titulo: "Becas por tamanho",
@@ -184,8 +185,14 @@ export async function relatorioAluguel(C, lista, filtro, insts = []) {
                 cols: ["Beca", "Tamanho", "Alunos"],
                 linhas: Object.entries(
                   arr.reduce((m, a) => {
-                    if (!a.tamanho) return m;
-                    const k = idadeBeca(a.becaTipo) + "|" + a.tamanho + (a.menosLonga ? "1" : "");
+                    if (a.naoParticipa) return m;
+                    const k =
+                      a.becaTipo === "pelerineAzul"
+                        ? "pelerine|Tamanho único"
+                        : a.tamanho
+                          ? idadeBeca(a.becaTipo) + "|" + a.tamanho + (a.menosLonga ? "1" : "")
+                          : "";
+                    if (!k) return m;
                     m[k] = (m[k] || 0) + 1;
                     return m;
                   }, {})
@@ -194,7 +201,7 @@ export async function relatorioAluguel(C, lista, filtro, insts = []) {
                     const ord = k => {
                       const [i, t] = k.split("|");
                       return (
-                        (i === "infantil" ? 0 : 100) +
+                        (i === "infantil" ? 0 : i === "pelerine" ? 200 : 100) +
                         TAMANHOS.findIndex(([z]) => z === t.replace(/1$/, "")) * 2 +
                         (t.endsWith("1") ? 1 : 0)
                       );
@@ -203,7 +210,7 @@ export async function relatorioAluguel(C, lista, filtro, insts = []) {
                   })
                   .map(([k, n]) => {
                     const [i, t] = k.split("|");
-                    return [i === "infantil" ? "Infantil" : "Adulto", t, n];
+                    return [i === "infantil" ? "Infantil" : i === "pelerine" ? "Pelerine azul" : "Adulto", t, n];
                   })
               }
             }
