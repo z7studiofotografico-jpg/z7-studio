@@ -82,19 +82,21 @@ export function valorPeloKit(itens, precos) {
   return (itens || []).reduce((t, k) => t + (Number((precos || {})[k]) || 0), 0);
 }
 // "Sem item", "Nenhum", "Não vai participar" no Kit: entra em 🚫 Não vai participar, sem kit e sem valor
-const SEM_ITEM = /^(sem\s*(item|itens|kit|pacote)|nenhum|nada|nao\s*(vai\s*)?particip\w*)$/;
+// (também no Tamanho: "Sem medida", "Sem tamanho")
+const SEM_ITEM = /^(sem\s*(item|itens|kit|pacote|medida|tamanho)|nenhum|nada|nao\s*(vai\s*)?particip\w*)$/;
+const semItem = v =>
+  SEM_ITEM.test(
+    U.chave(v)
+      .toLowerCase()
+      .replace(/[^a-z ]/g, "")
+      .trim()
+  );
 export function paraDocAluguel(o, ext) {
   const d = docAluguel(o, ext);
-  if (
-    SEM_ITEM.test(
-      U.chave(o.pacote)
-        .toLowerCase()
-        .replace(/[^a-z ]/g, "")
-        .trim()
-    )
-  ) {
-    d.__falta = d.__falta.filter(f => !/^pacote/.test(f));
-    return Object.assign(d, { naoParticipa: true, soPaspatur: false, pacote: [], valor: 0, contratoZerado: true });
+  if (semItem(o.pacote) || semItem(o.tamanho)) {
+    d.__falta = d.__falta.filter(f => !/^(pacote|tamanho)/.test(f));
+    const nada = { pacote: [], valor: 0, contratoZerado: true, tamanho: "", menosLonga: false };
+    return Object.assign(d, { naoParticipa: true, soPaspatur: false }, nada);
   }
   // PACOTE "Kit 1" / "Kit 2": o kit do colégio para a turma do aluno (itens e preço fechado)
   // PACOTE vazio e o colégio tem kit para a turma: o Kit 1 da turma (o pacote de quem não escolheu outro)

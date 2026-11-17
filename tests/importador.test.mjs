@@ -76,8 +76,8 @@ test("aluguel: 'Beca pelerine azul' no Tamanho = pelerine, tamanho único (sem a
 test("Kit “Sem item” entra em Não vai participar, sem kit e sem valor", async () => {
   const { paraDocAluguel } = await import("../js/aluguel-importar.js");
   const ext = { instId: "x", instNome: "X", ano: 2026, contrato: { kits: [{ nome: "Kit 1", serie: "", itens: ["beca"], valor: 90 }] } };
-  for (const p of ["Sem item", "Não vai participar", "nenhum"]) {
-    const d = paraDocAluguel({ nome: "A", pacote: p }, ext);
+  for (const o of [{ pacote: "Sem item" }, { pacote: "Não vai participar" }, { pacote: "nenhum" }, { tamanho: "Sem medida" }]) {
+    const d = paraDocAluguel({ nome: "A", ...o }, ext);
     assert.equal(d.naoParticipa, true);
     assert.deepEqual(d.pacote, []);
     assert.equal(d.valor, 0);
