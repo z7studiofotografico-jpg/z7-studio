@@ -723,7 +723,8 @@ export function form(a, pre = {}) {
     // (o pai pode comprar só o Paspatur, só o Canudo, só o aluguel ou o kit inteiro)
     // (17/11/2026: os kits do colégio, com preço fechado, aparecem em botões em cima dos itens)
     let precos = null,
-      contrato = null;
+      contrato = null,
+      qtdKit = x.pacoteQtd || {}; // quantidade de cada item do kit (ex.: 2 PR 15x10)
     const kitsBox = el("div");
     const somar = () => {
       if (!precos || zer.disabled) return;
@@ -745,7 +746,7 @@ export function form(a, pre = {}) {
         const pr = (s.exists() && s.data().precos) || {};
         contrato = s.exists() ? s.data() : null;
         const { botoesKits } = await import("./contrato-kits.js");
-        kitsBox.replaceChildren(botoesKits(contrato, serie.value, pacCx, somar));
+        kitsBox.replaceChildren(botoesKits(contrato, serie.value, pacCx, k => ((qtdKit = k.qtd || {}), somar())));
         if (!Object.values(pr).some(v => Number(v) > 0) && !kitsBox.textContent) return;
         precos = pr;
         pacCx.forEach(([k, , l, n]) => (l.lastChild.textContent = ` ${n}${Number(pr[k]) ? " · " + brl(pr[k]) : ""}`));
@@ -803,6 +804,7 @@ export function form(a, pre = {}) {
         devolucao: dev.value,
         obs: obs.value.trim(),
         pacote: pacCx.filter(([, cb]) => cb.checked).map(([k]) => k),
+        pacoteQtd: Object.fromEntries(pacCx.filter(([k, cb]) => cb.checked && qtdKit[k] > 1).map(([k]) => [k, qtdKit[k]])),
         atualizadoEm: new Date().toISOString()
       };
       if (!a || C.isAdmin) Object.assign(body, { valor: zer.checked ? 0 : lerReais(valor.value), contratoZerado: zer.checked });

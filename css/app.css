@@ -113,6 +113,7 @@ details.guide summary{cursor:pointer;font-family:var(--f-display);font-weight:70
 .chips{display:flex;gap:6px;overflow-x:auto;padding-bottom:4px;scrollbar-width:thin}
 .kits-editor .chips{flex-wrap:wrap;overflow-x:visible}
 .kit-soma{margin:4px 0;display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.kit-qtd{width:48px;padding:2px 4px;margin-left:6px}
 .chip{flex:none;border:1px solid transparent;background:var(--chip);color:var(--fg);border-radius:999px;padding:6px 12px;font-family:var(--f-display);font-weight:600;letter-spacing:.05em;font-size:.95rem;text-transform:uppercase}
 .chip[aria-pressed="true"],.chip[aria-selected="true"]{background:var(--fg);color:var(--bg)}
 .chip .n{font-variant-numeric:tabular-nums;opacity:.7;margin-left:4px}

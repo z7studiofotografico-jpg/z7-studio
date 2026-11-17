@@ -46,15 +46,26 @@ export function editorKits(x, admin, o = {}) {
     const topo = el("div", "row3");
     topo.append(field("Nome do kit", nome), field("Turma do kit", serie), field("Preço do kit", valor));
     const chips = el("div", "chips");
+    // cada item com a quantidade (ex.: 2 PR 15x10), que aparece quando o item está marcado (17/11/2026)
+    const qs = {};
     const cx = ITENS_PACOTE.map(([id, n]) => {
       const l = el("label", "chk");
       const c = el("input");
       c.type = "checkbox";
       c.checked = (k.itens || []).includes(id);
-      l.append(c, document.createTextNode(" " + n));
+      const q = el("input", "kit-qtd");
+      q.type = "number";
+      q.min = "1";
+      q.value = String(Number((k.qtd || {})[id]) || 1);
+      q.setAttribute("aria-label", "Quantidade de " + n);
+      q.hidden = !c.checked;
+      c.addEventListener("change", () => (q.hidden = !c.checked));
+      qs[id] = q;
+      l.append(c, document.createTextNode(" " + n), q);
       chips.append(l);
       return [id, c];
     });
+    const qtdDe = id => Math.max(1, parseInt(qs[id].value, 10) || 1);
     const tirar = U.mkBtn("✕ Tirar este kit", "btn-sm", () => {
       r.remove();
       linhas.splice(linhas.indexOf(item), 1);
@@ -64,7 +75,7 @@ export function editorKits(x, admin, o = {}) {
     const soma = el("div", "kit-soma hint");
     const somar = () => {
       const pr = o.precos ? o.precos() : {};
-      return reais(cx.filter(([, c]) => c.checked).reduce((t, [id]) => t + (Number(pr[id]) || 0), 0));
+      return reais(cx.filter(([, c]) => c.checked).reduce((t, [id]) => t + (Number(pr[id]) || 0) * qtdDe(id), 0));
     };
     const usar = U.mkBtn("= Usar a soma no preço do kit", "btn-sm", () => {
       valor.value = String(somar().toFixed(2)).replace(".", ",");
@@ -77,11 +88,12 @@ export function editorKits(x, admin, o = {}) {
       );
     };
     cx.forEach(([, c]) => c.addEventListener("change", mostrarSoma));
+    Object.values(qs).forEach(q => q.addEventListener("input", mostrarSoma));
     somas.push(mostrarSoma);
     if (o.precos) mostrarSoma();
     r.append(topo, chips, ...(o.precos ? [soma] : []), tirar);
-    [nome, serie, valor, ...cx.map(([, c]) => c), tirar].forEach(i => (i.disabled = !admin));
-    const item = { nome, serie, valor, cx };
+    [nome, serie, valor, ...cx.map(([, c]) => c), ...Object.values(qs), tirar].forEach(i => (i.disabled = !admin));
+    const item = { nome, serie, valor, cx, qtdDe };
     linhas.push(item);
     lista.append(r);
   };
@@ -98,7 +110,8 @@ export function editorKits(x, admin, o = {}) {
           nome: l.nome.value.trim(),
           serie: l.serie.value.trim(),
           valor: reais(l.valor.value),
-          itens: l.cx.filter(([, c]) => c.checked).map(([id]) => id)
+          itens: l.cx.filter(([, c]) => c.checked).map(([id]) => id),
+          qtd: Object.fromEntries(l.cx.filter(([id, c]) => c.checked && l.qtdDe(id) > 1).map(([id]) => [id, l.qtdDe(id)]))
         }))
         .filter(k => k.nome && k.itens.length)
     })
@@ -116,7 +129,7 @@ export function botoesKits(contrato, serie, caixas, depois) {
       caixas.forEach(([id, c]) => (c.checked = k.itens.includes(id)));
       if (depois) depois(k);
     });
-    b.title = textoPacote(k.itens);
+    b.title = textoPacote(k.itens, k.qtd);
     box.append(b);
   });
   return box;

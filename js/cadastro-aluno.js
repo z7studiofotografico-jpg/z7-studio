@@ -388,7 +388,7 @@ export function abrirCadastroAluno(C, o = {}) {
           k => !k.serie || !serieTxt() || U.chave(k.serie).replace(/\W/g, "") === U.chave(serieTxt()).replace(/\W/g, "")
         );
         kitsCol.forEach((k, i) => {
-          const op = el("option", null, `${R.nomeKit(k)} · ${U.money(k.valor)} (${R.textoPacote(k.itens)})`);
+          const op = el("option", null, `${R.nomeKit(k)} · ${U.money(k.valor)} (${R.textoPacote(k.itens, k.qtd)})`);
           op.value = String(i);
           bKit.append(op);
         });
@@ -561,7 +561,8 @@ export function abrirCadastroAluno(C, o = {}) {
                 faixa: bFaixa.value,
                 capelo: bCap.value,
                 valor: lerReais(bValor.value),
-                pacote: bKit.value !== "" && kitsCol[Number(bKit.value)] ? kitsCol[Number(bKit.value)].itens.slice() : []
+                pacote: bKit.value !== "" && kitsCol[Number(bKit.value)] ? kitsCol[Number(bKit.value)].itens.slice() : [],
+                pacoteQtd: bKit.value !== "" && kitsCol[Number(bKit.value)] ? kitsCol[Number(bKit.value)].qtd || {} : {}
               })
             );
           if (fazer.includes("pr")) feitos.push(await criarPR(C, "repasse", d, "pr"));
@@ -633,6 +634,7 @@ async function criarAluguel(C, d, b) {
     devolucao: "",
     obs: "",
     pacote: b.pacote || [],
+    pacoteQtd: b.pacoteQtd || {},
     valor: Number(b.valor) || 0,
     contratoZerado: false,
     status: "Cadastrado",

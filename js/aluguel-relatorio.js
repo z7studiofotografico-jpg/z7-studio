@@ -6,7 +6,7 @@ import { ocultoParaMim } from "./confirmar.js";
 import { nomeFaixa, nomeCapelo, usoDosAlunos, tamanhoBeca, idadeBeca, TAMANHOS } from "./becas-estoque.js";
 import { pedirFiltros } from "./relatorio.js";
 import { contatoRel, ordemCodigo } from "./aluno-id.js";
-import { pacoteDoAluno, nomeItem } from "./contrato-colegio-regras.js";
+import { pacoteDoAluno, textoPacote } from "./contrato-colegio-regras.js";
 import { cartaoDoTipo } from "./instituicoes-dados.js";
 import { brl } from "./regras.js";
 
@@ -127,7 +127,7 @@ export async function relatorioAluguel(C, lista, filtro, insts = []) {
       ? "Sem kit"
       : a.soPaspatur
         ? "Só o Paspatur"
-        : pacoteDoAluno(a, contratos[`${a.instId}_${a.ano}`]).itens.map(nomeItem).join(" + ") || "Sem kit";
+        : textoPacote(pacoteDoAluno(a, contratos[`${a.instId}_${a.ano}`]).itens, a.pacoteQtd) || "Sem kit";
   const cols = ["ID", "Aluno", "Contato", "Turma", "Kit", "Beca", "Faixa / capelo", "Status", "Devolução"];
   const linha = a => [
     a.codigo || "",

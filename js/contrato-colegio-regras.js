@@ -67,7 +67,9 @@ export function lerPacote(v) {
   });
   return ITENS_PACOTE.map(([k]) => k).filter(k => achou.has(k));
 }
-export const textoPacote = itens => (itens || []).map(nomeItem).join(" + ");
+// qtd = { pr1510: 2 } (só o que é mais de 1): "2× PR 15x10 cm" (17/11/2026)
+export const textoPacote = (itens, qtd) =>
+  (itens || []).map(i => (Number((qtd || {})[i]) > 1 ? `${Number(qtd[i])}× ` : "") + nomeItem(i)).join(" + ");
 
 // Pacote do aluno: o dele (se tiver) ou o padrão do contrato
 export function pacoteDoAluno(a, contrato) {
