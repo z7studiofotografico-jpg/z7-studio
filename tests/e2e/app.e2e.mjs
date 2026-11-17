@@ -2973,10 +2973,7 @@ await cenario("Prévias do colégio inteiro direto no site (janela do colégio)"
   await pg.locator("#viewInstTipo").getByRole("button", { name: "📤 Enviar prévias para o site" }).click();
   const esc = pg.locator(".sheet:visible").last();
   await esc.getByLabel("Colégio e ano").waitFor();
-  ok(
-    /2026 · C\.E\. TESTE · PR/i.test(await esc.getByLabel("Colégio e ano").textContent()),
-    "o topo do cartão lista o colégio e o ano"
-  );
+  ok(/2026 · C\.E\. TESTE · PR/i.test(await esc.getByLabel("Colégio e ano").textContent()), "o topo do cartão lista o colégio e o ano");
   await esc.getByRole("button", { name: "Continuar" }).click();
   await pg
     .locator(".sheet:visible")
@@ -4563,6 +4560,23 @@ await cenario("Aluguel de becas: avançar o colégio inteiro (Cadastrado → Bec
       1,
     "só o Paspatur: o próximo passo é a produção (sem medir beca)"
   );
+  // ⏩ avançar o colégio inteiro para Só o Paspatur; avançando de novo, vão para a produção
+  await pg.getByRole("button", { name: "⏩ Avançar o colégio inteiro" }).click();
+  const sp = pg.locator(".sheet").filter({ hasText: "Avançar o colégio inteiro" });
+  await sp.getByRole("button", { name: "Cadastrado (1) → Só o Paspatur" }).click();
+  await pg.locator(".sheet").last().getByRole("button", { name: "Sim, passar todos" }).click();
+  await sp.getByText(/1 aluno em “Só o Paspatur”/).waitFor({ timeout: 8000 });
+  const sa = (await store())["alugueis/b1"];
+  ok(sa.soPaspatur === true && sa.pacote.join() === "paspatur", "avançar o colégio: Cadastrado → Só o Paspatur");
+  await sp.getByRole("button", { name: "Fechar" }).click();
+  await pg.getByRole("button", { name: "⏩ Avançar o colégio inteiro" }).click();
+  const sp2 = pg.locator(".sheet").filter({ hasText: "Avançar o colégio inteiro" });
+  await pg.waitForTimeout(300);
+  ok(
+    /Só o Paspatur \(2\) → Produtos em produção/.test(await sp2.textContent()),
+    "avançando de novo: Só o Paspatur → Produtos em produção"
+  );
+  await sp2.getByRole("button", { name: "Fechar" }).click();
   ok(!erros.length, "sem erros" + (erros.length ? ": " + erros.join(" | ") : ""));
 });
 await cenario("Colégio sem preço: aviso vermelho e venda bloqueada", async () => {

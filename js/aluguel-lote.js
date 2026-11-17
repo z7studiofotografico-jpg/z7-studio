@@ -12,14 +12,17 @@ export function etapasDoColegio(alunos, voltar = false) {
   const m = new Map();
   alunos.forEach(a => {
     if (a.naoParticipa) return; // não vai participar da formatura: fica fora
-    const de = a.status || "Cadastrado";
+    const st = a.status || "Cadastrado";
     const para = voltar ? anteriorStatus(a) : proximoStatus(a);
     if (!para) return;
+    // quem é só do Paspatur aparece separado (vai direto para a produção)
+    const de = a.soPaspatur && st === "Cadastrado" ? "Só o Paspatur" : st;
     const k = de + "→" + para;
     if (!m.has(k)) m.set(k, [de, para, []]);
     m.get(k)[2].push(a);
   });
-  return [...m.values()].sort((x, y) => STATUS_ALUGUEL.indexOf(x[0]) - STATUS_ALUGUEL.indexOf(y[0]));
+  const ordem = x => (x === "Só o Paspatur" ? 0.5 : STATUS_ALUGUEL.indexOf(x));
+  return [...m.values()].sort((x, y) => ordem(x[0]) - ordem(y[0]));
 }
 
 export function avancarColegio(C, alunos, mudarStatus, voltar = false) {
@@ -39,6 +42,35 @@ export function avancarColegio(C, alunos, mudarStatus, voltar = false) {
     }
     const lista = el("div", "lote-etapas");
     const msg = el("div");
+    // 17/11/2026: Cadastrado → Só o Paspatur (o colégio inteiro, ou quem ainda está em Cadastrado); avançando de
+    // novo, eles vão para a produção
+    const paraPas = voltar ? [] : alunos.filter(a => !a.naoParticipa && !a.soPaspatur && (a.status || "Cadastrado") === "Cadastrado");
+    if (paraPas.length) {
+      const b = U.mkBtn(`Cadastrado (${paraPas.length}) → Só o Paspatur`, "btn-amarelo", async () => {
+        const ok = await confirmar(
+          `Passar ${paraPas.length} alunos para Só o Paspatur?`,
+          `${nome}: ficam só com o Paspatur, sem beca. Avançando de novo, vão para a produção.`,
+          { sim: "Sim, passar todos", nao: "Não" }
+        );
+        if (!ok) return;
+        lista.querySelectorAll("button").forEach(x => (x.disabled = true));
+        let feitos = 0;
+        for (const a of paraPas) {
+          msg.textContent = `Passando ${feitos + 1} de ${paraPas.length}…`;
+          try {
+            await C.FS.updateDoc(C.FS.doc(C.db, "alugueis", a.id), await patchParticipacao(C, a, "paspatur"));
+            feitos++;
+          } catch (e) {
+            console.warn("[Z7] só o paspatur", e);
+          }
+        }
+        msg.textContent = "";
+        msg.append(
+          el("p", "notice", `✅ ${feitos} aluno${feitos === 1 ? "" : "s"} em “Só o Paspatur”. Para mandar para a produção, avance de novo.`)
+        );
+      });
+      lista.append(b);
+    }
     etapas.forEach(([de, para, als]) => {
       const b = U.mkBtn(`${de} (${als.length}) → ${para}`, "btn-primary", async () => {
         const ok = await confirmar(`${voltar ? "Voltar" : "Passar"} ${als.length} alunos?`, `De “${de}” para “${para}”: ${nome}.`, {
@@ -90,11 +122,24 @@ const MODOS = {
 export async function participacao(C, a, modo, salvar) {
   const [titulo, texto] = MODOS[modo];
   if (!(await confirmar(titulo, `${title(a.nome)} ${texto}`, { sim: "Sim", nao: "Não" }))) return;
-  let pr = {};
-  try {
-    const c = await C.FS.getDoc(C.FS.doc(C.db, "contratosColegio", `${a.instId}_${Number(a.ano)}`));
-    pr = (c.exists() && c.data().precos) || {};
-  } catch (_) {}
+  const nome = { nao: "Não vai participar", paspatur: "Só o Paspatur", vai: "Vai participar" }[modo];
+  return salvar(a, await patchParticipacao(C, a, modo), "Marcado: " + nome);
+}
+// os preços do contrato do colégio (guardados enquanto o app está aberto: o lote não lê de novo para cada aluno)
+const precosContrato = new Map();
+async function precosDe(C, a) {
+  const k = `${a.instId}_${Number(a.ano)}`;
+  if (!precosContrato.has(k))
+    precosContrato.set(
+      k,
+      C.FS.getDoc(C.FS.doc(C.db, "contratosColegio", k))
+        .then(c => (c.exists() && c.data().precos) || {})
+        .catch(() => ({}))
+    );
+  return precosContrato.get(k);
+}
+export async function patchParticipacao(C, a, modo) {
+  const pr = await precosDe(C, a);
   const de = a.status || "Cadastrado";
   const vPas = Number(pr.paspatur) || 0;
   const patch =
@@ -105,7 +150,7 @@ export async function participacao(C, a, modo, salvar) {
         : { naoParticipa: false, soPaspatur: false, status: "Cadastrado" };
   const nome = { nao: "Não vai participar", paspatur: "Só o Paspatur", vai: "Vai participar" }[modo];
   patch.historico = [...(a.historico || []), { de, para: nome, em: new Date().toISOString(), por: C.me || "" }].slice(-30);
-  return salvar(a, patch, "Marcado: " + nome);
+  return patch;
 }
 
 // apaga os alunos do colégio e ano escolhidos; quem tem beca fora ou produto reservado/baixado fica (para não
