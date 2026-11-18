@@ -25,16 +25,17 @@ export function renderCobrancas(corpo, cob, o) {
     return;
   }
   // busca e colégio (como no PR)
-  const topo = el("div", "row2 va-busca");
-  const q = el("input");
+  const topo = el("div", "rbusca va-busca");
+  const q = el("input", "search");
   q.type = "search";
   q.placeholder = "Nome do aluno, ID ou telefone";
   q.setAttribute("aria-label", "Buscar aluno");
   q.value = busca;
   const cont = {};
   cob.forEach(({ f }) => (cont[f.instNome || "?"] = (cont[f.instNome || "?"] || 0) + 1));
-  const sCol = el("select");
+  const sCol = el("select", "search");
   sCol.setAttribute("aria-label", "Colégio");
+  sCol.dataset.semBusca = ""; // a busca ao lado já procura
   const o0 = el("option", null, `Todos os colégios (${cob.length})`);
   o0.value = "";
   sCol.append(o0);
