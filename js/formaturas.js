@@ -5,18 +5,7 @@
 //  - 📋 Kits e preços: tabela do contrato (antecipado) e preço depois das fotos
 //  - Turmas: colégios fechados, com acesso à lista de formandos
 // Quem não é administrador vê só as turmas dos colégios que fechou.
-import {
-  openTurma,
-  cobrarWa,
-  registrarPagamento,
-  pagaPorPix,
-  umaVez,
-  atrasado,
-  oferecerKit,
-  abrirPrevia,
-  retornoFormando
-} from "./turma.js";
-import { linhasRetorno } from "./retorno.js";
+import { openTurma, atrasado, oferecerKit, abrirPrevia } from "./turma.js";
 import { kitsPadrao, candidatosPosFoto, ehRepasse, anoDaTurma } from "./contrato.js";
 import {
   ativo,
@@ -29,7 +18,6 @@ import {
   quitado,
   vencDa,
   valorParcela,
-  esperadas,
   ehKit01,
   fimDoMes
 } from "./regras.js";
@@ -41,6 +29,9 @@ import { botaoRelatorio } from "./relatorio.js";
 import { siglaDe, contatoRel } from "./aluno-id.js";
 import { pintarSeletor } from "./numeros-tela.js";
 import { renderFechados } from "./formaturas-fechados.js";
+import { renderCobrancas as renderCobrancasVA } from "./va-cobrancas.js";
+// Cobranças: só os lembretes de hoje da régua (3 dias antes, no dia, 3 e 10 dias depois) ou todas
+let soHoje = true;
 // Leitura sob demanda: ao abrir, só as parcelas que vencem até o fim do mês (campo proxVenc);
 // a lista completa de formandos só é lida quando alguém abre as abas Adesão, Kits ou Turmas.
 let C,
@@ -111,8 +102,11 @@ export function show() {
       U.mkBtn("🔎 Conferir fotos", "btn-sm", () =>
         import("./conferir-fotos.js").then(m => m.abrirConferirFotos(C, "formaturaAlunos")).catch(e => C.handleErr(e))
       ),
+      // na Venda Antecipada: a planilha do colégio com as parcelas (18/11/2026); nas outras abas, a da Linha de Frente
       U.mkBtn("Importar planilha", "btn-sm", () =>
-        import("./repasse.js").then(m => (m.init(C), m.importarFormatura())).catch(e => C.handleErr(e))
+        parte === "va"
+          ? import("./va-importar.js").then(m => m.abrirImportarVA(C, () => carregarTudo(true))).catch(e => C.handleErr(e))
+          : import("./repasse.js").then(m => (m.init(C), m.importarFormatura())).catch(e => C.handleErr(e))
       ),
       U.mkBtn("✏️ Mensagens", "btn-sm", () =>
         import("./formatura-mensagens.js").then(m => m.editarMensagensFormatura(C)).catch(e => C.handleErr(e))
@@ -456,61 +450,7 @@ function cobrancas(fs) {
     .sort((a, b) => a.venc.localeCompare(b.venc) || (a.f.nome || "").localeCompare(b.f.nome || ""));
 }
 function renderCobrancas(corpo, cob) {
-  if (!cob.length) {
-    const e = el("div", "empty");
-    e.append(
-      el("strong", null, "Nenhuma parcela para cobrar este mês ✓"),
-      el("span", null, "Aqui aparecem as parcelas atrasadas e as que vencem até o fim do mês, de todas as turmas.")
-    );
-    corpo.append(e);
-    return;
-  }
-  const g = el("div", "grid");
-  cob.forEach(({ f, venc }) => {
-    const at = atrasado(f);
-    const e = el("article", "card " + (at ? "late" : "today"));
-    const top = el("div", "card-top");
-    top.append(el("h3", "name", title(f.nome)), el("span", "stage", at ? "ATRASADO" : "VENCE " + U.fmtDate(venc)));
-    e.append(top);
-    const meta = el("div", "meta");
-    [title(f.instNome), (ehKit01(f) ? "🎓 " : "📘 ") + (f.kit || (ehKit01(f) ? "Kit 01 · adesão" : "Kit")), f.serie]
-      .filter(Boolean)
-      .forEach((t, i) => meta.append(el("span", "tag" + (i === 1 ? " svc" : ""), t)));
-    e.append(meta);
-    linhasRetorno(f).forEach(x => e.append(x));
-    const pg = pagasDe(f),
-      emAtraso = esperadas(f, U.todayStr()) - pg;
-    e.append(
-      el(
-        "div",
-        "fu " + (at ? "late" : "today"),
-        `Parcela ${pg + 1}/${nParcelas(f)} · ${moeda(valorParcela(f, pg + 1))} · ${at ? "venceu" : "vence"} ${U.fmtDate(venc)}` +
-          (at && emAtraso > 1 ? ` · ${emAtraso} em atraso` : "")
-      )
-    );
-    const act = el("div", "actions");
-    if (C.isAdmin)
-      act.append(
-        U.mkBtn(
-          "✅ Parcela paga",
-          "btn-ok",
-          umaVez(() => registrarPagamento(C, f))
-        ),
-        U.mkBtn(
-          "💠 Paga por Pix",
-          "",
-          umaVez(() => pagaPorPix(C, f))
-        )
-      );
-    if (f.tel) act.append(U.mkBtn("💬 Cobrar", at ? "btn-primary" : "", () => cobrarWa(C, f)));
-    act.append(ajuda(f));
-    act.append(U.mkBtn("📅 Pediu contato depois", "", () => retornoFormando(C, f)));
-    const inst = insts.find(i => i.id === f.instId);
-    if (inst) act.append(U.mkBtn("Ver turma", "", () => abrirTurma(inst)));
-    e.append(act);
-    g.append(e);
-  });
-  corpo.append(g);
+  renderCobrancasVA(corpo, cob, { C, soHoje, mudarHoje: v => ((soHoje = v), render()), insts, abrirTurma, ajuda });
 }
 
 function resumoInst(i, lst) {

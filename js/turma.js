@@ -118,7 +118,8 @@ export function retornoFormando(ctx, f) {
     )
   );
 }
-export function cobrarWa(ctx, f) {
+// et = etapa da régua de cobrança (va-regua.js): o texto acompanha o momento, e o lembrete fica anotado no aluno
+export function cobrarWa(ctx, f, et) {
   usar(ctx);
   const prox = pagasDe(f) + 1,
     venc = vencDa(f, prox),
@@ -132,11 +133,17 @@ export function cobrarWa(ctx, f) {
     parcela: `${prox}/${nParcelas(f)}`,
     item,
     valor: brl(valorParcela(f, prox)),
-    venc: venc ? U.fmtDate(venc) : "",
+    venc: et && et.etapa === "d0" ? "hoje" : venc ? U.fmtDate(venc) : "",
     atrasada: atrasado(f),
     pagar
   });
   wa(f.tel, msg, U.toast);
+  if (et && !et.enviado)
+    FS.updateDoc(FS.doc(db, "formandos", f.id), {
+      lembretes: [...(f.lembretes || []), { parcela: et.parcela, etapa: et.etapa, em: new Date().toISOString(), por: C.me || "" }].slice(
+        -30
+      )
+    }).catch(e => console.warn("[Z7] lembrete", e));
 }
 // Mensagem para quem tem só o Kit 01: as fotos ficaram prontas, kits no preço depois das fotos (tabela da turma)
 // Kits no preço depois das fotos (tabela da turma), uma linha por kit
@@ -302,6 +309,14 @@ function desenhar(T) {
     b.style.marginLeft = "8px";
     T.qtdBox.append(b);
   }
+  // quem não comprou kit de fotos vai para a Linha de Frente só quando mandar (18/11/2026)
+  const paraLF = semKit.filter(f => !f.lfEnviadoEm);
+  if (C.isAdmin && paraLF.length)
+    T.qtdBox.append(
+      U.mkBtn(`➡️ Mandar para a Linha de Frente (${paraLF.length}): sem kit de fotos`, "btn-sm", () =>
+        import("./va-linha-frente.js").then(m => m.mandarParaLF(C, T.inst, paraLF)).catch(e => C.handleErr(e))
+      )
+    );
   // contrato item 4.3: mínimo de 30 formandos na solenidade
   const total = T.inst.alunosConfirmados || nomesUnicos;
   if (total && total < MINIMO_FORMANDOS)

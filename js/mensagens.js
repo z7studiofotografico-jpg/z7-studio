@@ -25,7 +25,7 @@ export function msgCobranca({ nome, parcela, item, valor, venc, atrasada, pagar 
   const oi = `Oi, ${primeiro(nome)}! Aqui é do ${ESTUDIO.nome} 📸`;
   return atrasada
     ? `${oi} Passando para lembrar da parcela ${parcela} ${item}, de ${valor}, que venceu ${venc ? "dia " + venc : "este mês"}.${pagar}\nPode me mandar o comprovante por aqui? Se já pagou, é só desconsiderar 😊`
-    : `${oi} Só lembrando que a parcela ${parcela} ${item}, de ${valor}, vence ${venc ? "dia " + venc : "em breve"}.${pagar}\nQualquer dúvida, estou por aqui 😊`;
+    : `${oi} Só lembrando que a parcela ${parcela} ${item}, de ${valor}, vence ${venc === "hoje" ? "hoje" : venc ? "dia " + venc : "em breve"}.${pagar}\nQualquer dúvida, estou por aqui 😊`;
 }
 
 // Oferta para quem tem só o Kit 01: { nome, escola, linhas (kits com preço), repasse, ano }

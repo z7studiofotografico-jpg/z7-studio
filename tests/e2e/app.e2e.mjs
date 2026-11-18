@@ -533,7 +533,13 @@ async function etapa(pg, nome, fn) {
     await fn();
   } catch (e) {
     falhas++;
-    console.log(`  ✗ [${nome}] parou com erro: ` + String((e && e.message) || e).split("\n")[0]);
+    console.log(
+      `  ✗ [${nome}] parou com erro: ` +
+        String((e && e.message) || e)
+          .split("\n")
+          .slice(0, 3)
+          .join(" ")
+    );
     // fecha as janelas abertas: as criadas na hora saem; as fixas da página (Ajustes, Equipe, lead) só se escondem
     await pg.evaluate(() => document.querySelectorAll(".sheet").forEach(x => (x.id ? (x.hidden = true) : x.remove()))).catch(() => {});
     await ir(pg, "#home").catch(() => {});
@@ -650,8 +656,10 @@ await cenario("Adriano (admin), com os dados já atualizados no servidor", async
     // Formaturas: registrar parcela (transação)
     await ir(pg, "#formaturas");
     ok(/Lucas Silva/.test(await pg.textContent("#fmCorpo")), "cobranças mostram o formando atrasado");
+    // a lista no desenho do app: tocar na linha abre o cartão com os botões
+    await pg.locator("#fmCorpo .lc-linha", { hasText: "Lucas" }).first().click();
     // pediu para pagar outro dia: motivo + data ficam no formando (e no histórico de motivos)
-    await pg.locator("#fmCorpo .card").filter({ hasText: "Lucas" }).getByRole("button", { name: "📅 Pediu contato depois" }).click();
+    await pg.locator("#fmCorpo .lc-item").filter({ hasText: "Lucas" }).getByRole("button", { name: "📅 Pediu contato depois" }).click();
     await calmo(pg);
     const shRet = pg.locator(".sheet").last();
     await shRet.getByLabel("Motivo").fill("Sem dinheiro agora, recebe dia 10");
@@ -666,7 +674,7 @@ await cenario("Adriano (admin), com os dados já atualizados no servidor", async
         s["formandos/f1"].motivos.length === 1,
       "Formaturas: 'Pediu contato depois' guarda motivo e data (histórico de motivos)"
     );
-    await pg.locator("#fmCorpo .card").filter({ hasText: "Lucas" }).getByText("✅ Parcela paga").click();
+    await pg.locator("#fmCorpo .lc-item").filter({ hasText: "Lucas" }).getByText("✅ Parcela paga").click();
     await calmo(pg);
     s = await store();
     ok(
@@ -4105,7 +4113,12 @@ await cenario("Formaturas · abas Linha de Frente / Repasse / Venda Antecipada, 
   // Venda Antecipada: parcela paga por Pix, com a data
   await pg.locator("#viewFormaturas .seg", { hasText: "Venda Antecipada" }).click();
   await calmo(pg);
-  await pg.locator("#fmCorpo .card").filter({ hasText: "Lucas" }).getByRole("button", { name: "💠 Paga por Pix" }).click();
+  await pg
+    .locator("#fmCorpo")
+    .getByRole("button", { name: /Todas do mês/ })
+    .click();
+  await pg.locator("#fmCorpo .lc-linha", { hasText: "Lucas" }).click();
+  await pg.locator("#fmCorpo .card").filter({ hasText: "Colegio Alfa" }).getByRole("button", { name: "💠 Paga por Pix" }).click();
   await pg.locator(".sheet").last().locator("input[type=date]").fill(dia(-2));
   await pg.locator(".sheet").last().locator("button[type=submit]").click();
   await calmo(pg);
@@ -4115,6 +4128,194 @@ await cenario("Formaturas · abas Linha de Frente / Repasse / Venda Antecipada, 
     pgs.length && pgs[pgs.length - 1].forma === "Pix" && pgs[pgs.length - 1].data === dia(-2),
     "Paga por Pix: grava a forma e a data do Pix"
   );
+  ok(!erros.length, "sem erros no console: " + erros.join(" | "));
+});
+await cenario("Venda Antecipada · importar a planilha do colégio (meses, OBS e Linha de Frente)", async () => {
+  // planilha como a do estúdio, com alunos inventados (VA_PLANILHA = arquivo de verdade, só para o print local)
+  const { createRequire } = await import("node:module");
+  const XLSX = createRequire(import.meta.url)("xlsx");
+  const cab = [
+    "BECA",
+    "ESCOLA / FAC.",
+    "CURSO",
+    "TURMA",
+    "FOTO ESCOLA",
+    "STATUS",
+    "VENDEDOR",
+    "ID",
+    "FORMANDO ",
+    "CELULAR 1",
+    "CEL 2 MAE ",
+    "REPONSAVEL",
+    "CPF",
+    "E-MAIL",
+    "ENDEREÇO",
+    "BAIRRO",
+    "CIDADE",
+    "QUADRO A3",
+    "PR 10X15",
+    "ALBUM",
+    "FOTOS",
+    "OBS",
+    "CANUDO",
+    "PG. 05 JUNHO",
+    "PG JULHO",
+    "PG AGOSTO",
+    "PG SETEMBRO",
+    "PG OUTUBRO",
+    "PG NOVEMBRO",
+    "PG DEZEMBRO",
+    "PG JANEIRO",
+    "PG FEVEREIRO",
+    "PG MARÇO"
+  ];
+  const lin = (beca, turma, id, nome, obs, itens, meses) => [
+    beca,
+    "C.E TESTE PALMEIRO",
+    "3° ANO",
+    turma,
+    "SIM",
+    "",
+    "ROBERTO",
+    "CETP - " + id,
+    nome,
+    21990000000 + Number(id),
+    21980000000,
+    "MAE " + nome,
+    "12345678901",
+    "-",
+    "RUA A",
+    "CENTRO",
+    "ITAGUAI",
+    ...itens,
+    obs,
+    1,
+    ...meses
+  ];
+  const nada = Array(10).fill(null);
+  const nove = v => [...Array(9).fill(v), "-"];
+  const linhas = [
+    lin("P", 3001, "01", "ANA KIT UM", "pagou", ["-", "-", "-", "-"], [65, ...nada.slice(1)]),
+    lin("M", 3001, "02", "BRUNO KIT DOIS", "pagou", ["-", "-", "-", 1], nove(41)),
+    lin("PP", 3002, "03", "CARLA ATRASADA", "atrasado", ["-", "-", "-", 1], nove(41)),
+    lin("G", 3002, "04", "DIEGO QUITOU", "Quitou", [1, 1, "-", 1], Array(10).fill(53)),
+    lin("FALTOU", 3003, "05", "ELISA BOLETO", "boleto enviado", ["-", "-", "-", "-"], [null, null, null, 65, ...nada.slice(4)]),
+    lin("P", 3003, "06", "FABIO SAIU", "-", ["-", "-", "-", "-"], nada)
+  ];
+  linhas[5][5] = "saiu da escola";
+  const ws = XLSX.utils.aoa_to_sheet([cab, ...linhas]);
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, "Folha1");
+  const buffer = process.env.VA_PLANILHA ? fs.readFileSync(process.env.VA_PLANILHA) : XLSX.write(wb, { type: "buffer", bookType: "xlsx" });
+  const d = Object.assign({}, base, {
+    "instituicoes/publico_ce-teste-palmeiro": { nome: "C.E. Teste Palmeiro", etapa: "VISITADO", tipo: "publico" },
+    ...(process.env.VA_PLANILHA
+      ? {
+          "instituicoes/publico_c-e-professor-ney-cidade-palmeiro": {
+            nome: "C.E. Professor Ney Cidade Palmeiro",
+            etapa: "VISITADO",
+            tipo: "publico"
+          }
+        }
+      : {})
+  });
+  const { pg, erros, store } = await abrir(ADRIANO, migrar(d));
+  await ir(pg, "#formaturas");
+  await pg.locator("#viewFormaturas .seg", { hasText: "Venda Antecipada" }).click();
+  await calmo(pg);
+  await pg.getByRole("button", { name: "Importar planilha" }).click();
+  const sh = pg.locator(".sheet:visible").filter({ hasText: "Importar planilha · Venda Antecipada" }).last();
+  await sh.locator("input[type=file]").setInputFiles({ name: "turma.xlsx", mimeType: "application/octet-stream", buffer });
+  await sh.locator(".kpis").waitFor({ timeout: 8000 });
+  ok((await sh.getByLabel("Colégio", { exact: true }).inputValue()).includes("palmeiro"), "acha o colégio pelo nome da planilha");
+  if (process.env.VA_PRINT) {
+    await pg.setViewportSize({ width: 900, height: 1600 });
+    await sh.locator("details", { hasText: "Para conferir" }).locator("summary").click();
+    await sh.evaluate(e => (e.querySelector(".panel") || e).scrollTo(0, 0));
+    await sh.screenshot({ path: process.env.VA_PRINT });
+  }
+  if (process.env.VA_PRINT2) {
+    await sh.getByRole("button", { name: /Importar \d+ alunos/ }).click();
+    await calmo(pg);
+    await pg.setViewportSize({ width: 900, height: 1500 });
+    await pg.evaluate(() => window.scrollTo(0, 0));
+    await pg.setViewportSize({ width: 900, height: 1100 });
+    await pg.locator("#viewFormaturas").screenshot({ path: process.env.VA_PRINT2 });
+    await pg.locator("#fmChips button", { hasText: "Colégios fechados" }).click();
+    await calmo(pg);
+    await pg.locator("#fmCorpo .lc-linha", { hasText: "Ney" }).click();
+    await pg.locator("#fmCorpo .lc-item", { hasText: "Ney" }).getByRole("button", { name: "👥 Alunos e parcelas" }).click();
+    await calmo(pg);
+    await pg
+      .locator(".sheet:visible")
+      .last()
+      .screenshot({ path: process.env.VA_PRINT2.replace(".png", "-turma.png") });
+  }
+  if (!process.env.VA_PLANILHA) {
+    const txt = await sh.textContent();
+    ok(
+      /Sem kit de fotos\s*2/.test(txt) && /Para conferir\s*1/.test(txt) && /Atrasados\s*1/.test(txt),
+      "prévia: quitados, atrasados, para conferir e Linha de Frente"
+    );
+    ok(/FABIO SAIU|Fabio Saiu/i.test(txt), "quem saiu da escola fica fora");
+    await sh.getByRole("button", { name: /Importar 5 alunos/ }).click();
+    await calmo(pg);
+    const st = await store();
+    const fs0 = Object.entries(st)
+      .filter(([k, v]) => k.startsWith("formandos/") && v.instId === "publico_ce-teste-palmeiro")
+      .map(([, v]) => v);
+    const por = n => fs0.find(f => f.nome === n) || {};
+    ok(fs0.length === 5, "5 alunos na Venda Antecipada");
+    ok(
+      por("BRUNO KIT DOIS").kitId === "k02" && por("BRUNO KIT DOIS").pagas >= 1 && por("BRUNO KIT DOIS").codigo.endsWith("CETP-02"),
+      "Kit 02 pelo valor, pagas pela OBS, ID com o ano"
+    );
+    ok(por("DIEGO QUITOU").pagas === 10 && por("DIEGO QUITOU").proxVenc === "", "Quitou: todas as parcelas pagas");
+    ok(por("ELISA BOLETO").pagas === 0, "boleto enviado: entra sem parcela paga");
+    ok(
+      !Object.entries(st).some(([k, v]) => k.startsWith("formaturaAlunos/") && v.instId === "publico_ce-teste-palmeiro"),
+      "Linha de Frente: ninguém vai sozinho na importação"
+    );
+    ok(st["instituicoes/publico_ce-teste-palmeiro"].etapa === "FECHADO", "o colégio fica Fechado");
+    ok(
+      Object.entries(st).filter(([k, v]) => k.startsWith("importacoes/") && v.modulo === "vendaAntecipada").length === 1,
+      "importação guardada para desfazer"
+    );
+    // Cobranças: lista no desenho do app, com busca e colégio
+    await pg.locator("#fmChips button", { hasText: "Cobranças" }).click();
+    await calmo(pg);
+    await pg
+      .locator("#fmCorpo")
+      .getByRole("button", { name: /Todas do mês/ })
+      .click();
+    await pg.getByLabel("Buscar aluno").fill("carla");
+    await calmo(pg);
+    ok(
+      (await pg.locator("#fmCorpo .lc-linha").count()) === 1 &&
+        (await pg.locator("#fmCorpo .lc-linha").first().textContent()).includes("CETP-03"),
+      "Cobranças: busca pelo nome, uma linha por aluno com o ID"
+    );
+    await pg.getByLabel("Buscar aluno").fill("");
+    // turma: manda quem não tem kit de fotos para a Linha de Frente, quando quiser
+    await pg.locator("#fmChips button", { hasText: "Colégios fechados" }).click();
+    await calmo(pg);
+    await pg.locator("#fmCorpo .lc-linha", { hasText: "Teste Palmeiro" }).click();
+    await calmo(pg);
+    await pg.locator("#fmCorpo .lc-item", { hasText: "C.E. Teste Palmeiro" }).getByRole("button", { name: "👥 Alunos e parcelas" }).click();
+    await calmo(pg);
+    await pg.getByRole("button", { name: /Mandar para a Linha de Frente \(2\)/ }).click();
+    await pg.locator(".sheet:visible").last().getByRole("button", { name: "Mandar 2" }).click();
+    await calmo(pg);
+    let st2 = await store();
+    for (let t = 0; t < 20 && Object.keys(st2).filter(k => k.startsWith("formaturaAlunos/")).length < 2; t++) {
+      await pg.waitForTimeout(250);
+      st2 = await store();
+    }
+    const lf = Object.entries(st2)
+      .filter(([k, v]) => k.startsWith("formaturaAlunos/") && v.instId === "publico_ce-teste-palmeiro")
+      .map(([, v]) => v);
+    ok(lf.length === 2 && lf.every(x => x.seg === "lf" && x.codigo), "botão: quem só tem o Kit 01 vai para a Linha de Frente");
+  }
   ok(!erros.length, "sem erros no console: " + erros.join(" | "));
 });
 await cenario("Produtos e estoque (entrada, estorno com motivo, preço mínimo)", async () => {
