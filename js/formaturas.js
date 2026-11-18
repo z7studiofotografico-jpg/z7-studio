@@ -29,7 +29,8 @@ import { botaoRelatorio } from "./relatorio.js";
 import { siglaDe, contatoRel } from "./aluno-id.js";
 import { pintarSeletor } from "./numeros-tela.js";
 import { renderFechados } from "./formaturas-fechados.js";
-import { renderCobrancas as renderCobrancasVA } from "./va-cobrancas.js";
+import { linhaGenerica } from "./lista-compacta.js";
+import { renderCobrancas as renderCobrancasVA, renderAlunosVA } from "./va-cobrancas.js";
 // Cobranças: só os lembretes de hoje da régua (3 dias antes, no dia, 3 e 10 dias depois) ou todas
 let soHoje = true;
 // Leitura sob demanda: ao abrir, só as parcelas que vencem até o fim do mês (campo proxVenc);
@@ -462,6 +463,7 @@ function resumoInst(i, lst) {
     atr: lst.filter(atrasado).length
   };
 }
+// Adesão (Kit 01) e Kits 02 a 05: uma linha por aluno, com busca e colégio (o mesmo desenho das Cobranças)
 function renderContrato(corpo, tipo) {
   const adesao = tipo === "adesao";
   corpo.append(
@@ -473,51 +475,9 @@ function renderContrato(corpo, tipo) {
         : "Kits 02 a 05 do contrato (e outros kits). Preços em “📋 Kits e preços”."
     )
   );
-  const g = el("div", "grid");
-  let algum = false;
-  minhasInsts().forEach(i => {
-    const lst = meusForms().filter(f => f.instId === i.id && (adesao ? ehKit01(f) : !ehKit01(f)));
-    if (!lst.length) return;
-    algum = true;
-    const r = resumoInst(i, lst);
-    const e = el("article", "card " + (r.atr ? "late" : ""));
-    const top = el("div", "card-top");
-    top.append(el("h3", "name", title(i.nome)), el("span", "stage", `${r.n} aluno${r.n !== 1 ? "s" : ""}`));
-    e.append(top);
-    const meta = el("div", "meta");
-    if (i.formatura && i.formatura.data && i.formatura.status !== "recusado")
-      meta.append(el("span", "tag", `🎓 ${U.fmtDate(i.formatura.data)}/${i.formatura.data.slice(0, 4)}`));
-    if (!adesao) {
-      const kits = {};
-      lst.forEach(f => {
-        const kk = (f.kit || "Outro").split(" · ")[0];
-        kits[kk] = (kits[kk] || 0) + 1;
-      });
-      Object.entries(kits).forEach(([kk, n]) => meta.append(el("span", "tag", `${kk}: ${n}`)));
-    }
-    e.append(meta);
-    e.append(
-      el(
-        "div",
-        "fu" + (r.atr ? " late" : ""),
-        `Vendido ${moeda(r.vend)} · recebido ${moeda(r.rec)} · em aberto ${moeda(r.aberto)}${r.atr ? ` · ${r.atr} atrasado${r.atr > 1 ? "s" : ""}` : ""}`
-      )
-    );
-    const act = el("div", "actions");
-    act.append(U.mkBtn("Abrir turma", "btn-primary", () => abrirTurma(i)));
-    e.append(act);
-    g.append(e);
-  });
-  if (!algum) {
-    const e = el("div", "empty");
-    e.append(
-      el("strong", null, adesao ? "Nenhuma adesão (Kit 01) ainda" : "Nenhum kit vendido ainda"),
-      el("span", null, "Abra a turma do colégio fechado (aba Turmas) e inclua os alunos.")
-    );
-    corpo.append(e);
-    return;
-  }
-  corpo.append(g);
+  const ids = new Set(minhasInsts().map(i => i.id));
+  const fs = meusForms().filter(f => ids.has(f.instId) && ativo(f) && (adesao ? ehKit01(f) : !ehKit01(f)));
+  renderAlunosVA(corpo, fs, { C, insts, abrirTurma, ajuda }, tipo);
 }
 function renderTurmas(corpo) {
   const lst = minhasInsts();
@@ -638,17 +598,30 @@ function renderPosFoto(corpo) {
     corpo.append(e);
     return;
   }
-  const g = el("div", "grid");
+  // uma linha por aluno (o desenho de todas as listas); tocar abre o cartão com os botões
+  const g = el("div", "lc-lista");
   lst.forEach(f => {
     const inst = insts.find(i => i.id === f.instId) || { id: f.instId, nome: f.instNome };
     const pr = (inst.contratoTurma || {}).fotosProntasEm;
-    const e = el("article", "card today");
-    const top = el("div", "card-top");
-    top.append(
-      el("h3", "name", title(f.nome)),
-      el("span", "stage", seg === "rep" ? "REPASSE " + anoDaTurma(inst) : pr ? "FOTOS PRONTAS " + U.fmtDate(pr) : "OFERECER")
+    const selo = seg === "rep" ? "REPASSE " + anoDaTurma(inst) : pr ? "FOTOS PRONTAS" : "OFERECER";
+    g.append(
+      linhaGenerica({
+        id: "pos-" + f.id,
+        cor: "amarelo",
+        idAluno: f.codigo,
+        titulo: title(f.nome),
+        sub: [title(f.instNome), f.sala || f.serie, (f.kit || "Kit 01").split(" · ")[0]].filter(Boolean).join(" · "),
+        passo: pr ? "fotos prontas em " + U.fmtDate(pr) : "",
+        selo,
+        card: () => cartaoPos(f, inst)
+      })
     );
-    e.append(top);
+  });
+  corpo.append(g);
+}
+function cartaoPos(f, inst) {
+  {
+    const e = el("article", "card today");
     const meta = el("div", "meta");
     [title(f.instNome), f.kit || "Kit 01", f.serie, f.tel].filter(Boolean).forEach(t => meta.append(el("span", "tag", t)));
     e.append(meta);
@@ -657,9 +630,8 @@ function renderPosFoto(corpo) {
     act.append(U.mkBtn("🖼️ Prévia", "", () => abrirPrevia(C, inst, f)));
     if (insts.find(i => i.id === f.instId)) act.append(U.mkBtn("Abrir turma", "", () => abrirTurma(inst)));
     e.append(act);
-    g.append(e);
-  });
-  corpo.append(g);
+    return e;
+  }
 }
 
 // ---------- tabela de kits (contrato) ----------

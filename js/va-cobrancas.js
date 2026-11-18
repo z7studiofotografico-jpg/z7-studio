@@ -3,7 +3,7 @@
 // embaixo, uma linha por aluno (ID, nome, colégio · turma · kit, a parcela e o selo). Tocar abre o cartão com os botões.
 import { cobrarWa, registrarPagamento, pagaPorPix, umaVez, atrasado, retornoFormando } from "./turma.js";
 import { linhasRetorno } from "./retorno.js";
-import { brl, pagasDe, nParcelas, valorParcela, esperadas, ehKit01 } from "./regras.js";
+import { brl, pagasDe, nParcelas, valorParcela, esperadas, ehKit01, quitado, vencDa, somar, recebido, emAberto } from "./regras.js";
 import { etapaHoje, filtroLembretes } from "./va-regua.js";
 import { linhaGenerica } from "./lista-compacta.js";
 import { el, title } from "./ui.js";
@@ -14,7 +14,27 @@ let busca = "",
 
 // o = { C, soHoje, mudarHoje, insts, abrirTurma, ajuda }
 export function renderCobrancas(corpo, cob, o) {
+  return lista(corpo, cob, o, { regua: true });
+}
+
+// Adesão (Kit 01) e Kits 02 a 05 (18/11/2026): a mesma lista, com todos os alunos (pagos ou não) e o total embaixo
+export function renderAlunosVA(corpo, fs, o, tipo) {
+  const itens = fs
+    .slice()
+    .sort((a, b) => String(a.codigo || "~").localeCompare(String(b.codigo || "~"), "pt-BR", { numeric: true }))
+    .map(f => ({ f, venc: quitado(f) ? "" : vencDa(f, pagasDe(f) + 1) }));
+  return lista(corpo, itens, o, {
+    regua: false,
+    vazio:
+      tipo === "adesao"
+        ? "Nenhuma adesão (Kit 01) ainda. Importe a planilha do colégio ou abra a turma e inclua os alunos."
+        : "Nenhum kit vendido ainda. Importe a planilha do colégio ou abra a turma e inclua os alunos."
+  });
+}
+
+function lista(corpo, cob, o, cfg) {
   const hoje = U.todayStr();
+  if (!cob.length && !cfg.regua) return corpo.append(el("div", "empty", cfg.vazio));
   if (!cob.length) {
     const e = el("div", "empty");
     e.append(
@@ -26,6 +46,7 @@ export function renderCobrancas(corpo, cob, o) {
   }
   // busca e colégio (como no PR)
   const topo = el("div", "rbusca va-busca");
+  const colBox = el("div"); // o colégio e, embaixo dele, a busca do colégio (como em todas as janelas)
   const q = el("input", "search");
   q.type = "search";
   q.placeholder = "Nome do aluno, ID ou telefone";
@@ -35,7 +56,6 @@ export function renderCobrancas(corpo, cob, o) {
   cob.forEach(({ f }) => (cont[f.instNome || "?"] = (cont[f.instNome || "?"] || 0) + 1));
   const sCol = el("select", "search");
   sCol.setAttribute("aria-label", "Colégio");
-  sCol.dataset.semBusca = ""; // a busca ao lado já procura
   const o0 = el("option", null, `Todos os colégios (${cob.length})`);
   o0.value = "";
   sCol.append(o0);
@@ -47,9 +67,11 @@ export function renderCobrancas(corpo, cob, o) {
       sCol.append(op);
     });
   sCol.value = cont[colegio] ? colegio : "";
-  topo.append(q, sCol);
+  colBox.append(sCol);
+  topo.append(q, colBox);
   corpo.append(topo);
   const lista = el("div", "lc-lista");
+  lista.className = "lc-lista";
   const desenhar = () => {
     lista.innerHTML = "";
     const t = U.chave(busca).trim(),
@@ -64,11 +86,24 @@ export function renderCobrancas(corpo, cob, o) {
             .includes(t.replace(/[^A-Z0-9]/g, "")) ||
           (dig.length >= 4 && String(f.tel || "").includes(dig)))
     );
-    const caixa = el("div");
-    l = filtroLembretes(caixa, l, hoje, o.soHoje, o.mudarHoje);
-    lista.append(caixa);
-    if (!l) return;
-    if (!l.length) return lista.append(el("div", "empty", "Ninguém com esse nome ou colégio nas cobranças."));
+    if (cfg.regua) {
+      const caixa = el("div");
+      l = filtroLembretes(caixa, l, hoje, o.soHoje, o.mudarHoje);
+      lista.append(caixa);
+      if (!l) return;
+    } else {
+      // o total do que está na tela
+      const fs = l.map(x => x.f);
+      const atr = fs.filter(atrasado).length;
+      lista.append(
+        el(
+          "p",
+          "hint",
+          `${fs.length} aluno${fs.length === 1 ? "" : "s"} · vendido ${brl(somar(fs.map(f => f.valor)))} · recebido ${brl(somar(fs.map(recebido)))} · em aberto ${brl(somar(fs.map(emAberto)))}${atr ? ` · ${atr} atrasado${atr > 1 ? "s" : ""}` : ""}`
+        )
+      );
+    }
+    if (!l.length) return lista.append(el("div", "empty", "Ninguém com esse nome ou colégio."));
     l.forEach(({ f, venc }) => lista.append(linha(f, venc, hoje, o)));
   };
   q.addEventListener("input", () => {
@@ -87,18 +122,20 @@ function linha(f, venc, hoje, o) {
   const at = atrasado(f);
   const et = etapaHoje(f, hoje);
   const pg = pagasDe(f);
+  const q0 = quitado(f);
   const kit = (f.kit || (ehKit01(f) ? "Kit 01" : "Kit")).split(" · ")[0];
   return linhaGenerica({
     id: "cob-" + f.id,
-    cor: at ? "vermelho" : "cinza",
+    cor: at ? "vermelho" : q0 ? "azul" : "cinza",
     idAluno: f.codigo,
     titulo: title(f.nome),
     sub: [title(f.instNome), f.sala || f.serie, kit].filter(Boolean).join(" · "),
-    passo:
-      `Parcela ${pg + 1}/${nParcelas(f)} · ${brl(valorParcela(f, pg + 1))} · ${at ? "venceu" : "vence"} ${U.fmtDate(venc)}` +
-      (et && !et.enviado ? ` · 📣 lembrete: ${et.txt}` : ""),
-    passoCls: at ? "late" : "today",
-    selo: at ? "ATRASADO" : "A VENCER",
+    passo: q0
+      ? `${nParcelas(f)}/${nParcelas(f)} parcelas pagas ✓`
+      : `Parcela ${pg + 1}/${nParcelas(f)} · ${brl(valorParcela(f, pg + 1))} · ${at ? "venceu" : "vence"} ${U.fmtDate(venc)}` +
+        (et && !et.enviado ? ` · 📣 lembrete: ${et.txt}` : ""),
+    passoCls: at ? "late" : q0 ? "" : "today",
+    selo: at ? "ATRASADO" : q0 ? "QUITADO" : "EM DIA",
     card: () => cartao(f, venc, et, at, o)
   });
 }
@@ -123,16 +160,18 @@ function cartao(f, venc, et, at, o) {
     );
   const pg = pagasDe(f),
     emAtraso = esperadas(f, U.todayStr()) - pg;
-  e.append(
-    el(
-      "div",
-      "fu " + (at ? "late" : "today"),
-      `Parcela ${pg + 1}/${nParcelas(f)} · ${brl(valorParcela(f, pg + 1))} · ${at ? "venceu" : "vence"} ${U.fmtDate(venc)}` +
-        (at && emAtraso > 1 ? ` · ${emAtraso} em atraso` : "")
-    )
-  );
+  if (quitado(f)) e.append(el("div", "fu", `${nParcelas(f)}/${nParcelas(f)} parcelas pagas ✓ · ${brl(f.valor)}`));
+  else
+    e.append(
+      el(
+        "div",
+        "fu " + (at ? "late" : "today"),
+        `Parcela ${pg + 1}/${nParcelas(f)} · ${brl(valorParcela(f, pg + 1))} · ${at ? "venceu" : "vence"} ${U.fmtDate(venc)}` +
+          (at && emAtraso > 1 ? ` · ${emAtraso} em atraso` : "")
+      )
+    );
   const act = el("div", "actions");
-  if (C.isAdmin)
+  if (C.isAdmin && !quitado(f))
     act.append(
       U.mkBtn(
         "✅ Parcela paga",
@@ -145,7 +184,7 @@ function cartao(f, venc, et, at, o) {
         umaVez(() => pagaPorPix(C, f))
       )
     );
-  if (f.tel)
+  if (f.tel && !quitado(f))
     act.append(
       U.mkBtn(et && !et.enviado ? "💬 Mandar lembrete" : "💬 Cobrar", at || (et && !et.enviado) ? "btn-primary" : "", () =>
         cobrarWa(C, f, et)

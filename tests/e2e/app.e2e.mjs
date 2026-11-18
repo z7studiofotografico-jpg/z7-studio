@@ -841,14 +841,15 @@ await cenario("Adriano (admin), com os dados já atualizados no servidor", async
       /Caio Kit Um/.test(await pg.textContent("#fmCorpo")) && !/Bia Antecipada/.test(await pg.textContent("#fmCorpo")),
       "só quem tem o Kit 01 aparece em Depois das fotos"
     );
-    await pg.locator("#fmCorpo .card").filter({ hasText: "Caio" }).getByText("💬 Oferecer kit").click();
+    await pg.locator("#fmCorpo .lc-linha", { hasText: "Caio" }).first().click();
+    await pg.locator("#fmCorpo .lc-item").filter({ hasText: "Caio" }).getByText("💬 Oferecer kit").click();
     await calmo(pg);
     ok(
       /Kit 04.*6x de R\$ 183,33/.test(decodeURIComponent(await pg.evaluate(() => window.__aberto || ""))),
       "mensagem oferece o Kit 04 a 6x de R$ 183,33"
     );
     // prévia: todas as fotos do kit (35 fotos = 2 páginas) e prévia do álbum, montadas no aparelho
-    await pg.locator("#fmCorpo .card").filter({ hasText: "Caio" }).getByText("🖼️ Prévia").click();
+    await pg.locator("#fmCorpo .lc-item").filter({ hasText: "Caio" }).getByText("🖼️ Prévia").click();
     await calmo(pg);
     const foto = fs.readFileSync(RAIZ + "icons/icon-512.png");
     await pg
@@ -880,7 +881,7 @@ await cenario("Adriano (admin), com os dados já atualizados no servidor", async
     ok(/90 fotos/.test(await pg.textContent(".panel.mock")) && /até 90 fotos/.test(avisoLimite), "prévia: limite de 90 fotos com aviso");
     await pg.locator(".panel.mock").getByRole("button", { name: "Fechar" }).click();
     await calmo(pg);
-    await pg.locator("#fmCorpo .card").filter({ hasText: "Caio" }).getByText("Abrir turma").click();
+    await pg.locator("#fmCorpo .lc-item").filter({ hasText: "Caio" }).getByText("Abrir turma").click();
     await calmo(pg);
     if (process.env.FOTOS) await pg.locator(".panel.wide").screenshot({ path: process.env.FOTOS + "/turma.png" });
     await pg.locator(".panel.wide .card").filter({ hasText: "Caio" }).getByText("🛒 Comprou kit").click();
@@ -938,14 +939,15 @@ await cenario("Adriano (admin), com os dados já atualizados no servidor", async
     await calmo(pg);
     let rt = await pg.textContent("#fmCorpo");
     ok(/Lia Antiga/.test(rt) && !/Caio Kit Um/.test(rt), "Repasse mostra só quem ficou com o Kit 01 nas turmas de anos anteriores");
-    await pg.locator("#fmCorpo .card").filter({ hasText: "Lia" }).getByText("💬 Oferecer kit").click();
+    await pg.locator("#fmCorpo .lc-linha", { hasText: "Lia" }).first().click();
+    await pg.locator("#fmCorpo .lc-item").filter({ hasText: "Lia" }).getByText("💬 Oferecer kit").click();
     await calmo(pg);
     const msgRep = decodeURIComponent(await pg.evaluate(() => window.__aberto || ""));
     ok(
       new RegExp("formatura de " + (hoje.getFullYear() - 1)).test(msgRep) && /Kit 04.*5x de R\$ 140,00/.test(msgRep),
       "mensagem do repasse com o preço de repasse (5x de R$ 140,00)"
     );
-    await pg.locator("#fmCorpo .card").filter({ hasText: "Lia" }).getByText("Abrir turma").click();
+    await pg.locator("#fmCorpo .lc-item").filter({ hasText: "Lia" }).getByText("Abrir turma").click();
     await calmo(pg);
     await pg.locator(".panel.wide .card").filter({ hasText: "Lia" }).getByText("🛒 Comprou kit").click();
     await calmo(pg);
