@@ -92,6 +92,7 @@ export function show() {
     ),
     // (12/11/2026: o "Prévia e fotos" do topo saiu, como no PR: a prévia é feita na janela de cada aluno)
     U.mkBtn("📋 Kits e preços", "btn-sm", () => openKits()),
+    U.mkBtn("🖨️ Fichas", "btn-sm", () => import("./fichas-impressao.js").then(m => m.escolherFichas()).catch(e => C.handleErr(e))),
     U.mkBtn("💲 Preços mínimos", "btn-sm", () => Ev.openPrecos()),
     botaoRelatorio(
       () => (parte === "va" ? relatorioFormaturas() : import("./repasse.js").then(m => m.relatorioPR())),

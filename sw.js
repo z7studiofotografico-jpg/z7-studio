@@ -36,6 +36,7 @@ const SHELL = [
   "./js/va-regua.js",
   "./js/va-cobrancas.js",
   "./js/va-linha-frente.js",
+  "./js/fichas-impressao.js",
   "./js/conferir-fotos.js",
   "./js/backup.js",
   "./js/confirmar.js",

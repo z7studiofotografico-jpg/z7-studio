@@ -204,8 +204,7 @@ function mount() {
         .catch(e => C.handleErr(e))
     )
   );
-  // (11/11/2026: o botão "Prévia e fotos" do topo saiu: a prévia é feita na janela de cada aluno)
-  // (12/11/2026: "Prévias de um colégio" e "🤖 Cadastro automático" foram para o ➕ Cadastrar aluno, em Fotos)
+  hb.append(U.mkBtn("🖨️ Fichas", "", () => import("./fichas-impressao.js").then(m => m.escolherFichas()))); // 18/11
   if (C.isAdmin)
     hb.append(
       // quem está sem prévia no Drive: já comprou (normal) × falta gerar (com o "📤 Enviar foto")
