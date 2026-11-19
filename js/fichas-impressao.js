@@ -28,7 +28,7 @@ const DATA = { 2: "/", 4: "/" };
 const CEL = { 0: "(", 2: ")" };
 
 function frente(o) {
-  return `<section class="ficha">
+  return `<section class="ficha"><div class="in">
   <header class="topo">
     <img src="${o.logo}" alt="">
     <div><h1>Z7 Studio Fotográfico</h1><p>${SITE} · WhatsApp ${ZAP}</p></div>
@@ -50,11 +50,11 @@ function frente(o) {
   <div class="linha">${campo("Cidade", 12)}${campo("CEP", 8, "", { 5: "-" })}</div>
   ${campo("E-mail", 22)}
   <p class="obrig">Preenchimento obrigatório · entraremos em contato pelo WhatsApp</p>
-</section>`;
+</div></section>`;
 }
 
 function verso(o) {
-  return `<section class="ficha verso">
+  return `<section class="ficha verso"><div class="in">
   <header class="topo">
     <img src="${o.logo}" alt="">
     <div><h1>Z7 Studio Fotográfico</h1><p>${SITE} · WhatsApp ${ZAP}</p></div>
@@ -73,7 +73,7 @@ function verso(o) {
   <div class="linha">${campo("Parentesco", 6)}${campo("Data", 8, "", DATA)}</div>
   <div class="assin"><span></span><small>Assinatura do responsável</small></div>
   <p class="rodape">Aluno(a) com 18 anos ou mais pode assinar por si. · ${EMAIL}</p>
-</section>`;
+</div></section>`;
 }
 
 const CSS = `
@@ -82,7 +82,8 @@ const CSS = `
 body { margin: 0; font-family: "Source Sans 3", Arial, sans-serif; color: #1f1f1f; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
 .folha { width: 297mm; height: 210mm; display: grid; grid-template-columns: 1fr 1fr; page-break-after: always; break-after: page; position: relative; }
 .folha::after { content: ""; position: absolute; left: 148.5mm; top: 6mm; bottom: 6mm; border-left: 0.3mm dashed #bbb; }
-.ficha { padding: 7mm 8mm 6mm; display: flex; flex-direction: column; gap: 1.3mm; border: 0.5mm solid #2e2e2e; outline: 0.25mm solid #2e2e2e; outline-offset: -1.6mm; margin: 4mm; height: 202mm; overflow: hidden; }
+.ficha { padding: 7mm 8mm 6mm; border: 0.5mm solid #2e2e2e; outline: 0.25mm solid #2e2e2e; outline-offset: -1.6mm; margin: 4mm; height: 202mm; overflow: hidden; }
+.ficha .in { display: flex; flex-direction: column; gap: 1.3mm; height: 100%; transform-origin: top left; }
 .topo { display: flex; align-items: center; gap: 3mm; border-bottom: 0.6mm solid #b3141c; padding-bottom: 2mm; }
 .topo img { width: 13mm; height: 13mm; }
 .topo h1 { font-family: "Cormorant Garamond", Georgia, serif; font-size: 17pt; margin: 0; letter-spacing: .02em; line-height: 1; }
@@ -127,6 +128,26 @@ export function htmlFichas(o) {
   <button onclick="print()">🖨️ Imprimir</button></div>
 <div class="folha">${frente(o)}${frente(o)}</div>
 <div class="folha">${verso(o)}${verso(o)}</div>
+<script>
+// se as letras da fonte deixarem a ficha mais alta que a folha, diminui tudo por igual até caber (nada some embaixo)
+function caber() {
+  document.querySelectorAll(".ficha").forEach(f => {
+    const i = f.querySelector(".in");
+    i.style.transform = "";
+    i.style.width = "";
+    i.style.height = "auto";
+    const livre = f.clientHeight - 13 * 3.78, alto = i.scrollHeight;
+    if (alto > livre) {
+      const k = livre / alto;
+      i.style.transform = "scale(" + k + ")";
+      i.style.width = 100 / k + "%";
+      i.style.height = 100 / k + "%";
+    } else i.style.height = "";
+  });
+}
+(document.fonts ? document.fonts.ready : Promise.resolve()).then(caber);
+addEventListener("load", caber);
+</script>
 </body></html>`;
 }
 
