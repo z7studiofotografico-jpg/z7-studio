@@ -69,6 +69,23 @@ export function mkBtn(text, cls, fn) {
   b.type = "button";
   b.className = "btn btn-sm " + (cls || "");
   b.textContent = text;
-  b.onclick = fn;
+  // (19/11/2026) toque duplo: enquanto a ação (que grava no banco) não termina, o botão fica desligado
+  // (antes, dois toques rápidos podiam gravar duas vezes: pagamento, aluno, aluguel)
+  b.onclick = fn
+    ? function (ev) {
+        if (b.dataset.ocupado) return;
+        const r = fn.call(this, ev);
+        if (r && typeof r.then === "function") {
+          b.dataset.ocupado = "1";
+          b.disabled = true;
+          const solta = () => {
+            delete b.dataset.ocupado;
+            b.disabled = false;
+          };
+          r.then(solta, solta);
+        }
+        return r;
+      }
+    : fn;
   return b;
 }

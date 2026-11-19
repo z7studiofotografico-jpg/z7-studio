@@ -353,7 +353,19 @@ const { renderPushState, renderPushBanner, refreshPushToken } = criarNotificacoe
   me: () => me,
   user: () => user
 });
-ligarAjustes(ctx, { sair: () => signOut(auth), renderPushState, verComo: () => escolherVerComo(USERS, isDono, MODULOS) });
+// (19/11/2026) Sair apaga a cópia guardada no aparelho (nomes e telefones de alunos, muitos menores de idade):
+// num celular ou computador emprestado, os dados não ficam para a próxima pessoa.
+async function sairLimpando() {
+  try {
+    if (FS.terminate) await FS.terminate(db);
+    if (FS.clearIndexedDbPersistence) await FS.clearIndexedDbPersistence(db);
+  } catch (e) {
+    console.warn("[Z7] limpar a cópia do aparelho", e);
+  }
+  await signOut(auth);
+  location.reload();
+}
+ligarAjustes(ctx, { sair: sairLimpando, renderPushState, verComo: () => escolherVerComo(USERS, isDono, MODULOS) });
 const { renderHome, contarInst } = criarInicio(ctx, Funil);
 let usersLoaded = false,
   painelNum = null;

@@ -73,6 +73,27 @@ export function sheet(tit, build, opts) {
     if (ev.target === sh) close();
   });
   if (tit) p.append(el("h2", null, tit));
+  // (19/11/2026) toque duplo no "Salvar": um 2º envio em menos de 1,5 s, sem nada ter mudado na janela, é ignorado
+  // (não grava duas vezes). Se a janela mostrou um aviso ("toque de novo para salvar assim mesmo"), o 2º toque vale.
+  let mudancas = 0;
+  if (typeof MutationObserver === "function")
+    new MutationObserver(() => mudancas++).observe(p, { subtree: true, childList: true, characterData: true, attributes: true });
+  ["input", "change"].forEach(t => p.addEventListener(t, () => mudancas++, true)); // a pessoa mexeu num campo
+  p.addEventListener(
+    "submit",
+    ev => {
+      const agora = Date.now();
+      if (p._enviouEm && agora - p._enviouEm < 1500 && mudancas === p._mudancasNoEnvio) {
+        ev.preventDefault();
+        ev.stopImmediatePropagation();
+        return;
+      }
+      p._enviouEm = agora;
+      // o que mudar a partir daqui (aviso, erro na janela) libera o próximo envio
+      p._mudancasNoEnvio = mudancas;
+    },
+    true
+  );
   build(p, close);
   document.body.append(sh);
   return close;

@@ -30,8 +30,17 @@ export const COLECOES = [
   "contratos",
   "respostas",
   "paspatur",
-  "formaturaAlunos"
+  "formaturaAlunos",
+  // (19/11/2026) coleções que faltavam na cópia ("tokens" fica de fora de propósito: são os avisos dos aparelhos)
+  "atividades",
+  "becasUso",
+  "contratosColegio",
+  "fichas",
+  "fichasPedidos",
+  "previasSite"
 ];
+// subcoleções: os pagamentos de cada contrato do colégio (Aluguel de becas) ficam dentro do contrato
+export const SUBCOLECOES = { contratosColegio: ["pagamentos"] };
 // C = contexto do app (FS, db); aoAndar(texto) mostra o andamento
 export async function baixarCopia(C, aoAndar = () => {}) {
   const { FS, db } = C;
@@ -43,6 +52,15 @@ export async function baixarCopia(C, aoAndar = () => {}) {
       const s = await FS.getDocs(FS.collection(db, nome));
       dados.colecoes[nome] = Object.fromEntries(s.docs.map(d => [d.id, d.data()]));
       total += s.size;
+      for (const sub of SUBCOLECOES[nome] || []) {
+        const chave = `${nome}/*/${sub}`;
+        dados.colecoes[chave] = {};
+        for (const d of s.docs) {
+          const ss = await FS.getDocs(FS.collection(db, nome, d.id, sub));
+          ss.docs.forEach(x => (dados.colecoes[chave][`${d.id}/${x.id}`] = x.data()));
+          total += ss.size;
+        }
+      }
     } catch (e) {
       dados.colecoes[nome] = { __erro: String((e && e.code) || e) };
     }

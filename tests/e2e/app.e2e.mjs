@@ -5228,6 +5228,29 @@ await cenario("Agendamento de becas: quantidades, estoque no período e o colég
   ok(!erros.length, "sem erros" + (erros.length ? ": " + erros.join(" | ") : ""));
 });
 
+await cenario("Toque duplo no Salvar não grava duas vezes", async () => {
+  const { pg, erros, store } = await abrir(ADRIANO, migrar(base));
+  await ir(pg, "#pr");
+  await calmo(pg);
+  await pg.getByRole("button", { name: "+ Aluno" }).first().click();
+  const fa = pg.locator(".sheet:visible").filter({ hasText: "Cadastrar aluno" }).last();
+  await fa.getByLabel("Colégio").waitFor();
+  await escolherColegio(fa, "Colegio Alfa");
+  await calmo(pg);
+  await fa.getByLabel("Número do ID do aluno").fill("77");
+  await fa.getByLabel("Nome do aluno").fill("Duplo Toque");
+  await fa.getByLabel("WhatsApp", { exact: true }).fill("21977776666");
+  await fa.getByLabel("Nome do responsável").fill("Rita");
+  await fa.getByLabel("Turma", { exact: true }).fill("901");
+  await fa.getByRole("button", { name: "Salvar", exact: true }).dblclick();
+  await calmo(pg);
+  await pg.waitForTimeout(800);
+  const s = await store();
+  const n = Object.entries(s).filter(([k, x]) => !k.startsWith("fones/") && x && x.nome === "Duplo Toque").length;
+  ok(n === 1, "um aluno só (" + n + ")");
+  ok(!erros.length, "sem erros" + (erros.length ? ": " + erros.join(" | ") : ""));
+});
+
 await browser.close();
 srv.close();
 console.log(falhas ? `\n${falhas} falha(s)` : "\nTudo certo ✅");
