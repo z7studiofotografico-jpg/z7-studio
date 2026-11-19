@@ -5268,6 +5268,45 @@ await cenario("Toque duplo no Salvar não grava duas vezes", async () => {
   ok(!erros.length, "sem erros" + (erros.length ? ": " + erros.join(" | ") : ""));
 });
 
+await cenario("Equipe só com o que é dela e histórico de alterações (19/11/2026)", async () => {
+  // a equipe: sem a fila, com o aviso de que o Adriano separa
+  const a = await abrir(PEDRO, migrar(base));
+  await ir(a.pg, "#pr");
+  await calmo(a.pg);
+  ok(await a.pg.locator("#rLoteBtn").isHidden(), "vendedor não separa da fila");
+  if (process.env.FOTOS) await a.pg.locator("#viewRepasse").screenshot({ path: process.env.FOTOS + "/equipe-pr.png", clip: undefined }).catch(() => {});
+  // o admin: uma mudança no Aluguel fica no histórico
+  const { pg, erros, store } = await abrir(ADRIANO, migrar(base));
+  await ir(pg, "#becas");
+  await calmo(pg);
+  await pg.locator("#viewBecas .seg", { hasText: "Aluguéis avulsos" }).click();
+  await calmo(pg);
+  await pg.getByRole("button", { name: "+ Aluguel" }).click();
+  await calmo(pg);
+  const sh = pg.locator(".sheet").last();
+  await sh.getByLabel("Cliente").fill("Igreja do Histórico");
+  await sh.getByLabel("Data do evento").fill(dia(15));
+  await sh.getByLabel("Data do evento").dispatchEvent("change");
+  await sh.getByLabel("Beca tradicional preta", { exact: true }).fill("1");
+  await sh.getByLabel("Valor total").fill("100");
+  await sh.locator("button[type=submit]").click();
+  await calmo(pg);
+  if (await pg.locator(".sheet").count()) {
+    await pg.locator(".sheet").last().locator("button[type=submit]").click();
+    await calmo(pg);
+  }
+  const s = await store();
+  const h = Object.entries(s).find(([k, x]) => k.startsWith("historico/") && x.col === "becas" && x.acao === "criou");
+  ok(h && h[1].porEmail === ADRIANO && !JSON.stringify(h[1]).includes("Igreja"), "o histórico registra quem criou (sem dados do cliente)");
+  await pg.click("#btnPrices");
+  await pg.locator("#pHistorico").click();
+  await calmo(pg);
+  const hj = pg.locator(".sheet").last();
+  ok(/criou · Aluguel avulso/.test(await hj.textContent()), "Ajustes → Histórico de alterações mostra a mudança");
+  if (process.env.FOTOS) await hj.locator(".panel").screenshot({ path: process.env.FOTOS + "/historico.png" });
+  ok(!erros.length, "sem erros" + (erros.length ? ": " + erros.join(" | ") : ""));
+});
+
 await browser.close();
 srv.close();
 console.log(falhas ? `\n${falhas} falha(s)` : "\nTudo certo ✅");

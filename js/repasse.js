@@ -265,7 +265,7 @@ function mount() {
   g.id = "rGuide";
   g.innerHTML = `<summary>Como funciona o PR</summary><ol>
     <li><b>Linha de Frente</b> são os ensaios deste ano; <b>Repasse</b> são os dos anos anteriores. Em 1º de janeiro tudo vira sozinho: a Linha de Frente do ano que acabou passa para o Repasse.</li>
-    <li><b>Separe o seu lote do dia</b> no quadro abaixo: toque em <b>Separar alunos</b> e diga quantos quer. Nunca vem o mesmo aluno duas vezes. Vá com calma nas mensagens novas para o WhatsApp não bloquear o número.</li>
+    <li><b>Os alunos chegam separados</b>: o Adriano separa da fila para cada pessoa (no quadro abaixo, em <b>Separar alunos</b>). Nunca vem o mesmo aluno duas vezes. Vá com calma nas mensagens novas para o WhatsApp não bloquear o número.</li>
     <li>Cada cartão mostra <b>para quem mandar</b> (mãe, pai ou aluno) e a mensagem pronta. O 1º contato só pede permissão para mandar a prévia.</li>
     <li>Respondeu que quer ver? Toque em <b>Quer ver a prévia</b>, depois em <b>🖼️ Prévia</b>: arraste a foto do aluno e o app monta o kit pronto para enviar.</li>
     <li><b>Pagou?</b> Toque em <b>Pagou</b>. O cartão pede para <b>confirmar o endereço</b> (ou agendar a retirada no estúdio) e vai para <b>Entregar</b>, separado por cidade e bairro para montar a rota.</li>
@@ -737,7 +737,7 @@ function renderList(loading, emptyMsg) {
       caidos: ["Nenhum caído", "Quem não quer mais (com o motivo) aparece aqui."],
       vendidos: ["Nenhuma venda entregue ainda", "Quem comprou e já recebeu o kit aparece aqui, só para consulta."],
       conferir: ["Nenhuma venda para conferir ✓", "As vendas registradas pela equipe aparecem aqui até você conferir o comprovante."],
-      hoje: ["Nada em negociação hoje", 'Separe o seu lote do dia no quadro acima, ou toque em "Trabalhar hoje" na aba A trabalhar.'],
+      hoje: ["Nada em negociação hoje", C.isAdmin ? "Separe o lote do dia no quadro acima." : "O Adriano separa os alunos para você."],
       trabalhar: ["Nada a trabalhar", "Os alunos passados para você, sem data para hoje, aparecem aqui."],
       equipe: [`Nada com ${U.first(title(pessoaAberta.nome))}`, "Ninguém em andamento nem caído com essa pessoa nesta lista."],
       interessados: ["Nenhum interessado ainda", "Quem responder que quer ver a prévia aparece aqui."],
