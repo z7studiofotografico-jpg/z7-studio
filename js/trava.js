@@ -1,9 +1,9 @@
-// (19/11/2026) Trava por inatividade no celular: o app é usado na rua, então depois de 20 minutos sem uso ele trava e
+// (19/11/2026) Trava por inatividade no celular: o app é usado na rua, então depois de 5 minutos sem uso ele trava e
 // pede a digital (ou o rosto, o que o celular tiver) ou a senha do app para voltar. Os dados ficam escondidos atrás
 // da trava; o login continua o mesmo (não precisa entrar de novo do zero).
 // A digital fica só neste aparelho: o celular confere e o app só recebe "confirmou" (nenhuma digital sai do aparelho).
 // o = { email(), verificarSenha(senha) → Promise, sair() }
-const LIMITE = 20 * 60 * 1000; // 20 minutos sem uso (19/11/2026: era 1 hora)
+const LIMITE = 5 * 60 * 1000; // 5 minutos sem uso (19/11/2026: era 1 hora, depois 20 minutos)
 const CHAVE_USO = "z7ultimoUso";
 const chaveDigital = em => "z7digital_" + String(em || "").toLowerCase();
 
@@ -125,7 +125,7 @@ function travar(agora = false) {
   document.body.append(t);
   t.querySelector("input[name=username]").value = em;
   t.querySelector("#travaMotivo").textContent =
-    (agora ? "Travado por você." : "Ficou mais de 20 minutos sem uso.") + " Para continuar, confirme que é você.";
+    (agora ? "Travado por você." : "Ficou mais de 5 minutos sem uso.") + " Para continuar, confirme que é você.";
   const err = t.querySelector("#travaErr");
   const erro = txt => {
     err.textContent = txt;

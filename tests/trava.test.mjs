@@ -2,8 +2,8 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import { venceu, ehCelular } from "../js/trava.js";
 
-test("trava: 20 minutos sem uso", () => {
-  const h = 20 * 60000;
+test("trava: 5 minutos sem uso", () => {
+  const h = 5 * 60000;
   assert.equal(venceu(1000, 1000 + h - 1), false);
   assert.equal(venceu(1000, 1000 + h), true);
   assert.equal(venceu(0, 99999999), false); // sem registro: ainda não conta
