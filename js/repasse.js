@@ -204,7 +204,6 @@ function mount() {
         .catch(e => C.handleErr(e))
     )
   );
-  hb.append(U.mkBtn("🖨️ Fichas", "", () => import("./fichas-impressao.js").then(m => m.escolherFichas()))); // 18/11
   if (C.isAdmin)
     hb.append(
       // quem está sem prévia no Drive: já comprou (normal) × falta gerar (com o "📤 Enviar foto")

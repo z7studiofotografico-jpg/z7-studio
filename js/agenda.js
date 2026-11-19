@@ -80,6 +80,10 @@ export function show() {
     )
   );
   // (17/11/2026: o "📥 Importação" das prévias de qualquer pasta foi para o Aluguel de becas, ao lado de Importar planilha)
+  // 🖨️ Fichas de identificação e autorização para imprimir (18/11/2026), no lugar e na cor da antiga Importação
+  hb.append(
+    U.mkBtn("🖨️ Fichas", "btn-azul btn-sm", () => import("./fichas-impressao.js").then(m => m.escolherFichas()).catch(e => C.handleErr(e)))
+  );
   head.append(hb);
   v.append(head);
   v.append(

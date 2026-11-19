@@ -141,7 +141,7 @@ export function abrirFichas(o) {
   return true;
 }
 
-// o botão "🖨️ Fichas" (PR e Formaturas): a mesma ficha para tudo; se quiser, já sai com o colégio, a turma e a
+// o botão "🖨️ Fichas" (na Agenda): a mesma ficha para tudo; se quiser, já sai com o colégio, a turma e a
 // data da foto escritos; em branco, a família escreve tudo
 export async function escolherFichas() {
   const { el, field, sheet, botoes } = await import("./ui.js");
