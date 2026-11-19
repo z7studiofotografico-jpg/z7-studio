@@ -15,7 +15,9 @@ import {
   signOut,
   setPersistence,
   indexedDBLocalPersistence,
-  inMemoryPersistence
+  inMemoryPersistence,
+  EmailAuthProvider,
+  reauthenticateWithCredential
 } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
 import {
   initializeFirestore,
@@ -33,6 +35,7 @@ import * as FS from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firesto
 import { getMessaging, onMessage } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-messaging.js";
 import { avisoErro, ligarCamposReais } from "./ui.js";
 import { registrar, caminho } from "./historico-alteracoes.js";
+import { ligarTrava, entrou } from "./trava.js";
 import { first, toast, showNotice, mkBtn } from "./util.js";
 ligarCamposReais();
 import * as Funil from "./funil.js";
@@ -591,6 +594,7 @@ $("formLogin").addEventListener("submit", async e => {
   $("lBtn").disabled = true;
   try {
     await signInWithEmailAndPassword(auth, $("lEmail").value.trim(), $("lSenha").value);
+    entrou();
   } catch (err) {
     $("lErr").textContent = "E-mail ou senha incorretos.";
     $("lErr").hidden = false;
@@ -733,6 +737,12 @@ onAuthStateChanged(auth, u => {
   $("viewLogin").hidden = !!u;
   $("viewApp").hidden = !u;
   if (u) {
+    // (19/11/2026) no celular: 1 hora sem uso trava o app (digital ou senha para voltar)
+    ligarTrava({
+      email: () => (user && user.email) || "",
+      verificarSenha: senha => reauthenticateWithCredential(auth.currentUser, EmailAuthProvider.credential(user.email, senha)),
+      sair: sairLimpando
+    });
     startData();
     renderPushBanner();
     refreshPushToken();

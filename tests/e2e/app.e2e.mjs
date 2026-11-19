@@ -5307,6 +5307,40 @@ await cenario("Equipe só com o que é dela e histórico de alterações (19/11/
   ok(!erros.length, "sem erros" + (erros.length ? ": " + erros.join(" | ") : ""));
 });
 
+await cenario("Celular: 1 hora sem uso trava o app (senha ou digital para voltar)", async () => {
+  const UA = "Mozilla/5.0 (Linux; Android 14; SM-A546E) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/130.0 Mobile Safari/537.36";
+  const { pg, erros } = await abrir(PEDRO, migrar(base), { userAgent: UA });
+  await calmo(pg);
+  ok(!(await pg.locator("#trava").count()), "usando: não trava");
+  // passou 1 hora sem uso e a pessoa volta para o app
+  await pg.evaluate(() => {
+    localStorage.setItem("z7ultimoUso", String(Date.now() - 3600001));
+    document.dispatchEvent(new Event("visibilitychange"));
+  });
+  await pg.locator("#trava").waitFor({ timeout: 5000 });
+  ok(/App travado/.test(await pg.textContent("#trava")), "travou depois de 1 hora sem uso");
+  if (process.env.FOTOS) await pg.screenshot({ path: process.env.FOTOS + "/trava.png" });
+  await pg.fill("#travaSenha", "errada");
+  await pg.locator("#travaForm button[type=submit]").click();
+  await pg.getByText("Senha errada").waitFor({ timeout: 5000 });
+  ok(await pg.locator("#trava").isVisible(), "senha errada: continua travado");
+  pg.once("dialog", d => d.dismiss());
+  await pg.fill("#travaSenha", "senha-certa");
+  await pg.locator("#travaForm button[type=submit]").click();
+  await pg.locator("#trava").waitFor({ state: "detached", timeout: 5000 });
+  ok(!(await pg.locator("#trava").count()), "senha certa: destrava");
+  ok(!erros.length, "sem erros" + (erros.length ? ": " + erros.join(" | ") : ""));
+  // no computador não trava
+  const c = await abrir(PEDRO, migrar(base));
+  await calmo(c.pg);
+  await c.pg.evaluate(() => {
+    localStorage.setItem("z7ultimoUso", String(Date.now() - 3600001));
+    document.dispatchEvent(new Event("visibilitychange"));
+  });
+  await c.pg.waitForTimeout(500);
+  ok(!(await c.pg.locator("#trava").count()), "no computador não trava");
+});
+
 await browser.close();
 srv.close();
 console.log(falhas ? `\n${falhas} falha(s)` : "\nTudo certo ✅");

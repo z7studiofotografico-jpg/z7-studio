@@ -603,3 +603,9 @@ body:not(.ver-valores) .vlr{filter:blur(6px);user-select:none;-webkit-user-selec
 .eb-data.atual{border-color:var(--accent);box-shadow:inset 3px 0 0 var(--accent)}
 .eb-dia{text-align:center;min-width:52px}.eb-dia b{display:block;font-size:1.05rem}.eb-dia small{color:var(--muted);font-size:.75rem}
 .eb-txt{flex:1;display:flex;flex-direction:column;gap:2px;min-width:0}.eb-txt small{color:var(--muted)}
+/* (19/11/2026) Trava por inatividade no celular */
+.trava{position:fixed;inset:0;z-index:99999;background:var(--bg,#f4f1ec);display:flex;align-items:center;justify-content:center;padding:24px}
+.trava-box{width:100%;max-width:360px;background:var(--surface,#fff);border:1px solid var(--line);border-radius:16px;padding:24px 20px;display:flex;flex-direction:column;gap:12px;text-align:center}
+.trava-box h2{margin:0}.trava-ico{font-size:44px;line-height:1}
+.trava-box form{display:flex;flex-direction:column;gap:8px;text-align:left}
+.trava-box .btn{width:100%}

@@ -34,3 +34,9 @@ export async function signOut(a) {
   window.__EMAIL = "";
   cbs.forEach(cb => cb(null));
 }
+// trava do celular: confere a senha de novo (a senha certa nos testes é "senha-certa")
+export const EmailAuthProvider = { credential: (email, senha) => ({ email, senha }) };
+export async function reauthenticateWithCredential(_u, cred) {
+  if (cred.senha !== "senha-certa") throw Object.assign(new Error("senha errada"), { code: "auth/wrong-password" });
+  return { user: { email: cred.email } };
+}

@@ -161,6 +161,7 @@ const SHELL = [
   "./js/eventos-msg.js",
   "./js/evento-becas.js",
   "./js/historico-alteracoes.js",
+  "./js/trava.js",
   "./js/migracao.js",
   "./js/contrato.js",
   "./js/previa.js",
