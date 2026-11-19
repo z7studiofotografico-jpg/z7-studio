@@ -120,6 +120,7 @@ export function ligarAjustes(ctx, o) {
     if (ctx.isAdmin) mostrarErros();
     $("pVerComo").hidden = !ctx.isAdmin;
     $("pBackup").hidden = !ctx.isAdmin;
+    $("pHistorico").hidden = !ctx.isAdmin;
     // link e chave do Drive: a equipe nem vê os campos (só o Adriano)
     ["pDrive", "pDriveChave", "pDriveCliente"].forEach(id => {
       const f = $(id).closest(".field");
@@ -267,6 +268,7 @@ export function ligarAjustes(ctx, o) {
       $("pBackup").disabled = false;
     }
   };
+  $("pHistorico").onclick = () => import("./historico-alteracoes.js").then(m => m.abrirHistorico(ctx)).catch(e => ctx.handleErr(e));
   $("pVerComo").onclick = () => {
     $("sheetPrices").hidden = true;
     o.verComo();

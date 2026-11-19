@@ -1,6 +1,6 @@
 // PR / Paspatur / Formatura: a consulta do Firebase de cada aba (saiu do repasse.js em 11/11/2026).
 // A equipe vê só os contatos dela (soMinha); a busca continua mostrando todos, para achar o aluno.
-import { C, FS, col, seg, ABERTAS, baseLF, baseSeg, soMinha, ehFormatura, pessoaAberta } from "./repasse-estado.js";
+import { C, FS, col, seg, ABERTAS, baseLF, baseSeg, soMinha, ehFormatura, pessoaAberta, colNome } from "./repasse-estado.js";
 import { emAndamento } from "./repasse-equipe.js";
 import { consultaPessoa } from "./pessoa-janela.js";
 import * as U from "./util.js";
@@ -64,4 +64,17 @@ export function consultaDaAba(k, todosEntregues = false) {
       FS.limit(500)
     );
   return q;
+}
+
+// (19/11/2026) Busca de quem não lê o PR inteiro (equipe e só Linha de Frente): a própria lista, carregada uma vez a
+// cada 10 min e filtrada na tela (a equipe só lê os alunos dela)
+let cacheBusca = { at: 0, chave: "", docs: [] };
+export async function listaParaBusca() {
+  const chave = colNome() + "|" + C.email;
+  if (Date.now() - cacheBusca.at > 600000 || cacheBusca.chave !== chave) {
+    const f = C.isAdmin ? baseLF() : [...(C.pode("rep") || ehFormatura() ? [] : baseLF()), ...soMinha()];
+    const s0 = await FS.getDocs(FS.query(col, ...f, FS.limit(3000)));
+    cacheBusca = { at: Date.now(), chave, docs: s0.docs.map(d => Object.assign({ id: d.id }, d.data())) };
+  }
+  return cacheBusca.docs;
 }

@@ -160,6 +160,8 @@ test("carteira: vendedor vê os colégios livres e os seus, e só os próprios f
   );
 });
 test("PR: venda do vendedor fica a conferir; só o admin confere", async () => {
+  // (19/11/2026) o aluno precisa estar com ele (o Adriano separa da fila)
+  await semRegra(d => updateDoc(doc(d, "repasse", "r2"), { etapa: "SEPARADO", resp: "Pedro", respEmail: PEDRO }));
   await assertSucceeds(
     updateDoc(doc(como(PEDRO), "repasse", "r2"), {
       etapa: "PAGO",
@@ -189,7 +191,8 @@ test("PR pago: vendedor não muda valor, forma de pagamento nem responsável", a
   await assertFails(updateDoc(doc(db, "repasse", "r1"), { formaPag: "Pix" }));
   await assertFails(updateDoc(doc(db, "repasse", "r1"), { valor: 999 }));
   await assertSucceeds(updateDoc(doc(db, "repasse", "r1"), { etapa: "ENTREGUE", entregueEm: "2099-01-01" }));
-  await assertSucceeds(updateDoc(doc(db, "repasse", "r2"), { etapa: "SEPARADO", resp: "Pedro", respEmail: PEDRO }));
+  // (19/11/2026) o vendedor não pega aluno da fila: só o Adriano separa
+  await assertFails(updateDoc(doc(db, "repasse", "r2"), { etapa: "SEPARADO", resp: "Pedro", respEmail: PEDRO }));
   await assertFails(updateDoc(doc(db, "repasse", "r2"), { etapa: "SEPARADO", respEmail: ANA }));
 });
 test("agenda: cada um mexe só no próprio pedido; a Luciana aprova", async () => {
@@ -210,7 +213,9 @@ test("assunto particular e resumo do dashboard só para admin", async () => {
 });
 test("becas: só quem tem o módulo", async () => {
   await assertFails(getDocs(query(collection(como(PEDRO), "becas"))));
-  await assertSucceeds(setDoc(doc(como(ANA), "becas", "b9"), { cliente: "X", status: "reservado" }));
+  await assertSucceeds(setDoc(doc(como(ANA), "becas", "b9"), { cliente: "X", status: "reservado", respEmail: ANA }));
+  await assertFails(setDoc(doc(como(ANA), "becas", "b8"), { cliente: "X", status: "reservado" })); // sem dono
+  await assertFails(setDoc(doc(como(ANA), "becas", "b7"), { cliente: "X", status: "retirado", respEmail: ANA }));
   await assertFails(deleteDoc(doc(como(ANA), "becas", "b9")));
 });
 test("aparelhos: cada um grava só o seu, ninguém lê os dos outros", async () => {
@@ -242,12 +247,15 @@ test("funil: a equipe vê e mexe só nos leads livres e nos seus", async () => {
   );
   await assertFails(getDocs(query(collection(db, "leads"), where("etapa", "in", ["NOVO LEAD", "FOLLOW-UP"]))));
 });
-test("becas: equipe não muda valor nem caução, e o já pago só aumenta", async () => {
+test("becas: depois da reserva, só a Luciana e o Adriano mudam (a equipe só pede a exclusão)", async () => {
+  await semRegra(d => setDoc(doc(d, "becas", "b5"), { cliente: "Da Ana", valor: 100, pago: 0, status: "reservado", respEmail: ANA }));
   const db = como(ANA);
-  await assertFails(updateDoc(doc(db, "becas", "b1"), { valor: 10 }));
-  await assertFails(updateDoc(doc(db, "becas", "b1"), { pago: 100 }));
-  await assertSucceeds(updateDoc(doc(db, "becas", "b1"), { pago: 600, status: "retirado" }));
-  await assertFails(deleteDoc(doc(db, "becas", "b1")));
+  await assertFails(getDoc(doc(db, "becas", "b1"))); // sem dono: não é dela
+  await assertFails(updateDoc(doc(db, "becas", "b5"), { valor: 10 }));
+  await assertFails(updateDoc(doc(db, "becas", "b5"), { pago: 600, status: "retirado" }));
+  await assertSucceeds(updateDoc(doc(db, "becas", "b5"), { excluido: { porEmail: ANA, motivo: "duplicado" } }));
+  await assertFails(deleteDoc(doc(db, "becas", "b5")));
+  await assertSucceeds(updateDoc(doc(como(LUCIANA), "becas", "b5"), { status: "retirado" }));
 });
 test("PR: equipe não apaga aluno (só pede a exclusão); o admin apaga", async () => {
   await assertFails(deleteDoc(doc(como(ANA), "repasse", "r1")));
@@ -295,7 +303,11 @@ test("valores da turma (kits e contrato) só o admin muda", async () => {
 });
 
 test("PR: a equipe inclui aluno à mão na fila ou separado para si, mas não como venda", async () => {
-  await assertSucceeds(setDoc(doc(como(ANA), "repasse", "n1"), { nome: "NOVO", ano: 2099, etapa: "NA FILA", resp: "", respEmail: "" }));
+  // (19/11/2026) a equipe só inclui aluno para si (sem dono, só o Adriano)
+  await assertFails(setDoc(doc(como(ANA), "repasse", "n1"), { nome: "NOVO", ano: 2099, etapa: "NA FILA", resp: "", respEmail: "" }));
+  await assertSucceeds(
+    setDoc(doc(como(ANA), "repasse", "n1b"), { nome: "NOVO", ano: 2099, etapa: "INCOMPLETO", resp: "Ana", respEmail: ANA })
+  );
   await assertSucceeds(
     setDoc(doc(como(PEDRO), "repasse", "n2"), { nome: "NOVO 2", ano: 2099, etapa: "SEPARADO", resp: "Pedro", respEmail: PEDRO })
   );
@@ -511,7 +523,8 @@ test("consultas da equipe 2: carteira de colégios, formandos e contagens da tel
   await assertSucceeds(getDocs(query(c(p, "agenda"), where("data", ">=", "2026-01-01"), orderBy("data"), limit(400))));
   await assertSucceeds(getDocs(query(c(p, "ensaios"), where("data", ">=", "2026-01-01"), orderBy("data"), limit(600))));
   // becas: a equipe consulta pela carteira (os seus e os sem dono); o estoque vem de becasUso
-  await assertSucceeds(getDocs(query(c(como(ANA), "becas"), where("respEmail", "in", ["", ANA]), limit(3000))));
+  await assertSucceeds(getDocs(query(c(como(ANA), "becas"), where("respEmail", "==", ANA), limit(3000))));
+  await assertFails(getDocs(query(c(como(ANA), "becas"), where("respEmail", "in", ["", ANA]), limit(3000))));
   await assertFails(getDocs(query(c(como(ANA), "becas"), where("status", "in", ["reservado", "retirado"]), limit(500))));
   await assertSucceeds(getDocs(c(como(ANA), "becasUso")));
 });
@@ -520,9 +533,13 @@ test("consultas da equipe 3: PR da Linha de Frente (só o ano atual)", async () 
   await assertSucceeds(
     getDocs(query(c(db, "repasse"), where("ano", "==", ANO), where("etapa", "in", ["SEPARADO", "CONTATADO", "INTERESSADO"]), limit(300)))
   );
-  await assertSucceeds(getCountFromServer(query(c(db, "repasse"), where("etapa", "==", "NA FILA"), where("ano", "==", ANO))));
-  await assertSucceeds(getDocs(query(c(db, "repasse"), where("nomeBusca", "==", "LIA"), where("ano", "==", ANO), limit(20))));
-  await assertSucceeds(getDocs(query(c(db, "repasse"), where("escola", "in", ["ALFA", "Alfa"]), where("ano", "==", ANO), limit(3000))));
+  // (19/11/2026) a equipe só lê os alunos dela: a fila e os dos outros, não
+  await assertFails(getCountFromServer(query(c(db, "repasse"), where("etapa", "==", "NA FILA"), where("ano", "==", ANO))));
+  await assertFails(getDocs(query(c(db, "repasse"), where("nomeBusca", "==", "LIA"), where("ano", "==", ANO), limit(20))));
+  await assertSucceeds(
+    getDocs(query(c(db, "repasse"), where("nomeBusca", "==", "LIA"), where("ano", "==", ANO), where("respEmail", "==", PEDRO), limit(20)))
+  );
+  await assertSucceeds(getDocs(query(c(db, "repasse"), where("ano", "==", ANO), where("respEmail", "==", PEDRO), limit(3000))));
   await assertSucceeds(
     getDocs(
       query(c(db, "repasse"), where("ano", "==", ANO), where("etapa", "==", "INCOMPLETO"), where("respEmail", "==", PEDRO), limit(200))
@@ -535,9 +552,10 @@ test("consultas da equipe 3: PR da Linha de Frente (só o ano atual)", async () 
 });
 test("consultas da equipe 4: Repasse (todos os anos) e ID do aluno", async () => {
   const db = como(ANA);
-  await assertSucceeds(getDocs(query(c(db, "repasse"), where("escola", "in", ["ALFA", "Alfa"]), limit(3000))));
-  await assertSucceeds(getDocs(query(c(db, "repasse"), where("codigoBusca", "in", ["26ALFA01", "ALFA01"]), limit(30))));
-  await assertSucceeds(getDocs(query(c(db, "repasse"), where("followup", "<=", "2026-12-31"), orderBy("followup"), limit(150))));
+  // (19/11/2026) só a lista dela
+  await assertFails(getDocs(query(c(db, "repasse"), where("escola", "in", ["ALFA", "Alfa"]), limit(3000))));
+  await assertFails(getDocs(query(c(db, "repasse"), where("codigoBusca", "in", ["26ALFA01", "ALFA01"]), limit(30))));
+  await assertSucceeds(getDocs(query(c(db, "repasse"), where("respEmail", "==", ANA), limit(3000))));
   await assertSucceeds(setDoc(doc(db, "ids", "26ALFA"), { ultimo: 1 }));
   await assertSucceeds(setDoc(doc(como(FORM), "ids", "26BETA"), { ultimo: 1 }));
 });
@@ -689,6 +707,7 @@ test("link da prévia no site: quem tem o código lê; a página só soma visita
     por: "Pedro",
     criadoEm: "2026-11-11T12:00:00Z",
     ate: "2027-02-09T12:00:00Z",
+    ateTs: new Date(Date.now() + 11 * 36e5),
     vistos: 0,
     cliques: 0,
     vistoEm: null,
@@ -718,6 +737,36 @@ test("link da prévia no site: quem tem o código lê; a página só soma visita
   await assertSucceeds(deleteDoc(doc(como(ADRIANO), "previasSite", "abcde23456")));
 });
 
+test("link da prévia: vale 12 horas; depois o banco recusa (19/11/2026)", async () => {
+  const anon = env.unauthenticatedContext().firestore();
+  const base = {
+    nome: "Maria Santos",
+    escola: "Colégio",
+    kit: "pr",
+    idade: "adulto",
+    fotos: ["a1"],
+    preco: "R$ 1,00",
+    por: "Pedro",
+    criadoEm: "2026-11-19T12:00:00Z",
+    ate: "2026-11-20T00:00:00Z",
+    vistos: 0,
+    cliques: 0,
+    vistoEm: null,
+    cliqueEm: null
+  };
+  // prazo maior que 12 horas: o app não grava
+  await assertFails(setDoc(doc(como(PEDRO), "previasSite", "zzzzz00001"), { ...base, ateTs: new Date(Date.now() + 48 * 36e5) }));
+  // sem o prazo no formato do banco: não grava
+  await assertFails(setDoc(doc(como(PEDRO), "previasSite", "zzzzz00002"), base));
+  // venceu: a página (sem login) não lê mais; a equipe ainda vê as contagens
+  await semRegra(d => setDoc(doc(d, "previasSite", "zzzzz00003"), { ...base, ateTs: new Date(Date.now() - 36e5) }));
+  await assertFails(getDoc(doc(anon, "previasSite", "zzzzz00003")));
+  await assertSucceeds(getDoc(doc(como(PEDRO), "previasSite", "zzzzz00003")));
+  // link antigo, sem o prazo do banco: a página não lê
+  await semRegra(d => setDoc(doc(d, "previasSite", "zzzzz00004"), base));
+  await assertFails(getDoc(doc(anon, "previasSite", "zzzzz00004")));
+});
+
 test("becas e alunos de aluguel: cada um vê os seus; o estoque (só números) é de todos", async () => {
   await semRegra(async db => {
     await setDoc(doc(db, "alugueis", "x1"), { nome: "Aluno da Ana", instId: "i1", ano: 2026, status: "Beca medida", respEmail: ANA });
@@ -733,40 +782,95 @@ test("becas e alunos de aluguel: cada um vê os seus; o estoque (só números) �
   });
   const ana = como(ANA);
   await assertSucceeds(getDoc(doc(ana, "alugueis", "x1")));
-  await assertSucceeds(getDoc(doc(ana, "alugueis", "x3")));
+  await assertFails(getDoc(doc(ana, "alugueis", "x3"))); // (19/11/2026) sem contrato: só o admin
   await assertFails(getDoc(doc(ana, "alugueis", "x2")));
   await assertFails(getDoc(doc(ana, "becas", "v1")));
-  await assertSucceeds(getDocs(query(c(ana, "alugueis"), where("respEmail", "in", ["", ANA]), limit(3000))));
+  await assertFails(getDocs(query(c(ana, "alugueis"), where("respEmail", "in", ["", ANA]), limit(3000))));
+  await assertSucceeds(getDocs(query(c(ana, "alugueis"), where("respEmail", "==", ANA), limit(3000))));
   await assertFails(getDocs(query(c(ana, "alugueis"), limit(5000))));
   await assertSucceeds(getDocs(query(c(ana, "alugueis"), where("instId", "==", "i1"), where("respEmail", "==", ANA), limit(2000))));
   await assertFails(updateDoc(doc(ana, "alugueis", "x2"), { status: "Pronto para retirada" }));
-  await assertSucceeds(updateDoc(doc(ana, "alugueis", "x1"), { status: "Pronto para retirada" }));
+  // (19/11/2026) o representante só cadastra e reserva; depois da reserva, só a Luciana e o Adriano
+  await assertFails(updateDoc(doc(ana, "alugueis", "x1"), { status: "Pronto para retirada" }));
+  await assertSucceeds(updateDoc(doc(ana, "alugueis", "x1"), { status: "Cadastrado" }));
+  await assertSucceeds(updateDoc(doc(ana, "alugueis", "x1"), { status: "Beca medida", tamanho: "M" }));
   await assertFails(updateDoc(doc(ana, "alugueis", "x1"), { respEmail: "" })); // não solta o aluno
-  await assertSucceeds(updateDoc(doc(ana, "alugueis", "x3"), { respEmail: ANA })); // pega o sem contrato (contrato novo)
+  await assertFails(updateDoc(doc(ana, "alugueis", "x3"), { respEmail: ANA })); // não pega o sem contrato
   await assertSucceeds(setDoc(doc(ana, "alugueis", "x4"), { nome: "Novo", status: "Cadastrado", respEmail: ANA }));
+  await assertFails(setDoc(doc(ana, "alugueis", "x6"), { nome: "Novo", status: "Retirou a beca", respEmail: ANA }));
+  await assertSucceeds(updateDoc(doc(como(ADRIANO), "alugueis", "x1"), { status: "Pronto para retirada" }));
+  await assertFails(updateDoc(doc(ana, "alugueis", "x1"), { status: "Beca medida" }));
   await assertFails(setDoc(doc(ana, "alugueis", "x5"), { nome: "Novo", status: "Cadastrado", respEmail: "bia@equipe.com" }));
   await assertSucceeds(setDoc(doc(ana, "becas", "v2"), { cliente: "X", status: "reservado", respEmail: ANA }));
   // o estoque: só números
   await assertSucceeds(
-    setDoc(doc(ana, "becasUso", "aluno_x1"), { tipo: "aluno", status: "Beca medida", becaTipo: "tradPreta", tamanho: "M" })
+    setDoc(doc(ana, "becasUso", "aluno_x1"), { tipo: "aluno", status: "Beca medida", becaTipo: "tradPreta", tamanho: "M", respEmail: ANA })
   );
-  await assertFails(setDoc(doc(ana, "becasUso", "aluno_x9"), { tipo: "aluno", status: "Beca medida", nome: "Fulano" }));
+  await assertFails(setDoc(doc(ana, "becasUso", "aluno_x9"), { tipo: "aluno", status: "Beca medida", nome: "Fulano", respEmail: ANA }));
+  // (19/11/2026) a equipe só mexe na cópia dos próprios aluguéis, e só na reserva
+  await assertFails(setDoc(doc(ana, "becasUso", "aluno_x2"), { tipo: "aluno", status: "Beca medida", respEmail: "bia@equipe.com" }));
+  await assertFails(setDoc(doc(ana, "becasUso", "aluno_x8"), { tipo: "aluno", status: "Retirou a beca", respEmail: ANA }));
+  await assertFails(setDoc(doc(ana, "becasUso", "evento_i1_diaBecas"), { tipo: "evento", status: "reservado", respEmail: ANA }));
+  await semRegra(d => setDoc(doc(d, "becasUso", "aluno_y1"), { tipo: "aluno", status: "Retirou a beca", respEmail: "bia@equipe.com" }));
+  await assertFails(deleteDoc(doc(ana, "becasUso", "aluno_y1")));
+  await assertSucceeds(setDoc(doc(como(ADRIANO), "becasUso", "evento_i1_diaBecas"), { tipo: "evento", status: "reservado" }));
   await assertFails(getDocs(c(como(PEDRO), "becasUso")));
   await assertSucceeds(getDocs(c(ana, "becasUso")));
   await assertSucceeds(deleteDoc(doc(ana, "becasUso", "aluno_x1")));
 });
 
-test("Ajuda no cadastro: com a chave ligada, lê todos os colégios para cadastrar alunos", async () => {
+test("Ajuda no cadastro saiu do sistema (19/11/2026): a chave não abre mais todos os colégios", async () => {
   await semRegra(async db => {
     await setDoc(doc(db, "instituicoes", "outro"), { nome: "Colégio do Pedro", tipo: "publico", respEmail: PEDRO });
     await setDoc(doc(db, "usuarios", ANA), { nome: "Ana", papel: "equipe", ativo: true, modulos: ["becas"], ajudaCadastro: true });
   });
-  await assertSucceeds(getDocs(query(c(como(ANA), "instituicoes"), limit(1500))));
-  await assertSucceeds(setDoc(doc(como(ANA), "ids", "26CDP"), { ultimo: 3 }));
-  await semRegra(db => setDoc(doc(db, "usuarios", ANA), { nome: "Ana", papel: "equipe", ativo: true, modulos: ["becas"] }));
   await assertFails(getDocs(query(c(como(ANA), "instituicoes"), limit(1500))));
-  // a própria pessoa não liga a chave
-  await assertFails(updateDoc(doc(como(ANA), "usuarios", ANA), { ajudaCadastro: true }));
+  await semRegra(db =>
+    setDoc(doc(db, "usuarios", ANA), { nome: "Ana", papel: "equipe", ativo: true, modulos: ["becas", "agenda", "funil", "rep"] })
+  );
+});
+
+test("PR e Formatura: a equipe só lê e muda os alunos dela (19/11/2026)", async () => {
+  await semRegra(async db => {
+    await setDoc(doc(db, "repasse", "m1"), { nome: "DA ANA", ano: 2099, etapa: "SEPARADO", resp: "Ana", respEmail: ANA });
+    await setDoc(doc(db, "repasse", "m2"), { nome: "DO PEDRO", ano: 2099, etapa: "SEPARADO", resp: "Pedro", respEmail: PEDRO });
+    await setDoc(doc(db, "usuarios", FORM), { nome: "Fabi", papel: "equipe", ativo: true, modulos: ["formaturas"] });
+    await setDoc(doc(db, "formaturaAlunos", "g1"), { nome: "DA FABI", etapa: "SEPARADO", seg: "lf", respEmail: FORM });
+    await setDoc(doc(db, "formaturaAlunos", "g2"), { nome: "DA FILA", etapa: "NA FILA", seg: "lf", respEmail: "" });
+  });
+  const ana = como(ANA);
+  await assertSucceeds(getDoc(doc(ana, "repasse", "m1")));
+  await assertFails(getDoc(doc(ana, "repasse", "m2")));
+  await assertFails(getDoc(doc(ana, "repasse", "r2"))); // da fila
+  await assertFails(updateDoc(doc(ana, "repasse", "m2"), { obs: "x" }));
+  await assertSucceeds(updateDoc(doc(ana, "repasse", "m1"), { obs: "ok" }));
+  const fabi = como(FORM);
+  await assertSucceeds(getDoc(doc(fabi, "formaturaAlunos", "g1")));
+  await assertFails(getDoc(doc(fabi, "formaturaAlunos", "g2")));
+  await assertFails(getDocs(query(c(fabi, "formaturaAlunos"), where("seg", "==", "lf"), limit(300))));
+  await assertSucceeds(getDocs(query(c(fabi, "formaturaAlunos"), where("respEmail", "==", FORM), limit(300))));
+  await assertFails(updateDoc(doc(fabi, "formaturaAlunos", "g2"), { respEmail: FORM, etapa: "SEPARADO" }));
+  // o índice de telefones: consulta um número, mas não lista
+  await assertFails(getDocs(query(c(como(PEDRO), "fones"), limit(10))));
+});
+
+test("histórico de alterações: cada um registra o que fez; só o admin lê (19/11/2026)", async () => {
+  const r = {
+    col: "alugueis",
+    doc: "x1",
+    acao: "mudou",
+    campos: ["status"],
+    status: "Beca medida",
+    por: "Ana",
+    porEmail: ANA,
+    em: "2026-11-19T10:00:00Z"
+  };
+  await assertSucceeds(setDoc(doc(como(ANA), "historico", "h1"), r));
+  await assertFails(setDoc(doc(como(ANA), "historico", "h2"), { ...r, porEmail: PEDRO }));
+  await assertFails(setDoc(doc(como(ANA), "historico", "h3"), { ...r, tel: "21999990000" }));
+  await assertFails(getDoc(doc(como(ANA), "historico", "h1")));
+  await assertFails(updateDoc(doc(como(ANA), "historico", "h1"), { acao: "criou" }));
+  await assertSucceeds(getDoc(doc(como(ADRIANO), "historico", "h1")));
 });
 
 test("Cadastro automático: a foto da ficha (dados pessoais) só o admin lê e grava", async () => {

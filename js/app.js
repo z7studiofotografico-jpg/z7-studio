@@ -32,6 +32,7 @@ import {
 import * as FS from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
 import { getMessaging, onMessage } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-messaging.js";
 import { avisoErro, ligarCamposReais } from "./ui.js";
+import { registrar, caminho } from "./historico-alteracoes.js";
 import { first, toast, showNotice, mkBtn } from "./util.js";
 ligarCamposReais();
 import * as Funil from "./funil.js";
@@ -222,11 +223,12 @@ const FSv = Object.assign({}, FS, {
     confereLimite(q, s);
     return s;
   },
-  // "Ver como a equipe": nenhuma gravação sai do app
-  setDoc: soLeitura("setDoc"),
-  updateDoc: soLeitura("updateDoc"),
-  addDoc: soLeitura("addDoc"),
-  deleteDoc: soLeitura("deleteDoc"),
+  // "Ver como a equipe": nenhuma gravação sai do app; e (19/11/2026) cada gravação no Aluguel, contratos e Agenda
+  // deixa o registro de quem fez (historico-alteracoes.js)
+  setDoc: gravando("setDoc"),
+  updateDoc: gravando("updateDoc"),
+  addDoc: gravando("addDoc"),
+  deleteDoc: gravando("deleteDoc"),
   runTransaction: soLeitura("runTransaction"),
   writeBatch(...a) {
     const b = FS.writeBatch(...a);
@@ -247,6 +249,17 @@ function soLeitura(nome) {
       return Promise.reject(Object.assign(new Error("Modo visualização"), { code: "ver-como" }));
     }
     return FS[nome](...a);
+  };
+}
+const ACAO = { setDoc: "salvou", updateDoc: "mudou", addDoc: "criou", deleteDoc: "apagou" };
+function gravando(nome) {
+  const f = soLeitura(nome);
+  return async (...a) => {
+    const r = await f(...a);
+    const quem = { nome: me || "", email: ((user && user.email) || "").toLowerCase() };
+    const alvo = nome === "addDoc" ? r : a[0];
+    registrar(FS, db, caminho(alvo), ACAO[nome], nome === "deleteDoc" ? {} : a[1], quem);
+    return r;
   };
 }
 function confereLimite(q, s) {
@@ -274,11 +287,6 @@ const ctx = {
   },
   get verComo() {
     return verComo;
-  },
-  // "Ajuda no cadastro" ligada pelo admin em Equipe: cadastra alunos em qualquer colégio (11/11/2026)
-  get ajudaCadastro() {
-    const p = USERS[((user && user.email) || "").toLowerCase()];
-    return !verComo && !!(p && p.ativo !== false && p.ajudaCadastro === true);
   },
   get user() {
     return user;
@@ -328,7 +336,8 @@ const ctx = {
   carteira(nomeCol, ...filtros) {
     const c = collection(db, nomeCol);
     if (isAdmin) return FSv.query(c, ...filtros);
-    return nomeCol === "formandos"
+    // (19/11/2026) formandos, aluguéis e becas: só os da própria pessoa
+    return ["formandos", "alugueis", "becas"].includes(nomeCol)
       ? FSv.query(c, where("respEmail", "==", ctx.email), FSv.limit(3000))
       : FSv.query(c, where("respEmail", "in", ["", ctx.email]), FSv.limit(3000));
   },

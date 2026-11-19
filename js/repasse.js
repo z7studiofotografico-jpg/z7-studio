@@ -56,7 +56,7 @@ import {
 } from "./repasse-estado.js";
 import { botoesEquipe, renderTrabalhar, recontarEquipe, ouvirJuntas, emAndamento } from "./repasse-equipe.js";
 import { renderPessoa } from "./pessoa-janela.js";
-import { consultaDaAba, LIMITE_ENTREGUES } from "./repasse-consultas.js";
+import { consultaDaAba, LIMITE_ENTREGUES, listaParaBusca } from "./repasse-consultas.js";
 // Entregues (admin): 300 por vez; "Ver todos" lê até 5.000 (gasta leitura do Firebase)
 let verTodosEntregues = false;
 import { card } from "./repasse-cartao.js";
@@ -563,7 +563,6 @@ function openTab(k) {
   }
 }
 
-let cacheLF = { at: 0, docs: [] };
 // escola escolhida: na ordem do ID (como na separação das fotos); senão, por nome
 const porNome = (a, b) => (a.nome || "").localeCompare(b.nome || "", "pt-BR");
 const ordemBusca = porEscola => (porEscola ? (a, b) => (a.ano || 0) - (b.ano || 0) || ordemCodigo(a, b) : porNome);
@@ -578,7 +577,8 @@ async function buscar() {
     escE = escolaEscolhida(esc); // { ano, nomes } do colégio escolhido (uma linha por colégio e ano)
   const daEscola = it => !escE || ((!escE.ano || it.ano === escE.ano) && escE.nomes.includes(it.escola));
   const num = escE && numeroDaBusca(txt); // colégio escolhido + só o número ("71", "id 71"): busca pelo número do ID
-  if (!C.pode("rep") && !ehFormatura()) {
+  // (19/11/2026) a equipe só lê os próprios alunos: a busca dela é na lista dela (carregada e filtrada aqui)
+  if (!C.isAdmin || (!C.pode("rep") && !ehFormatura())) {
     // Só Linha de Frente: carrega os ensaios do ano (uma vez a cada 10 min) e filtra aqui.
     if (!txt && !esc) {
       mudarItems([]);
@@ -586,16 +586,18 @@ async function buscar() {
       return;
     }
     try {
-      if (Date.now() - cacheLF.at > 600000) {
-        const s0 = await FS.getDocs(FS.query(col, ...baseLF(), FS.limit(3000)));
-        cacheLF = { at: Date.now(), docs: s0.docs.map(d => Object.assign({ id: d.id }, d.data())) };
-      }
+      const docsBusca = await listaParaBusca();
       if (minha !== buscaN) return;
       const n = norm(txt),
         dg = txt.replace(/\D/g, ""),
-        cods = pareceCodigo(txt) ? codigosDaBusca(txt, [ANO()]) : [];
+        cods = pareceCodigo(txt)
+          ? codigosDaBusca(
+              txt,
+              Array.from({ length: 12 }, (_, i) => ANO() - i)
+            )
+          : [];
       mudarItems(
-        cacheLF.docs
+        docsBusca
           .filter(
             it =>
               daEscola(it) &&

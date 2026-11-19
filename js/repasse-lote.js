@@ -73,6 +73,8 @@ export async function refreshStats() {
     set("rsMes", U.money(vendasMes.v));
     set("rVendMes", textoVendasMes());
     // Fila: conta por ano (só filtros de igualdade, não precisa de índice extra no Firebase)
+    // (19/11/2026) a fila é só do Adriano: a equipe não vê os alunos sem dono
+    if (!C.isAdmin) return;
     const anos = ehFormatura() ? [null] : seg === "lf" ? [Y] : anosRepasse();
     const cs = await Promise.all(
       anos.map(a =>
@@ -102,18 +104,28 @@ const MAX_POR_VEZ = 100;
 export async function refreshLote() {
   // qual WhatsApp usar: o da empresa (admin) ou os da própria pessoa (equipe); aparece mesmo sem internet para contar
   pintarSeletor($("rLoteNum"), C, seg);
+  // (19/11/2026) só o Adriano separa alunos da fila; a equipe trabalha os que ele passou para ela
+  const equipe = !C.isAdmin;
+  const esc = $("rLote") && $("rLote").querySelector(".lote-esc");
+  if (esc) esc.hidden = equipe;
+  const fila = $("rsFila") && $("rsFila").closest(".stat");
+  if (fila) fila.hidden = equipe;
   try {
     const c = await FS.getCountFromServer(
       FS.query(
         col,
-        FS.where("resp", "==", C.me),
+        ...(equipe ? [FS.where("respEmail", "==", C.email || "")] : [FS.where("resp", "==", C.me)]),
         FS.where("separadoEm", "==", U.todayStr()),
         FS.where("separadoSeg", "==", seg),
         ...(seg === "lf" ? baseLF() : [])
       )
     );
     const n = c.data().count;
-    $("rLoteTxt").textContent = n ? ` ${n} separado${n > 1 ? "s" : ""} hoje.` : " Separe os alunos que você vai trabalhar hoje.";
+    $("rLoteTxt").textContent = equipe
+      ? (n ? ` ${n} aluno${n > 1 ? "s" : ""} novo${n > 1 ? "s" : ""} hoje.` : "") + " Os alunos novos o Adriano separa para você."
+      : n
+        ? ` ${n} separado${n > 1 ? "s" : ""} hoje.`
+        : " Separe os alunos que você vai trabalhar hoje.";
     $("rLoteAviso").hidden = true;
     $("rLote").classList.remove("lote-aviso");
     $("rLoteBtn").disabled = false;
@@ -158,6 +170,7 @@ export function perguntarQuantos() {
   });
 }
 export async function separarLote() {
+  if (!C.isAdmin) return U.toast("Os alunos novos o Adriano separa para você.");
   if (!C.me) return;
   const quantos = await perguntarQuantos();
   if (!quantos) return;

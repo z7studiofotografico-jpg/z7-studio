@@ -242,7 +242,9 @@ export function blocoBecasEvento(C, it, kind, ev, campo, fechar) {
   }
   box._gravar = gravar;
   const pe = el("div", "eb-acoes");
-  pe.append(U.mkBtn("💾 Salvar as becas", "btn-primary", () => gravar(false)));
+  // (19/11/2026) as becas do agendamento (estoque) só a Luciana e o Adriano gravam; a equipe confere
+  if (C.isAdmin) pe.append(U.mkBtn("💾 Salvar as becas", "btn-primary", () => gravar(false)));
+  else pe.append(el("small", "hint", "As quantidades de becas do agendamento só a Luciana e o Adriano salvam."));
   box.append(err, pe);
   // os alunos chegam depois (busca no banco)
   alunosDoColegio(C, it, ano).then(al => {
@@ -295,7 +297,7 @@ export function ligarSistema(C, ponto, p, it, kind, ev, campo, close) {
   const b = blocoBecasEvento(C, it, kind, ev, campo, close);
   if (b) {
     ponto.append(b);
-    p._salvarBecas = () => b._gravar(true);
+    if (C.isAdmin) p._salvarBecas = () => b._gravar(true);
   }
   ponto.append(blocoColegio(C, it, campo, close));
 }

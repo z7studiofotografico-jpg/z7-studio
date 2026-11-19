@@ -202,7 +202,13 @@ export function openDados(it) {
         // cria só se ainda não existe (transação): nunca sobrescreve um aluno que já está no PR
         const ref = FS.doc(db, colNome(), docId(docNovo, Date.now()));
         const existente = await FS.runTransaction(db, async tx => {
-          const s0 = await tx.get(ref);
+          // (19/11/2026) a equipe não lê aluno de outra pessoa: se esse aluno já existe com outra pessoa, o banco
+          // recusa a leitura, e aí vira o pedido ao Adriano (igual a aluno repetido)
+          const s0 = await tx.get(ref).catch(e => {
+            if (e && e.code === "permission-denied" && !C.isAdmin)
+              return { exists: () => true, data: () => ({ parcial: true, ...docNovo }) };
+            throw e;
+          });
           if (s0.exists()) return Object.assign({ id: ref.id }, s0.data());
           tx.set(ref, docNovo);
           if (colNome() === "repasse") indexarFones(FS, db, tx, ref.id, docNovo); // telefones no índice: acha a família depois, em outro ano ou colégio

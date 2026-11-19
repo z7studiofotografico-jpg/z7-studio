@@ -43,12 +43,10 @@ async function colegios(C) {
     gravarListaColegios(C, l).catch(e => console.warn("[Z7] lista de colégios", e));
     return l;
   }
-  // quem cuida de colégios (e quem está com a "Ajuda no cadastro" ligada): os colégios da carteira, ou todos
-  if (C.pode("colegios") || C.pode("formaturas") || C.ajudaCadastro)
+  // quem cuida de colégios: os colégios da carteira (19/11/2026: a "Ajuda no cadastro" saiu do sistema)
+  if (C.pode("colegios") || C.pode("formaturas"))
     try {
-      const q = C.ajudaCadastro
-        ? FS.query(FS.collection(db, "instituicoes"), FS.limit(2000))
-        : FS.query(FS.collection(db, "instituicoes"), FS.where("respEmail", "in", ["", C.email]), FS.limit(2000));
+      const q = FS.query(FS.collection(db, "instituicoes"), FS.where("respEmail", "in", ["", C.email]), FS.limit(2000));
       const l = limpa((await FS.getDocs(q)).docs.map(d => Object.assign({ id: d.id }, d.data())));
       if (l.length) return l;
     } catch (e) {
@@ -78,7 +76,8 @@ async function procurar(C, f) {
   const cb = f.codigo ? codigoBusca(f.codigo) : "";
   const nome = U.chave(f.nome || "");
   const ano = Number(f.ano);
-  const carteira = C.isAdmin ? [] : [FS.where("respEmail", "in", ["", C.email])];
+  // (19/11/2026) a equipe só lê os próprios alunos (de outra pessoa, o índice de telefones avisa no PR)
+  const carteira = C.isAdmin ? [] : [FS.where("respEmail", "==", C.email)];
   const ler = async (colecao, modulo, filtros) => {
     try {
       const s = await FS.getDocs(FS.query(FS.collection(db, colecao), ...filtros, FS.limit(10)));
@@ -107,8 +106,8 @@ async function procurar(C, f) {
     const f0 = por(campo);
     if (!f0) continue;
     if (mods.includes("becas")) await ler("alugueis", "becas", [...f0, ...carteira]);
-    if (mods.includes("pr")) await ler("repasse", moduloPR, [...f0, FS.where("ano", "==", ano)]);
-    if (mods.includes("formatura")) await ler("formaturaAlunos", "formatura", [...f0, FS.where("ano", "==", ano)]);
+    if (mods.includes("pr")) await ler("repasse", moduloPR, [...f0, FS.where("ano", "==", ano), ...carteira]);
+    if (mods.includes("formatura")) await ler("formaturaAlunos", "formatura", [...f0, FS.where("ano", "==", ano), ...carteira]);
   }
   return achados;
 }

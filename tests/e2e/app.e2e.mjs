@@ -187,6 +187,8 @@ const base = {
     contatos: [{ tipo: "Mãe", nome: "Sonia", tel: "21955556666" }],
     telefones: ["21955556666"]
   },
+  // índice de telefones (o PR acha a família de outra carteira pelo telefone, sem ler o aluno)
+  "fones/21955556666": { alunos: { r5: { nome: "CARLA FILA", ano: hoje.getFullYear(), escola: "COLEGIO ALFA" } } },
   "pedidos/p8": {
     tipo: "pr-repetido",
     alvoId: "rx",
@@ -520,6 +522,16 @@ async function cenario(nome, fn) {
     falhas++;
     console.log("  ✗ parou com erro: " + String((e && e.message) || e).split("\n")[0]);
   } finally {
+    // (19/11/2026) consultas que o Firebase recusaria para a equipe (só os próprios alunos), mesmo as silenciosas
+    for (const ctx of abertos) {
+      for (const pg of ctx.pages ? ctx.pages() : []) {
+        const n = await pg.evaluate(() => window.__negados || []).catch(() => []);
+        if (n.length) {
+          falhas++;
+          console.log("  ✗ recusado pelas regras da carteira: " + [...new Set(n)].slice(0, 6).join(" ; "));
+        }
+      }
+    }
     while (abertos.length)
       await abertos
         .pop()
@@ -1782,16 +1794,10 @@ await cenario("Pedro (vendedor: Linha de Frente, Agendamento, Instituições)", 
     await calmo(pg);
     ok((await pg.textContent("#viewRepasse")).length > 50, "PR (Linha de Frente) abre");
     ok(!/Outra Da Ana/i.test(await pg.textContent("#rList")), "Para hoje da equipe: só os contatos dela (o da Ana não aparece)");
-    // lote do dia: a pessoa diz quantos quer separar (sem número fixo por dia)
-    await pg.locator("#rLoteBtn").click();
-    await pg.locator(".sheet:visible input[type=number]").fill("30");
-    await pg.locator(".sheet:visible button[type=submit]").click();
-    await calmo(pg);
-    const sepS = await store();
-    const sep = Object.values(sepS).filter(x => x.separadoEm && x.respEmail === PEDRO).length;
-    ok(sep === 30, "“Deseja separar quantos alunos?” 30 → separou 30: " + sep);
-    ok(!/o ideal é até|combinado é até/.test(await pg.textContent("#rLote")), "sem número fixo de contatos por dia");
-    ok(await pg.locator("#rLoteBtn").isEnabled(), "botão continua liberado");
+    // (19/11/2026) a equipe não separa da fila: só o Adriano passa os alunos para ela
+    ok(await pg.locator("#rLoteBtn").isHidden(), "equipe não vê o botão de separar alunos da fila");
+    ok(await pg.locator("#rsFila").isHidden(), "equipe não vê a fila");
+    ok(/o Adriano separa para você/.test(await pg.textContent("#rLote")), "avisa que o Adriano separa os alunos");
     // "+ Aluno" no PR, sem planilha: entra separado para quem incluiu
     let fa = await incluirAluno(pg, { nome: "Paulo Manual", colegio: "Colegio Alfa", tel: "21933332222", contato: "Marta" });
     const sp = await store();
@@ -1823,7 +1829,7 @@ await cenario("Pedro (vendedor: Linha de Frente, Agendamento, Instituições)", 
     await fa.click({ position: { x: 5, y: 5 } }); // toque fora do painel fecha
     await calmo(pg);
     // aluno que está na fila do repasse: não passa sozinho; vai um pedido para o admin decidir
-    fa = await incluirAluno(pg, { nome: "Carla Fila", colegio: "Colegio Alfa", tel: "21922223333", contato: "Vera", numero: "32" });
+    fa = await incluirAluno(pg, { nome: "Carla Fila", colegio: "Colegio Alfa", tel: "21955556666", contato: "Vera", numero: "32" });
     const sp3 = await store();
     const pedC = Object.entries(sp3).find(([k, v]) => k.startsWith("pedidos/") && v.alvoId === "r5" && v.porEmail === PEDRO);
     ok(
@@ -1836,7 +1842,7 @@ await cenario("Pedro (vendedor: Linha de Frente, Agendamento, Instituições)", 
     );
     ok(/Carla Fila.*Aguardando/i.test(await pg.textContent("#rPedidos")), "vendedor vê o pedido aguardando");
     // de novo o mesmo aluno, ainda aguardando: avisa que já foi pedido
-    fa = await incluirAluno(pg, { nome: "Carla Fila", colegio: "Colegio Alfa", tel: "21922223333", contato: "Vera", numero: "32" });
+    fa = await incluirAluno(pg, { nome: "Carla Fila", colegio: "Colegio Alfa", tel: "21955556666", contato: "Vera", numero: "32" });
     ok(
       /já foi pedido por você e está aguardando/.test(await pg.textContent("body")),
       "pedido repetido: avisa que esse aluno já foi pedido"

@@ -36,16 +36,14 @@ import { ITENS_PACOTE, nomeItem, lerPacote, valorDoPacote } from "./contrato-col
 import { linhaGenerica } from "./lista-compacta.js";
 import { chipItem, lerQtd } from "./itens-qtd.js";
 import { avisoPrecoAluguel } from "./precos-colegio.js";
-import { ouvirUso, espelhar, donoDoAluguel, somaAvulsos } from "./becas-uso.js";
+import { ouvirUso, espelhar, donoDoAluguel, somaAvulsos, equipePode, AVISO_RESERVA } from "./becas-uso.js";
 import { abrirJanela } from "./janela.js";
 import { abaColegio, abaHistorico } from "./aluguel-janela.js";
 
 export const STATUS_ALUGUEL = ["Cadastrado", "Beca medida", "Produtos em produção", "Pronto para retirada", "Retirou a beca", "Devolvida"];
-// ano · série · turma (ex.: "2026 · 9º ano · turma 901")
 const anoSerie = a => [a.ano, a.serie, a.turma && "turma " + a.turma].filter(Boolean).join(" · ");
 const SERIES = ["Pré", "5º ano", "9º ano", "Ensino médio", "Faculdade", "Curso", "Outra"];
 const ANO = () => new Date().getFullYear();
-// atrasadoAluguel fica em aluguel-relatorio.js (o relatório também usa); continua exportado daqui
 export { atrasadoAluguel };
 // as etapas de cada aluno (17/11/2026): Produtos em produção para quem tem Paspatur, Canudo, Certificado, quadro ou
 // fotos (no kit ou nos produtos); só a beca vai direto para Pronto para retirada. Só o Paspatur não tem beca:
@@ -113,7 +111,6 @@ export function mostrarAlunos(ctx, v, o) {
     U.mkBtn("⬇️ Planilha", "btn-sm", () =>
       import("./cadastro-aluno.js").then(m => m.baixarPlanilha("aluguel-becas", lista, m.CAMPOS_ALUGUEL)).catch(e => C.handleErr(e))
     )
-    // (18/11/2026: o "📥 Importação" voltou para a Agenda, ao lado das Fichas)
   );
   head.append(hb);
   v.append(head);
@@ -527,10 +524,10 @@ function card(a) {
   if (a.naoParticipa) base.append(el("span", "hint", "🚫 Não vai participar da formatura"));
   else {
     if (a.soPaspatur) base.append(el("span", "hint", "📒 Só o Paspatur"));
-    if (prox) base.append(U.mkBtn("Avançar: " + nomeEtapa(a, prox), "btn-ok", () => mudarStatus(a, prox)));
-    if (ant) base.append(U.mkBtn("Voltar: " + nomeEtapa(a, ant), "", () => mudarStatus(a, ant)));
+    if (prox && equipePode(C, a.status, prox)) base.append(U.mkBtn("Avançar: " + nomeEtapa(a, prox), "btn-ok", () => mudarStatus(a, prox)));
+    if (ant && equipePode(C, a.status, ant)) base.append(U.mkBtn("Voltar: " + nomeEtapa(a, ant), "", () => mudarStatus(a, ant)));
   }
-  if (iStatus(a) < STATUS_ALUGUEL.indexOf("Retirou a beca")) {
+  if (iStatus(a) < STATUS_ALUGUEL.indexOf("Retirou a beca") && equipePode(C, a.status)) {
     if (!a.naoParticipa) base.append(U.mkBtn("🚫 Não vai participar", "btn-sm", () => marcar("nao")));
     if (!a.soPaspatur || a.naoParticipa) base.append(U.mkBtn("📒 Só o Paspatur", "btn-sm", () => marcar("paspatur")));
     if (a.naoParticipa || a.soPaspatur) base.append(U.mkBtn("↩️ Vai participar (aluga a beca)", "btn-sm", () => marcar("vai")));
@@ -541,6 +538,7 @@ function card(a) {
 
 const iStatus = a => STATUS_ALUGUEL.indexOf(a.status || "Cadastrado");
 async function salvar(a, patch, msg) {
+  if (!equipePode(C, a.status, patch.status || a.status)) return U.toast(AVISO_RESERVA), false;
   try {
     await FS.updateDoc(FS.doc(db, "alugueis", a.id), Object.assign({ atualizadoEm: new Date().toISOString() }, patch));
     espelhar(C, "aluno", a.id, Object.assign({}, a, patch));
@@ -557,6 +555,7 @@ const itensProd = a => (a.produtos || []).filter(p => p.estado === "reservado").
 // lote = true (o colégio inteiro de uma vez): não pergunta nada; devolve "ok" ou o motivo de ter pulado o aluno
 export async function mudarStatus(a, para, lote = false) {
   const de = a.status || "Cadastrado";
+  if (!equipePode(C, de, para)) return lote ? "só o admin" : U.toast(AVISO_RESERVA);
   const iDe = STATUS_ALUGUEL.indexOf(de),
     iPara = STATUS_ALUGUEL.indexOf(para);
   if (!a.soPaspatur && iPara >= STATUS_ALUGUEL.indexOf("Beca medida") && (!a.becaTipo || (!a.tamanho && !semTamanho(a.becaTipo)))) {
@@ -650,6 +649,7 @@ export async function mudarStatus(a, para, lote = false) {
 
 // Cadastro / edição do aluno de aluguel
 export function form(a, pre = {}) {
+  if (a && !equipePode(C, a.status)) return U.toast(AVISO_RESERVA);
   sheet(a ? "Editar aluno de aluguel" : "Novo aluno de aluguel", (p, close) => {
     const x = a || pre;
     const sInst = sel(

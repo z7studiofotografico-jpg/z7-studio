@@ -136,9 +136,11 @@ export async function gerarCodigoPR(C, d, nomesEscolas) {
     col = FS.collection(db, "repasse"),
     ano = Number(d.ano) || ANO();
   const jeitos = [...new Set([d.escola, d.escola.toUpperCase(), title(d.escola), U.chave(d.escola)])];
-  const doAno = (await FS.getDocs(FS.query(col, FS.where("escola", "in", jeitos), FS.where("ano", "==", ano), FS.limit(3000)))).docs.map(
-    x => x.data()
-  );
+  // (19/11/2026) a equipe só lê os próprios alunos; o número do ID vem do contador do banco (nunca repete)
+  const minha = C.isAdmin ? [] : [FS.where("respEmail", "==", C.email || "")];
+  const doAno = (
+    await FS.getDocs(FS.query(col, FS.where("escola", "in", jeitos), FS.where("ano", "==", ano), ...minha, FS.limit(3000)))
+  ).docs.map(x => x.data());
   if (doAno.length && !doAno.some(x => x.escola === d.escola)) d.escola = doAno[0].escola;
   let sigla = siglaUsada(doAno.map(x => x.codigo));
   // (quem não é admin só lê os colégios livres e os seus: a consulta já vai com esse filtro)
@@ -156,7 +158,7 @@ export async function gerarCodigoPR(C, d, nomesEscolas) {
     } catch (e) {
       console.warn("[Z7] sigla do colégio", e);
     }
-  if (!sigla && (C.isAdmin || C.pode("rep")))
+  if (!sigla && C.isAdmin)
     sigla = siglaUsada((await FS.getDocs(FS.query(col, FS.where("escola", "in", jeitos), FS.limit(200)))).docs.map(x => x.data().codigo));
   if (!sigla) {
     const outras = (nomesEscolas || []).filter(n => U.chave(n) !== U.chave(d.escola)).map(n => siglaDe(n));
@@ -201,7 +203,13 @@ export async function procurarRepetido(C, d) {
   }
   // 2) mesmo nome (quem só tem a Linha de Frente procura no ano atual)
   const s = await FS.getDocs(
-    FS.query(col, FS.where("nomeBusca", "==", U.chave(d.nome)), ...(soLF ? [FS.where("ano", "==", ANO())] : []), FS.limit(20))
+    FS.query(
+      col,
+      FS.where("nomeBusca", "==", U.chave(d.nome)),
+      ...(soLF ? [FS.where("ano", "==", ANO())] : []),
+      ...(C.isAdmin ? [] : [FS.where("respEmail", "==", C.email || "")]),
+      FS.limit(20)
+    )
   );
   for (const x of s.docs) {
     const r = Object.assign({ id: x.id }, x.data()),

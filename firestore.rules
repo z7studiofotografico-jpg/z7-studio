@@ -47,7 +47,6 @@ service cloud.firestore {
     function minhaTurma(instId) {
       return instId != '' && get(/databases/$(database)/documents/instituicoes/$(instId)).data.get('respEmail', '') == email();
     }
-    function ajudaCadastro() { return logado() && perfil().get('ajudaCadastro', false) == true && perfil().ativo == true; }
     function meuPedido() { return resource.data.get('pedidoEmail', email()) == email(); }
     // Formulário do site (WordPress, sem login): só cria um lead novo, sem dono, com estes campos e tamanhos
     function doSite() {
@@ -97,8 +96,8 @@ service cloud.firestore {
 
     match /instituicoes/{id} {
       // quem só tem Formaturas também lê as turmas da carteira (para ver os formandos), mas não muda o cadastro
-      // (11/11/2026: quem está com a "Ajuda no cadastro" ligada pelo admin lê todos, para cadastrar alunos)
-      allow read: if admin() || ((pode('colegios') || pode('formaturas')) && minhaOuLivre()) || ajudaCadastro();
+      // (19/11/2026: a "Ajuda no cadastro" saiu do sistema)
+      allow read: if admin() || ((pode('colegios') || pode('formaturas')) && minhaOuLivre());
       allow create: if admin() || (pode('colegios') && request.resource.data.get('respEmail', email()) == email());
       // valores da turma (kits, contrato) e responsável: só admin (o responsável recebe a comissão da turma)
       allow update: if admin() || (pode('colegios') && minhaOuLivre() && respOk() && exclusaoOk() && !mudou(['kits', 'contratoTurma'])
@@ -140,21 +139,31 @@ service cloud.firestore {
     // Aluguel de becas
     // (11/11/2026: cada um da equipe vê só os aluguéis que registrou e os antigos sem dono; o estoque vem de becasUso)
     match /becas/{id} {
-      allow read: if admin() || (pode('becas') && (resource == null || minhaOuLivre()));
-      allow create: if admin() || (pode('becas') && request.resource.data.get('respEmail', '') in ['', email()]);
-      // depois de registrado, a equipe não muda valor nem caução, e o "já pago" só aumenta (receber mais)
-      allow update: if admin() || (pode('becas') && minhaOuLivre() && respOk() && !mudou(['valor', 'caucao'])
-        && request.resource.data.get('pago', 0) >= resource.data.get('pago', 0));
+      // (19/11/2026) cada um da equipe vê só os seus; o representante só registra a reserva. Depois da reserva
+      // (retirada, devolução, valores), só a Luciana e o Adriano mudam; a equipe só pode pedir a exclusão.
+      allow read: if admin() || (pode('becas') && (resource == null || minha()));
+      allow create: if admin() || (pode('becas') && request.resource.data.get('respEmail', '') == email()
+        && request.resource.data.get('status', '') == 'reservado');
+      allow update: if admin() || (pode('becas') && minha() && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['excluido', 'atualizadoEm'])
+        && exclusaoOk());
       allow delete: if admin();
     }
     // Estoque de becas (11/11/2026): uma cópia só com os números de cada aluguel que segura beca (sem nome, telefone
     // nem valor). Todos com o módulo de becas leem (o estoque é de todos) e o app grava junto com o aluguel.
     match /becasUso/{id} {
-      allow read, delete: if pode('becas');
+      function semDados() { return !request.resource.data.keys().hasAny(['nome', 'tel', 'cliente', 'valor', 'pago', 'responsavel']); }
+      // a equipe só mexe na cópia dos próprios aluguéis, e só na reserva (19/11/2026)
+      function reservaDaEquipe(d) {
+        return d.get('respEmail', '') == email()
+          && ((d.tipo == 'aluno' && d.status == 'Beca medida') || (d.tipo == 'avulso' && d.status == 'reservado'));
+      }
+      allow read: if pode('becas');
       // (19/11/2026) evento_<colégio>_<campo>: as becas de um agendamento de colégio (Agenda), contadas pelas datas
-      allow write: if pode('becas') && (id.matches('(aluno|avulso)_[A-Za-z0-9]+') || id.matches('evento_[A-Za-z0-9_-]+'))
-        && request.resource.data.tipo in ['aluno', 'avulso', 'evento'] && request.resource.data.status is string
-        && !request.resource.data.keys().hasAny(['nome', 'tel', 'cliente', 'valor', 'pago', 'responsavel']);
+      allow write: if (admin() && (id.matches('(aluno|avulso)_[A-Za-z0-9]+') || id.matches('evento_[A-Za-z0-9_-]+'))
+          && request.resource.data.tipo in ['aluno', 'avulso', 'evento'] && request.resource.data.status is string && semDados())
+        || (pode('becas') && id.matches('(aluno|avulso)_[A-Za-z0-9]+') && semDados() && reservaDaEquipe(request.resource.data)
+          && (resource == null || reservaDaEquipe(resource.data)));
+      allow delete: if admin() || (pode('becas') && reservaDaEquipe(resource.data));
     }
     // Fila de e-mails para os colégios (enviados pelo GitHub com o Gmail do estúdio)
     match /emails/{id} {
@@ -191,15 +200,18 @@ service cloud.firestore {
         return request.resource.data.diff(resource.data).affectedKeys().hasOnly([campo, hora])
           && request.resource.data[campo] == resource.data[campo] + 1 && request.resource.data[hora] == request.time;
       }
-      allow get: if true;
+      // (19/11/2026) o link vale 12 horas: depois, o banco recusa (quem é da equipe ainda vê, para as contagens)
+      allow get: if (resource.data.get('ateTs', null) is timestamp && request.time < resource.data.ateTs) || membro();
       allow list, delete: if admin();
       allow create: if membro() && c.matches('[a-z0-9]{10,16}')
-        && request.resource.data.keys().hasOnly(['nome', 'escola', 'kit', 'idade', 'fotos', 'preco', 'cartao', 'por', 'criadoEm', 'ate', 'vistos', 'cliques', 'vistoEm', 'cliqueEm'])
+        && request.resource.data.keys().hasOnly(['nome', 'escola', 'kit', 'idade', 'fotos', 'preco', 'cartao', 'por', 'criadoEm', 'ate', 'ateTs', 'vistos', 'cliques', 'vistoEm', 'cliqueEm'])
         && linkOk(request.resource.data) && request.resource.data.criadoEm is string
+        && request.resource.data.ateTs is timestamp && request.resource.data.ateTs <= request.time + duration.value(13, 'h')
         && request.resource.data.vistos == 0 && request.resource.data.cliques == 0
         && request.resource.data.vistoEm == null && request.resource.data.cliqueEm == null;
       allow update: if (membro() && !mudou(['vistos', 'cliques', 'vistoEm', 'cliqueEm', 'criadoEm', 'por', 'idade'])
-          && linkOk(request.resource.data))
+          && linkOk(request.resource.data)
+          && (!mudou(['ateTs']) || (request.resource.data.ateTs is timestamp && request.resource.data.ateTs <= request.time + duration.value(13, 'h'))))
         || soma('vistos', 'vistoEm') || soma('cliques', 'cliqueEm');
     }
     match /atividades/{id} {
@@ -227,7 +239,9 @@ service cloud.firestore {
     // Índice de telefones do PR (um documento por telefone, com o nome e o ano dos alunos daquela família):
     // quem trabalha o PR consulta para achar o mesmo aluno em outro ano ou colégio; só acrescenta, nunca apaga nem troca.
     match /fones/{tel} {
-      allow read: if pode('rep') || pode('lf');
+      // (19/11/2026) a equipe só consulta um telefone que ela já tem (não lista o índice inteiro)
+      allow get: if pode('rep') || pode('lf');
+      allow list: if admin();
       allow create: if admin() || ((pode('rep') || pode('lf')) && request.resource.data.keys().hasOnly(['alunos']));
       allow update: if admin() || ((pode('rep') || pode('lf'))
         && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['alunos'])
@@ -260,32 +274,34 @@ service cloud.firestore {
     // PR: depois de pago, valor, forma de pagamento e responsável só o admin muda
     match /repasse/{id} {
       // (resource == null: aluno que ainda não existe; o "+ Aluno" confere antes de criar)
-      allow read: if pode('rep') || (pode('lf') && (resource == null || anoAtual(resource.data)));
+      // (19/11/2026) a equipe só lê e só muda os alunos que estão com ela (a fila, só o Adriano separa)
+      allow read: if admin() || ((resource == null || minha()) && (pode('rep') || (pode('lf') && (resource == null || anoAtual(resource.data)))));
       allow update: if admin() || ((pode('rep') || (pode('lf') && anoAtual(resource.data) && anoAtual(request.resource.data)))
-        && respOk() && exclusaoOk() && caidoOk()
+        && minha() && respOk() && exclusaoOk() && caidoOk()
         // a venda entra "a conferir": só o admin marca como conferida (a comissão só conta depois)
         && (!mudou(['conferido']) || request.resource.data.conferido == false)
         && !(resource.data.etapa in ['PAGO', 'ENTREGUE'] && mudou(['valor', 'formaPag', 'pagoEm', 'resp', 'respEmail'])));
       // a equipe inclui aluno à mão (sem planilha): entra na fila ou separado para si, nunca como venda
       allow create: if admin() || ((pode('rep') || (pode('lf') && anoAtual(request.resource.data)))
         && request.resource.data.get('etapa', '') in ['NA FILA', 'INCOMPLETO', 'SEPARADO']
-        && request.resource.data.get('respEmail', '') in ['', email()]);
+        && request.resource.data.get('respEmail', '') == email());
       // apagar de verdade: só o admin (a equipe pede a exclusão, Regra 4)
       allow delete: if admin();
     }
     // PR · Paspatur (Etapa 4): as mesmas regras do PR, numa lista separada
     match /paspatur/{id} {
       // (resource == null: aluno que ainda não existe; o "+ Aluno" confere antes de criar)
-      allow read: if pode('rep') || (pode('lf') && (resource == null || anoAtual(resource.data)));
+      // (19/11/2026) a equipe só lê e só muda os alunos que estão com ela (a fila, só o Adriano separa)
+      allow read: if admin() || ((resource == null || minha()) && (pode('rep') || (pode('lf') && (resource == null || anoAtual(resource.data)))));
       allow update: if admin() || ((pode('rep') || (pode('lf') && anoAtual(resource.data) && anoAtual(request.resource.data)))
-        && respOk() && exclusaoOk() && caidoOk()
+        && minha() && respOk() && exclusaoOk() && caidoOk()
         // a venda entra "a conferir": só o admin marca como conferida (a comissão só conta depois)
         && (!mudou(['conferido']) || request.resource.data.conferido == false)
         && !(resource.data.etapa in ['PAGO', 'ENTREGUE'] && mudou(['valor', 'formaPag', 'pagoEm', 'resp', 'respEmail'])));
       // a equipe inclui aluno à mão (sem planilha): entra na fila ou separado para si, nunca como venda
       allow create: if admin() || ((pode('rep') || (pode('lf') && anoAtual(request.resource.data)))
         && request.resource.data.get('etapa', '') in ['NA FILA', 'INCOMPLETO', 'SEPARADO']
-        && request.resource.data.get('respEmail', '') in ['', email()]);
+        && request.resource.data.get('respEmail', '') == email());
       // apagar de verdade: só o admin (a equipe pede a exclusão, Regra 4)
       allow delete: if admin();
     }
@@ -302,8 +318,9 @@ service cloud.firestore {
     }
     match /formaturaAlunos/{id} {
       // (resource == null: aluno que ainda não existe; o "+ Aluno" confere antes de criar)
-      allow read: if podeForm();
-      allow update: if admin() || (podeForm()
+      // (19/11/2026) a equipe só lê e só muda os alunos que estão com ela
+      allow read: if admin() || (podeForm() && (resource == null || minha()));
+      allow update: if admin() || (podeForm() && minha()
         && respOk() && exclusaoOk()
         // aluno Caído só volta para a fila pelo Adriano ("Resgatar aluno")
         && !(resource.data.get('etapa', '') == 'CAÍDO' && mudou(['etapa']))
@@ -318,16 +335,20 @@ service cloud.firestore {
       // a equipe inclui aluno à mão (sem planilha): entra na fila ou separado para si, nunca como venda
       allow create: if admin() || (podeForm()
         && request.resource.data.get('etapa', '') in ['NA FILA', 'INCOMPLETO', 'SEPARADO']
-        && request.resource.data.get('respEmail', '') in ['', email()]);
+        && request.resource.data.get('respEmail', '') == email());
       // apagar de verdade: só o admin (a equipe pede a exclusão, Regra 4)
       allow delete: if admin();
     }
     // Aluguel de becas · alunos dos colégios (Etapa 3): a equipe cadastra e muda o status; valor e contrato só o admin
     // (11/11/2026: o aluno fica com quem fechou o contrato do colégio, "respEmail"; a equipe vê os seus e os sem contrato)
     match /alugueis/{id} {
-      allow read: if admin() || (pode('becas') && (resource == null || minhaOuLivre()));
-      allow create: if admin() || (pode('becas') && request.resource.data.get('respEmail', '') in ['', email()]);
-      allow update: if admin() || (pode('becas') && minhaOuLivre() && respOk() && exclusaoOk() && !mudou(['valor', 'contratoZerado']));
+      // (19/11/2026) só os próprios; o representante cadastra e reserva (até "Beca medida"); depois, só o admin
+      allow read: if admin() || (pode('becas') && (resource == null || minha()));
+      allow create: if admin() || (pode('becas') && request.resource.data.get('respEmail', '') == email()
+        && request.resource.data.get('status', 'Cadastrado') in ['Cadastrado', 'Beca medida']);
+      allow update: if admin() || (pode('becas') && minha() && respOk() && exclusaoOk() && !mudou(['valor', 'contratoZerado'])
+        && resource.data.get('status', 'Cadastrado') in ['Cadastrado', 'Beca medida']
+        && request.resource.data.get('status', 'Cadastrado') in ['Cadastrado', 'Beca medida']);
       allow delete: if admin();
     }
     // Contrato do colégio (Aluguel de becas): o admin e o representante que fechou. Depois de criado, valor, preços, parcelas,
@@ -384,6 +405,19 @@ service cloud.firestore {
       allow create: if membro() && request.resource.data.porEmail == email() && request.resource.data.visto == false;
     }
     match /importacoes/{id} { allow read, write: if admin(); }
+    // (19/11/2026) Histórico de alterações (Aluguel, contratos, Agenda): cada um registra o que ele mesmo fez, só os
+    // nomes dos campos (sem dados do aluno); ninguém muda um registro; só o admin lê e apaga
+    match /historico/{id} {
+      allow create: if membro() && request.resource.data.porEmail == email()
+        && request.resource.data.keys().hasOnly(['col', 'doc', 'acao', 'campos', 'status', 'por', 'porEmail', 'em'])
+        && request.resource.data.col is string && request.resource.data.col.size() <= 40
+        && request.resource.data.doc is string && request.resource.data.doc.size() <= 300
+        && request.resource.data.acao in ['criou', 'mudou', 'salvou', 'apagou']
+        && request.resource.data.campos is list && request.resource.data.campos.size() <= 30
+        && request.resource.data.status is string && request.resource.data.status.size() <= 40
+        && request.resource.data.por is string && request.resource.data.por.size() <= 80;
+      allow read, delete: if admin();
+    }
     // Pedidos de exclusão da equipe (Regra 4): a equipe cria o pedido; só o admin decide
     match /exclusoes/{id} {
       allow read: if admin() || (membro() && resource.data.porEmail == email());

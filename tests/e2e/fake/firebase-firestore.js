@@ -102,7 +102,14 @@ function fire() {
   }, 0);
 }
 window.__fire = fire;
-export function onSnapshot(q, cb) {
+export function onSnapshot(q, cb, erroCb) {
+  if (q.t !== "doc")
+    try {
+      confereConsulta(q);
+    } catch (e) {
+      setTimeout(() => (erroCb ? erroCb(e) : console.error("onSnapshot sem tratar erro", e)), 5);
+      return () => {};
+    }
   if (q.t === "doc") {
     const f = () => {
       const v = store.get(q.n + "/" + q.id);
@@ -128,19 +135,50 @@ export function onSnapshot(q, cb) {
     if (i >= 0) listeners.splice(i, 1);
   };
 }
+// (19/11/2026) As regras da carteira, simuladas: quem é da equipe só lê e muda os próprios alunos nestas coleções.
+// Consulta sem o filtro respEmail == e-mail da pessoa é recusada, como no Firebase de verdade.
+const SO_DONO = ["repasse", "paspatur", "formaturaAlunos", "alugueis", "becas"];
+const daEquipe = () => {
+  const u = store.get("usuarios/" + (window.__EMAIL || ""));
+  return !!(u && u.papel !== "admin") && !window.__semCarteira;
+};
+const negado = () => Object.assign(new Error("Missing or insufficient permissions."), { code: "permission-denied" });
+function confereConsulta(q) {
+  const qq = q.t === "col" ? { c: q, k: [] } : q;
+  if (!SO_DONO.includes(qq.c.n) || !daEquipe()) return;
+  const meu = qq.k.some(x => x.w && x.f === "respEmail" && x.op === "==" && x.v === window.__EMAIL);
+  if (!meu) {
+    (window.__negados = window.__negados || []).push(qq.c.n + " " + JSON.stringify(qq.k.filter(x => x.w)));
+    throw negado();
+  }
+}
+function confereDoc(r, novo) {
+  if (!SO_DONO.includes(r.n) || !daEquipe()) return;
+  const v = store.get(r.n + "/" + r.id);
+  if ((v && v.respEmail !== window.__EMAIL) || (novo && novo.respEmail !== undefined && novo.respEmail !== window.__EMAIL)) {
+    (window.__negadosDoc = window.__negadosDoc || []).push(r.n + "/" + r.id); // leitura de um só (o app trata)
+    throw negado();
+  }
+}
+window.__confereConsulta = confereConsulta;
 // registra as leituras (o teste confere que telas não leem coleções inteiras sem precisar)
 window.__leituras = [];
 // leituras também contam como "em andamento" (o teste espera o app terminar de ler antes de conferir)
 export const getDocs = conta(async q => {
+  confereConsulta(q);
   const qq = q.t === "col" ? { c: q, k: [] } : q;
   window.__leituras.push({ col: qq.c.n, filtros: qq.k.filter(x => x.w).length });
   return run(qq);
 });
 export const getDoc = conta(async r => {
+  confereDoc(r);
   const v = store.get(r.n + "/" + r.id);
   return { exists: () => !!v, data: () => clone(v), id: r.id, ref: r };
 });
-export const getCountFromServer = conta(async q => ({ data: () => ({ count: run(q).size }) }));
+export const getCountFromServer = conta(async q => {
+  confereConsulta(q);
+  return { data: () => ({ count: run(q).size }) };
+});
 function aplica(o, p) {
   for (const [kk, vv] of Object.entries(clone(p))) {
     if (kk.includes(".")) {
@@ -167,11 +205,13 @@ function fundir(o, p) {
   return o;
 }
 async function setDoc_(r, d, opt) {
+  confereDoc(r, opt && opt.merge ? null : d);
   const k = r.n + "/" + r.id;
   store.set(k, opt && opt.merge ? fundir(clone(store.get(k)) || {}, d) : clone(d));
   fire();
 }
 async function updateDoc_(r, p) {
+  confereDoc(r);
   const k = r.n + "/" + r.id;
   if (!store.has(k)) throw Object.assign(new Error("not-found"), { code: "not-found" });
   store.set(k, aplica(clone(store.get(k)), p));

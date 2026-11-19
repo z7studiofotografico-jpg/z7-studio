@@ -352,7 +352,10 @@ function card(x) {
     )
   );
   if (x.status === "reservado") {
-    act.append(U.mkBtn("📦 Retirou", "btn-ok", () => salvar(x, { status: "retirado", retiradoEm: U.todayStr() }, "Marcado como retirado")));
+    if (C.isAdmin)
+      act.append(
+        U.mkBtn("📦 Retirou", "btn-ok", () => salvar(x, { status: "retirado", retiradoEm: U.todayStr() }, "Marcado como retirado"))
+      );
     if (x.tel)
       act.append(
         U.mkBtn("📲 Lembrar retirada", "", () =>
@@ -364,7 +367,7 @@ function card(x) {
       );
   }
   if (x.status === "retirado") {
-    act.append(U.mkBtn("↩️ Devolveu", "btn-ok", () => devolver(x)));
+    if (C.isAdmin) act.append(U.mkBtn("↩️ Devolveu", "btn-ok", () => devolver(x)));
     if (x.tel)
       act.append(
         U.mkBtn(at ? "💬 Cobrar devolução" : "📲 Lembrar devolução", at ? "btn-primary" : "", () =>
@@ -377,7 +380,8 @@ function card(x) {
         )
       );
   }
-  act.append(U.mkBtn("Editar", "", () => form(x)));
+  // (19/11/2026) depois da reserva, só a Luciana e o Adriano mudam o aluguel (retirada, devolução, valores)
+  if (C.isAdmin) act.append(U.mkBtn("Editar", "", () => form(x)));
   e.append(act);
   return e;
 }
@@ -385,6 +389,7 @@ const wa = (x, msg) => abrirWa(x.tel, msg, U.toast);
 // quanto falta receber, em reais (conta em centavos)
 const falta = x => reais(Math.max(0, centavos(x.valor) - centavos(x.pago)));
 async function salvar(x, patch, msg) {
+  if (!C.isAdmin) return U.toast("Depois da reserva, só a Luciana e o Adriano mudam a beca.");
   try {
     await FS.updateDoc(FS.doc(db, "becas", x.id), Object.assign(patch, { atualizadoEm: new Date().toISOString() }));
     espelhar(C, "avulso", x.id, Object.assign({}, x, patch));

@@ -12,7 +12,9 @@ export const SITE_LINK = "https://z7studio.com.br/previa/?c=";
 export const COLECAO = "previasSite";
 const LETRAS = "abcdefghjkmnpqrstuvwxyz23456789"; // sem 0/o, 1/l/i (a família pode digitar)
 export const MAX_FOTOS = 60;
-const DIAS = 30; // o link vale 30 dias (depois a página pede para chamar no WhatsApp)
+// (19/11/2026) o link vale 12 horas: depois disso o próprio banco recusa (dados de aluno, muitos menores de idade);
+// se a família precisar, o representante manda outro link
+export const HORAS = 12;
 
 export function codigoNovo(aleatorio = n => crypto.getRandomValues(new Uint8Array(n))) {
   return [...aleatorio(10)].map(b => LETRAS[b % LETRAS.length]).join("");
@@ -48,7 +50,8 @@ export function dadosLink(it, r, preco, por, agora = new Date(), cartao = "") {
     cartao: /\[/.test(preco || "") ? "" : String(cartao || "").slice(0, 90),
     por: U.first(por || "").slice(0, 40),
     criadoEm: agora.toISOString(),
-    ate: new Date(agora.getTime() + DIAS * 864e5).toISOString()
+    ate: new Date(agora.getTime() + HORAS * 36e5).toISOString(),
+    ateTs: new Date(agora.getTime() + HORAS * 36e5) // o mesmo prazo, como data do banco (as regras conferem)
   };
 }
 export const mensagemLink = (it, codigo) =>
@@ -65,9 +68,9 @@ export async function mandarLinkPrevia(C, it, r, o = {}) {
   const { prazo, patch: patchPrazo } = prazoParaMandar(it);
   let codigo = it.linkPrevia;
   if (codigo) {
-    // já tem link: atualiza as fotos e o preço, e renova o prazo de 30 dias (os números de visitas continuam)
-    const { nome, escola, kit, fotos, preco, cartao, ate } = d;
-    await FS.updateDoc(FS.doc(C.db, COLECAO, codigo), { nome, escola, kit, fotos, preco, cartao, ate, prazo: prazo.toISOString() });
+    // já tem link: atualiza as fotos e o preço, e renova o prazo de 12 horas (os números de visitas continuam)
+    const { nome, escola, kit, fotos, preco, cartao, ate, ateTs } = d;
+    await FS.updateDoc(FS.doc(C.db, COLECAO, codigo), { nome, escola, kit, fotos, preco, cartao, ate, ateTs, prazo: prazo.toISOString() });
   } else {
     codigo = codigoNovo();
     await FS.setDoc(FS.doc(C.db, COLECAO, codigo), Object.assign(d, { vistos: 0, cliques: 0, vistoEm: null, cliqueEm: null }));

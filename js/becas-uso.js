@@ -24,7 +24,8 @@ export function usoDeAluno(a) {
     faixa: a.faixa || "",
     capelo: a.capelo || "",
     instId: a.instId || "", // (19/11/2026) para o agendamento do colégio tomar o lugar dos alunos no estoque
-    ano: Number(a.ano) || 0
+    ano: Number(a.ano) || 0,
+    respEmail: a.respEmail || "" // (19/11/2026) de quem é: a equipe só mexe na cópia dos próprios alunos
   };
 }
 // a cópia de um aluguel avulso
@@ -43,6 +44,7 @@ export function usoDeAvulso(x) {
   return {
     tipo: "avulso",
     status: x.status,
+    respEmail: x.respEmail || "",
     retirada: x.retirada || "",
     devolucao: x.devolucao || "",
     becasQtd: num(x.becasQtd),
@@ -137,7 +139,7 @@ export async function acertarBecas(C, hoje) {
   if (!C.isAdmin || C.verComo) return 0;
   const chave = "z7becasAcerto";
   try {
-    if (localStorage.getItem(chave) === hoje + "b") return 0;
+    if (localStorage.getItem(chave) === hoje + "c") return 0;
   } catch (_) {}
   const { FS, db } = C;
   const ler = async q => (await FS.getDocs(q)).docs.map(d => Object.assign({ id: d.id }, d.data()));
@@ -159,7 +161,7 @@ export async function acertarBecas(C, hoje) {
     await b.commit();
   }
   try {
-    localStorage.setItem(chave, hoje + "b"); // "b" (19/11/2026): a cópia dos alunos passou a levar colégio e ano
+    localStorage.setItem(chave, hoje + "c"); // "c" (19/11/2026): a cópia passou a levar colégio, ano e de quem é
   } catch (_) {}
   return ops.length;
 }
@@ -320,3 +322,9 @@ export function pedidoDosAlunos(alunos) {
     });
   return p;
 }
+
+// (19/11/2026) O representante só cadastra e reserva (até "Beca medida"); depois da reserva, só a Luciana e o Adriano
+// mudam a beca (produção, retirada, devolução). As regras do Firebase conferem o mesmo.
+export const EQUIPE_ATE = ["Cadastrado", "Beca medida"];
+export const equipePode = (C, ...status) => !!(C && C.isAdmin) || status.every(x => EQUIPE_ATE.includes(x || "Cadastrado"));
+export const AVISO_RESERVA = "Depois da reserva, só a Luciana e o Adriano mudam a beca.";
