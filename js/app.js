@@ -737,7 +737,7 @@ onAuthStateChanged(auth, u => {
   $("viewLogin").hidden = !!u;
   $("viewApp").hidden = !u;
   if (u) {
-    // (19/11/2026) no celular: 1 hora sem uso trava o app (digital ou senha para voltar)
+    // (19/11/2026) no celular: 20 minutos sem uso trava o app (digital ou senha para voltar)
     ligarTrava({
       email: () => (user && user.email) || "",
       verificarSenha: senha => reauthenticateWithCredential(auth.currentUser, EmailAuthProvider.credential(user.email, senha)),

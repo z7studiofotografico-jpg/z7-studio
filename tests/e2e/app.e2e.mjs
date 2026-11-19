@@ -5307,18 +5307,18 @@ await cenario("Equipe só com o que é dela e histórico de alterações (19/11/
   ok(!erros.length, "sem erros" + (erros.length ? ": " + erros.join(" | ") : ""));
 });
 
-await cenario("Celular: 1 hora sem uso trava o app (senha ou digital para voltar)", async () => {
+await cenario("Celular: 20 minutos sem uso trava o app (senha ou digital para voltar)", async () => {
   const UA = "Mozilla/5.0 (Linux; Android 14; SM-A546E) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/130.0 Mobile Safari/537.36";
   const { pg, erros } = await abrir(PEDRO, migrar(base), { userAgent: UA });
   await calmo(pg);
   ok(!(await pg.locator("#trava").count()), "usando: não trava");
-  // passou 1 hora sem uso e a pessoa volta para o app
+  // passou 20 minutos sem uso e a pessoa volta para o app
   await pg.evaluate(() => {
-    localStorage.setItem("z7ultimoUso", String(Date.now() - 3600001));
+    localStorage.setItem("z7ultimoUso", String(Date.now() - 1200001));
     document.dispatchEvent(new Event("visibilitychange"));
   });
   await pg.locator("#trava").waitFor({ timeout: 5000 });
-  ok(/App travado/.test(await pg.textContent("#trava")), "travou depois de 1 hora sem uso");
+  ok(/App travado/.test(await pg.textContent("#trava")), "travou depois de 20 minutos sem uso");
   if (process.env.FOTOS) await pg.screenshot({ path: process.env.FOTOS + "/trava.png" });
   await pg.fill("#travaSenha", "errada");
   await pg.locator("#travaForm button[type=submit]").click();
@@ -5334,7 +5334,7 @@ await cenario("Celular: 1 hora sem uso trava o app (senha ou digital para voltar
   const c = await abrir(PEDRO, migrar(base));
   await calmo(c.pg);
   await c.pg.evaluate(() => {
-    localStorage.setItem("z7ultimoUso", String(Date.now() - 3600001));
+    localStorage.setItem("z7ultimoUso", String(Date.now() - 1200001));
     document.dispatchEvent(new Event("visibilitychange"));
   });
   await c.pg.waitForTimeout(500);

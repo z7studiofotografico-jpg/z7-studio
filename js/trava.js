@@ -1,16 +1,16 @@
-// (19/11/2026) Trava por inatividade no celular: o app é usado na rua, então depois de 1 hora sem uso ele trava e
+// (19/11/2026) Trava por inatividade no celular: o app é usado na rua, então depois de 20 minutos sem uso ele trava e
 // pede a digital (ou o rosto, o que o celular tiver) ou a senha do app para voltar. Os dados ficam escondidos atrás
 // da trava; o login continua o mesmo (não precisa entrar de novo do zero).
 // A digital fica só neste aparelho: o celular confere e o app só recebe "confirmou" (nenhuma digital sai do aparelho).
 // o = { email(), verificarSenha(senha) → Promise, sair() }
-const UMA_HORA = 60 * 60 * 1000;
+const LIMITE = 20 * 60 * 1000; // 20 minutos sem uso (19/11/2026: era 1 hora)
 const CHAVE_USO = "z7ultimoUso";
 const chaveDigital = em => "z7digital_" + String(em || "").toLowerCase();
 
 export const ehCelular = (nav = navigator) =>
   /Android|iPhone|iPad|iPod|Mobile/i.test(nav.userAgent || "") || (nav.maxTouchPoints > 1 && /Macintosh/.test(nav.userAgent || ""));
 // passou do tempo? (ultimo = quando usou por último, em ms)
-export const venceu = (ultimo, agora, limite = UMA_HORA) => !!ultimo && agora - ultimo >= limite;
+export const venceu = (ultimo, agora, limite = LIMITE) => !!ultimo && agora - ultimo >= limite;
 
 const ler = k => {
   try {
@@ -39,7 +39,7 @@ const temDigital = async () => {
 let travado = false,
   ligado = false,
   O = null;
-const limite = () => Number(window.__z7InatividadeMs) || UMA_HORA; // (os testes encurtam o tempo)
+const limite = () => Number(window.__z7InatividadeMs) || LIMITE; // (os testes encurtam o tempo)
 const marcarUso = () => {
   if (!travado) gravar(CHAVE_USO, String(Date.now()));
 };
@@ -105,7 +105,7 @@ function travar() {
   t.innerHTML = `<div class="trava-box">
     <div class="trava-ico">🔒</div>
     <h2>App travado</h2>
-    <p class="hint">Ficou mais de 1 hora sem uso. Para continuar, confirme que é você.</p>
+    <p class="hint">Ficou mais de 20 minutos sem uso. Para continuar, confirme que é você.</p>
     <button type="button" class="btn btn-primary" id="travaDigital" hidden>👆 Entrar com a digital</button>
     <form id="travaForm" autocomplete="on">
       <input type="email" name="username" autocomplete="username" hidden>
