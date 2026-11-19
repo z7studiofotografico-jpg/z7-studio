@@ -530,10 +530,10 @@ test("consultas da equipe 2: carteira de colégios, formandos e contagens da tel
 });
 test("consultas da equipe 3: PR da Linha de Frente (só o ano atual)", async () => {
   const db = como(PEDRO);
-  await assertSucceeds(
+  // (19/11/2026) a equipe só lê os alunos dela: sem o filtro dela, a fila e os dos outros, não
+  await assertFails(
     getDocs(query(c(db, "repasse"), where("ano", "==", ANO), where("etapa", "in", ["SEPARADO", "CONTATADO", "INTERESSADO"]), limit(300)))
   );
-  // (19/11/2026) a equipe só lê os alunos dela: a fila e os dos outros, não
   await assertFails(getCountFromServer(query(c(db, "repasse"), where("etapa", "==", "NA FILA"), where("ano", "==", ANO))));
   await assertFails(getDocs(query(c(db, "repasse"), where("nomeBusca", "==", "LIA"), where("ano", "==", ANO), limit(20))));
   await assertSucceeds(
