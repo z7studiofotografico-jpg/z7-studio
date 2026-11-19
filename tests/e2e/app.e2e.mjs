@@ -5274,7 +5274,11 @@ await cenario("Equipe só com o que é dela e histórico de alterações (19/11/
   await ir(a.pg, "#pr");
   await calmo(a.pg);
   ok(await a.pg.locator("#rLoteBtn").isHidden(), "vendedor não separa da fila");
-  if (process.env.FOTOS) await a.pg.locator("#viewRepasse").screenshot({ path: process.env.FOTOS + "/equipe-pr.png", clip: undefined }).catch(() => {});
+  if (process.env.FOTOS)
+    await a.pg
+      .locator("#viewRepasse")
+      .screenshot({ path: process.env.FOTOS + "/equipe-pr.png", clip: undefined })
+      .catch(() => {});
   // o admin: uma mudança no Aluguel fica no histórico
   const { pg, erros, store } = await abrir(ADRIANO, migrar(base));
   await ir(pg, "#becas");
@@ -5355,6 +5359,14 @@ await cenario("Celular: 20 minutos sem uso trava o app (senha ou digital para vo
   await pg.locator("#pTravar").click();
   await pg.locator("#trava").waitFor({ timeout: 5000 });
   ok(/Travado por você/.test(await pg.textContent("#trava")), "Ajustes → Travar agora");
+  // no celular, "Sair da conta" só trava (a digital volta); sair de vez fica na trava
+  await pg.locator("#travaDigital").click();
+  await pg.locator("#trava").waitFor({ state: "detached", timeout: 5000 });
+  await pg.click("#btnPrices");
+  await pg.locator("#pSair").click();
+  await pg.locator("#trava").waitFor({ timeout: 5000 });
+  ok(await pg.locator("#travaDigital").isVisible(), "Sair da conta no celular: trava e volta com a digital");
+  ok((await pg.locator("#viewApp").isHidden()) === false, "continua com a conta (não pede e-mail e senha)");
   ok(!erros.length, "sem erros" + (erros.length ? ": " + erros.join(" | ") : ""));
   // no computador não trava
   const c = await abrir(PEDRO, migrar(base));

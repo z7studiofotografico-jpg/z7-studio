@@ -227,6 +227,10 @@ export function ligarAjustes(ctx, o) {
   };
   $("pSair").onclick = async () => {
     $("sheetPrices").hidden = true;
+    // (19/11/2026) no celular, "Sair da conta" só trava o app: para voltar, a digital (ou a senha).
+    // Sair de vez (pedir e-mail e senha) fica na própria tela da trava.
+    const t = await import("./trava.js").catch(() => null);
+    if (t && t.travaLigada()) return t.travarAgora();
     await o.sair();
   };
   $("formPrices").addEventListener("submit", async e => {

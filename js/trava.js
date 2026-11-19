@@ -120,7 +120,7 @@ function travar(agora = false) {
       <p class="err" id="travaErr" hidden></p>
       <button type="submit" class="btn btn-primary">Entrar com a senha</button>
     </form>
-    <button type="button" class="btn btn-sm" id="travaSair">Sair do app</button>
+    <button type="button" class="btn btn-sm" id="travaSair">Sair de vez (vai pedir e-mail e senha)</button>
   </div>`;
   document.body.append(t);
   t.querySelector("input[name=username]").value = em;
