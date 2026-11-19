@@ -171,6 +171,11 @@ export function show() {
   );
 }
 
+// (19/11/2026) becas dos colégios fora hoje: agendamentos entre a entrega e a devolução
+const foraColegios = (hoje = U.todayStr()) =>
+  avulsosUso
+    .filter(x => x.tipo === "evento" && x.retirada <= hoje && (!x.devolucao || x.devolucao >= hoje))
+    .reduce((s, x) => s + totBecas(x), 0);
 // Quantas becas estão comprometidas entre duas datas (para conferir o estoque)
 let alunosAtivos = [], // alunos de aluguel com beca reservada ou fora (da cópia do estoque, de todos)
   avulsosUso = []; // avulsos reservados ou fora (da cópia do estoque, de todos)
@@ -212,7 +217,7 @@ function render() {
   k.innerHTML = "";
   const est = somaObj(estoque().becas);
   [
-    ["Becas fora agora", `${fora.reduce((s, x) => s + totBecas(x), 0)}${est ? " de " + est : ""}`],
+    ["Becas fora agora", `${fora.reduce((s, x) => s + totBecas(x), 0) + foraColegios()}${est ? " de " + est : ""}`],
     ["Retiradas em 7 dias", String(prox.filter(x => x.retirada <= em7).length)],
     ["Devoluções atrasadas", String(atr.length)],
     ["A receber", brl(aRec)]
@@ -796,7 +801,7 @@ function relatorioBecas() {
       {
         titulo: "Resumo",
         kpis: [
-          ["Becas fora agora", `${fora.reduce((s, x) => s + totBecas(x), 0)}${est ? " de " + est : ""}`],
+          ["Becas fora agora", `${fora.reduce((s, x) => s + totBecas(x), 0) + foraColegios()}${est ? " de " + est : ""}`],
           ["Reservas", prox.length],
           ["Devoluções atrasadas", atr.length],
           ["A receber", brl(aRec)]

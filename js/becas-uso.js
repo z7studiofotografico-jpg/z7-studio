@@ -3,7 +3,7 @@
 // números na coleção "becasUso" (tipo, tamanho, faixa, capelo, datas), sem nome, telefone ou valor. A equipe confere
 // o estoque por ela. O app grava a cópia junto com o aluguel; ao abrir as becas, o admin acerta o que ficou diferente
 // (aluguel apagado, planilha importada…).
-import { RESERVA, FORA } from "./becas-estoque.js";
+import { RESERVA, FORA, usoDosAlunos, nomeBeca, nomeFaixa, nomeCapelo, semTamanho } from "./becas-estoque.js";
 
 export const USO = "becasUso";
 const AVULSO_ATIVO = ["reservado", "retirado"];
@@ -22,7 +22,9 @@ export function usoDeAluno(a) {
     tamanho: a.tamanho || "",
     menosLonga: !!a.menosLonga,
     faixa: a.faixa || "",
-    capelo: a.capelo || ""
+    capelo: a.capelo || "",
+    instId: a.instId || "", // (19/11/2026) para o agendamento do colégio tomar o lugar dos alunos no estoque
+    ano: Number(a.ano) || 0
   };
 }
 // a cópia de um aluguel avulso
@@ -46,6 +48,39 @@ export function usoDeAvulso(x) {
     becasQtd: num(x.becasQtd),
     faixasQtd: num(x.faixasQtd),
     capelosQtd: num(x.capelosQtd),
+    tamanhosQtd: tam
+  };
+}
+// (19/11/2026) a cópia de um agendamento de becas do colégio (Agenda): as becas saem no dia da entrega e voltam na
+// devolução. id "evento_<colégio>_<campo>"; leva só números, datas e o nome do colégio.
+export const idEvento = (instId, campo) => `evento_${instId}_${campo}`;
+export function usoDeEvento(inst, campo, ev) {
+  const b = ev && ev.becas;
+  if (!inst || !b || !ev.data || ev.status === "recusado") return null;
+  const n = v =>
+    Object.fromEntries(
+      Object.entries(v && typeof v === "object" ? v : {})
+        .filter(([, q]) => n0(q))
+        .map(([k, q]) => [k, n0(q)])
+    );
+  const tam = {};
+  Object.entries(b.tamanhosQtd || {}).forEach(([tp, zs]) => {
+    const z = n(zs);
+    if (Object.keys(z).length) tam[tp] = z;
+  });
+  const becasQtd = n(b.becasQtd);
+  if (!Object.keys(becasQtd).length) return null;
+  return {
+    tipo: "evento",
+    status: "reservado",
+    instId: inst.id,
+    instNome: inst.nome || "",
+    campo,
+    retirada: b.retirada || ev.data,
+    devolucao: b.devolucao || "",
+    becasQtd,
+    faixasQtd: n(b.faixasQtd),
+    capelosQtd: n(b.capelosQtd),
     tamanhosQtd: tam
   };
 }
@@ -84,7 +119,8 @@ export function acertoDoUso(alunos, avulsos, copias) {
     const { id: _id, ...semId } = c || {};
     if (!c || JSON.stringify(ordenado(semId)) !== JSON.stringify(ordenado(u))) gravar.push([id, u]);
   });
-  atual.forEach((_c, id) => !certo.has(id) && apagar.push(id));
+  // os agendamentos (evento_…) são gravados pela Agenda, não pelos aluguéis
+  atual.forEach((_c, id) => !certo.has(id) && !String(id).startsWith("evento_") && apagar.push(id));
   return { gravar, apagar };
 }
 function ordenado(o) {
@@ -101,7 +137,7 @@ export async function acertarBecas(C, hoje) {
   if (!C.isAdmin || C.verComo) return 0;
   const chave = "z7becasAcerto";
   try {
-    if (localStorage.getItem(chave) === hoje) return 0;
+    if (localStorage.getItem(chave) === hoje + "b") return 0;
   } catch (_) {}
   const { FS, db } = C;
   const ler = async q => (await FS.getDocs(q)).docs.map(d => Object.assign({ id: d.id }, d.data()));
@@ -123,18 +159,23 @@ export async function acertarBecas(C, hoje) {
     await b.commit();
   }
   try {
-    localStorage.setItem(chave, hoje);
+    localStorage.setItem(chave, hoje + "b"); // "b" (19/11/2026): a cópia dos alunos passou a levar colégio e ano
   } catch (_) {}
   return ops.length;
 }
 
 // as cópias separadas: alunos (no formato de usoDosAlunos) e avulsos (no formato dos aluguéis), com o id do aluguel
 // copias = [{ id: "aluno_<id>", ...dados }]
+// Os agendamentos de becas dos colégios entram junto com os avulsos (contam pelas datas: entrega → devolução) e
+// tomam o lugar dos alunos daquele colégio e ano (senão as mesmas becas contariam duas vezes).
 export function separarUso(copias) {
   const comId = c => Object.assign({}, c, { id: String(c.id).replace(/^(aluno|avulso)_/, "") });
+  const eventos = copias.filter(c => c.tipo === "evento").map(c => Object.assign({}, c));
+  const doEvento = new Set(eventos.map(e => `${e.instId}|${String(e.retirada || "").slice(0, 4)}`));
   return {
-    alunos: copias.filter(c => c.tipo === "aluno").map(comId),
-    avulsos: copias.filter(c => c.tipo === "avulso").map(comId)
+    alunos: copias.filter(c => c.tipo === "aluno" && !doEvento.has(`${c.instId}|${c.ano}`)).map(comId),
+    avulsos: [...copias.filter(c => c.tipo === "avulso").map(comId), ...eventos],
+    eventos
   };
 }
 // ouve a cópia do estoque (todos com o módulo de becas leem): aoMudar({ alunos, avulsos })
@@ -193,4 +234,89 @@ export async function passarAlugueis(C, instId, ano, respEmail) {
     await b.commit();
   }
   return docs.length;
+}
+
+// soma as becas dos avulsos e agendamentos (sem olhar as datas: na dúvida, segura)
+export function somaAvulsos(arr) {
+  const t = { becas: {}, faixas: {}, capelos: {}, tamanhos: {} };
+  arr.forEach(x => {
+    ["becas", "faixas", "capelos"].forEach(kk =>
+      Object.entries(x[kk + "Qtd"] || {}).forEach(([z, n]) => (t[kk][z] = (Number(t[kk][z]) || 0) + (Number(n) || 0)))
+    );
+    Object.entries(x.tamanhosQtd || {}).forEach(([tp, zs]) => {
+      const m = (t.tamanhos[tp] = t.tamanhos[tp] || {});
+      Object.entries(zs || {}).forEach(([z, n]) => (m[z] = (Number(m[z]) || 0) + (Number(n) || 0)));
+    });
+  });
+  return t;
+}
+
+// (19/11/2026) Estoque no período de um agendamento de becas: o que já está comprometido entre "de" e "ate"
+// copias = os documentos de becasUso (com id); ignora = id da cópia do próprio agendamento.
+// Devolve { uso, outros: [{ nome, de, ate, n }] } (outros = colégios e avulsos no mesmo período).
+export function usoNoPeriodo(copias, de, ate, ignora) {
+  // os alunos do próprio colégio continuam fora (o agendamento toma o lugar deles); só a cópia dele não conta
+  const sep = separarUso(copias);
+  const alunos = sep.alunos,
+    avulsos = sep.avulsos.filter(c => c.id !== ignora);
+  const uso = Object.assign({ tamanhos: {} }, usoDosAlunos(alunos));
+  const soma = somaAvulsos(avulsos.filter(x => x.retirada && x.retirada <= ate && (x.devolucao || "9999") >= de));
+  ["becas", "faixas", "capelos"].forEach(k => Object.entries(soma[k]).forEach(([z, v]) => (uso[k][z] = n0(uso[k][z]) + n0(v))));
+  Object.entries(soma.tamanhos).forEach(([tp, zs]) => {
+    const o = (uso.tamanhos[tp] = uso.tamanhos[tp] || {});
+    Object.entries(zs).forEach(([z, v]) => (o[z] = n0(o[z]) + n0(v)));
+  });
+  const tot = x => Object.values(x.becasQtd || {}).reduce((s, v) => s + n0(v), 0);
+  const outros = avulsos
+    .filter(x => x.tipo === "evento" && x.retirada <= ate && (x.devolucao || "9999") >= de)
+    .map(x => ({ nome: x.instNome || "Colégio", de: x.retirada, ate: x.devolucao || "", n: tot(x) }));
+  const av = avulsos.filter(x => x.tipo !== "evento" && x.retirada && x.retirada <= ate && (x.devolucao || "9999") >= de);
+  if (av.length) outros.push({ nome: `Aluguéis avulsos (${av.length})`, de: "", ate: "", n: av.reduce((s, x) => s + tot(x), 0) });
+  const nAl = alunos.length;
+  if (nAl) outros.push({ nome: "Alunos de colégios sem agendamento (medidos ou com a beca)", de: "", ate: "", n: nAl });
+  return { uso, outros };
+}
+// Confere o pedido (becasQtd, tamanhosQtd, faixasQtd, capelosQtd) com o estoque E menos o uso:
+// [{ rot, pede, livre, falta }] de tudo o que foi pedido. O tamanho só é conferido se o estoque de tamanhos foi preenchido.
+export function conferirPedido(E, uso, ped) {
+  const out = [];
+  const linha = (rot, pede, tem, usado) => {
+    const livre = Math.max(0, n0(tem) - n0(usado));
+    out.push({ rot, pede, livre, falta: Math.max(0, pede - livre) });
+  };
+  Object.entries(ped.becasQtd || {}).forEach(([tp, q]) => {
+    if (!n0(q)) return;
+    const ET = (E.tamanhos || {})[tp] || {};
+    const temTam = Object.values(ET).some(v => n0(v));
+    const tams = Object.entries((ped.tamanhosQtd || {})[tp] || {}).filter(([, v]) => n0(v));
+    if (temTam && !semTamanho(tp) && tams.length)
+      tams.forEach(([z, v]) => linha(`${nomeBeca(tp)} ${z}`, n0(v), ET[z], ((uso.tamanhos || {})[tp] || {})[z]));
+    else linha(nomeBeca(tp), n0(q), (E.becas || {})[tp], (uso.becas || {})[tp]);
+  });
+  Object.entries(ped.faixasQtd || {}).forEach(
+    ([k, q]) => n0(q) && linha(`Faixa ${nomeFaixa(k).toLowerCase()}`, n0(q), (E.faixas || {})[k], (uso.faixas || {})[k])
+  );
+  Object.entries(ped.capelosQtd || {}).forEach(
+    ([k, q]) => n0(q) && linha(nomeCapelo(k), n0(q), (E.capelos || {})[k], (uso.capelos || {})[k])
+  );
+  return out;
+}
+// As quantidades a partir dos alunos do aluguel do colégio (os que vão participar)
+export function pedidoDosAlunos(alunos) {
+  const p = { becasQtd: {}, tamanhosQtd: {}, faixasQtd: {}, capelosQtd: {}, semMedida: 0 };
+  alunos
+    .filter(a => !a.excluido && !a.naoParticipa && !a.soPaspatur)
+    .forEach(a => {
+      if (!a.becaTipo || (!a.tamanho && !semTamanho(a.becaTipo))) p.semMedida++;
+      if (a.becaTipo) {
+        p.becasQtd[a.becaTipo] = n0(p.becasQtd[a.becaTipo]) + 1;
+        if (a.tamanho) {
+          const t = (p.tamanhosQtd[a.becaTipo] = p.tamanhosQtd[a.becaTipo] || {});
+          t[a.tamanho] = n0(t[a.tamanho]) + 1;
+        }
+      }
+      if (a.faixa) p.faixasQtd[a.faixa] = n0(p.faixasQtd[a.faixa]) + 1;
+      if (a.capelo) p.capelosQtd[a.capelo] = n0(p.capelosQtd[a.capelo]) + 1;
+    });
+  return p;
 }

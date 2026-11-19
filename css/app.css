@@ -575,3 +575,31 @@ body:not(.ver-valores) .vlr{filter:blur(6px);user-select:none;-webkit-user-selec
 .sel-busca-lista button:hover,.sel-busca-lista button:focus{background:var(--soft,#f1f1f1)}
 .sel-busca-vazio{padding:8px 10px;opacity:.7;font-size:13px}
 @media print{.sel-busca{display:none}}
+/* (19/11/2026) Agendamento: becas e o colégio no sistema */
+.eb-alunos{background:var(--surface,#fff);border:1px solid var(--line);border-radius:12px;padding:12px 14px;margin:4px 0 14px;display:flex;flex-direction:column;gap:10px;color:var(--muted)}
+.eb-alunos.vazio{border-style:dashed}.eb-alunos.vazio b{color:var(--warn)}
+.eb-nums{display:grid;grid-template-columns:repeat(auto-fit,minmax(90px,1fr));gap:8px}
+.eb-num{background:var(--next);border-radius:10px;padding:8px 10px;text-align:center}
+.eb-num b{display:block;font-size:1.35rem;color:var(--fg);line-height:1.1}.eb-num small{font-size:.78rem}
+.eb-num.alerta b{color:var(--warn)}
+.eb-bts{display:flex;gap:8px;flex-wrap:wrap}.eb-bts .btn{flex:1 1 200px}
+.eb-dica{margin:-4px 0 10px}
+.eb-sub{font-size:.8rem;font-weight:700;text-transform:uppercase;letter-spacing:.04em;color:var(--muted);margin:12px 0 6px}
+.eb-qtd details.tamtipo{background:var(--surface,#fff);margin:6px 0}
+.est-periodo{background:var(--surface,#fff);border:1px solid var(--line);border-radius:12px;padding:12px 14px;margin-top:14px}
+.eb-topo{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:8px}.eb-topo small{color:var(--muted);flex:1}
+.eb-topo .tag{font-weight:700;padding:3px 10px;border-radius:999px}
+.eb-vazio{margin:0}
+.eb-tab{width:100%;border-collapse:collapse;font-size:.92rem}
+.eb-tab th{text-align:left;font-size:.75rem;text-transform:uppercase;color:var(--muted);font-weight:700;padding:4px 6px;border-bottom:1px solid var(--line)}
+.eb-tab td{padding:7px 6px;border-bottom:1px solid var(--line)}.eb-tab tr:last-child td{border-bottom:0}
+.eb-tab th:not(:first-child),.eb-tab td.n{text-align:right;white-space:nowrap}
+.eb-tab tr.eb-falta td{color:var(--late,#b3261e);font-weight:700}
+.eb-outros{display:flex;flex-direction:column;gap:4px}
+.eb-outro{display:flex;justify-content:space-between;gap:10px;background:var(--next);border-radius:8px;padding:6px 10px}.eb-outro small{color:var(--muted);white-space:nowrap}
+.eb-acoes{display:flex;justify-content:flex-end;margin-top:12px}.eb-acoes .btn{width:auto;flex:0 0 auto;padding-left:22px;padding-right:22px}
+.eb-datas{display:flex;flex-direction:column;gap:6px;margin-bottom:10px}
+.eb-data{display:flex;align-items:center;gap:12px;background:var(--surface,#fff);border:1px solid var(--line);border-radius:10px;padding:8px 12px}
+.eb-data.atual{border-color:var(--accent);box-shadow:inset 3px 0 0 var(--accent)}
+.eb-dia{text-align:center;min-width:52px}.eb-dia b{display:block;font-size:1.05rem}.eb-dia small{color:var(--muted);font-size:.75rem}
+.eb-txt{flex:1;display:flex;flex-direction:column;gap:2px;min-width:0}.eb-txt small{color:var(--muted)}

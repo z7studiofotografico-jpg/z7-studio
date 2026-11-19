@@ -137,6 +137,11 @@ export function abrirJanelaInst(it0, o) {
   );
 }
 
+// (19/11/2026) da Agenda: só os alunos do colégio no PR e na Formatura, numa janela
+export function abrirAlunosDoColegio(C, it) {
+  sheet(`🏫 ${title(it.nome)} · alunos`, (p, close) => alunos(p, it, C, close), { div: true, wide: true });
+}
+
 // Alunos: quantos alunos o colégio tem em cada ano, no PR e na Formatura, com o atalho para a lista deles
 async function alunos(box, it, C, fechar) {
   box.append(el("p", "hint", "Os alunos deste colégio, por ano. Toque em “Ver alunos” para abrir a lista deles."));

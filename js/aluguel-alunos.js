@@ -36,7 +36,7 @@ import { ITENS_PACOTE, nomeItem, lerPacote, valorDoPacote } from "./contrato-col
 import { linhaGenerica } from "./lista-compacta.js";
 import { chipItem, lerQtd } from "./itens-qtd.js";
 import { avisoPrecoAluguel } from "./precos-colegio.js";
-import { ouvirUso, espelhar, donoDoAluguel } from "./becas-uso.js";
+import { ouvirUso, espelhar, donoDoAluguel, somaAvulsos } from "./becas-uso.js";
 import { abrirJanela } from "./janela.js";
 import { abaColegio, abaHistorico } from "./aluguel-janela.js";
 
@@ -72,10 +72,21 @@ export const nomeEtapa = (a, s) => (a.soPaspatur && s === "Retirou a beca" ? "Pa
 let C, FS, db, col;
 let lista = [],
   insts = [],
-  usoAvulsos = { becas: {}, faixas: {}, capelos: {}, tamanhos: {} },
   alunosUso = [], // alunos com beca reservada ou fora, de todos (cópia do estoque)
+  avulsosLista = [], // avulsos e agendamentos de becas dos colégios (cópia do estoque)
+  eventosUso = [], // (19/11/2026) agendamentos de becas dos colégios: as becas saem na entrega e voltam na devolução
   filtro = { ano: String(ANO()), tipo: "", inst: "", status: "Cadastrado", q: "" };
 const $ = id => document.getElementById(id);
+// o uso sem o próprio colégio do aluno (o agendamento dele já inclui a beca dele)
+const usoSemColegio = a => somaAvulsos(avulsosLista.filter(x => !(x.tipo === "evento" && x.instId === a.instId)));
+// Agenda → Aluguel de becas: abre os alunos já filtrados no colégio e ano
+export function pedirColegio(instId, ano) {
+  filtro.inst = instId || "";
+  filtro.ano = String(ano || ANO());
+  filtro.tipo = "";
+  filtro.status = "todos";
+  filtro.q = "";
+}
 
 export function mostrarAlunos(ctx, v, o) {
   C = ctx;
@@ -161,17 +172,9 @@ export function mostrarAlunos(ctx, v, o) {
   o.unsubs.push(
     ouvirUso(C, u => {
       alunosUso = u.alunos;
-      const t = { becas: {}, faixas: {}, capelos: {}, tamanhos: {} };
-      u.avulsos.forEach(x => {
-        ["becas", "faixas", "capelos"].forEach(kk =>
-          Object.entries(x[kk + "Qtd"] || {}).forEach(([z, n]) => (t[kk][z] = (Number(t[kk][z]) || 0) + (Number(n) || 0)))
-        );
-        Object.entries(x.tamanhosQtd || {}).forEach(([tp, zs]) => {
-          const m = (t.tamanhos[tp] = t.tamanhos[tp] || {});
-          Object.entries(zs || {}).forEach(([z, n]) => (m[z] = (Number(m[z]) || 0) + (Number(n) || 0)));
-        });
-      });
-      usoAvulsos = t;
+      avulsosLista = u.avulsos;
+      eventosUso = u.eventos || [];
+      render();
     })
   );
   FS.getDocs(C.carteira("instituicoes", FS.limit(1500)))
@@ -195,7 +198,18 @@ function render() {
   // números do topo
   const k = $("alKpis");
   k.innerHTML = "";
-  const u = usoDosAlunos(doAno);
+  // (19/11/2026) colégio com agendamento de becas: conta pelo agendamento (pelas datas), não pelos alunos
+  const evs = eventosUso.filter(
+    e => (!filtro.ano || String(e.retirada || "").slice(0, 4) === filtro.ano) && (!filtro.tipo || tipoDoAluno(e, insts) === filtro.tipo)
+  );
+  const cobre = new Set(evs.map(e => e.instId));
+  const u = usoDosAlunos(doAno.filter(a => !cobre.has(a.instId)));
+  const totEv = e => Object.values(e.becasQtd || {}).reduce((s, v) => s + (Number(v) || 0), 0);
+  evs.forEach(e => {
+    if (e.devolucao && e.devolucao < hoje) return;
+    if (e.retirada <= hoje) u.fora += totEv(e);
+    else u.reservado += totEv(e);
+  });
   const atr = doAno.filter(a => atrasadoAluguel(a, hoje));
   [
     ["Alunos", String(doAno.length)],
@@ -552,7 +566,7 @@ export async function mudarStatus(a, para, lote = false) {
   }
   // reservar a beca: confere se tem livre (sem contar o próprio aluno)
   if (!a.soPaspatur && iDe < 1 && iPara >= 1) {
-    const uso = somarUso(usoAvulsos, usoDosAlunos(alunosUso.filter(x => x.id !== a.id)));
+    const uso = somarUso(usoSemColegio(a), usoDosAlunos(alunosUso.filter(x => x.id !== a.id)));
     const falta = faltaParaAluno(C.P.estoque || {}, uso, a);
     if (falta.length) {
       if (lote) return "sem estoque: " + falta.join(", ");
@@ -801,7 +815,7 @@ export function form(a, pre = {}) {
       try {
         // já reservado: a troca de tamanho/faixa/capelo também precisa ter livre
         if (a && STATUS_ALUGUEL.indexOf(a.status) >= 1 && a.status !== "Devolvida") {
-          const uso = somarUso(usoAvulsos, usoDosAlunos(alunosUso.filter(y => y.id !== a.id)));
+          const uso = somarUso(usoSemColegio(a), usoDosAlunos(alunosUso.filter(y => y.id !== a.id)));
           const falta = faltaParaAluno(C.P.estoque || {}, uso, body);
           if (falta.length) {
             err.textContent = "Não tem livre: " + falta.join(", ");

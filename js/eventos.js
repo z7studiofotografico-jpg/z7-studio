@@ -7,6 +7,7 @@ import { ASSINATURA_EMAIL, ESTUDIO, assuntoDatas } from "./mensagens.js";
 import { el, title, field, inp, sel, sheet, botoes as actions, avisoErro, wa, parseTel } from "./ui.js";
 import { TIPOS, CARGOS } from "./instituicoes-dados.js";
 import * as U from "./util.js";
+import { msgDaData } from "./eventos-msg.js";
 let C, FS, db;
 export function init(ctx) {
   C = ctx;
@@ -179,21 +180,7 @@ export async function liberar(it, kind) {
     if (s0.exists() && s0.data().instId === it.id && s0.data().kind === kind) tx.delete(ref);
   });
 }
-export function msgErroData(e) {
-  if (e.code === "ocupado") return msgOcupado(e);
-  if (e.code === "bloqueado") {
-    const x = e.bloqueio || {};
-    return `O dia ${U.fmtDate(e.ocupado.data)} está bloqueado: ${x.particular ? "compromisso particular" : x.titulo || "compromisso"}${x.deQuem ? " (" + x.deQuem + ")" : ""}. Escolha outra data.`;
-  }
-  if (e.code === "confirmado") return "Essa data já foi confirmada pela Luciana. Para mudar, fale com ela.";
-  if (e.code === "mesmodia") return "O dia das fotos e o dia da formatura precisam ser dias diferentes.";
-  if (e.code === "ordem") return "O dia de medir beca e fazer o ensaio precisa ser ANTES da formatura.";
-  return "Não foi possível reservar o dia.";
-}
-function msgOcupado(e) {
-  const o = e.ocupado || {};
-  return `O dia ${U.fmtDate(o.data)}/${String(o.data || "").slice(0, 4)} já está ocupado: ${nomeEvento(o.kind, o.instNome)}${o.hora ? " às " + o.hora : ""} (${o.status === "confirmado" ? "confirmado" : "aguardando a Luciana"}). Escolha outra data.`;
-}
+export const msgErroData = e => msgDaData(e, nomeEvento); // (19/11/2026) os textos ficam em eventos-msg.js
 // O que o estúdio faz no dia do colégio (botões na data; "Outros" para o resto)
 export const FAZER = ["Medir becas", "Entregar becas", "Recolher becas", "Ensaio do PR", "Fotos do Paspatur", "Foto da turma"];
 FAZER.push("Fotografar o colégio");
@@ -486,6 +473,13 @@ export async function confirmarAlunosFormatura(it, kind) {
   }
 }
 
+// (19/11/2026) a janela do agendamento ligada ao sistema: becas (estoque no período) e tudo do colégio
+// (o lugar fica reservado já, antes dos botões; o bloco chega depois)
+function ligarSistema(p, ...a) {
+  const d = el("div");
+  p.append(d);
+  import("./evento-becas.js").then(m => m.ligarSistema(C, d, p, ...a)).catch(e => console.warn("[Z7] agendamento", e));
+}
 // dia (opcional): data já escolhida na agenda; entra no campo da data quando ele ainda está vazio
 export function openEvento(it, kind, dia) {
   const K = KINDS[kind],
@@ -512,6 +506,7 @@ export function openEvento(it, kind, dia) {
           );
       });
       p.append(el("p", "hint", "Confirmado pela Luciana. Para mudar ou desmarcar, fale com ela."));
+      ligarSistema(p, it, kind, ev, K.campo, close);
       const a = el("div", "panel-actions");
       const ok = el("button", "btn btn-primary", "Fechar");
       ok.type = "button";
@@ -659,6 +654,7 @@ export function openEvento(it, kind, dia) {
             FS.doc(db, "instituicoes", it.id),
             Object.assign({ [K.campo]: null, atualizadoEm: new Date().toISOString() }, comFotos && !extra ? { diaFotos: null } : {})
           );
+          import("./evento-becas.js").then(m => m.espelharEvento(C, it, K.campo, null)).catch(() => {});
           U.toast("Desmarcado");
           close();
         } catch (e) {
@@ -667,6 +663,7 @@ export function openEvento(it, kind, dia) {
       };
       p.append(lib);
     }
+    ligarSistema(p, it, kind, ev, K.campo, close);
     p.append(actions(close, C.aprovador ? "Confirmar datas" : "Mandar para a Luciana aprovar"));
     p.addEventListener("submit", async evt => {
       evt.preventDefault();
@@ -759,7 +756,11 @@ export function openEvento(it, kind, dia) {
             : [[kind, f]];
         const r = await reservarVarios(it, pares);
         const patch = {
-          [K.campo]: Object.assign(f, { status: r.status, grupo: r.grupo, pedidoPor: C.me || "" }),
+          [K.campo]: Object.assign(
+            f,
+            { status: r.status, grupo: r.grupo, pedidoPor: C.me || "" },
+            ev && ev.becas ? { becas: ev.becas } : {}
+          ),
           atualizadoEm: new Date().toISOString()
         };
         if (fd && fd.data) patch.diaFotos = Object.assign(fd, { status: r.status, grupo: r.grupo, pedidoPor: C.me || "" });
@@ -770,6 +771,7 @@ export function openEvento(it, kind, dia) {
         }
         if (ct.novo) patch.contatos = [...(it.contatos || []), contato];
         await FS.updateDoc(FS.doc(db, "instituicoes", it.id), patch);
+        if (p._salvarBecas) await p._salvarBecas(); // as becas da janela vão junto
         if (r.status === "confirmado") await avisarColegioPorEmail(it.id);
         close();
         const evs = [fd && fd.data ? Object.assign({ kind: "fotos" }, fd) : null, Object.assign({ kind }, f)].filter(Boolean);

@@ -2744,7 +2744,6 @@ await cenario("PR por colégio e ano · passar para a equipe", async () => {
   if (await segRep.count()) await segRep.first().click();
   await calmo(pg);
   const ops = await pg.$$eval("#rLoteEscola option", os => os.map(o => o.textContent));
-  if (process.env.DEBUG) console.log("DBG", ops, erros, await pg.evaluate(() => document.body.dataset.tela));
   ok(
     ops.includes(`${Y - 1} - C.E. João Cardoso (2)`) && ops.includes(`${Y - 2} - C.E. João Cardoso (1)`),
     "lista de escolas com o ano e o nome do cadastro: " + ops.slice(1).join(" | ")
@@ -5146,6 +5145,89 @@ await cenario("Várias formaturas no mesmo colégio e alunos confirmados depois"
   ok(/Formatura 2 do Colegio Beta/.test(await jf.locator(".ja-corpo").textContent()), "colégio fechado: aba Datas com todas as formaturas");
   ok(!erros.length, "sem erros" + (erros.length ? ": " + erros.join(" | ") : ""));
 });
+await cenario("Agendamento de becas: quantidades, estoque no período e o colégio no sistema", async () => {
+  const Y = new Date().getFullYear();
+  const al = (nome, tam) => ({
+    instId: "i1",
+    instNome: "COLEGIO ALFA",
+    ano: Y,
+    nome,
+    status: "Cadastrado",
+    becaTipo: "tradPreta",
+    tamanho: tam,
+    faixa: "azul_fina",
+    produtos: [],
+    historico: []
+  });
+  const d = Object.assign({}, base, {
+    "config/app": Object.assign({}, base["config/app"], {
+      estoque: { becas: { tradPreta: 10 }, tamanhos: { tradPreta: { P: 4, M: 6 } }, faixas: { azul_fina: 5 }, capelos: { preto: 10 } }
+    }),
+    "instituicoes/i1": Object.assign({}, base["instituicoes/i1"], {
+      diaBecas: { data: `${Y}-12-07`, hora: "18:00", status: "confirmado", obs: "Medir e entregar as becas no colégio", alunos: 3 },
+      formatura: { data: `${Y}-12-10`, hora: "18:00", status: "confirmado", local: "Salão" }
+    }),
+    "alugueis/a1": al("Ana", "P"),
+    "alugueis/a2": al("Bia", "P"),
+    "alugueis/a3": al("Caio", "M"),
+    "becasUso/evento_i2_diaBecas": {
+      tipo: "evento",
+      status: "reservado",
+      instId: "i2",
+      instNome: "COLEGIO BETA",
+      campo: "diaBecas",
+      retirada: `${Y}-12-05`,
+      devolucao: `${Y}-12-12`,
+      becasQtd: { tradPreta: 3 },
+      tamanhosQtd: { tradPreta: { P: 3 } },
+      faixasQtd: {},
+      capelosQtd: {}
+    }
+  });
+  const { pg, erros, store } = await abrir(ADRIANO, d);
+  // abre o agendamento do colégio (Instituições → colégio → Agendamentos → Ver / mudar)
+  await ir(pg, "#inst-particular");
+  await pg.locator("#iChips").getByText("Todas").click();
+  await pg.locator("#iList button.lc-linha").filter({ hasText: /Alfa/i }).click();
+  const jan = pg.locator(".janela-aluno");
+  await jan.locator(".ja-abas").getByText("Agendamentos").click();
+  await jan.locator(".ja-ev", { hasText: "👘" }).getByRole("button", { name: "Ver / mudar" }).click();
+  await calmo(pg);
+  const sh = pg.locator(".sheet").last();
+  await sh.locator(".eb-num", { hasText: "alunos" }).first().waitFor({ timeout: 8000 });
+  ok((await sh.locator(".eb-num").first().textContent()) === "3alunos", "mostra os 3 alunos do aluguel do colégio");
+  ok(/Becas deste agendamento/.test(await sh.textContent()), "a janela do agendamento tem as becas");
+  ok((await sh.getByLabel("Devolução (recolher)").inputValue()) === `${Y}-12-11`, "devolução sugerida: o dia seguinte à formatura");
+  await sh.getByText(/Falta 1 item/).waitFor({ timeout: 8000 });
+  const t = await sh.textContent();
+  ok((await sh.locator("tr.eb-falta").textContent()) === "Beca tradicional preta P21faltam 1", "tamanho P: pede 2, só 1 livre (o Beta está com 3 nesses dias)");
+  ok(/Colegio Beta/i.test(t), "mostra o outro colégio usando becas nos mesmos dias");
+  ok(/Este colégio no sistema/.test(t) && /PR e Formatura/.test(t), "o colégio no sistema: datas e atalhos");
+  if (process.env.FOTOS) {
+    await pg.setViewportSize({ width: 900, height: 1400 });
+    await sh
+      .locator(".imp", { hasText: "Becas deste agendamento" })
+      .first()
+      .screenshot({ path: process.env.FOTOS + "/agendamento-becas.png" });
+    await sh.locator(".imp", { hasText: "Este colégio no sistema" }).screenshot({ path: process.env.FOTOS + "/agendamento-colegio.png" });
+    await pg.setViewportSize({ width: 400, height: 1600 });
+    await sh.locator(".imp", { hasText: "Becas deste agendamento" }).first().screenshot({ path: process.env.FOTOS + "/agendamento-celular.png" });
+  }
+  await sh.getByRole("button", { name: "💾 Salvar as becas" }).click();
+  await calmo(pg);
+  const s = await store();
+  ok(
+    s["instituicoes/i1"].diaBecas.becas && s["instituicoes/i1"].diaBecas.becas.becasQtd.tradPreta === 3,
+    "as becas ficam gravadas no agendamento"
+  );
+  const c = s["becasUso/evento_i1_diaBecas"];
+  ok(
+    c && c.retirada === `${Y}-12-07` && c.devolucao === `${Y}-12-11` && c.tamanhosQtd.tradPreta.P === 2,
+    "o estoque conta o agendamento pelas datas"
+  );
+  ok(!erros.length, "sem erros" + (erros.length ? ": " + erros.join(" | ") : ""));
+});
+
 await browser.close();
 srv.close();
 console.log(falhas ? `\n${falhas} falha(s)` : "\nTudo certo ✅");
