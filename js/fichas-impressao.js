@@ -37,7 +37,7 @@ function frente(o) {
   <h2>Ficha de identificação</h2>
   <p class="aviso">Escreva com <b>LETRA DE FORMA</b>, uma letra em cada quadrado ${caixas(5, "MARIA")}<br><b>Deixe um quadrado vazio entre as palavras</b></p>
   ${campo("Colégio", 22, o.colegio)}
-  <div class="linha">${campo("Turma", 5, o.turma)}${campo("Data da foto", 8, o.data, DATA)}</div>
+  <div class="linha">${campo("Série", 6, o.serie)}${campo("Turma", 5, o.turma)}${campo("Data da foto", 8, o.data, DATA)}</div>
   ${campo("Nome completo do(a) aluno(a)", 22)}
   ${campo("", 22, "", {}, "cont")}
   <div class="linha">${campo("Nascimento do(a) aluno(a)", 8, "", DATA)}${campo("WhatsApp do(a) aluno(a)", 11, "", CEL)}</div>
@@ -155,17 +155,19 @@ export async function escolherFichas() {
     );
     const col = el("input");
     col.placeholder = "em branco = a família escreve";
+    const ser = el("input");
+    ser.placeholder = "ex.: 3º ano";
     const tur = el("input");
     tur.placeholder = "ex.: 3003";
     const dt = el("input");
     dt.type = "date";
     const r = el("div", "row3");
-    r.append(field("Colégio (opcional)", col), field("Turma (opcional)", tur), field("Data da foto (opcional)", dt));
-    p.append(r, botoes(close, "🖨️ Abrir para imprimir"));
+    r.append(field("Série (opcional)", ser), field("Turma (opcional)", tur), field("Data da foto (opcional)", dt));
+    p.append(field("Colégio (opcional)", col), r, botoes(close, "🖨️ Abrir para imprimir"));
     p.addEventListener("submit", ev => {
       ev.preventDefault();
       const d = dt.value ? dt.value.split("-").reverse().join("") : "";
-      if (!abrirFichas({ colegio: col.value.trim(), turma: tur.value.trim(), data: d }))
+      if (!abrirFichas({ colegio: col.value.trim(), serie: ser.value.trim(), turma: tur.value.trim(), data: d }))
         alert("O navegador bloqueou a janela nova. Libere as janelas (pop-ups) deste site e tente de novo.");
       else close();
     });

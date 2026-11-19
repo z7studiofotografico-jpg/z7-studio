@@ -101,15 +101,8 @@ export function mostrarAlunos(ctx, v, o) {
     ),
     U.mkBtn("⬇️ Planilha", "btn-sm", () =>
       import("./cadastro-aluno.js").then(m => m.baixarPlanilha("aluguel-becas", lista, m.CAMPOS_ALUGUEL)).catch(e => C.handleErr(e))
-    ),
-    // 📥 Importação: prévias de qualquer pasta (folha da turma), sem mudar o nome de ninguém (veio da Agenda)
-    ...(C.isAdmin || C.aprovador
-      ? [
-          U.mkBtn("📥 Importação", "btn-azul btn-sm", () =>
-            import("./previas-lote.js").then(m => m.abrirPreviasLote(C, { livre: true })).catch(e => C.handleErr(e))
-          )
-        ]
-      : [])
+    )
+    // (18/11/2026: o "📥 Importação" voltou para a Agenda, ao lado das Fichas)
   );
   head.append(hb);
   v.append(head);

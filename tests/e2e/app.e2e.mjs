@@ -3077,10 +3077,10 @@ await cenario("Agendamento · Importação: prévias de qualquer pasta, sem muda
     const fila = [origem, dirFalso("")];
     window.showDirectoryPicker = async () => fila.shift();
   });
-  await ir(pg, "#becas");
-  const bt = pg.getByRole("button", { name: "📥 Importação" });
+  await ir(pg, "#agenda");
+  const bt = pg.locator("#viewAgenda").getByRole("button", { name: "📥 Importação" });
   await bt.waitFor({ timeout: 8000 });
-  ok(await bt.isVisible(), "Aluguel de becas tem o botão 📥 Importação (saiu da Agenda)");
+  ok(await bt.isVisible(), "Agenda tem o botão 📥 Importação, ao lado das Fichas");
   await bt.click();
   const sh = pg.locator(".sheet:visible").last();
   ok(!/Pular quem já comprou/.test(await sh.textContent()), "importação livre: entram todos (sem pular ninguém)");
@@ -3147,8 +3147,8 @@ await cenario("Agendamento · Importação: folha da turma (20 por página, nome
     const fila = [origem, dirFalso("")];
     window.showDirectoryPicker = async () => fila.shift();
   });
-  await ir(pg, "#becas");
-  await pg.getByRole("button", { name: "📥 Importação" }).click();
+  await ir(pg, "#agenda");
+  await pg.locator("#viewAgenda").getByRole("button", { name: "📥 Importação" }).click();
   const sh = pg.locator(".sheet:visible").last();
   await sh.getByLabel("Colégio (cabeçalho)").fill("Legacy School Nova Iguaçu");
   await sh.getByLabel("Turma (cabeçalho)").fill("5º ano A");
