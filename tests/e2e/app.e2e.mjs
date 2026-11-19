@@ -5200,7 +5200,10 @@ await cenario("Agendamento de becas: quantidades, estoque no período e o colég
   ok((await sh.getByLabel("Devolução (recolher)").inputValue()) === `${Y}-12-11`, "devolução sugerida: o dia seguinte à formatura");
   await sh.getByText(/Falta 1 item/).waitFor({ timeout: 8000 });
   const t = await sh.textContent();
-  ok((await sh.locator("tr.eb-falta").textContent()) === "Beca tradicional preta P21faltam 1", "tamanho P: pede 2, só 1 livre (o Beta está com 3 nesses dias)");
+  ok(
+    (await sh.locator("tr.eb-falta").textContent()) === "Beca tradicional preta P21faltam 1",
+    "tamanho P: pede 2, só 1 livre (o Beta está com 3 nesses dias)"
+  );
   ok(/Colegio Beta/i.test(t), "mostra o outro colégio usando becas nos mesmos dias");
   ok(/Este colégio no sistema/.test(t) && /PR e Formatura/.test(t), "o colégio no sistema: datas e atalhos");
   if (process.env.FOTOS) {
@@ -5211,7 +5214,10 @@ await cenario("Agendamento de becas: quantidades, estoque no período e o colég
       .screenshot({ path: process.env.FOTOS + "/agendamento-becas.png" });
     await sh.locator(".imp", { hasText: "Este colégio no sistema" }).screenshot({ path: process.env.FOTOS + "/agendamento-colegio.png" });
     await pg.setViewportSize({ width: 400, height: 1600 });
-    await sh.locator(".imp", { hasText: "Becas deste agendamento" }).first().screenshot({ path: process.env.FOTOS + "/agendamento-celular.png" });
+    await sh
+      .locator(".imp", { hasText: "Becas deste agendamento" })
+      .first()
+      .screenshot({ path: process.env.FOTOS + "/agendamento-celular.png" });
   }
   await sh.getByRole("button", { name: "💾 Salvar as becas" }).click();
   await calmo(pg);
@@ -5225,6 +5231,11 @@ await cenario("Agendamento de becas: quantidades, estoque no período e o colég
     c && c.retirada === `${Y}-12-07` && c.devolucao === `${Y}-12-11` && c.tamanhosQtd.tradPreta.P === 2,
     "o estoque conta o agendamento pelas datas"
   );
+  // atalho para o Aluguel de becas: fecha as janelas, mas as fixas do app (Funil) continuam no lugar
+  await sh.getByRole("button", { name: "👘 Aluguel de becas" }).click();
+  await pg.waitForURL(/#becas/, { timeout: 15000 }).catch(() => {});
+  ok((await pg.locator("#sheet").count()) === 1 && (await pg.locator("#sheetPrices").count()) === 1, "as janelas fixas do app continuam");
+  ok(/#becas/.test(pg.url()), "abre o Aluguel de becas");
   ok(!erros.length, "sem erros" + (erros.length ? ": " + erros.join(" | ") : ""));
 });
 

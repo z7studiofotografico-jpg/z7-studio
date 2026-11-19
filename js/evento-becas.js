@@ -317,7 +317,7 @@ async function irAluguel(C, instId, ano, fechar) {
     const m = await import("./aluguel-alunos.js");
     m.pedirColegio(instId, ano);
     if (fechar) fechar();
-    document.querySelectorAll(".sheet").forEach(x => x.remove()); // a janela do colégio por baixo, se houver
+    document.querySelectorAll(".sheet:not([id])").forEach(x => x.remove()); // a janela do colégio por baixo (as fixas do Funil ficam)
     C.ir("#becas");
   } catch (e) {
     C.handleErr(e);

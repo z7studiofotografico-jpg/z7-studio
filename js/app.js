@@ -763,7 +763,9 @@ try {
   });
 } catch (_) {}
 setInterval(() => {
-  if ($("sheet").hidden && $("sheetPrices").hidden) Funil.render();
+  // (19/11/2026) sem a janela no lugar não quebra (antes dava erro a cada minuto: "reading 'hidden'")
+  const fechada = id => !$(id) || $(id).hidden;
+  if (fechada("sheet") && fechada("sheetPrices")) Funil.render();
 }, 60000);
 document.addEventListener("visibilitychange", () => {
   if (!document.hidden) Funil.render();
