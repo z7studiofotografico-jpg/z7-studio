@@ -84,6 +84,13 @@ export function show() {
   hb.append(
     U.mkBtn("🖨️ Fichas", "btn-azul btn-sm", () => import("./fichas-impressao.js").then(m => m.escolherFichas()).catch(e => C.handleErr(e)))
   );
+  // 📥 Importação também aqui, ao lado das Fichas, em roxo (18/11/2026); continua no Aluguel de becas
+  if (C.isAdmin || C.aprovador)
+    hb.append(
+      U.mkBtn("📥 Importação", "btn-roxo btn-sm", () =>
+        import("./previas-lote.js").then(m => m.abrirPreviasLote(C, { livre: true })).catch(e => C.handleErr(e))
+      )
+    );
   head.append(hb);
   v.append(head);
   v.append(
