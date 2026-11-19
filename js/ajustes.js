@@ -121,6 +121,7 @@ export function ligarAjustes(ctx, o) {
     $("pVerComo").hidden = !ctx.isAdmin;
     $("pBackup").hidden = !ctx.isAdmin;
     $("pHistorico").hidden = !ctx.isAdmin;
+    import("./trava.js").then(m => ($("pTravar").hidden = !m.travaLigada())).catch(() => {});
     // link e chave do Drive: a equipe nem vê os campos (só o Adriano)
     ["pDrive", "pDriveChave", "pDriveCliente"].forEach(id => {
       const f = $(id).closest(".field");
@@ -267,6 +268,10 @@ export function ligarAjustes(ctx, o) {
     } finally {
       $("pBackup").disabled = false;
     }
+  };
+  $("pTravar").onclick = () => {
+    $("sheetPrices").hidden = true;
+    import("./trava.js").then(m => m.travarAgora());
   };
   $("pHistorico").onclick = () => import("./historico-alteracoes.js").then(m => m.abrirHistorico(ctx)).catch(e => ctx.handleErr(e));
   $("pVerComo").onclick = () => {

@@ -53,7 +53,11 @@ export function ligarTrava(o) {
   O = o;
   if (ligado || !(window.__z7TravaSempre || ehCelular())) return;
   ligado = true;
-  ["pointerdown", "keydown", "touchstart", "scroll"].forEach(t => addEventListener(t, marcarUso, { passive: true, capture: true }));
+  // só toque e teclado contam como uso (19/11/2026: a rolagem também contava, e as listas que se atualizam sozinhas
+  // rolavam a tela e "usavam" o app sem ninguém mexer, então ele nunca travava)
+  ["pointerdown", "keydown", "touchstart"].forEach(t =>
+    addEventListener(t, ev => ev.isTrusted !== false && marcarUso(), { passive: true, capture: true })
+  );
   // voltou para o app (estava em outra tela ou com a tela apagada): confere antes de mostrar
   document.addEventListener("visibilitychange", () => (document.hidden ? null : conferir()));
   addEventListener("pageshow", conferir);
@@ -62,6 +66,9 @@ export function ligarTrava(o) {
 }
 // ao entrar com a senha na tela de login, começa a contar de novo
 export const entrou = () => gravar(CHAVE_USO, String(Date.now()));
+// Ajustes → 🔒 Travar agora (emprestar o celular, ou testar a digital)
+export const travaLigada = () => ligado;
+export const travarAgora = () => !travado && O && O.email() && travar(true);
 
 async function usarDigital(em) {
   const id = ler(chaveDigital(em));
@@ -94,7 +101,7 @@ async function cadastrarDigital(em) {
   gravar(chaveDigital(em), b64(c.rawId));
 }
 
-function travar() {
+function travar(agora = false) {
   travado = true;
   const em = O.email();
   const t = document.createElement("div");
@@ -105,7 +112,7 @@ function travar() {
   t.innerHTML = `<div class="trava-box">
     <div class="trava-ico">🔒</div>
     <h2>App travado</h2>
-    <p class="hint">Ficou mais de 20 minutos sem uso. Para continuar, confirme que é você.</p>
+    <p class="hint" id="travaMotivo"></p>
     <button type="button" class="btn btn-primary" id="travaDigital" hidden>👆 Entrar com a digital</button>
     <form id="travaForm" autocomplete="on">
       <input type="email" name="username" autocomplete="username" hidden>
@@ -117,18 +124,41 @@ function travar() {
   </div>`;
   document.body.append(t);
   t.querySelector("input[name=username]").value = em;
+  t.querySelector("#travaMotivo").textContent =
+    (agora ? "Travado por você." : "Ficou mais de 20 minutos sem uso.") + " Para continuar, confirme que é você.";
   const err = t.querySelector("#travaErr");
   const erro = txt => {
     err.textContent = txt;
     err.hidden = false;
   };
-  const destravar = async () => {
+  let podeDigital = false;
+  temDigital().then(ok => (podeDigital = ok));
+  const fechar = () => {
     travado = false;
     t.remove();
     entrou();
-    // primeira vez com a senha, num celular com digital: oferece usar a digital nas próximas
-    if (!ler(chaveDigital(em)) && (await temDigital()) && confirm("Usar a digital (ou o rosto) para destravar nas próximas vezes?"))
-      cadastrarDigital(em).catch(e => console.warn("[Z7] digital", e));
+  };
+  // destravou: na primeira vez com a senha, num celular com digital, oferece usar a digital nas próximas
+  // (o cadastro da digital precisa sair de um toque no botão, senão o celular recusa)
+  const destravar = async comSenha => {
+    if (!comSenha || ler(chaveDigital(em)) || !(podeDigital || (await temDigital()))) return fechar();
+    const box = t.querySelector(".trava-box");
+    box.innerHTML = `<div class="trava-ico">👆</div><h2>Usar a digital?</h2>
+      <p class="hint">Nas próximas vezes, destrave com a digital (ou o rosto), sem digitar a senha.</p>
+      <button type="button" class="btn btn-primary" id="travaSim">👆 Usar a digital</button>
+      <p class="err" id="travaErr2" hidden></p>
+      <button type="button" class="btn btn-sm" id="travaNao">Agora não</button>`;
+    box.querySelector("#travaNao").onclick = fechar;
+    box.querySelector("#travaSim").onclick = () =>
+      cadastrarDigital(em)
+        .then(fechar)
+        .catch(e => {
+          console.warn("[Z7] digital", e);
+          const e2 = box.querySelector("#travaErr2");
+          e2.textContent =
+            "O celular não liberou a digital agora. Pode seguir com a senha e tentar de novo depois (Ajustes → Travar agora).";
+          e2.hidden = false;
+        });
   };
   const bD = t.querySelector("#travaDigital");
   if (ler(chaveDigital(em)))
@@ -139,7 +169,7 @@ function travar() {
   bD.onclick = async () => {
     err.hidden = true;
     try {
-      if (await usarDigital(em)) destravar();
+      if (await usarDigital(em)) destravar(false);
     } catch (e) {
       erro("A digital não foi confirmada. Tente de novo ou use a senha.");
     }
@@ -151,7 +181,7 @@ function travar() {
     if (!s) return;
     try {
       await O.verificarSenha(s);
-      destravar();
+      destravar(true);
     } catch (e) {
       erro(
         e && /network/i.test(e.code || "")

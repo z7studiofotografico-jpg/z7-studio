@@ -5324,11 +5324,37 @@ await cenario("Celular: 20 minutos sem uso trava o app (senha ou digital para vo
   await pg.locator("#travaForm button[type=submit]").click();
   await pg.getByText("Senha errada").waitFor({ timeout: 5000 });
   ok(await pg.locator("#trava").isVisible(), "senha errada: continua travado");
-  pg.once("dialog", d => d.dismiss());
+  // o celular tem digital (simulado: o navegador dos testes não tem leitor)
+  await pg.evaluate(() => {
+    window.PublicKeyCredential = { isUserVerifyingPlatformAuthenticatorAvailable: async () => true };
+    navigator.credentials.create = async () => ({ rawId: new Uint8Array([1, 2, 3]).buffer });
+    navigator.credentials.get = async () => ({ id: "x" });
+  });
   await pg.fill("#travaSenha", "senha-certa");
   await pg.locator("#travaForm button[type=submit]").click();
+  await pg.getByText("Usar a digital?").waitFor({ timeout: 5000 });
+  ok(true, "senha certa: oferece usar a digital nas próximas");
+  if (process.env.FOTOS) await pg.screenshot({ path: process.env.FOTOS + "/trava-digital.png" });
+  await pg.locator("#travaSim").click();
   await pg.locator("#trava").waitFor({ state: "detached", timeout: 5000 });
   ok(!(await pg.locator("#trava").count()), "senha certa: destrava");
+  // rolagem sozinha (lista que se atualiza) não conta como uso
+  await pg.evaluate(() => {
+    localStorage.setItem("z7ultimoUso", String(Date.now() - 1200001));
+    window.dispatchEvent(new Event("scroll"));
+    document.dispatchEvent(new Event("visibilitychange"));
+  });
+  await pg.locator("#trava").waitFor({ timeout: 5000 });
+  ok(true, "rolagem sem ninguém tocar não impede a trava");
+  await pg.locator("#travaDigital").waitFor({ timeout: 5000 });
+  await pg.locator("#travaDigital").click();
+  await pg.locator("#trava").waitFor({ state: "detached", timeout: 5000 });
+  ok(true, "destrava com a digital");
+  // Ajustes → Travar agora
+  await pg.click("#btnPrices");
+  await pg.locator("#pTravar").click();
+  await pg.locator("#trava").waitFor({ timeout: 5000 });
+  ok(/Travado por você/.test(await pg.textContent("#trava")), "Ajustes → Travar agora");
   ok(!erros.length, "sem erros" + (erros.length ? ": " + erros.join(" | ") : ""));
   // no computador não trava
   const c = await abrir(PEDRO, migrar(base));
