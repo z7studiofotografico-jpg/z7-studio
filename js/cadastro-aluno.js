@@ -112,7 +112,7 @@ async function procurar(C, f) {
   return achados;
 }
 
-export const TURMAS = ["Pré", "5º ano", "9º ano", "Ensino Médio", "Profissionalizante"];
+export const TURMAS = ["Pré", "5º ano", "9º ano", "Ensino Médio", "EJA", "Profissionalizante"];
 const GRUPOS = [
   ["particular", "🏫 Particular"],
   ["publico", "🏛️ Público"],
