@@ -364,7 +364,9 @@ base["fichas/ficha1"] = {
     turma: "3007",
     bairro: "Inhoaíba"
   },
-  duvidas: ["rua"]
+  duvidas: ["rua"],
+  fotos: ["_MG_0001.JPG", "_MG_0002.JPG"], // 📂 veio de uma pasta só (separada pela ficha)
+  origem: "ENSAIO ALFA"
 };
 // fila da Linha de Frente: 30 contatos para separar
 for (let i = 0; i < 30; i++)
@@ -1114,6 +1116,10 @@ await cenario("Adriano (admin), com os dados já atualizados no servidor", async
         gus.contatos[0].tel === "21973566011" &&
         !s["fichas/ficha1"],
       "Cadastro automático: confirma a ficha, ID com o menor número livre, telefones certos e a foto da ficha apagada"
+    );
+    ok(
+      s["pastasFotos/ficha1"] && s["pastasFotos/ficha1"].status === "a criar" && s["pastasFotos/ficha1"].codigo === gus.codigo,
+      "Cadastro automático: o aluno da pasta única fica com a pasta a criar"
     );
     await cf.getByRole("button", { name: "Fechar" }).click();
     // fecha as janelas e volta para o PR
@@ -3243,7 +3249,13 @@ await cenario("Tabela de preço dos colégios no PR (o Juntar colégio saiu)", a
   const d = Object.assign({}, migrar(base), {
     "config/precosColegio": {
       colegios: {
-        [`${Y}|COLEGIO ALFA`]: { escola: "COLEGIO ALFA", ano: Y, pr: { lfPix: 350, lfCartao: 377, lfParcelas: 3 }, em: `${Y}-11-13T12:00:00Z`, por: "Adriano" },
+        [`${Y}|COLEGIO ALFA`]: {
+          escola: "COLEGIO ALFA",
+          ano: Y,
+          pr: { lfPix: 350, lfCartao: 377, lfParcelas: 3 },
+          em: `${Y}-11-13T12:00:00Z`,
+          por: "Adriano"
+        },
         [`${Y}|CIEP 336 OCTAVIO MALTA`]: {
           escola: "CIEP 336 - Octávio Malta",
           ano: Y,
@@ -3266,7 +3278,10 @@ await cenario("Tabela de preço dos colégios no PR (o Juntar colégio saiu)", a
   await pg.getByRole("button", { name: "💰 Tabela de preço" }).click();
   await calmo(pg);
   const sh = pg.locator(".sheet").last();
-  await sh.getByText(/Cadastrado por/).first().waitFor({ timeout: 8000 });
+  await sh
+    .getByText(/Cadastrado por/)
+    .first()
+    .waitFor({ timeout: 8000 });
   const t = await sh.textContent();
   ok(/Colegio Alfa/i.test(t) && /Pix R\$ 350/.test(t) && /Cartão R\$ 377/.test(t) && /3x sem juros/.test(t), "mostra o preço do colégio");
   ok(/13\/11/.test(t) && /Cadastrado por Adriano/.test(t), "mostra a data e quem cadastrou");
@@ -5351,6 +5366,182 @@ await cenario("Celular: 5 minutos sem uso trava o app (senha ou digital para vol
   });
   await c.pg.waitForTimeout(500);
   ok(!(await c.pg.locator("#trava").count()), "no computador não trava");
+});
+
+await cenario("📂 Fotos numa pasta só: separa pela ficha e cria as pastas dos alunos (20/11/2026)", async () => {
+  const d = migrar(base);
+  delete d["fichas/ficha1"];
+  const { pg, erros, store } = await abrir(ADRIANO, d);
+  if (process.env.REAIS) {
+    const fsr = await import("node:fs");
+    const lista = fsr.readdirSync(process.env.REAIS).sort().map(n => [n, fsr.readFileSync(process.env.REAIS + "/" + n).toString("base64")]);
+    await pg.evaluate(l => (window.__reais = l), lista);
+  }
+  // a pasta do ensaio no computador (simulada): 5 fotos, a 1ª e a 4ª com a ficha (papel branco escrito)
+  await pg.evaluate(async () => {
+    const foto = async ficha => {
+      const c = document.createElement("canvas");
+      c.width = 400;
+      c.height = 600;
+      const x = c.getContext("2d");
+      x.fillStyle = "#1d2a44";
+      x.fillRect(0, 0, 400, 600);
+      x.fillStyle = "#222";
+      x.fillRect(120, 80, 160, 420);
+      if (ficha) {
+        x.fillStyle = "#fbfbfb";
+        x.fillRect(110, 300, 180, 240);
+        x.fillStyle = "#333";
+        for (let y = 320; y < 520; y += 18) x.fillRect(125, y, 150, 3);
+      }
+      return await new Promise(ok => c.toBlob(ok, "image/jpeg", 0.9));
+    };
+    class Arq {
+      constructor(nome, blob) {
+        this.kind = "file";
+        this.name = nome;
+        this.blob = blob;
+      }
+      async getFile() {
+        return new File([this.blob], this.name, { type: "image/jpeg" });
+      }
+      async createWritable() {
+        const a = this;
+        return { write: async b => (a.blob = b), close: async () => {} };
+      }
+    }
+    class Pasta {
+      constructor(nome) {
+        this.kind = "directory";
+        this.name = nome;
+        this.m = new Map();
+      }
+      async *entries() {
+        for (const e of [...this.m]) yield e;
+      }
+      async getFileHandle(n, o = {}) {
+        let h = this.m.get(n);
+        if (!h) {
+          if (!o.create) throw new DOMException("não achei", "NotFoundError");
+          h = new Arq(n, new Blob());
+          this.m.set(n, h);
+        }
+        return h;
+      }
+      async getDirectoryHandle(n, o = {}) {
+        let h = this.m.get(n);
+        if (!h) {
+          if (!o.create) throw new DOMException("não achei", "NotFoundError");
+          h = new Pasta(n);
+          this.m.set(n, h);
+        }
+        return h;
+      }
+      async removeEntry(n) {
+        this.m.delete(n);
+      }
+      async queryPermission() {
+        return "granted";
+      }
+      async requestPermission() {
+        return "granted";
+      }
+    }
+    const raiz = new Pasta("2026-11-18 - COLEGIO ALFA");
+    const fichas = [1, 0, 0, 1, 0];
+    // (prévia com fotos de verdade: REAIS=pasta com as fotos reduzidas)
+    if (window.__reais) {
+      for (const [n, b64] of window.__reais) raiz.m.set(n, new Arq(n, await (await fetch("data:image/jpeg;base64," + b64)).blob()));
+      window.__pastaTeste = raiz;
+      window.showDirectoryPicker = async () => raiz;
+      return;
+    }
+    for (let i = 0; i < 5; i++) raiz.m.set(`_MG_09${10 + i}.JPG`, new Arq(`_MG_09${10 + i}.JPG`, await foto(fichas[i])));
+    window.__pastaTeste = raiz;
+    window.showDirectoryPicker = async () => raiz;
+  });
+  await ir(pg, "#home");
+  await pg.locator("#tileCadastrar").click();
+  await pg.locator(".sheet .cad-fotos").getByRole("button", { name: "🤖 Cadastro automático" }).click();
+  const ca = pg.locator(".sheet").filter({ hasText: "🤖 Cadastro automático" });
+  await ca.getByRole("button", { name: /Fotos numa pasta só/ }).click();
+  const sp = pg.locator(".sheet").filter({ hasText: "📂 Separar as fotos pela ficha" });
+  await sp.getByLabel("Colégio").waitFor();
+  await sp.getByLabel("Colégio").selectOption({ label: "Colegio Alfa" });
+  await sp.getByRole("button", { name: "📁 Escolher a pasta das fotos" }).click();
+  if (process.env.REAIS) {
+    await sp.getByText(/\d+ fotos · \d+ alunos/).waitFor({ timeout: 60000 });
+    await pg.setViewportSize({ width: 700, height: 2600 });
+    await pg.waitForTimeout(800);
+    await sp.locator(".eb-datas").screenshot({ path: process.env.FOTOS + "/separar-ficha-real.png" });
+    return;
+  }
+  await sp.getByText(/5 fotos · 2 alunos/).waitFor({ timeout: 15000 });
+  ok(true, "acha as 2 fichas e separa 2 alunos");
+  // o app não viu uma ficha: ✂️ Separar e escolher a foto (e depois "Não é ficha" desfaz)
+  await sp.locator(".eb-data").nth(1).getByRole("button", { name: "✂️ Separar" }).click();
+  await pg.locator(".sheet").filter({ hasText: "Qual foto é a ficha" }).getByRole("button", { name: /_MG_0914/ }).click();
+  await sp.getByText(/5 fotos · 3 alunos/).waitFor({ timeout: 5000 });
+  ok(true, "✂️ Separar: a foto escolhida começa outro aluno");
+  await sp.locator(".eb-data").nth(2).getByRole("button", { name: "Não é ficha" }).click();
+  await sp.getByText(/5 fotos · 2 alunos/).waitFor({ timeout: 5000 });
+  ok(true, "Não é ficha: junta de volta");
+  if (process.env.FOTOS) await sp.locator(".panel").screenshot({ path: process.env.FOTOS + "/separar-ficha.png" });
+  await sp.getByRole("button", { name: "Guardar as fichas" }).click();
+  await sp.waitFor({ state: "detached", timeout: 15000 });
+  await calmo(pg);
+  let s = await store();
+  const fs = Object.entries(s).filter(([k, x]) => k.startsWith("fichas/") && x.origem === "2026-11-18 - COLEGIO ALFA");
+  ok(fs.length === 2, "guarda as 2 fichas para o Claude ler");
+  const f1 = fs.find(([, x]) => x.arquivo === "_MG_0910.JPG");
+  ok(f1 && f1[1].fotos.join() === "_MG_0910.JPG,_MG_0911.JPG,_MG_0912.JPG", "cada ficha leva as fotos do aluno");
+  // o Claude leu e vocês conferiram: o aluno 01 fica com a pasta a criar (como faz o Confirmar)
+  const Y = new Date().getFullYear();
+  await pg.evaluate(
+    ([id, ano]) => {
+      window.__store.set("repasse/novo1", {
+        nome: "MARIA EDUARDA FERREIRA DOS SANTOS SILVA",
+        escola: "COLEGIO ALFA",
+        ano,
+        codigo: String(ano).slice(2) + "CA-01"
+      });
+      window.__store.set("pastasFotos/" + id, {
+        escola: "COLEGIO ALFA",
+        ano,
+        colNome: "repasse",
+        alunoId: "novo1",
+        codigo: String(ano).slice(2) + "CA-01",
+        nome: "MARIA EDUARDA FERREIRA DOS SANTOS SILVA",
+        fotos: ["_MG_0910.JPG", "_MG_0911.JPG", "_MG_0912.JPG"],
+        origem: "2026-11-18 - COLEGIO ALFA",
+        status: "a criar"
+      });
+    },
+    [f1[0].split("/")[1], Y]
+  );
+  await ca.getByRole("button", { name: "Fechar" }).click();
+  await pg.locator(".sheet .cad-fotos").getByRole("button", { name: "🤖 Cadastro automático" }).click();
+  await ca.getByRole("button", { name: /Criar as pastas dos alunos \(1\)/ }).click();
+  await calmo(pg);
+  await pg.waitForTimeout(500);
+  const pasta = `${String(Y).slice(2)} -CA- 01 - MARIA EDUARDA F. S. SILVA`;
+  const r = await pg.evaluate(p => {
+    const raiz = window.__pastaTeste;
+    const al = raiz.m.get(p);
+    return { soltas: [...raiz.m.keys()].filter(k => k.endsWith(".JPG")), dentro: al ? [...al.m.keys()] : null };
+  }, pasta);
+  ok(
+    r.dentro && r.dentro.join("|") === [1, 2, 3].map(i => `${pasta} (${i}).JPG`).join("|"),
+    "cria a pasta do aluno (nome grande abreviado) e move as fotos renomeadas: " + JSON.stringify(r.dentro)
+  );
+  ok(r.soltas.join() === "_MG_0913.JPG,_MG_0914.JPG", "as fotos do outro aluno continuam na pasta do colégio");
+  s = await store();
+  ok(
+    s["repasse/novo1"].fotosPasta === pasta && s["repasse/novo1"].fotosArquivos.length === 3,
+    "o aluno fica com a pasta e as fotos no app"
+  );
+  ok(s["pastasFotos/" + f1[0].split("/")[1]].status === "feita", "a pasta fica marcada como feita");
+  ok(!erros.length, "sem erros" + (erros.length ? ": " + erros.join(" | ") : ""));
 });
 
 await browser.close();

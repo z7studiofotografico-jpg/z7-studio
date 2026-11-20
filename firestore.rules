@@ -188,6 +188,10 @@ service cloud.firestore {
     match /fichasPedidos/{g} {
       allow read, write: if admin();
     }
+    // (20/11/2026) as pastas de aluno a criar no computador (📂 fotos numa pasta só, depois da conferência)
+    match /pastasFotos/{p} {
+      allow read, write: if admin();
+    }
     match /previasSite/{c} {
       function linkOk(d) {
         return d.nome is string && d.nome.size() <= 80 && d.escola is string && d.escola.size() <= 120

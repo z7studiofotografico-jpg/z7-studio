@@ -47,7 +47,7 @@ const ORDEM_CONF = [
 export const chaveGrupo = (escola, ano) => U.chave(escola).replace(/[^A-Z0-9]+/g, "-") + "_" + (ano || "");
 // o grupo da tela (e o pedido de leitura): o Aluguel de becas fica separado do PR e da Formatura do mesmo colégio
 export const chaveGrupoCol = (escola, ano, colNome) => chaveGrupo(escola, ano) + (colNome === "alugueis" ? "_ALU" : "");
-const idFicha = (escola, ano, pasta) => (chaveGrupo(escola, ano) + "_" + U.chave(pasta).replace(/[^A-Z0-9]+/g, "-")).slice(0, 140);
+export const idFicha = (escola, ano, pasta) => (chaveGrupo(escola, ano) + "_" + U.chave(pasta).replace(/[^A-Z0-9]+/g, "-")).slice(0, 140);
 
 // ---------- 1. Prévias de um colégio: guarda a foto da ficha ----------
 // A ficha ocupa só um pedaço da foto (o aluno segura o papel na frente do corpo): o app acha o papel branco e guarda
@@ -94,7 +94,9 @@ export function acharPapel(data, w, h) {
       cheio = n / (bw * bh),
       prop = bh / bw;
     // papel: grande, quase todo branco (a renda da beca é branca mas vazada) e em pé
-    if (n < w * h * 0.02 || cheio < 0.6 || prop < 0.9 || prop > 2.2) continue;
+    // (20/11/2026: 0.55 em vez de 0.6 — o papel inclinado na mão ficava de fora; testado em 60 fotos do Manoel Gomes:
+    // as 20 fichas achadas e nenhuma foto de beca confundida)
+    if (n < w * h * 0.02 || cheio < 0.55 || prop < 0.9 || prop > 2.2) continue;
     // tem que ter escrita dentro (a luz clara do fundo é branca e lisa)
     let escuro = 0;
     for (let y = y0; y <= y1; y++)
@@ -303,9 +305,29 @@ export function abrirCadastroAutomatico(C, colNome = "") {
       const bAlu = U.mkBtn("📤 Fichas do Aluguel de becas", "btn-sm", () =>
         import("./fichas-aluguel.js").then(m => m.enviarFichasAluguel(C, montar)).catch(e => C.handleErr(e))
       );
-      p.append(bAlu, lista, U.mkBtn("Fechar", "", close));
+      // 📂 (20/11/2026) todas as fotos numa pasta só: o app separa os alunos pela foto da ficha e, depois da conferência,
+      // cria a pasta de cada aluno com as fotos dentro
+      const bSep = U.mkBtn("📂 Fotos numa pasta só (separar pela ficha)", "btn-sm", () =>
+        import("./fichas-separar.js").then(m => m.abrirSepararPelaFicha(C, montar)).catch(e => C.handleErr(e))
+      );
+      const bPastas = U.mkBtn("📁 Criar as pastas dos alunos", "btn-sm btn-primary", () =>
+        import("./fichas-separar.js").then(m => m.criarPastas(C, montar)).catch(e => C.handleErr(e))
+      );
+      bPastas.hidden = true;
+      const contarPastas = () =>
+        import("./fichas-separar.js")
+          .then(m => m.pastasACriar(C))
+          .then(l => {
+            bPastas.hidden = !l.length;
+            bPastas.textContent = `📁 Criar as pastas dos alunos (${l.length})`;
+          })
+          .catch(() => {});
+      const acoes = el("div", "eb-bts");
+      acoes.append(bSep, bAlu);
+      p.append(acoes, bPastas, lista, U.mkBtn("Fechar", "", close));
       const { FS, db } = C;
       async function montar() {
+        contarPastas();
         lista.textContent = "Carregando…";
         let fichas, pedidos;
         try {
@@ -646,6 +668,12 @@ export async function confirmar(C, { f, lido, colNome, existentes, usados, sigla
       if (colNome === "repasse") indexarFones(FS, db, tx, ref.id, doc);
     });
     existentes.push({ id: ref.id, ...doc });
+  }
+  // 📂 fotos numa pasta só: guarda a pasta a criar do aluno (com as fotos dele)
+  if (f.fotos && f.fotos.length) {
+    const al = achado || existentes[existentes.length - 1];
+    const { guardarPastaPendente } = await import("./fichas-separar.js");
+    await guardarPastaPendente(C, f, { id: al.id, codigo, nome: al.nome });
   }
   await FS.deleteDoc(FS.doc(db, "fichas", f.id)); // a foto da ficha não é mais usada
   f.status = "confirmada";

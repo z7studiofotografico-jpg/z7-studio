@@ -285,6 +285,12 @@ export async function confirmarAluguel(C, { f, lido, extra, existentes, usados, 
     await FS.setDoc(ref, doc);
     existentes.push({ id: ref.id, ...doc });
   }
+  // 📂 fotos numa pasta só: guarda a pasta a criar do aluno (com as fotos dele)
+  if (f.fotos && f.fotos.length) {
+    const al = achado || existentes[existentes.length - 1];
+    const { guardarPastaPendente } = await import("./fichas-separar.js");
+    await guardarPastaPendente(C, f, { id: al.id, codigo, nome: al.nome });
+  }
   await FS.deleteDoc(FS.doc(db, "fichas", f.id)); // a foto da ficha não é mais usada
   f.status = "confirmada";
   const resta = await FS.getDocs(

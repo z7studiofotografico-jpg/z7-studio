@@ -38,7 +38,8 @@ export const COLECOES = [
   "fichas",
   "fichasPedidos",
   "previasSite",
-  "historico"
+  "historico",
+  "pastasFotos"
 ];
 // subcoleções: os pagamentos de cada contrato do colégio (Aluguel de becas) ficam dentro do contrato
 export const SUBCOLECOES = { contratosColegio: ["pagamentos"] };
