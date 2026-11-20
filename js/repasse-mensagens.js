@@ -5,6 +5,29 @@ import * as U from "./util.js";
 import { C, segDe, eu, ofertaTxt, entregaTxt, sextaTxt, parcTxt, ehFormatura, precos, vendaDe } from "./repasse-estado.js";
 import { passoFormatura } from "./formatura-mensagens.js";
 import { ehRespCadastro } from "./repasse-dados.js";
+import { contatoPadrao } from "./repasse-estado.js";
+
+// Quem já recebeu a 1ª mensagem (a apresentação). 20/11/2026: a mensagem seguia a etapa do aluno, então o pai,
+// escolhido depois que a mãe não respondeu, recebia direto o preço. Agora quem ainda não recebeu a 1ª
+// mensagem recebe a 1ª mensagem. Alunos antigos (sem a lista): conta o contato padrão e o do último envio.
+// o número sem o 55 do país (o mesmo telefone pode vir com ou sem ele)
+const chaveTel = t => U.digits(t || "").slice(-11);
+export function contatados(it) {
+  if (Array.isArray(it.contatados)) return it.contatados;
+  const cs = it.contatos || [];
+  const p = contatoPadrao(it);
+  const ult = it.ultimo && it.ultimo.para ? cs.find(c => c.tipo === it.ultimo.para) : null;
+  return [
+    ...new Set(
+      [p, ult]
+        .filter(Boolean)
+        .map(c => U.digits(c.tel || ""))
+        .filter(Boolean)
+    )
+  ];
+}
+export const jaRecebeu = (it, c) => !c || !chaveTel(c.tel) || contatados(it).map(chaveTel).includes(chaveTel(c.tel));
+export const comContatado = (it, c) => [...new Set([...contatados(it).map(chaveTel), chaveTel(c && c.tel)].filter(Boolean))];
 
 export function passo(it, c) {
   const F = U.first(title(it.nome));
@@ -26,11 +49,21 @@ export function passo(it, c) {
     msg: `${cn || "Tudo bem"}, vou entender que agora não é o momento e não vou mais te incomodar. Se um dia quiser o ${PECA} ${c && c.tipo === "Formando" ? "da sua formatura" : "de " + F}, é só me chamar aqui! 💛`,
     then: { etapa: "NÃO QUER", days: -1 }
   };
+  const primeiraMsg = `${oi} Tudo bem? ${souEu}\nNós fizemos ${quem} no colégio${onde ? " (" + onde + ")" : ""}, e as fotos ficaram lindas!\nO ${KIT} ${c && c.tipo === "Formando" ? "com as suas fotos" : "de " + F} já está pronto aqui no estúdio${pas ? "" : ": quadro 30x40 com moldura preta, 2 porta-retratos e as fotos digitais"}. Posso te mandar uma foto de como ficou? 😊`;
+  // outro contato (ex.: o pai, porque a mãe não respondeu) que ainda não recebeu nada: começa pela 1ª mensagem
+  if ((it.etapa === "CONTATADO" || it.etapa === "INTERESSADO") && !jaRecebeu(it, c))
+    return {
+      title: "1º contato com " + (c.tipo ? c.tipo.toLowerCase() : "este contato") + ": pedir para mandar a prévia",
+      primeiro: true,
+      msg: primeiraMsg,
+      then: { etapa: it.etapa, days: 2 }
+    };
   switch (it.etapa) {
     case "SEPARADO":
       return {
         title: "1º contato: pedir para mandar a prévia",
-        msg: `${oi} Tudo bem? ${souEu}\nNós fizemos ${quem} no colégio${onde ? " (" + onde + ")" : ""}, e as fotos ficaram lindas!\nO ${KIT} ${c && c.tipo === "Formando" ? "com as suas fotos" : "de " + F} já está pronto aqui no estúdio${pas ? "" : ": quadro 30x40 com moldura preta, 2 porta-retratos e as fotos digitais"}. Posso te mandar uma foto de como ficou? 😊`,
+        primeiro: true,
+        msg: primeiraMsg,
         then: { etapa: "CONTATADO", days: 2, count: true }
       };
     case "CONTATADO":

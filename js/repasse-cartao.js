@@ -35,7 +35,7 @@ import {
   parcTxt
 } from "./repasse-estado.js";
 import { avisoSemPreco, travarMensagensSemValor } from "./precos-colegio.js";
-import { passo } from "./repasse-mensagens.js";
+import { passo, comContatado } from "./repasse-mensagens.js";
 import { openPago, openEntrega, openNotas } from "./repasse-janelas.js";
 import { openDados } from "./repasse-form.js";
 import { passarAluno } from "./passar-pr.js";
@@ -174,6 +174,8 @@ export function desenharProximo(box, it, escolhido, blocked, li) {
   box.hidden = false;
   const msg = el("p", null, ns.msg);
   box.append(el("small", null, "Próximo passo: " + ns.title), msg);
+  // o texto com o preço nunca vai sem a foto: a prévia vai antes (20/11/2026)
+  if (ns.mockup) box.append(el("p", "wait", "📸 Primeiro mande a foto da prévia (botão 🖼️ abaixo). Depois mande este texto com o preço."));
   if (blocked) {
     box.append(el("p", "wait", "Espere " + U.first(li.por) + " terminar, ou toque em “Assumir mesmo assim”."));
     return;
@@ -181,7 +183,7 @@ export function desenharProximo(box, it, escolhido, blocked, li) {
   const row = el("div", "row");
   const d = escolhido ? U.digits(escolhido.tel) : "";
   if (d) {
-    const a = el("a", "btn btn-sm btn-primary", "Abrir no WhatsApp");
+    const a = el("a", "btn btn-sm btn-primary", ns.mockup ? "Abrir no WhatsApp (depois da prévia)" : "Abrir no WhatsApp");
     a.href = "https://wa.me/" + d + "?text=" + encodeURIComponent(ns.msg);
     a.target = "_blank";
     a.rel = "noopener";
@@ -319,6 +321,8 @@ export function desenharProximo(box, it, escolhido, blocked, li) {
           }
         };
         if (ns.then.count) p.tentativas = (it.tentativas || 0) + 1;
+        // quem recebeu a 1ª mensagem (ou a prévia): o próximo envio para ele segue a conversa
+        if (escolhido) p.contatados = comContatado(it, escolhido);
         // a mensagem enviada fica na conversa do aluno (janela do aluno → Conversa)
         p.conversa = [...(it.conversa || []), { de: "estudio", txt: ns.msg, em: p.ultimo.em, por: C.me || "" }].slice(-60);
         if (ns.then.countI) p.tentInteresse = (it.tentInteresse || 0) + 1;
@@ -379,7 +383,10 @@ function acoesDoCartao(it, li, e) {
       U.mkBtn("Quer ver a prévia ✓", "btn-ok", () =>
         save(
           it,
-          Object.assign({ etapa: "INTERESSADO", followup: U.todayStr(), tentInteresse: 0 }, prazoParaMandar(it).patch || {}),
+          Object.assign(
+            { etapa: "INTERESSADO", followup: U.todayStr(), tentInteresse: 0, contatados: comContatado(it, contatoAtual(it)) },
+            prazoParaMandar(it).patch || {}
+          ),
           "Ótimo! Agora mande a prévia"
         )
       )

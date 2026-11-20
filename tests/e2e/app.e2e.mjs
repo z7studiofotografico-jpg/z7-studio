@@ -2345,6 +2345,79 @@ await cenario("Responsável antigo sem cadastro (admin liga a alguém da equipe)
   ok(erros.length === 0, "sem erros no console" + (erros.length ? ": " + erros.slice(0, 3).join(" | ") : ""));
 });
 
+await cenario("PR: mãe não respondeu, mandar para o pai começa pela 1ª mensagem", async () => {
+  const d = migrar(base);
+  d["repasse/pp1"] = {
+    nome: "LIA PAI",
+    nomeBusca: "LIA PAI",
+    escola: "COLEGIO ALFA",
+    ano: hoje.getFullYear(),
+    etapa: "SEPARADO",
+    followup: dia(0),
+    resp: "Adriano",
+    respEmail: ADRIANO,
+    contatos: [
+      { tipo: "Mãe", nome: "Rosa", tel: "21911112222" },
+      { tipo: "Pai", nome: "Jorge", tel: "21933334444" }
+    ],
+    telefones: ["21911112222", "21933334444"]
+  };
+  let { pg, erros, store } = await abrir(ADRIANO, d);
+  await ir(pg, "#pr");
+  let cartao = pg.locator("#rList .card").filter({ hasText: /Lia Pai/i });
+  await cartao.getByRole("button", { name: "Enviei ✓" }).click();
+  await pg
+    .locator(".sheet:visible")
+    .last()
+    .getByRole("button", { name: /Mudar|Sim|Confirmar/ })
+    .first()
+    .click()
+    .catch(() => {});
+  await calmo(pg);
+  let r = (await store())["repasse/pp1"];
+  ok(
+    r.etapa === "CONTATADO" && JSON.stringify(r.contatados) === '["21911112222"]',
+    "1ª mensagem para a mãe: fica guardado que ela recebeu"
+  );
+  // abre de novo já em "Contatado" (o fake recomeça a cada abertura)
+  d["repasse/pp1"] = Object.assign({}, d["repasse/pp1"], {
+    etapa: "CONTATADO",
+    tentativas: 1,
+    contatados: ["21911112222"],
+    followup: dia(0)
+  });
+  ({ pg, erros, store } = await abrir(ADRIANO, d));
+  await ir(pg, "#pr");
+  await calmo(pg);
+  cartao = pg.locator("#rList .card").filter({ hasText: /Lia Pai/i });
+  await cartao.getByRole("button", { name: /^Pai/ }).click();
+  const t = await cartao.locator(".next").textContent();
+  await cartao.screenshot({ path: (process.env.FOTOS || "/tmp") + "/pr-pai-1.png" });
+  ok(
+    /1º contato com pai/.test(t) && /Posso te mandar uma foto/.test(t) && !/R\$/.test(t),
+    "pai ainda não recebeu: vai a 1ª mensagem, sem preço"
+  );
+  await cartao.getByRole("button", { name: /^Mãe/ }).click();
+  ok(/2º contato/.test(await cartao.locator(".next").textContent()), "mãe: segue a conversa (2º contato)");
+  await cartao.getByRole("button", { name: /^Pai/ }).click();
+  await cartao.getByRole("button", { name: "Quer ver a prévia ✓" }).click();
+  await pg
+    .locator(".sheet:visible")
+    .last()
+    .getByRole("button", { name: /Mudar|Sim|Confirmar/ })
+    .first()
+    .click()
+    .catch(() => {});
+  await calmo(pg);
+  r = (await store())["repasse/pp1"];
+  ok(r.etapa === "INTERESSADO" && r.contatados.includes("21933334444"), "pai quis ver a prévia: passa a contar como contatado");
+  await pg
+    .locator("#rList .card")
+    .filter({ hasText: /Lia Pai/i })
+    .screenshot({ path: (process.env.FOTOS || "/tmp") + "/pr-pai-2.png" });
+  ok(erros.length === 0, "sem erros no console" + (erros.length ? ": " + erros.slice(0, 3).join(" | ") : ""));
+});
+
 await cenario("WhatsApp de trabalho (empresa x equipe, troca com autorização)", async () => {
   const comNumero = () => {
     const d = migrar(base);
@@ -5374,7 +5447,10 @@ await cenario("📂 Fotos numa pasta só: separa pela ficha e cria as pastas dos
   const { pg, erros, store } = await abrir(ADRIANO, d);
   if (process.env.REAIS) {
     const fsr = await import("node:fs");
-    const lista = fsr.readdirSync(process.env.REAIS).sort().map(n => [n, fsr.readFileSync(process.env.REAIS + "/" + n).toString("base64")]);
+    const lista = fsr
+      .readdirSync(process.env.REAIS)
+      .sort()
+      .map(n => [n, fsr.readFileSync(process.env.REAIS + "/" + n).toString("base64")]);
     await pg.evaluate(l => (window.__reais = l), lista);
   }
   // a pasta do ensaio no computador (simulada): 5 fotos, a 1ª e a 4ª com a ficha (papel branco escrito)
@@ -5480,7 +5556,11 @@ await cenario("📂 Fotos numa pasta só: separa pela ficha e cria as pastas dos
   ok(true, "acha as 2 fichas e separa 2 alunos");
   // o app não viu uma ficha: ✂️ Separar e escolher a foto (e depois "Não é ficha" desfaz)
   await sp.locator(".eb-data").nth(1).getByRole("button", { name: "✂️ Separar" }).click();
-  await pg.locator(".sheet").filter({ hasText: "Qual foto é a ficha" }).getByRole("button", { name: /_MG_0914/ }).click();
+  await pg
+    .locator(".sheet")
+    .filter({ hasText: "Qual foto é a ficha" })
+    .getByRole("button", { name: /_MG_0914/ })
+    .click();
   await sp.getByText(/5 fotos · 3 alunos/).waitFor({ timeout: 5000 });
   ok(true, "✂️ Separar: a foto escolhida começa outro aluno");
   await sp.locator(".eb-data").nth(2).getByRole("button", { name: "Não é ficha" }).click();
