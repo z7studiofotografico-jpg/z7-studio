@@ -446,6 +446,26 @@ async function conferir(C, g, colNome, depois, status = "lida") {
           : `${fichas.length} fichas para conferir. Os campos com ⚠️ estavam difíceis de ler: confira com a foto.`
       );
       p.append(info);
+      // ✔ Confirmar todos (20/11/2026): confirma um por um, na ordem das pastas, como se tocasse em cada ✔ Confirmar
+      const fila = [];
+      if (fichas.length > 1) {
+        let certeza = false;
+        const todos = U.mkBtn(`✔ Confirmar todos (${fichas.length})`, "btn-primary", async () => {
+          if (!certeza) {
+            certeza = true;
+            todos.textContent = `Toque de novo para confirmar os ${fichas.length} alunos`;
+            return;
+          }
+          todos.disabled = true;
+          let n = 0;
+          for (const fazer of fila) {
+            todos.textContent = `Confirmando… ${++n} de ${fila.length}`;
+            await fazer();
+          }
+          todos.textContent = "✅ Todos confirmados";
+        });
+        p.append(todos);
+      }
       fichas.forEach(f => p.append(cartao(f)));
       p.append(U.mkBtn("Fechar", "", () => (close(), depois())));
       function cartao(f) {
@@ -517,7 +537,8 @@ async function conferir(C, g, colNome, depois, status = "lida") {
           : soNumero((f.lido || {}).numero)
             ? "Cadastro novo, com o número da ficha."
             : "⚠️ Cadastro novo e sem número na ficha: ao confirmar, recebe o menor número livre.";
-        const ok = U.mkBtn("✔ Confirmar", "btn-primary btn-sm", async () => {
+        const fazer = async () => {
+          if (ok.disabled) return;
           ok.disabled = true;
           try {
             const lido = Object.fromEntries(Object.entries(ins).map(([k, i]) => [k, i.value.trim()]));
@@ -535,7 +556,9 @@ async function conferir(C, g, colNome, depois, status = "lida") {
             ok.disabled = false;
             C.handleErr(e);
           }
-        });
+        };
+        const ok = U.mkBtn("✔ Confirmar", "btn-primary btn-sm", fazer);
+        fila.push(fazer);
         const topo = el("div", "ficha-topo");
         topo.append(el("b", null, f.pasta), ok);
         // pasta que não é de aluno ("14,8", "A3"): tira da lista
@@ -544,6 +567,7 @@ async function conferir(C, g, colNome, depois, status = "lida") {
             U.mkBtn("🗑 Não é aluno", "btn-sm", async () => {
               await FS.deleteDoc(FS.doc(db, "fichas", f.id));
               f.status = "descartada";
+              ok.disabled = true;
               b.replaceChildren(el("p", "hint", `🗑 ${f.pasta}: tirada da lista.`));
             })
           );

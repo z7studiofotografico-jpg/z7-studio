@@ -2418,6 +2418,33 @@ await cenario("PR: mãe não respondeu, mandar para o pai começa pela 1ª mensa
   ok(erros.length === 0, "sem erros no console" + (erros.length ? ": " + erros.slice(0, 3).join(" | ") : ""));
 });
 
+await cenario("Cadastro automático: confirmar todos de uma vez", async () => {
+  const d = migrar(base);
+  d["fichas/ficha2"] = Object.assign({}, d["fichas/ficha1"], {
+    pasta: "Aluno 02 (_MG_0003)",
+    lido: { numero: "40", nome: "Bia Todos", turma: "901" },
+    duvidas: [],
+    fotos: ["_MG_0003.JPG"]
+  });
+  const { pg, erros, store } = await abrir(ADRIANO, d);
+  await pg.locator("#tileCadastrar").click();
+  await pg.locator(".sheet .cad-fotos").getByRole("button", { name: "🤖 Cadastro automático" }).click();
+  const ca = pg.locator(".sheet").filter({ hasText: "🤖 Cadastro automático" });
+  await ca.getByRole("button", { name: /Conferir \(2\)/ }).click();
+  const cf = pg.locator(".sheet").filter({ hasText: "Conferir fichas" });
+  const todos = cf.getByRole("button", { name: "✔ Confirmar todos (2)" });
+  await todos.click();
+  await cf.getByRole("button", { name: /Toque de novo/ }).click();
+  await cf.getByRole("button", { name: "✅ Todos confirmados" }).waitFor({ timeout: 8000 });
+  await pg.screenshot({ path: (process.env.FOTOS || "/tmp") + "/fichas-todos.png" });
+  const s = await store();
+  const bia = Object.values(s).find(x => x && x.nome === "BIA TODOS");
+  const gus = Object.values(s).find(x => x && x.nome === "GUSTAVO FICHA");
+  ok(bia && gus && !s["fichas/ficha1"] && !s["fichas/ficha2"], "Confirmar todos: os 2 alunos cadastrados e as fichas saem da lista");
+  ok(bia && /-40$/.test(bia.codigo), "Confirmar todos: usa o número da ficha (" + (bia && bia.codigo) + ")");
+  ok(erros.length === 0, "sem erros no console" + (erros.length ? ": " + erros.slice(0, 3).join(" | ") : ""));
+});
+
 await cenario("WhatsApp de trabalho (empresa x equipe, troca com autorização)", async () => {
   const comNumero = () => {
     const d = migrar(base);
