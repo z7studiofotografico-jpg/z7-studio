@@ -47,7 +47,6 @@ import {
   ehFormatura,
   baseSeg,
   colNome,
-  metaNome,
   $,
   textoVendasMes,
   meuOuLivre,
@@ -287,7 +286,7 @@ function mount() {
     <input id="rLoteBusca" type="search" placeholder="🔎 Procurar colégio (ex.: yonne)" aria-label="Procurar colégio na lista">
     <div class="quick" id="rFerColegio" hidden>
       <button class="btn btn-sm" id="rPassarCol" type="button">📤 Passar o colégio para a equipe</button>
-      <button class="btn btn-sm" id="rJuntar" type="button">🔀 Juntar com outro colégio</button>
+      <button class="btn btn-sm" id="rPrecos" type="button">💰 Tabela de preço</button>
       <button class="btn btn-sm" id="rVerAlunos" type="button">👥 Ver / excluir alunos</button>
       <button class="btn btn-sm btn-danger" id="rExcluirCol" type="button">🗑️ Excluir colégio inteiro</button>
       <button class="btn btn-sm" id="rAcertar" type="button">🔄 Acertar a lista</button>
@@ -369,22 +368,16 @@ function mount() {
     import("./juntar-colegio.js")
       .then(m => m.acertarLista(C, { colNome: colNome(), aoTerminar: depoisDaLista }))
       .catch(e => C.handleErr(e));
-  $("rJuntar").onclick = () => {
-    const de = gruposPR.find(g => g.valor === $("rLoteEscola").value);
-    if (!de) return U.toast("Escolha primeiro, na lista acima, o colégio que veio errado (com o ano).");
-    import("./juntar-colegio.js")
+  // (20/11/2026) a tabela de preço dos colégios (o "Juntar com outro colégio" saiu: não há mais importação)
+  $("rPrecos").onclick = () => {
+    const g = gruposPR.find(x => x.valor === $("rLoteEscola").value);
+    const tipo = ehFormatura() ? "formatura" : "pr";
+    import("./precos-colegio.js")
       .then(m =>
-        m.abrirJuntar(C, {
-          grupos: gruposPR,
-          de,
-          colNome: colNome(),
-          metaNome: metaNome(),
-          aoTerminar: () => {
-            $("rLoteEscola").value = "";
-            loadMeta().then(refreshStats);
-            openTab(tab);
-          }
-        })
+        m.abrirTabelaPrecos(
+          C,
+          g && { escola: (g.nomes && g.nomes[0]) || g.nome, ano: g.ano, tipo, nomeTipo: tipo === "pr" ? "PR" : "Formatura", seg }
+        )
       )
       .catch(e => C.handleErr(e));
   };

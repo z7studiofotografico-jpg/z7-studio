@@ -245,3 +245,76 @@ export async function avisoPrecoAluguel(C, a) {
     );
   return box;
 }
+
+// (20/11/2026) PR, Paspatur e Formatura → "💰 Tabela de preço": a situação de preço de cada colégio, com a data e quem
+// cadastrou. O colégio escolhido na lista vem primeiro (e, sem preço, com o botão de cadastrar).
+const VALORES = [...CAMPOS_SEG.lf.map(([k, r]) => [k, r, "lf"]), ...CAMPOS_SEG.rep.map(([k, r]) => [k, r, "rep"])];
+const real = v => "R$ " + Number(v).toLocaleString("pt-BR", { minimumFractionDigits: 0, maximumFractionDigits: 2 });
+// os valores de um tipo de venda, por etapa (só os preenchidos), ou "" se não tem
+export function textoPreco(p) {
+  if (!p) return "";
+  return ["lf", "rep"]
+    .map(sg => {
+      const vs = VALORES.filter(([k, , s]) => s === sg && Number(p[k]) > 0).map(([k, r]) => `${r.replace(" (à vista)", "")} ${real(p[k])}`);
+      const parc = Number(p[PARCELAS_SEG[sg]]) > 1 ? ` · ${p[PARCELAS_SEG[sg]]}x sem juros` : "";
+      return vs.length ? `${NOME_SEG[sg]}: ${vs.join(" · ")}${parc}` : "";
+    })
+    .filter(Boolean)
+    .join(" | ");
+}
+export function abrirTabelaPrecos(C, escolhido) {
+  const lista = Object.entries(mapa)
+    .map(([k, x]) => Object.assign({ k }, x))
+    .sort((a, b) => (Number(b.ano) || 0) - (Number(a.ano) || 0) || String(a.escola).localeCompare(String(b.escola)));
+  const kEsc = escolhido && escolhido.escola ? chavePreco(escolhido.escola, escolhido.ano) : "";
+  sheet(
+    "💰 Tabela de preço dos colégios",
+    p => {
+      p.append(el("p", "hint", "O preço de cada colégio, com a data e quem cadastrou. Colégio sem preço fica bloqueado para vender."));
+      const box = el("div", "eb-datas");
+      const linha = (x, atual) => {
+        const l = el("div", "eb-data" + (atual ? " atual" : ""));
+        const dt = el("div", "eb-dia");
+        dt.append(el("b", null, x.em ? U.fmtDate(String(x.em).slice(0, 10)) : "—"), el("small", null, x.ano ? String(x.ano) : ""));
+        const tx = el("div", "eb-txt");
+        tx.append(el("span", null, title(x.escola || "Colégio")));
+        [
+          ["pr", "PR"],
+          ["paspatur", "Paspatur"],
+          ["formatura", "Formatura"]
+        ].forEach(([t, nome]) => {
+          const s = textoPreco(x[t]);
+          tx.append(el("small", s ? null : "wait", `${nome}: ${s || "sem preço"}`));
+        });
+        if (x.por) tx.append(el("small", null, "Cadastrado por " + title(x.por)));
+        l.append(dt, tx);
+        return l;
+      };
+      if (kEsc) {
+        const x = lista.find(y => y.k === kEsc);
+        if (x) box.append(linha(x, true));
+        else {
+          const l = linha({ escola: escolhido.escola, ano: escolhido.ano }, true);
+          if (C.isAdmin)
+            l.append(
+              U.mkBtn("💲 Cadastrar", "btn-sm btn-primary", () =>
+                abrirPrecoColegio(
+                  C,
+                  escolhido.escola,
+                  escolhido.ano,
+                  escolhido.tipo || "pr",
+                  escolhido.nomeTipo || "PR",
+                  escolhido.seg || "lf"
+                )
+              )
+            );
+          box.append(l);
+        }
+      }
+      lista.filter(x => x.k !== kEsc).forEach(x => box.append(linha(x)));
+      if (!lista.length && !kEsc) box.append(el("p", "hint", "Nenhum colégio com preço ainda."));
+      p.append(box);
+    },
+    { div: true, wide: true }
+  );
+}

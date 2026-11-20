@@ -3238,73 +3238,47 @@ await cenario("Agendamento · Importação: folha da turma (20 por página, nome
   );
   ok(!erros.length, "sem erros" + (erros.length ? ": " + erros.join(" | ") : ""));
 });
-await cenario("Juntar colégio que veio errado da planilha (G e M → C.E. Roberto Lyra)", async () => {
-  const al = (nome, escola) => ({
-    nome,
-    nomeBusca: nome.toUpperCase(),
-    escola,
-    ano: 2025,
-    seg: "rep",
-    etapa: "NA FILA",
-    resp: "",
-    respEmail: "",
-    contatos: [],
-    telefones: []
+await cenario("Tabela de preço dos colégios no PR (o Juntar colégio saiu)", async () => {
+  const Y = new Date().getFullYear();
+  const d = Object.assign({}, migrar(base), {
+    "config/precosColegio": {
+      colegios: {
+        [`${Y}|COLEGIO ALFA`]: { escola: "COLEGIO ALFA", ano: Y, pr: { lfPix: 350, lfCartao: 377, lfParcelas: 3 }, em: `${Y}-11-13T12:00:00Z`, por: "Adriano" },
+        [`${Y}|CIEP 336 OCTAVIO MALTA`]: {
+          escola: "CIEP 336 - Octávio Malta",
+          ano: Y,
+          pr: { lfPix: 350, lfCartao: 377 },
+          paspatur: { lfPix: 160, lfCartao: 180 },
+          em: `${Y}-11-16T12:00:00Z`,
+          por: "Adriano Vinicius"
+        }
+      }
+    }
   });
-  const d = Object.assign({}, base, {
-    "config/formatura_meta": {
-      escolas: { G: 1, M: 1, "C.E ROBERTO LYRA": 1 },
-      anos: { 2025: 3 },
-      escolasAno: { "G|2025": 1, "M|2025": 1, "C.E ROBERTO LYRA|2025": 1 }
-    },
-    "formaturaAlunos/g1": al("Aluno Gê", "G"),
-    "formaturaAlunos/m1": al("Aluno Eme", "M"),
-    "formaturaAlunos/r1": al("Aluno Lyra", "C.E ROBERTO LYRA")
-  });
-  const { pg, store, erros } = await abrir(ADRIANO, migrar(d));
-  await ir(pg, "#formaturas");
-  await pg.locator("#viewFormaturas .seg", { hasText: "Repasse" }).click();
+  const { pg, erros } = await abrir(ADRIANO, d);
+  await ir(pg, "#pr");
   await calmo(pg);
-  // os números do topo levam para a lista deles
-  await pg.locator("#viewFormaturas .stat", { hasText: "Interessados" }).click();
+  const valor = await pg.locator("#rLoteEscola option").evaluateAll(os => (os.find(o => /alfa/i.test(o.textContent)) || {}).value || "");
+  await pg.selectOption("#rLoteEscola", valor);
+  await pg.locator("#rLoteEscola").dispatchEvent("change");
   await calmo(pg);
-  ok(
-    (await pg.locator("#viewFormaturas #rChips .chip", { hasText: "Interessados" }).getAttribute("aria-pressed")) === "true",
-    "tocar em “Interessados” abre a lista de interessados"
-  );
-  for (const x of ["G", "M"]) {
-    await pg.selectOption("#rLoteEscola", { label: `2025 - ${x} (1)` });
-    await calmo(pg);
-    await pg.getByRole("button", { name: "🔀 Juntar com outro colégio" }).click();
-    const sh = pg.locator(".sheet").last();
-    await sh.getByLabel("Colégio certo").selectOption({ label: "2025 - C.E. Roberto Lyra (" + (x === "G" ? 1 : 2) + ")" });
-    await sh.locator("button[type=submit]").click();
-    await pg.locator(".sheet").last().getByRole("button", { name: "Sim" }).click();
-    await calmo(pg);
+  ok(!(await pg.getByRole("button", { name: "🔀 Juntar com outro colégio" }).count()), "o botão Juntar colégio saiu");
+  await pg.getByRole("button", { name: "💰 Tabela de preço" }).click();
+  await calmo(pg);
+  const sh = pg.locator(".sheet").last();
+  await sh.getByText(/Cadastrado por/).first().waitFor({ timeout: 8000 });
+  const t = await sh.textContent();
+  ok(/Colegio Alfa/i.test(t) && /Pix R\$ 350/.test(t) && /Cartão R\$ 377/.test(t) && /3x sem juros/.test(t), "mostra o preço do colégio");
+  ok(/13\/11/.test(t) && /Cadastrado por Adriano/.test(t), "mostra a data e quem cadastrou");
+  ok(/Paspatur: sem preço/.test(t), "mostra o que está sem preço");
+  if (process.env.FOTOS) {
+    await pg.evaluate(() => document.body.classList.add("ver-valores"));
+    await pg.waitForTimeout(300);
+    await sh.locator(".panel").screenshot({ path: process.env.FOTOS + "/tabela-preco.png" });
   }
-  const st = await store();
-  ok(
-    st["formaturaAlunos/g1"].escola === "C.E ROBERTO LYRA" &&
-      st["formaturaAlunos/m1"].escola === "C.E ROBERTO LYRA" &&
-      st["formaturaAlunos/g1"].escolaAntes === "G",
-    "G e M passaram para o C.E. Roberto Lyra (e fica guardado o nome antigo)"
-  );
-  const ea = st["config/formatura_meta"].escolasAno;
-  ok(ea["C.E ROBERTO LYRA|2025"] === 3 && !ea["G|2025"] && !ea["M|2025"], "lista de escolas: Roberto Lyra 2025 com 3, sem G e M");
-  // excluir o colégio inteiro (ano importado errado): os alunos saem e o colégio some da lista
-  await pg.selectOption("#rLoteEscola", { label: "2025 - C.E. Roberto Lyra (3)" });
-  await pg.getByRole("button", { name: "🗑️ Excluir colégio inteiro" }).click();
-  await pg.locator(".sheet").last().getByRole("button", { name: "Sim, excluir tudo" }).click();
-  await calmo(pg);
-  const st2 = await store();
-  ok(
-    !st2["formaturaAlunos/g1"] && !st2["formaturaAlunos/r1"] && !(st2["config/formatura_meta"].escolasAno || {})["C.E ROBERTO LYRA|2025"],
-    "excluir colégio inteiro: alunos apagados e o colégio sai da lista"
-  );
-  const ops = await pg.$$eval("#rLoteEscola option", os => os.map(o => o.textContent));
-  ok(!ops.some(o => /Roberto Lyra/.test(o)), "a lista do lote já não mostra o colégio excluído");
   ok(!erros.length, "sem erros" + (erros.length ? ": " + erros.join(" | ") : ""));
 });
+
 await cenario("Fotos do aluno pela lista guardada no site (sem chamar o Google Drive)", async () => {
   const Y = new Date().getFullYear();
   const F = "application/vnd.google-apps.folder";
