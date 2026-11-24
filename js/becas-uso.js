@@ -326,7 +326,7 @@ export function conferirPedido(E, uso, ped) {
 export function pedidoDosAlunos(alunos) {
   const p = { becasQtd: {}, tamanhosQtd: {}, faixasQtd: {}, capelosQtd: {}, semMedida: 0 };
   alunos
-    .filter(a => !a.excluido && !a.naoParticipa && !a.soPaspatur)
+    .filter(a => !a.excluido && !a.naoParticipa && !a.soPaspatur && !a.semBeca)
     .forEach(a => {
       if (!a.becaTipo || (!a.tamanho && !semTamanho(a.becaTipo))) p.semMedida++;
       if (a.becaTipo) {

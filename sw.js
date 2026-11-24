@@ -43,6 +43,8 @@ const SHELL = [
   "./js/importador.js",
   "./js/aluguel-importar.js",
   "./js/aluguel-alunos.js",
+  "./js/aluguel-do-pr.js",
+  "./js/aluguel-etapas.js",
   "./js/becas-estoque.js",
   "./js/becas-uso.js",
   "./js/estoque.js",

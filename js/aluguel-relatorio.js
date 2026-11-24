@@ -37,7 +37,7 @@ export function situacaoAluguel(a, hoje = U.todayStr()) {
   if (a.naoParticipa) return "Não vai participar da formatura";
   if (atrasadoAluguel(a, hoje)) return "ATRASADO";
   const st = a.status || "Cadastrado";
-  return a.soPaspatur ? "Só o Paspatur · " + (st === "Retirou a beca" ? "entregue" : st) : st;
+  return a.semBeca && !a.soPaspatur ? "Sem beca · " + (st === "Retirou a beca" ? "entregue" : st) : a.soPaspatur ? "Só o Paspatur · " + (st === "Retirou a beca" ? "entregue" : st) : st;
 }
 export function filtrarRelatorio(arr, f, hoje = U.todayStr()) {
   return arr.filter(
@@ -130,7 +130,7 @@ export async function relatorioAluguel(C, lista, filtro, insts = []) {
     return a.soPaspatur ? (it.filter(k => k !== "beca" && k !== "pelerine").length ? it.filter(k => k !== "beca" && k !== "pelerine") : ["paspatur"]) : it;
   };
   const kit = a => (a.naoParticipa ? "Sem kit" : textoPacote(itensDe(a), a.pacoteQtd) || "Sem kit");
-  const usaBeca = a => !a.naoParticipa && !a.soPaspatur && (itensDe(a).some(k => k === "beca" || k === "pelerine") || !!a.becaTipo);
+  const usaBeca = a => !a.naoParticipa && !a.soPaspatur && !a.semBeca && (itensDe(a).some(k => k === "beca" || k === "pelerine") || !!a.becaTipo);
   // nenhum aluno com beca (ex.: contrato só de Paspatur): as colunas de beca e devolução saem do relatório
   const comBeca = arr.some(usaBeca);
   const cols = ["ID", "Aluno", "Contato", "Turma", "Kit", ...(comBeca ? ["Beca", "Faixa / capelo"] : []), "Status", ...(comBeca ? ["Devolução"] : [])];

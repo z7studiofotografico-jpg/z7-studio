@@ -226,8 +226,7 @@ export function abrirCadastroAluno(C, o = {}) {
       const sala = inp(o.turma || "", "ex.: 901", 20);
       sala.setAttribute("aria-label", "Turma");
       // (24/11/2026) as turmas cadastradas no contrato do colégio viram uma lista para escolher (dá para digitar outra)
-      const dlT = el("datalist");
-      dlT.id = "cadTurmas" + Date.now();
+      const dlT = Object.assign(el("datalist"), { id: "cadTurmas" + Date.now() });
       sala.setAttribute("list", dlT.id);
       let turmasCol = {};
       const pintarTurmas = () => {
@@ -428,7 +427,6 @@ export function abrirCadastroAluno(C, o = {}) {
         const s = await C.FS.getDoc(C.FS.doc(C.db, "contratosColegio", R.idContrato(sCol.value, Number(ano.value)))).catch(() => null);
         contratoCol = s && s.exists() ? s.data() : null;
         turmasCol = (contratoCol && contratoCol.turmas) || {};
-        // só uma série no colégio: já vem escolhida
         const sers = Object.keys(turmasCol);
         if (sers.length === 1 && !turma.value && [...turma.options].some(op => op.value === sers[0])) turma.value = sers[0];
         pintarTurmas();
@@ -660,6 +658,7 @@ export function abrirCadastroAluno(C, o = {}) {
 
 // ---------- gravação em cada módulo ----------
 // Aluguel de becas: o aluno fica com quem fechou o contrato do colégio (o admin acerta os donos uma vez por dia)
+const kitSemBeca = p => (p || []).length > 0 && !(p || []).some(k => k === "beca" || k === "pelerine");
 async function criarAluguel(C, d, b) {
   const { FS, db } = C;
   const { donoDoAluguel, espelhar } = await import("./becas-uso.js");
@@ -680,7 +679,8 @@ async function criarAluguel(C, d, b) {
     contatos: d.contatos || [],
     responsavel: d.resp,
     endereco: d.endereco || {},
-    becaTipo: b.becaTipo,
+    semBeca: kitSemBeca(b.pacote), // (24/11/2026) kit sem beca (ex.: certificado + canudo): não aluga beca
+    becaTipo: kitSemBeca(b.pacote) ? "" : b.becaTipo,
     tamanho: b.tamanho,
     menosLonga: !!b.menosLonga,
     faixa: b.faixa,

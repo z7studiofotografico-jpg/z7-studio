@@ -39,33 +39,12 @@ import { ouvirUso, espelhar, donoDoAluguel, equipePode, AVISO_RESERVA, faltaDoAl
 import { abrirJanela } from "./janela.js";
 import { abaColegio, abaHistorico } from "./aluguel-janela.js";
 
-export const STATUS_ALUGUEL = ["Cadastrado", "Beca medida", "Produtos em produção", "Pronto para retirada", "Retirou a beca", "Devolvida"];
+export { STATUS_ALUGUEL, temProducao, semBeca, etapasDe, proximoStatus, anteriorStatus, nomeEtapa } from "./aluguel-etapas.js";
+import { STATUS_ALUGUEL, temProducao, semBeca, etapasDe, proximoStatus, anteriorStatus, nomeEtapa } from "./aluguel-etapas.js";
 const anoSerie = a => [a.ano, a.serie, a.turma && "turma " + a.turma].filter(Boolean).join(" · ");
 const SERIES = ["Pré", "5º ano", "9º ano", "Ensino médio", "Faculdade", "Curso", "Outra"];
 const ANO = () => new Date().getFullYear();
 export { atrasadoAluguel };
-// as etapas de cada aluno (17/11/2026): Produtos em produção para quem tem Paspatur, Canudo, Certificado, quadro ou
-// fotos (no kit ou nos produtos); só a beca vai direto para Pronto para retirada. Só o Paspatur não tem beca:
-// Cadastrado → Produtos em produção → Pronto para retirada → Paspatur entregue. Quem não vai participar não anda.
-export const temProducao = a => (a.pacote || []).some(k => k !== "beca") || (a.produtos || []).some(x => x.estado !== "estornado");
-export function etapasDe(a) {
-  if (a.naoParticipa) return ["Cadastrado"];
-  if (a.soPaspatur) return ["Cadastrado", "Produtos em produção", "Pronto para retirada", "Retirou a beca"];
-  return STATUS_ALUGUEL.filter(s => s !== "Produtos em produção" || temProducao(a));
-}
-export function proximoStatus(a) {
-  const e = etapasDe(a);
-  const i = e.indexOf(a.status || "Cadastrado");
-  return (i < 0 ? e[0] : e[i + 1]) || null;
-}
-export function anteriorStatus(a) {
-  const e = etapasDe(a);
-  const i = e.indexOf(a.status || "Cadastrado");
-  return i > 0 ? e[i - 1] : null;
-}
-// "Retirou a beca" do aluno só do Paspatur é a entrega do Paspatur
-export const nomeEtapa = (a, s) => (a.soPaspatur && s === "Retirou a beca" ? "Paspatur entregue" : s);
-
 let C, FS, db, col;
 let lista = [],
   insts = [],
@@ -288,6 +267,10 @@ function render() {
           .catch(e => C.handleErr(e))
       )
     );
+    // (24/11/2026) alunos do cadastro automático (PR) que ainda não estão no contrato: trazer com um toque
+    import("./aluguel-do-pr.js")
+      .then(m => m.botaoTrazerDoPR(C, Object.assign({ id: filtro.inst }, inst), Number(filtro.ano || ANO()), doCol, r))
+      .catch(e => console.warn("[Z7] trazer do PR", e));
     // admin: excluir os alunos desse colégio e ano (importou errado, turma duplicada…)
     // o colégio inteiro de uma vez: medimos todo mundo no colégio, então passa todos para a próxima etapa
     r.append(
@@ -341,7 +324,7 @@ function render() {
   const q = U.chave(filtro.q);
   const arr = doCol
     .filter(fn)
-    .filter(a => !q || U.chave([a.nome, a.codigo].join(" ")).includes(q))
+    .filter(a => !q || U.chave([a.nome, a.codigo, a.instNome].join(" ")).includes(q)) // (24/11/2026) também pelo colégio
     .sort(
       (a, b) =>
         Number(atrasadoAluguel(b, hoje)) - Number(atrasadoAluguel(a, hoje)) ||
@@ -386,7 +369,11 @@ function linha(a) {
     cor: corAluguel(a, hoje),
     idAluno: a.codigo,
     titulo: title(a.nome || ""),
-    sub: [title(a.instNome || ""), anoSerie(a), a.naoParticipa ? "🚫 Não vai participar" : a.soPaspatur ? "📒 Só o Paspatur" : becaTxt(a)]
+    sub: [
+      title(a.instNome || ""),
+      anoSerie(a),
+      a.naoParticipa ? "🚫 Não vai participar" : a.soPaspatur ? "📒 Só o Paspatur" : a.semBeca ? "📦 " + (a.pacote || []).map(nomeItem).join(" + ") : becaTxt(a)
+    ]
       .filter(Boolean)
       .join(" · "),
     passo: a.naoParticipa ? "" : passoAluguel(a, hoje),
@@ -400,7 +387,7 @@ function linha(a) {
 function infoAluguel(a) {
   const kit = (a.pacote || []).map(nomeItem).join(" + ");
   const beca = a.becaTipo ? "👘 Beca " + tamanhoBeca(a).toLowerCase() : "";
-  const p = a.naoParticipa ? "🚫 Não vai participar da formatura" : a.soPaspatur ? "📒 Só o Paspatur" : beca;
+  const p = a.naoParticipa ? "🚫 Não vai participar da formatura" : a.soPaspatur ? "📒 Só o Paspatur" : a.semBeca ? "📦 Sem beca" : beca;
   return [
     p,
     kit ? "Kit: " + kit : "",
@@ -564,13 +551,13 @@ export async function mudarStatus(a, para, lote = false) {
   if (!equipePode(C, de, para)) return lote ? "só o admin" : U.toast(AVISO_RESERVA);
   const iDe = STATUS_ALUGUEL.indexOf(de),
     iPara = STATUS_ALUGUEL.indexOf(para);
-  if (!a.soPaspatur && iPara >= STATUS_ALUGUEL.indexOf("Beca medida") && (!a.becaTipo || (!a.tamanho && !semTamanho(a.becaTipo)))) {
+  if (!semBeca(a) && iPara >= STATUS_ALUGUEL.indexOf("Beca medida") && (!a.becaTipo || (!a.tamanho && !semTamanho(a.becaTipo)))) {
     if (lote) return "sem tamanho";
     U.toast("Antes, coloque o tipo e o tamanho da beca (Editar).");
     return form(a);
   }
   // reservar a beca: confere se tem livre (sem contar o próprio aluno)
-  if (!a.soPaspatur && iDe < 1 && iPara >= 1) {
+  if (!semBeca(a) && iDe < 1 && iPara >= 1) {
     const { dia, falta } = faltaNoDia(a);
     if (falta.length) {
       if (lote) return `sem estoque no dia ${fmtDia(dia)}: ` + falta.join(", ");
