@@ -22,7 +22,7 @@ const SIT_REL = [
   ["Cadastrado", "cadastrado"],
   ["Beca medida", "beca medida"],
   ["Produtos em produção", "produtos em produção"],
-  ["Pronto para retirada", "pronto para retirada"],
+  ["Pronto para retirada", "pronto para entregar"],
   ["Retirou a beca", "retirou a beca (becas fora)"],
   ["Devolvida", "beca devolvida"],
   ["andamento", "em andamento (todos menos devolvida)"]

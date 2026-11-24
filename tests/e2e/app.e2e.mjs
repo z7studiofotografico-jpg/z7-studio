@@ -2102,6 +2102,29 @@ await cenario("Relatórios para imprimir (um por card)", async () => {
         await pg.locator("#relatorio").getByRole("button", { name: "Fechar" }).click();
       }
     });
+    // (24/11/2026) ✂️ O que sai → Colunas: desmarca o telefone e ele não sai; o relatório lembra da escolha
+    await etapa(pg, "escolher as colunas do relatório", async () => {
+      const abre = async () => {
+        await ir(pg, "#formaturas");
+        await pg.getByRole("button", { name: "🖨️ Relatório" }).first().click();
+        await pg.waitForSelector("#relatorio .rel-tab", { timeout: 5000 });
+        await pg.locator("#relatorio .rel-escolha summary").click();
+      };
+      await abre();
+      const col = pg.locator("#relatorio .rel-escolha-box label", { hasText: /Telefone|Contato|WhatsApp/ }).first();
+      const nomeCol = (await col.textContent()).trim();
+      await col.locator("input").uncheck();
+      const ths = await pg.$$eval("#relatorio .rel-tab th", x => x.map(t => t.textContent.trim()));
+      ok(!ths.includes(nomeCol) && !/\(21\) 97777-6666/.test(await pg.textContent("#relatorio .rel-folha")), `coluna “${nomeCol}” desmarcada não sai`);
+      if (process.env.FOTOS) await pg.screenshot({ path: process.env.FOTOS + "/rel-colunas.png" });
+      await pg.locator("#relatorio .rel-escolha summary").click();
+      await pg.locator("#relatorio").getByRole("button", { name: "Fechar" }).click();
+      await abre();
+      ok(!(await col.locator("input").isChecked()), "o relatório lembra das colunas escolhidas");
+      await col.locator("input").check();
+      await pg.locator("#relatorio .rel-escolha summary").click();
+      await pg.locator("#relatorio").getByRole("button", { name: "Fechar" }).click();
+    });
     // 📋 Alunos por colégio: escolhe o colégio e as colunas; sai em ordem de ID
     await etapa(pg, "alunos por colégio", async () => {
       await ir(pg, "#pr");
@@ -3880,7 +3903,7 @@ await cenario("Aluguel de becas · alunos dos colégios (status, estoque e produ
     st["produtos/paspatur"].reservado === 2 && st["alugueis/a2"].produtos[0].estado === "reservado",
     "produto do aluguel reservado no estoque"
   );
-  for (const prox of ["Produtos em produção", "Pronto para retirada", "Retirou a beca"]) {
+  for (const prox of ["Produtos em produção", "Pronto para entregar", "Retirou a beca"]) {
     await pg
       .locator("#alLista article", { hasText: "Bia Aluguel" })
       .getByRole("button", { name: "Avançar: " + prox })

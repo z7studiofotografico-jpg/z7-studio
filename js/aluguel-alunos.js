@@ -40,7 +40,7 @@ import { abrirJanela } from "./janela.js";
 import { abaColegio, abaHistorico } from "./aluguel-janela.js";
 
 export { STATUS_ALUGUEL, temProducao, semBeca, etapasDe, proximoStatus, anteriorStatus, nomeEtapa } from "./aluguel-etapas.js";
-import { STATUS_ALUGUEL, temProducao, semBeca, etapasDe, proximoStatus, anteriorStatus, nomeEtapa } from "./aluguel-etapas.js";
+import { STATUS_ALUGUEL, temProducao, semBeca, etapasDe, proximoStatus, anteriorStatus, nomeEtapa, rotuloEtapa } from "./aluguel-etapas.js";
 const anoSerie = a => [a.ano, a.serie, a.turma && "turma " + a.turma].filter(Boolean).join(" · ");
 const SERIES = ["Pré", "5º ano", "9º ano", "Ensino médio", "Faculdade", "Curso", "Outra"];
 const ANO = () => new Date().getFullYear();
@@ -255,7 +255,7 @@ function render() {
         : " · sem visita registrada") +
       " · " +
       Object.entries(st)
-        .map(([s0, n]) => `${n} ${s0.toLowerCase()}`)
+        .map(([s0, n]) => `${n} ${rotuloEtapa(s0).toLowerCase()}`)
         .join(", ");
     r.append(
       " ",
@@ -307,7 +307,7 @@ function render() {
     ["naoParticipa", "🚫 Não vai participar", a => !!a.naoParticipa],
     ["soPaspatur", "📒 Só o Paspatur", a => !!a.soPaspatur && !a.naoParticipa && cad(a)],
     ["atrasados", "⚠️ Atrasados", a => atrasadoAluguel(a, hoje)],
-    ...["Cadastrado", "Beca medida", "Produtos em produção", "Pronto para retirada"].map(s0 => [s0, s0, naEtapa(s0)]),
+    ...["Cadastrado", "Beca medida", "Produtos em produção", "Pronto para retirada"].map(s0 => [s0, rotuloEtapa(s0), naEtapa(s0)]),
     ["Devolvida", "Beca devolvida", naEtapa("Devolvida")],
     ["todos", "Tudo", () => true]
   ];
@@ -588,11 +588,11 @@ export async function mudarStatus(a, para, lote = false) {
   if (voltaBaixa) {
     motivo =
       (await pedirTexto(
-        `Voltar de “${de}” para “${para}”?`,
+        `Voltar de “${rotuloEtapa(de)}” para “${rotuloEtapa(para)}”?`,
         "Os produtos já tiveram baixa no estoque. Qual o motivo de voltar? (fica registrado no estorno)"
       )) || "";
     if (!motivo) return;
-  } else if (!lote && !paraProducao && !(await confirmarStatus(de, para))) return;
+  } else if (!lote && !paraProducao && !(await confirmarStatus(rotuloEtapa(de), rotuloEtapa(para)))) return;
   const patch = {
     ...(paraProducao ? { fotoTirada: true } : {}),
     status: para,

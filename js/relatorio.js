@@ -103,8 +103,46 @@ function escolherPartes(conteudo, mudou) {
     l.append(cb, document.createTextNode(" 🙈 Sem valores (R$) — ex.: para entregar ao diretor"));
     box.append(l);
   }
+  // (24/11/2026) as colunas das tabelas também: desmarca (ex.: Contato) e ela não sai. Fica guardado para este
+  // relatório (pelo título) neste computador; vale para todos os relatórios do sistema
+  const chave = "z7RelColunas:" + String(conteudo.titulo || "").replace(/\s+\d{4}$/, "");
+  let semCol = new Set();
+  try {
+    semCol = new Set(JSON.parse(localStorage.getItem(chave) || "[]"));
+  } catch (_) {}
+  const colunas = [];
+  (conteudo.secoes || []).forEach(s => ((s.tabela || {}).cols || []).forEach(c => colunas.includes(String(c).trim()) || colunas.push(String(c).trim())));
+  if (colunas.length) {
+    box.append(el("b", "rel-escolha-tit", "Colunas"));
+    colunas.forEach(c => {
+      if (!c) return;
+      const l = el("label", "chk");
+      const cb = el("input");
+      cb.type = "checkbox";
+      cb.checked = !semCol.has(c);
+      cb.onchange = () => {
+        cb.checked ? semCol.delete(c) : semCol.add(c);
+        try {
+          localStorage.setItem(chave, JSON.stringify([...semCol]));
+        } catch (_) {}
+        mudou();
+      };
+      l.append(cb, document.createTextNode(" " + c));
+      box.append(l);
+    });
+  }
   caixa.append(box);
-  return { caixa, fora, limpar: s => (sem ? semValores(s) : s) };
+  return { caixa, fora, limpar: s => tirarColunas(sem ? semValores(s) : s, semCol) };
+}
+export function tirarColunas(s, semCol) {
+  if (!semCol || !semCol.size || !s.tabela || !s.tabela.cols) return s;
+  const fica = s.tabela.cols.map(c => !semCol.has(String(c).trim()));
+  return Object.assign({}, s, {
+    tabela: Object.assign({}, s.tabela, {
+      cols: s.tabela.cols.filter((_, i) => fica[i]),
+      linhas: s.tabela.linhas.map(l => l.filter((_, i) => fica[i]))
+    })
+  });
 }
 // a página da impressora: deitada (paisagem) ou em pé, com margem pequena
 function folhaDeitada(r, pais) {
