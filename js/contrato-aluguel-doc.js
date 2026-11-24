@@ -74,9 +74,25 @@ tr.t td{font-weight:bold;background:#f4f4f4}
 .nao-imprime{position:sticky;top:0;background:#fff8e1;border-bottom:1px solid #e0c060;padding:8px;text-align:center;font:14px Arial}
 .nao-imprime button{font-size:15px;padding:6px 14px;margin:0 4px}
 .pg{max-width:178mm;margin:0 auto;padding:10px}
+table.folha,table.folha>thead>tr>td,table.folha>tbody>tr>td{border:0;padding:0;margin:0;font-size:9.6pt}
+.timbre{display:flex;align-items:center;gap:10pt;border-bottom:2px solid #c8102e;padding-bottom:5pt;margin-bottom:9pt}
+.timbre img{width:17mm;height:17mm}
+.timbre b{font-size:12pt}
+.timbre div{font-size:8pt;line-height:1.35;color:#333}
 @media print{.nao-imprime{display:none}.pg{padding:0}}
 `;
 export const BARRA_IMPRIMIR = `<div class="nao-imprime"><button onclick="print()">🖨️ Imprimir / Salvar em PDF</button> Confira os dados antes de imprimir. Para mudar algo, ajuste no sistema e gere de novo.</div>`;
+// papel timbrado: o cabeçalho com a logo se repete no alto de cada página (thead da tabela "folha")
+export const ESTUDIO_CT = {
+  nome: "Z7 Studio Fotográfico",
+  linhas: [
+    "STUDIO Z7 PRODUÇÕES LTDA · CNPJ 28.336.346/0001-84",
+    "Estrada Doutor Rufino Gonçalves Ferreira, 290 – Centro, Nilópolis/RJ · CEP 26530-170",
+    "Tel.: (21) 3743-0000 · WhatsApp (21) 99881-7771 · z7studiofotografico@gmail.com · www.z7studio.com.br"
+  ]
+};
+export const folha = (logo, corpo) =>
+  `<div class="pg"><table class="folha"><thead><tr><td><div class="timbre">${logo ? `<img src="${esc(logo)}" alt="">` : ""}<div><b>${ESTUDIO_CT.nome}</b><br>${ESTUDIO_CT.linhas.join("<br>")}</div></div></td></tr></thead><tbody><tr><td>${corpo}</td></tr></tbody></table></div>`;
 export const linha = w => `<span class="l" style="width:${w}mm"></span>`;
 
 // d = { inst, contrato, alunos, pags, ano, nomeBeca(tipo), nomeFaixa(k), nomeItem(id), hoje "AAAA-MM-DD" }
@@ -175,8 +191,9 @@ export function htmlContratoAluguel(d) {
   return `<!DOCTYPE html><html lang="pt-BR"><head><meta charset="utf-8"><title>Contrato de locação de becas · ${esc(inst.nome)} · ${d.ano}</title><style>
 ${CSS_CONTRATO}</style></head><body>
 ${BARRA_IMPRIMIR}
-<div class="pg">
-<h1>CONTRATO DE LOCAÇÃO DE BECAS – FORMATURA ${d.ano}<br>${esc(nome)}</h1>
+${folha(
+  d.logo,
+  `<h1>CONTRATO DE LOCAÇÃO DE BECAS – FORMATURA ${d.ano}<br>${esc(nome)}</h1>
 <p class="sub">${qtd} aluno${qtd === 1 ? "" : "s"} · ${turmas.length} turma${turmas.length === 1 ? "" : "s"} · dados do sistema Z7 em ${esc(
     String(d.hoje || "")
       .split("-")
@@ -251,5 +268,6 @@ ${cl("Disposições gerais")}
 <p style="margin-top:10pt">Nilópolis/RJ, ${linha(10)} de ${linha(35)} de ${d.ano}.</p>
 <div class="ass"><div>STUDIO Z7 PRODUÇÕES LTDA<br>Locadora</div><div>${esc(nome)}<br>Locatária</div></div>
 <div class="ass"><div>Testemunha 1<span class="f">Nome: ${linha(55)}</span><span class="f">CPF: ${linha(40)}</span></div><div>Testemunha 2<span class="f">Nome: ${linha(55)}</span><span class="f">CPF: ${linha(40)}</span></div></div>
-</div></body></html>`;
+`
+)}</body></html>`;
 }

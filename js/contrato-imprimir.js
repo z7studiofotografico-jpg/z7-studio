@@ -6,6 +6,8 @@ import { nomeItem, idContrato } from "./contrato-colegio-regras.js";
 import { htmlContratoAluguel } from "./contrato-aluguel-doc.js";
 import { htmlContratoAvulso } from "./contrato-avulso-doc.js";
 
+// a logo do papel timbrado (endereço completo: a aba nova não tem endereço próprio)
+const LOGO = () => location.origin + "/icons/icon-512.png";
 const nomeBeca = k => (BECAS.find(([b]) => b === k) || [k, k])[1];
 
 // a aba abre no toque (senão o navegador bloqueia) e recebe o contrato quando os dados chegam
@@ -46,6 +48,7 @@ export function contratoColegio(C, inst, ano, alunos) {
       pags,
       ano,
       hoje: U.todayStr(),
+      logo: LOGO(),
       nomeBeca,
       nomeFaixa,
       nomeItem
@@ -54,7 +57,7 @@ export function contratoColegio(C, inst, ano, alunos) {
 }
 
 export const contratoAvulso = (C, x) =>
-  abrirAba(() => htmlContratoAvulso({ x, becas: BECAS, nomeFaixa, nomeCapelo, hoje: U.todayStr() }), C);
+  abrirAba(() => htmlContratoAvulso({ x, logo: LOGO(), becas: BECAS, nomeFaixa, nomeCapelo, hoje: U.todayStr() }), C);
 
 // os botões da faixa do colégio no Aluguel de becas (o contrato, a entrada e o contrato para imprimir)
 export function botoesContratoColegio(C, inst0, doCol, abrirContratoCol, instId, ano) {
