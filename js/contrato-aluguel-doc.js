@@ -75,10 +75,10 @@ tr.t td{font-weight:bold;background:#f4f4f4}
 .nao-imprime button{font-size:15px;padding:6px 14px;margin:0 4px}
 .pg{max-width:178mm;margin:0 auto;padding:10px}
 table.folha,table.folha>thead>tr>td,table.folha>tbody>tr>td{border:0;padding:0;margin:0;font-size:9.6pt}
-.timbre{display:flex;align-items:center;gap:10pt;border-bottom:2px solid #c8102e;padding-bottom:5pt;margin-bottom:9pt}
-.timbre img{width:17mm;height:17mm}
-.timbre b{font-size:12pt}
-.timbre div{font-size:8pt;line-height:1.35;color:#333}
+.timbre{display:flex;align-items:center;gap:10pt;border-bottom:2px solid #c8102e;padding-bottom:3pt;margin-bottom:6pt}
+.timbre img{width:11mm;height:11mm}
+.timbre b{font-size:10.5pt}
+.timbre div{font-size:7.5pt;line-height:1.3;color:#333}
 @media print{.nao-imprime{display:none}.pg{padding:0}}
 `;
 export const BARRA_IMPRIMIR = `<div class="nao-imprime"><button onclick="print()">🖨️ Imprimir / Salvar em PDF</button> Confira os dados antes de imprimir. Para mudar algo, ajuste no sistema e gere de novo.</div>`;
@@ -92,7 +92,7 @@ export const ESTUDIO_CT = {
   ]
 };
 export const folha = (logo, corpo) =>
-  `<div class="pg"><table class="folha"><thead><tr><td><div class="timbre">${logo ? `<img src="${esc(logo)}" alt="">` : ""}<div><b>${ESTUDIO_CT.nome}</b><br>${ESTUDIO_CT.linhas.join("<br>")}</div></div></td></tr></thead><tbody><tr><td>${corpo}</td></tr></tbody></table></div>`;
+  `<div class="pg"><table class="folha"><thead><tr><td><div class="timbre">${logo ? `<img src="${esc(logo)}" alt="">` : ""}<div><b>${ESTUDIO_CT.nome}</b> · ${ESTUDIO_CT.linhas.join("<br>")}</div></div></td></tr></thead><tbody><tr><td>${corpo}</td></tr></tbody></table></div>`;
 export const linha = w => `<span class="l" style="width:${w}mm"></span>`;
 
 // d = { inst, contrato, alunos, pags, ano, nomeBeca(tipo), nomeFaixa(k), nomeItem(id), hoje "AAAA-MM-DD" }
