@@ -1,0 +1,134 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Medidas da beca · Z7 Studio Fotográfico</title>
+<link rel="icon" href="icons/favicon-64.png">
+<meta name="description" content="Tire suas medidas e descubra o tamanho ideal da beca para alugar no Z7 Studio Fotográfico.">
+<!-- (24/11/2026) Página aberta (sem login) para quem aluga a beca a distância: como medir, tabela de medidas,
+     o tamanho ideal calculado na hora e o envio das medidas pelo WhatsApp do estúdio. Não guarda nenhum dado. -->
+<style>
+:root{--v:#c8102e;--t:#1a1a1a;--c:#f5f5f5}
+*{box-sizing:border-box}
+body{margin:0;font:16px/1.45 Arial,Helvetica,sans-serif;color:var(--t);background:#fff}
+header{display:flex;align-items:center;gap:12px;padding:12px 16px;border-bottom:3px solid var(--v)}
+header img{width:48px;height:48px}
+header b{font-size:18px}
+header span{display:block;font-size:13px;color:#555}
+main{max-width:720px;margin:0 auto;padding:16px}
+h1{font-size:22px;margin:4px 0 6px}
+h2{font-size:18px;margin:22px 0 8px}
+.passos{display:grid;grid-template-columns:repeat(3,1fr);gap:10px}
+.passo{background:var(--c);border-radius:12px;padding:10px;text-align:center;font-size:14px}
+.passo svg{width:100%;max-width:120px;height:auto}
+.passo b{display:block;color:var(--v)}
+.tabs{display:flex;gap:8px;margin:8px 0}
+.tabs button{flex:1;padding:12px;border:2px solid var(--v);background:#fff;color:var(--v);border-radius:10px;font-size:16px;font-weight:bold}
+.tabs button.on{background:var(--v);color:#fff}
+label{display:block;font-weight:bold;margin:10px 0 4px}
+input{width:100%;padding:12px;font-size:18px;border:1px solid #bbb;border-radius:10px}
+.row{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.res{margin:16px 0;padding:16px;border-radius:12px;background:#fff3f4;border:2px solid var(--v);text-align:center;display:none}
+.res .tam{font-size:40px;font-weight:bold;color:var(--v)}
+.zap{display:block;width:100%;padding:14px;border:0;border-radius:12px;background:#25d366;color:#fff;font-size:18px;font-weight:bold;margin-top:10px;cursor:pointer}
+table{border-collapse:collapse;width:100%;font-size:14px;margin:6px 0 14px}
+th,td{border:1px solid #ccc;padding:6px;text-align:center}
+th{background:var(--c)}
+tr.sel td{background:#ffe1e5;font-weight:bold}
+.obs{font-size:13px;color:#555}
+footer{text-align:center;font-size:13px;color:#555;padding:20px 16px;border-top:1px solid #eee;margin-top:20px}
+@media(max-width:480px){.passos{grid-template-columns:1fr 1fr 1fr;gap:6px}.passo{font-size:12px;padding:6px}}
+</style>
+</head>
+<body>
+<header><img src="icons/icon-512.png" alt=""><div><b>Z7 Studio Fotográfico</b><span>Aluguel de becas · Nilópolis/RJ</span></div></header>
+<main>
+<h1>Descubra o tamanho ideal da sua beca</h1>
+<p>Com uma fita métrica, tire as 3 medidas abaixo (em centímetros). A gente calcula o tamanho na hora e você manda tudo pelo WhatsApp.</p>
+
+<div class="passos">
+  <div class="passo"><svg viewBox="0 0 100 120"><circle cx="50" cy="18" r="12"/><path d="M40 32h20v40H40zM40 34L22 56M60 34l18 22M44 72l-8 44M56 72l8 44" stroke="#000" stroke-width="7" stroke-linecap="round"/><path d="M62 32l16 20" stroke="#c8102e" stroke-width="4" marker-end="url(#a)" marker-start="url(#a)"/><defs><marker id="a" viewBox="0 0 10 10" refX="5" refY="5" markerWidth="4" markerHeight="4" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" fill="#c8102e"/></marker></defs></svg><b>Manga</b>do ombro até o punho</div>
+  <div class="passo"><svg viewBox="0 0 100 120"><circle cx="50" cy="18" r="12"/><path d="M40 32h20v40H40zM40 34L22 56M60 34l18 22M44 72l-8 44M56 72l8 44" stroke="#000" stroke-width="7" stroke-linecap="round"/><path d="M66 34v80" stroke="#c8102e" stroke-width="4" marker-end="url(#b)" marker-start="url(#b)"/><defs><marker id="b" viewBox="0 0 10 10" refX="5" refY="5" markerWidth="4" markerHeight="4" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" fill="#c8102e"/></marker></defs></svg><b>Comprimento</b>do ombro até o pé</div>
+  <div class="passo"><svg viewBox="0 0 100 120"><circle cx="50" cy="18" r="12"/><path d="M40 32h20v40H40zM40 34L22 56M60 34l18 22M44 72l-8 44M56 72l8 44" stroke="#000" stroke-width="7" stroke-linecap="round"/><path d="M30 38h40M30 66h40" stroke="#c8102e" stroke-width="4" marker-end="url(#c)" marker-start="url(#c)"/><defs><marker id="c" viewBox="0 0 10 10" refX="5" refY="5" markerWidth="4" markerHeight="4" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" fill="#c8102e"/></marker></defs></svg><b>Largura</b>a maior volta do corpo: ombros ou cintura</div>
+</div>
+
+<h2>1. Qual beca?</h2>
+<div class="tabs"><button id="tAd" class="on" type="button">Adulto</button><button id="tIn" type="button">Infantil</button></div>
+
+<h2>2. Suas medidas (cm)</h2>
+<label for="nome">Nome do formando(a)</label>
+<input id="nome" autocomplete="name" placeholder="Nome completo">
+<div class="row">
+  <div><label for="manga">Manga</label><input id="manga" inputmode="decimal" placeholder="ex.: 60"></div>
+  <div><label for="comp">Comprimento</label><input id="comp" inputmode="decimal" placeholder="ex.: 140"></div>
+</div>
+<div id="boxLarg"><label for="larg">Largura (a maior volta)</label><input id="larg" inputmode="decimal" placeholder="ex.: 110"></div>
+
+<div class="res" id="res"><div>Tamanho ideal</div><div class="tam" id="tam">—</div><div id="porque" class="obs"></div>
+<button class="zap" id="zap" type="button">Enviar minhas medidas pelo WhatsApp</button></div>
+
+<h2>Tabela de medidas das becas (cm)</h2>
+<div id="tabela"></div>
+<p class="obs">Ficou entre dois tamanhos? Escolhemos o maior, para a beca não ficar curta. Na dúvida, mande as medidas e a gente confere.</p>
+</main>
+<footer>Z7 Studio Fotográfico · Estrada Dr. Rufino Gonçalves Ferreira, 290 – Centro, Nilópolis/RJ · WhatsApp (21) 99881-7771</footer>
+
+<script>
+// medidas das becas do estúdio (cm): [tamanho, manga, comprimento, largura]
+const BECAS = {
+  adulto: [["PP",58,136,125],["P",58,138,130],["M",60,140,135],["G",64,144,140],["GG",66,148,145],["EG",68,152,150],["XGG",72,166,160]],
+  infantil: [["PP",42,100],["P",46,105],["M",48,110],["G",48,115],["GG",50,120],["EG",52,130]]
+};
+const ZAP = "5521998817771";
+let tipo = "adulto";
+const $ = id => document.getElementById(id);
+const num = id => parseFloat(String($(id).value).replace(",", ".")) || 0;
+
+// o menor tamanho que cobre todas as medidas (folga de 2 cm na manga e no comprimento)
+function tamanhoIdeal(t, m, c, l) {
+  const lista = BECAS[t];
+  const i = lista.findIndex(([, bm, bc, bl]) => bm >= m - 2 && bc >= c - 2 && (!bl || !l || bl >= l));
+  return i < 0 ? null : lista[i];
+}
+function tabela(sel) {
+  const l = BECAS[tipo], comL = tipo === "adulto";
+  $("tabela").innerHTML = `<table><tr><th>Tamanho</th><th>Manga</th><th>Comprimento</th>${comL ? "<th>Largura</th>" : ""}</tr>${l
+    .map(r => `<tr${sel && sel[0] === r[0] ? ' class="sel"' : ""}><td>${r[0]}</td><td>${r[1]}</td><td>${r[2]}</td>${comL ? `<td>${r[3]}</td>` : ""}</tr>`)
+    .join("")}</table>`;
+}
+function calcular() {
+  const m = num("manga"), c = num("comp"), l = tipo === "adulto" ? num("larg") : 0;
+  if (!m || !c) { $("res").style.display = "none"; tabela(); return; }
+  const r = tamanhoIdeal(tipo, m, c, l);
+  $("res").style.display = "block";
+  $("tam").textContent = r ? r[0] : "Fale com a gente";
+  $("porque").textContent = r
+    ? `Beca ${tipo} ${r[0]}: manga ${r[1]} cm, comprimento ${r[2]} cm${r[3] ? ", largura " + r[3] + " cm" : ""}.`
+    : "Suas medidas passam do maior tamanho da tabela. Mande pelo WhatsApp que a gente resolve.";
+  tabela(r);
+}
+function trocar(t) {
+  tipo = t;
+  $("tAd").classList.toggle("on", t === "adulto");
+  $("tIn").classList.toggle("on", t === "infantil");
+  $("boxLarg").style.display = t === "adulto" ? "" : "none";
+  calcular();
+}
+$("tAd").onclick = () => trocar("adulto");
+$("tIn").onclick = () => trocar("infantil");
+["manga", "comp", "larg"].forEach(id => $(id).addEventListener("input", calcular));
+$("zap").onclick = () => {
+  const r = tamanhoIdeal(tipo, num("manga"), num("comp"), tipo === "adulto" ? num("larg") : 0);
+  const txt = `Oi! Quero alugar a beca. Seguem as medidas:\n` +
+    `Formando(a): ${$("nome").value.trim() || "-"}\nBeca: ${tipo}\nManga: ${num("manga")} cm\nComprimento: ${num("comp")} cm` +
+    (tipo === "adulto" ? `\nLargura: ${num("larg") || "-"} cm` : "") +
+    `\nTamanho que o site indicou: ${r ? r[0] : "acima da tabela"}`;
+  location.href = `https://wa.me/${ZAP}?text=${encodeURIComponent(txt)}`;
+};
+const p = new URLSearchParams(location.search);
+trocar(p.get("tipo") === "infantil" ? "infantil" : "adulto");
+if (p.get("nome")) $("nome").value = p.get("nome");
+</script>
+</body>
+</html>
