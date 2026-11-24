@@ -3883,6 +3883,14 @@ await cenario("Aluguel de becas · alunos dos colégios (status, estoque e produ
     /Caio Atrasado/.test(await pg.textContent("#alLista")) && !/Ana Aluguel/.test(await pg.textContent("#alLista")),
     "alerta: atrasado na devolução"
   );
+  // (24/11/2026) o quadro "Becas fora" abre a janela com quem está com a beca (o atrasado em vermelho)
+  ok((await pg.locator("#alKpis .kpi", { hasText: "Atrasados na devolução" }).count()) === 0, "sem o quadro Atrasados na devolução");
+  await pg.locator("#alKpis .kpi", { hasText: "Becas fora" }).click();
+  const jf = pg.locator(".sheet").last();
+  await jf.waitFor({ timeout: 5000 });
+  ok(/Becas fora/.test(await jf.textContent()) && /Caio Atrasado/.test(await jf.textContent()) && /passou da devolução/.test(await jf.textContent()), "janela Becas fora: quem está com a beca e o atraso");
+  if (process.env.FOTOS) await jf.screenshot({ path: process.env.FOTOS + "/becas-fora.png" });
+  await jf.getByRole("button", { name: "Fechar" }).click();
   await pg.locator("#alChips .chip", { hasText: "Tudo" }).click();
   // P1 já está reservado para a Bia (só 1 menos longa): a Ana não consegue reservar
   const cAna = pg.locator("#alLista article", { hasText: "Ana Aluguel" });

@@ -189,17 +189,17 @@ function render() {
     if (e.retirada <= hoje) u.fora += totEv(e);
     else u.reservado += totEv(e);
   });
-  const atr = doAno.filter(a => atrasadoAluguel(a, hoje));
+  const atr = doAno.filter(a => atrasadoAluguel(a, hoje)); // (24/11/2026) "Becas fora" abre a janela (aluguel-fora.js)
   [
     ["Alunos", String(doAno.length)],
     ["Becas reservadas", String(u.reservado)],
-    ["Becas fora", String(u.fora)],
-    ["Atrasados na devolução", String(atr.length)]
+    ["Becas fora", String(u.fora) + (atr.length ? ` · ⚠️ ${atr.length}` : "")]
   ].forEach(([t, val], i) => {
-    const c = el("div", "kpi" + (i === 3 && atr.length ? " late" : ""));
+    const c = el("div", "kpi" + (i === 2 && atr.length ? " late" : ""));
     c.append(el("small", null, t), el("b", null, val));
     clicavel(c, () => {
-      filtro.status = ["todos", "Beca medida", "Retirou a beca", "atrasados"][i];
+      if (i === 2) return import("./aluguel-fora.js").then(m => m.abrirBecasFora(doAno, evs, cobre, hoje, linha));
+      filtro.status = ["todos", "Beca medida"][i];
       render();
     });
     k.append(c);
