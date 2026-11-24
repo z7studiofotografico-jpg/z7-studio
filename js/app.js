@@ -274,6 +274,7 @@ function confereLimite(q, s) {
 const ctx = {
   db,
   FS: FSv,
+  isDono,
   // o "crachá" do login (Firebase), para o site saber quem está enviando as prévias (site-previas.js)
   token: () => (auth.currentUser ? auth.currentUser.getIdToken() : Promise.resolve("")),
   $,

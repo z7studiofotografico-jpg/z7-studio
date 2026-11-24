@@ -374,9 +374,11 @@ service cloud.firestore {
         allow create: if admin() || (pode('becas') && meuContrato(cid)
           && request.resource.data.get('conferido', false) == false
           && request.resource.data.get('porEmail', '') == email()
-          && request.resource.data.get('repassadoEm', '') == '');
+          && request.resource.data.get('repassadoEm', '') == ''
+          && request.resource.data.get('comissaoPagaEm', '') == '');
+        // (24/11/2026) "Paguei a comissão" (comissaoPagaEm): só o admin
         allow update: if admin() || (pode('becas') && meuContrato(cid)
-          && resource.data.get('conferido', false) == false && !mudou(['conferido', 'porEmail'])
+          && resource.data.get('conferido', false) == false && !mudou(['conferido', 'porEmail', 'comissaoPagaEm', 'comissaoPagaPor'])
           && !(resource.data.get('recebidoPor', '') == 'representante' && mudou(['recebidoPor', 'repassadoEm', 'valor']))
           && !(request.resource.data.get('recebidoPor', '') == 'representante' && request.resource.data.get('repassadoEm', '') != ''));
         allow delete: if admin();

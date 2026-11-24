@@ -196,3 +196,21 @@ test("valor do kit: o padrão vale o combinado e o item vendido depois soma", ()
   assert.equal(vdp(["beca", "certificado", "canudo", "paspatur"], "", c), 305);
   assert.equal(vdp(["paspatur"], "", c), 80);
 });
+
+test("comissão (24/11/2026): fechado pelo dono não tem comissão; 'Paguei a comissão' tira do a pagar", () => {
+  const c = { quemPaga: "alunos", comissaoPct: 10, respEmail: "rep@x.com" };
+  const pags = [
+    { valor: 100, recebidoPor: "estudio", conferido: true, comissaoPagaEm: "2026-11-24" },
+    { valor: 200, recebidoPor: "estudio", conferido: true, tipo: "antecipacao" },
+    { valor: 50, recebidoPor: "estudio", conferido: false }
+  ];
+  const r = R.resumoDinheiro(pags, c, [], {}, em => em === "dono@x.com");
+  assert.equal(r.recebido, 350);
+  assert.equal(r.comissao, 30);
+  assert.equal(r.comissaoAPagar, 20);
+  assert.equal(r.semComissao, false);
+  const d = R.resumoDinheiro(pags, Object.assign({}, c, { respEmail: "dono@x.com" }), [], {}, em => em === "dono@x.com");
+  assert.equal(d.comissao, 0);
+  assert.equal(d.comissaoAPagar, 0);
+  assert.equal(d.semComissao, true);
+});

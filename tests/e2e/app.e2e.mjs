@@ -4136,6 +4136,55 @@ await cenario("Contrato do colégio (pacote por aluno, quem recebeu, repasse e p
     ok(!erros.length, "sem erros" + (erros.length ? ": " + erros.join(" | ") : ""));
   }
 });
+await cenario("Aluguel de becas: entrada / antecipação do colégio, Recebido e comissão", async () => {
+  const Y = new Date().getFullYear();
+  const al = (nome, extra) =>
+    Object.assign(
+      { instId: "i1", instNome: "COLEGIO ALFA", ano: Y, nome, serie: "5º ano", status: "Cadastrado", produtos: [], historico: [], pacote: ["paspatur"], valor: 80, respEmail: ANA },
+      extra
+    );
+  const d = Object.assign({}, migrar(base), {
+    "alugueis/c1": al("Joao Lucas"),
+    "alugueis/c2": al("Miguel Augusto"),
+    "alugueis/c3": al("Pedro Henrique"),
+    [`contratosColegio/i1_${Y}`]: {
+      instId: "i1", instNome: "COLEGIO ALFA", ano: Y, respEmail: ANA, respNome: "Ana Vendedora",
+      quemPaga: "alunos", recebePadrao: "estudio", valor: 80, parcelas: 1, precos: { paspatur: 80 }, pacotePadrao: ["paspatur"], comissaoPct: 10
+    }
+  });
+  const { pg, erros, store } = await abrir(ADRIANO, d);
+  await ir(pg, "#becas");
+  await pg.waitForFunction(() => /Joao Lucas/i.test(document.getElementById("viewBecas").textContent), null, { timeout: 8000 });
+  await pg.locator("#alFiltros select").nth(2).selectOption("i1");
+  await calmo(pg);
+  await pg.getByRole("button", { name: "💰 Lançar entrada / antecipação" }).click();
+  const fp = pg.locator(".sheet").last();
+  await fp.getByLabel("Valor").fill("72");
+  await fp.getByLabel("Data").fill(`${Y}-05-01`);
+  await fp.locator("button[type=submit]").click();
+  await calmo(pg);
+  let st = await store();
+  const [pk, p] = Object.entries(st).find(([k]) => k.startsWith(`contratosColegio/i1_${Y}/pagamentos/`));
+  ok(p.tipo === "antecipacao" && !p.alunoId && p.valor === 72, "entrada do colégio lançada sem aluno");
+  const painel = pg.locator(".sheet").last();
+  ok(/Colégio · entrada \/ antecipação/.test(await painel.textContent()), "a linha mostra Colégio · entrada / antecipação");
+  await painel.getByRole("button", { name: "Conferir" }).click();
+  await calmo(pg);
+  ok(/comissão R\$\s*7,20 a pagar/.test(await pg.locator(".sheet").last().textContent()), "conferido: comissão de 10% a pagar");
+  await pg.locator(".sheet").last().getByRole("button", { name: "Paguei a comissão" }).click();
+  await pg.getByRole("button", { name: /Confirmar|Sim/ }).last().click();
+  await calmo(pg);
+  st = await store();
+  ok(!!st[pk].comissaoPagaEm, "Paguei a comissão grava a data");
+  if (process.env.FOTOS) await pg.locator(".sheet").last().screenshot({ path: process.env.FOTOS + "/contrato-entrada.png" });
+  await pg.locator(".sheet").last().getByRole("button", { name: "Fechar" }).click();
+  await calmo(pg);
+  await pg.waitForTimeout(800);
+  const topo = await pg.locator("#viewBecas .kpis").first().textContent();
+  ok(/Recebido\s*R\$\s*72/.test(topo) && /A receber\s*R\$\s*168/.test(topo), "topo: Recebido R$ 72 e A receber R$ 168");
+  if (process.env.FOTOS) await pg.locator("#viewBecas").screenshot({ path: process.env.FOTOS + "/becas-topo.png" });
+  ok(!erros.length, "sem erros" + (erros.length ? ": " + erros.join(" | ") : ""));
+});
 await cenario("Formaturas · abas Linha de Frente / Repasse / Venda Antecipada, virada e Pix", async () => {
   const Y = new Date().getFullYear();
   const aluno = (nome, escola, ano, seg, etapa = "NA FILA") => ({

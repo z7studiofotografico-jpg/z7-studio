@@ -153,6 +153,7 @@ details.guide summary{cursor:pointer;font-family:var(--f-display);font-weight:70
 .kpi small{color:var(--muted);font-size:.88rem;font-weight:600}
 .kpi b{font-size:1.35rem;font-variant-numeric:tabular-nums}
 .kpi.late{border-top-color:var(--late)}
+.kpi.ok{border-top-color:var(--ok,#2e7d32)}
 .vdbox{background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:14px;margin:10px 0}
 .vdbox h3{margin:0;font-size:1.15rem;font-weight:800;text-decoration:underline;text-decoration-thickness:2px;text-underline-offset:4px;text-decoration-color:var(--accent)}
 .vdbox>small{color:var(--muted);font-size:.8rem}

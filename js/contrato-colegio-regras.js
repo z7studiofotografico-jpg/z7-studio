@@ -185,6 +185,9 @@ export function baseItens(p) {
 }
 // Comissão de um pagamento, em centavos. Contrato com "comissão de quem fechou (% do total)": essa porcentagem
 // sobre o valor do pagamento (17/11/2026); sem ela, item por item, pelas taxas dos Ajustes.
+// (24/11/2026) contrato fechado pelo dono (Luciana, Adriano): não tem comissão. A entrada / antecipação do colégio
+// é um pagamento sem aluno (tipo "antecipacao"). "Paguei a comissão" grava comissaoPagaEm no pagamento.
+export const semComissao = (contrato, isDono) => !!(contrato && isDono && isDono(contrato.respEmail));
 export function comissaoPagamento(p, P, contrato) {
   const pct = Number(contrato && contrato.comissaoPct) || 0;
   if (pct > 0) return Math.round((centavos(p.valor) * pct) / 100);
@@ -212,7 +215,7 @@ export function textoOnde(p, contrato) {
 }
 
 // Totais do contrato (centavos internos, reais na saída)
-export function resumoDinheiro(pags, contrato, alunos, P) {
+export function resumoDinheiro(pags, contrato, alunos, P, isDono) {
   const lst = (pags || []).filter(p => p && !p.excluido);
   const soma = f => reais(lst.filter(f).reduce((t, p) => t + centavos(p.valor), 0));
   const caixa = soma(p => ondeEsta(p) === "caixa");
@@ -229,9 +232,10 @@ export function resumoDinheiro(pags, contrato, alunos, P) {
         ? reais((alunos || []).reduce((t, a) => t + centavos(precoAluno(a, c)), 0))
         : reais(centavos(c.valor) * nAlunos);
   // comissão item por item, sobre o que está no caixa e conferido
-  const comissao = reais(
-    lst.filter(p => ondeEsta(p) === "caixa" && p.conferido).reduce((t, p) => t + comissaoPagamento(p, P, contrato), 0)
-  );
+  const sem = semComissao(contrato, isDono);
+  const conf = lst.filter(p => ondeEsta(p) === "caixa" && p.conferido);
+  const comissao = sem ? 0 : reais(conf.reduce((t, p) => t + comissaoPagamento(p, P, contrato), 0));
+  const comissaoAPagar = sem ? 0 : reais(conf.filter(p => !p.comissaoPagaEm).reduce((t, p) => t + comissaoPagamento(p, P, contrato), 0));
   return {
     recebido,
     caixa,
@@ -240,7 +244,9 @@ export function resumoDinheiro(pags, contrato, alunos, P) {
     combinado,
     falta: Math.max(0, reais(centavos(combinado) - centavos(recebido))),
     aConferir: lst.filter(p => ondeEsta(p) === "caixa" && !p.conferido).length,
-    comissao
+    comissao,
+    comissaoAPagar,
+    semComissao: sem
   };
 }
 

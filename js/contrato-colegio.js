@@ -20,7 +20,8 @@ const histMais = (h, o) => [...(h || []), reg(o)].slice(-40);
 const dataBR = d => (d ? d.split("-").reverse().join("/") : "");
 
 // Abre a janela do contrato de um colégio e ano
-export function abrirContrato(ctx, inst, ano) {
+// o = { entrada: true } → abre já com a janela da entrada / antecipação do colégio (botão do Aluguel de becas)
+export function abrirContrato(ctx, inst, ano, o = {}) {
   C = ctx;
   FS = ctx.FS;
   db = ctx.db;
@@ -37,9 +38,18 @@ export function abrirContrato(ctx, inst, ano) {
       corpo.append(el("div", "empty", "Carregando…"));
       const fechar = U.mkBtn("Fechar", "", close);
       p.append(corpo, fechar);
+      let pediuEntrada = !!o.entrada;
       const desenhar = () => {
         render(corpo, st, inst, ano, ref);
         if (st.janela) st.janela();
+        if (pediuEntrada && st.contrato) {
+          pediuEntrada = false;
+          if (st.contrato.quemPaga === "colegio") formPagamento(null, st, ref);
+          else formPagamento(null, st, ref, { alunoId: COLEGIO });
+        } else if (pediuEntrada && st.carregou) {
+          pediuEntrada = false;
+          U.toast("Crie o contrato do colégio primeiro.");
+        }
       };
       unsubs.push(
         FS.onSnapshot(
@@ -95,7 +105,7 @@ export function abrirContrato(ctx, inst, ano) {
         )
       );
     },
-    { div: true, wide: true, onClose: () => unsubs.forEach(u => u()) }
+    { div: true, wide: true, onClose: () => (unsubs.forEach(u => u()), o.aoFechar && o.aoFechar()) }
   );
 }
 
@@ -169,7 +179,7 @@ function render(corpo, st, inst, ano, ref) {
   } else dados.append(acoes);
   corpo.append(dados);
   // ---- dinheiro
-  const r = R.resumoDinheiro(st.pags, c, st.alunos, C.P);
+  const r = R.resumoDinheiro(st.pags, c, st.alunos, C.P, C.isDono);
   const k = el("div", "kpis");
   const kpi = (t, v, cls) => {
     const b = el("div", "kpi" + (cls ? " " + cls : ""));
@@ -180,7 +190,11 @@ function render(corpo, st, inst, ano, ref) {
   kpi("Falta repassar · colégio", brl(r.comColegio), r.comColegio ? "late" : "");
   kpi("Falta repassar · representante", brl(r.comRep), r.comRep ? "late" : "");
   kpi("Falta receber", brl(r.falta));
-  if (C.isAdmin || c.respEmail === C.email) kpi(`Comissão${c.respNome ? " · " + U.first(c.respNome) : ""}`, brl(r.comissao));
+  if (r.semComissao) kpi("Comissão", `sem comissão (fechado por ${U.first(c.respNome || "") || "dono"})`);
+  else if (C.isAdmin || c.respEmail === C.email) {
+    kpi(`Comissão${c.respNome ? " · " + U.first(c.respNome) : ""}`, brl(r.comissao));
+    kpi("Comissão a pagar", brl(r.comissaoAPagar), r.comissaoAPagar ? "late" : "");
+  }
   corpo.append(el("h3", null, "Dinheiro"), k);
   if (r.aConferir && C.isAdmin)
     corpo.append(
@@ -192,6 +206,8 @@ function render(corpo, st, inst, ano, ref) {
   // contrato sem preço (cada aluno paga e nenhum item tem valor): não lança pagamento até o Adriano precificar
   const semPrecoC = c.quemPaga !== "colegio" && !R.temPreco(c);
   if (pode && !semPrecoC) hp.append(U.mkBtn("+ Pagamento", "btn-primary btn-sm", () => formPagamento(null, st, ref)));
+  if (pode && !semPrecoC && c.quemPaga !== "colegio")
+    hp.append(U.mkBtn("💰 Entrada / antecipação do colégio", "btn-sm", () => formPagamento(null, st, ref, { alunoId: COLEGIO })));
   // (23/11/2026) a entrada de todos de uma vez (quem ainda não tem nenhum pagamento lançado)
   if (pode && c.quemPaga !== "colegio" && c.entrada && c.entrada.valor > 0) {
     const pagos = new Set(st.pags.filter(x => !x.excluido).map(x => x.alunoId));
@@ -342,7 +358,11 @@ function linhaPagamento(pg, st, ref, pode) {
   const l = el("div", "lc-linha lc-pag");
   const n = el("div", "lc-nome");
   n.append(
-    el("b", null, `${pg.alunoNome ? title(pg.alunoNome) : c.quemPaga === "colegio" ? "Colégio" : "—"} · ${brl(pg.valor)}`),
+    el(
+      "b",
+      null,
+      `${pg.alunoNome ? title(pg.alunoNome) : pg.tipo === "antecipacao" ? "Colégio · entrada / antecipação" : c.quemPaga === "colegio" ? "Colégio" : "—"} · ${brl(pg.valor)}`
+    ),
     el(
       "small",
       null,
@@ -403,12 +423,30 @@ function linhaPagamento(pg, st, ref, pode) {
         )
       )
     );
+  // (24/11/2026) comissão de cada pagamento conferido: a pagar → "Paguei a comissão" (só o admin)
+  const com = !R.semComissao(c, C.isDono) && onde === "caixa" && pg.conferido ? R.comissaoPagamento(pg, C.P, c) / 100 : 0;
+  if (com > 0) {
+    l.append(el("span", "tag " + (pg.comissaoPagaEm ? "ok" : "warn"), `comissão ${brl(com)} ${pg.comissaoPagaEm ? "paga " + dataBR(pg.comissaoPagaEm) : "a pagar"}`));
+    if (C.isAdmin)
+      ac.append(
+        U.mkBtn(pg.comissaoPagaEm ? "Desfazer comissão paga" : "Paguei a comissão", "btn-sm" + (pg.comissaoPagaEm ? "" : " btn-ok"), async () => {
+          if (!pg.comissaoPagaEm && !(await confirmar("Pagou a comissão?", `Marcar a comissão de ${brl(com)} como paga hoje?`))) return;
+          muda(
+            pg.comissaoPagaEm ? { comissaoPagaEm: "", comissaoPagaPor: "" } : { comissaoPagaEm: U.todayStr(), comissaoPagaPor: C.me || "" },
+            pg.comissaoPagaEm ? "desfez a comissão paga" : `pagou a comissão (${brl(com)})`,
+            pg.comissaoPagaEm ? "Comissão voltou para a pagar" : "Comissão marcada como paga ✅"
+          );
+        })
+      );
+  }
   if (pode && (C.isAdmin || R.repPodeMexer(pg))) ac.append(U.mkBtn("Editar", "btn-sm", () => formPagamento(pg, st, ref)));
   if (ac.childNodes.length) l.append(ac);
   if ((pg.historico || []).length) l.title = pg.historico.map(h => `${dataBR(String(h.em).slice(0, 10))} · ${h.por}: ${h.o}`).join("\n");
   return l;
 }
 
+// valor do seletor de aluno para a entrada / antecipação do colégio (pagamento sem aluno)
+const COLEGIO = "__colegio";
 // Lançar / editar um pagamento
 function formPagamento(pg, st, ref, pre = {}) {
   const c = st.contrato;
@@ -416,8 +454,11 @@ function formPagamento(pg, st, ref, pre = {}) {
   sheet(pg ? "Editar pagamento" : "Novo pagamento", (p, close) => {
     const porAluno = c.quemPaga !== "colegio";
     const sAluno = sel(
-      st.alunos.map(a => [a.id, `${a.codigo ? a.codigo + " · " : ""}${title(a.nome || "")}${a.serie ? " · " + a.serie : ""}`]),
-      x.alunoId || "",
+      [
+        ...(porAluno ? [[COLEGIO, "🏫 Colégio · entrada / antecipação (sem aluno)"]] : []),
+        ...st.alunos.map(a => [a.id, `${a.codigo ? a.codigo + " · " : ""}${title(a.nome || "")}${a.serie ? " · " + a.serie : ""}`])
+      ],
+      x.alunoId || (pg && pg.tipo === "antecipacao" ? COLEGIO : ""),
       "escolha o aluno"
     );
     sAluno.required = porAluno;
@@ -491,7 +532,8 @@ function formPagamento(pg, st, ref, pre = {}) {
         return;
       }
       const al = st.alunos.find(a => a.id === sAluno.value);
-      if (porAluno && !al) {
+      const antecipa = sAluno.value === COLEGIO;
+      if (porAluno && !al && !antecipa) {
         err.textContent = "Escolha o aluno.";
         err.hidden = false;
         return;
@@ -507,6 +549,7 @@ function formPagamento(pg, st, ref, pre = {}) {
         comprovanteOk: ok.checked,
         // o que este pagamento paga, item por item (base da comissão)
         itens: R.itensDoPagamento(al || null, c, st.alunos),
+        tipo: antecipa ? "antecipacao" : "",
         atualizadoEm: agora()
       };
       try {
