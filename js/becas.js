@@ -8,6 +8,8 @@ import { lerReais, centavos, reais, brl } from "./regras.js";
 import * as U from "./util.js";
 import { botaoRelatorio } from "./relatorio.js";
 import { contratoAvulso } from "./contrato-imprimir.js";
+import { linhaGenerica } from "./lista-compacta.js";
+import { abrirJanela } from "./janela.js";
 import { contatoRel } from "./aluno-id.js";
 import { BECAS, TAMANHOS, FAIXAS, CAPELOS, nomeFaixa, nomeCapelo, abrirEstoqueBecas, somarUso, usoDosAlunos } from "./becas-estoque.js";
 import { ouvirUso, espelhar, acertarBecas, usoNoDia } from "./becas-uso.js";
@@ -114,7 +116,7 @@ export function show() {
   const chips = el("div", "chips");
   chips.id = "bcChips";
   v.append(chips);
-  const corpo = el("div", "grid");
+  const corpo = el("div", "grid lc-lista");
   corpo.id = "bcLista";
   corpo.append(el("div", "empty", "Carregando…"));
   v.append(corpo);
@@ -261,22 +263,62 @@ function render() {
     corpo.append(e);
     return;
   }
-  arr.forEach(x => corpo.append(card(x)));
+  arr.forEach(x => corpo.append(linha(x)));
 }
 
+// (24/11/2026) o mesmo desenho das outras listas: uma linha por aluguel; tocar abre a janela com o cartão completo
+function seloDe(x, at) {
+  if (x.status === "cancelado") return "CANCELADO";
+  if (x.status === "devolvido") return "DEVOLVIDO";
+  if (at) return "ATRASADO";
+  return x.status === "retirado" ? "FORA DO ESTÚDIO" : "RESERVADO";
+}
+function passoDe(x, hoje, at) {
+  if (at) return "⚠️ Devolução atrasada desde " + U.fmtDate(x.devolucao);
+  if (x.status === "retirado") return x.devolucao ? "Devolver até " + U.fmtDate(x.devolucao) : "";
+  if (x.status === "reservado")
+    return x.retirada ? `Retirada ${x.retirada === hoje ? "hoje" : U.fmtDate(x.retirada)} ${x.retiradaHora || ""}`.trim() : "";
+  return x.status === "devolvido" && x.devolvidoEm ? "Devolvida em " + U.fmtDate(x.devolvidoEm) : "";
+}
+function linha(x) {
+  const hoje = U.todayStr(),
+    at = atrasada(x, hoje),
+    pend = n0(x.valor) ? falta(x) : 0;
+  return linhaGenerica({
+    id: x.id,
+    cor: at ? "vermelho" : { devolvido: "verde", cancelado: "fim", retirado: "azul" }[x.status] || "cinza",
+    titulo: title(x.cliente || ""),
+    sub: [
+      `👘 ${totBecas(x)} beca${totBecas(x) !== 1 ? "s" : ""}`,
+      ...BECAS.filter(([k]) => n0((x.becasQtd || {})[k])).map(([, t]) => t.replace("Beca ", "")),
+      x.evento || (x.tipoEvento === "nosso" ? "Nosso evento" : "Outro evento"),
+      x.dataEvento ? "evento " + U.fmtDate(x.dataEvento) : "",
+      pend ? "falta " + brl(pend) : n0(x.valor) ? "pago ✓" : ""
+    ]
+      .filter(Boolean)
+      .join(" · "),
+    passo: passoDe(x, hoje, at),
+    passoCls: at ? "late" : x.status === "reservado" && x.retirada && x.retirada <= U.addDays(1) ? "today" : "",
+    selo: seloDe(x, at),
+    card: () => card(x),
+    abrir: () =>
+      abrirJanela({
+        C,
+        colecao: "becas",
+        item: x,
+        topo: y => ({
+          titulo: title(y.cliente || ""),
+          sub: passoDe(y, U.todayStr(), atrasada(y, hoje)),
+          selo: seloDe(y, atrasada(y, hoje))
+        }),
+        abas: [["resumo", "Resumo", (box, y) => box.append(card(y))]]
+      })
+  });
+}
 function card(x) {
   const hoje = U.todayStr(),
     at = atrasada(x, hoje);
-  const st =
-    x.status === "cancelado"
-      ? "CANCELADO"
-      : x.status === "devolvido"
-        ? "DEVOLVIDO"
-        : at
-          ? "ATRASADO"
-          : x.status === "retirado"
-            ? "FORA DO ESTÚDIO"
-            : "RESERVADO";
+  const st = seloDe(x, at);
   const e = el(
     "article",
     "card " + (at ? "late" : x.status === "devolvido" ? "won" : x.status === "reservado" && x.retirada <= U.addDays(1) ? "today" : "")

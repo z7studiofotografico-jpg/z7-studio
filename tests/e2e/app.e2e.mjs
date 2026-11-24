@@ -1518,6 +1518,24 @@ await cenario("Adriano (admin), com os dados já atualizados no servidor", async
       "tamanhos por tipo: tradicional preta 7 M e 5 G"
     );
     ok(/Falta receber R\$ 900/.test(await pg.textContent("#bcLista")), "falta receber R$ 900 (conta em centavos)");
+    // (24/11/2026) aluguéis avulsos no padrão das listas: uma linha por aluguel; tocar abre a janela
+    await pg.evaluate(() => (window.__z7CartaoNaLista = false));
+    await pg.locator("#viewBecas .seg", { hasText: "Alunos dos colégios" }).click();
+    await calmo(pg);
+    await pg.locator("#viewBecas .seg", { hasText: "Aluguéis avulsos" }).click();
+    await calmo(pg);
+    const lin = pg.locator("#bcLista .lc-linha", { hasText: "Igreja Central" });
+    ok((await lin.count()) === 1 && /12 becas.*falta R\$\s*900/.test(await lin.textContent()), "avulso: uma linha com becas e o que falta");
+    if (process.env.FOTOS) {
+      await pg.evaluate(() => document.querySelectorAll("#toast, .toast").forEach(t => (t.style.display = "none")));
+      await pg.locator("#bcLista").screenshot({ path: process.env.FOTOS + "/avulsos-lista.png" });
+    }
+    await lin.click();
+    await calmo(pg);
+    ok(/🖨️ Contrato/.test(await pg.locator(".sheet").last().textContent()), "avulso: a janela abre com o cartão e o botão do contrato");
+    if (process.env.FOTOS) await pg.locator(".sheet").last().screenshot({ path: process.env.FOTOS + "/avulsos-janela.png" });
+    await pg.keyboard.press("Escape");
+    await pg.evaluate(() => (window.__z7CartaoNaLista = true));
   });
   ok(erros.length === 0, "sem erros no console" + (erros.length ? ": " + erros.slice(0, 3).join(" | ") : ""));
 });
