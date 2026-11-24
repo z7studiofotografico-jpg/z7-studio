@@ -1,5 +1,6 @@
 // Contrato do colégio: o formulário (criar/editar) e lançar a entrada de todos (23/11/2026: separado de
 // contrato-colegio.js, que passou do tamanho). O valor combinado é o do kit inteiro por aluno; os itens são só para constar.
+import { campoRecepcionista, textoRecepcionista } from "./recepcionista.js";
 import { el, title, field, inp, inpReais, sel, sheet, botoes, bloco } from "./ui.js";
 import * as U from "./util.js";
 import { lerReais, brl } from "./regras.js";
@@ -194,7 +195,8 @@ export function formContrato(c, inst, ano, ref) {
     const b3 = bloco(4, "Contato do colégio");
     b3.append(r3, field("Unidade", unidade));
     const b4 = bloco(5, "Entrega e observações");
-    b4.append(r4, field("Observação", obs));
+    const recep = campoRecepcionista(x); // (24/11/2026) recepcionista que coloca as becas (recepcionista.js)
+    b4.append(r4, recep.box, field("Observação", obs));
     p.append(b1, bT, b2, b3, b4, err, botoes(close, c ? "Salvar" : "Criar contrato"));
     p.addEventListener("submit", async ev => {
       ev.preventDefault();
@@ -230,7 +232,8 @@ export function formContrato(c, inst, ano, ref) {
           precos: Object.fromEntries(precoCx.map(([k, i]) => [k, lerReais(i.value) || 0])),
           valorKit: lerReais(vKit.value) || 0,
           ...kitsEd.ler(),
-          parcelas: Math.max(1, parseInt(parc.value, 10) || 1)
+          parcelas: Math.max(1, parseInt(parc.value, 10) || 1),
+          recepcionista: recep.ler()
         });
       try {
         if (c) {
@@ -243,6 +246,8 @@ export function formContrato(c, inst, ano, ref) {
           if (R.textoTurmas(body.turmas) !== R.textoTurmas(x.turmas)) mud.push("séries e turmas");
           if (Number(body.entrada.valor) !== Number((x.entrada || {}).valor || 0)) mud.push("entrada " + brl(body.entrada.valor));
           if (body.quemPaga && body.quemPaga !== x.quemPaga) mud.push("quem paga");
+          if (body.recepcionista !== undefined && JSON.stringify(body.recepcionista) !== JSON.stringify(x.recepcionista || null))
+            mud.push(textoRecepcionista({ recepcionista: body.recepcionista }) || "recepcionista");
           if (body.respEmail && body.respEmail !== x.respEmail) mud.push("quem fechou: " + nomeResp);
           if (body.contato.nome !== (ct.nome || "") || body.contato.tel !== (ct.tel || "")) mud.push("contato");
           if (R.textoPacote(body.pacotePadrao, body.pacotePadraoQtd) !== R.textoPacote(x.pacotePadrao, x.pacotePadraoQtd))

@@ -7,7 +7,7 @@
 // Pronto para retirada → Retirou a beca (baixa o estoque dos produtos) → Devolvida (beca volta ao estoque).
 // "Atrasado na devolução": retirou e passou da data de devolução (destaque para o Adriano).
 import { ordemCodigo, telRelatorio } from "./aluno-id.js";
-import { kpisValores, limparCacheValores, TIPOS_FILTRO, tipoDoAluno, botaoNovaInstituicao } from "./aluguel-resumo.js";
+import { kpisValores, limparCacheValores, etiquetaRecep, TIPOS_FILTRO, tipoDoAluno, botaoNovaInstituicao } from "./aluguel-resumo.js";
 import { cartaoDoTipo } from "./instituicoes-dados.js";
 import { bloco, el, title, field, inp, inpReais, sel, sheet, botoes, wa, clicavel } from "./ui.js";
 import * as U from "./util.js";
@@ -259,9 +259,9 @@ function render() {
         .join(", ");
     r.append(
       " ",
+      ...[etiquetaRecep(C, `${filtro.inst}_${filtro.ano || ANO()}`), " "],
       U.mkBtn("📄 Contrato do colégio", "btn-primary btn-sm", () => abrirContratoCol(inst, doCol)),
       " ",
-      // (24/11/2026) a entrada / antecipação que o colégio pagou entra no Recebido e sai do A receber
       U.mkBtn("💰 Lançar entrada / antecipação", "btn-sm btn-ok", () => abrirContratoCol(inst, doCol, { entrada: true }))
     );
     // (24/11/2026) alunos do cadastro automático (PR) que ainda não estão no contrato: trazer com um toque

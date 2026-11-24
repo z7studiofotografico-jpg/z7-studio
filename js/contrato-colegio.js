@@ -3,6 +3,7 @@
 // dinheiro (recebido no estúdio, falta repassar com o colégio e com o representante, comissão), pagamentos dos alunos
 // (quem recebeu cada um), alunos e pacotes (um por um ou vários de uma vez) e o relatório de produção.
 // Quem mexe: o admin e o representante que fechou. Cada mudança guarda quem fez e quando. Regras em contrato-colegio-regras.js.
+import { textoRecepcionista } from "./recepcionista.js";
 import { el, title, field, inp, inpReais, sel, sheet, botoes, bloco, blocosDesde } from "./ui.js";
 import * as U from "./util.js";
 import { lerReais, brl } from "./regras.js";
@@ -159,6 +160,7 @@ function render(corpo, st, inst, ano, ref) {
     linha("Quem costuma receber", c.quemPaga === "colegio" ? "—" : (R.RECEBE.find(([k]) => k === c.recebePadrao) || [, "Estúdio"])[1]),
     linha("Contato do colégio", [ct.nome, ct.cargo && ct.cargo.replace("(a)", "").toLowerCase(), ct.tel].filter(Boolean).join(" · ")),
     linha("Entrega combinada", ent.data ? `${dataBR(ent.data)}${ent.com ? " com " + ent.com : ""}` : ""),
+    linha("Recepcionista", textoRecepcionista(c).replace(/^Recepcionista: /, "") || "não informado (toque em Editar contrato)"),
     linha("Séries e turmas", R.textoTurmas(c.turmas)),
     linha("O que vem no kit", R.textoPacote(c.pacotePadrao, c.pacotePadraoQtd) || "—"),
     linha("Unidade", c.unidade || "")
@@ -596,6 +598,7 @@ function relProducao(st, inst, ano) {
       subtitulo: [
         c.respNome ? "Representante: " + c.respNome : "",
         ent.data ? `Entrega ${dataBR(ent.data)}${ent.com ? " com " + ent.com : ""}` : "",
+        textoRecepcionista(c, false),
         ct.nome ? `Contato: ${ct.nome}${ct.cargo ? " (" + ct.cargo.replace("(a)", "").toLowerCase() + ")" : ""}` : ""
       ]
         .filter(Boolean)

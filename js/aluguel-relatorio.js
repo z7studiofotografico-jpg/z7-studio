@@ -1,5 +1,6 @@
 // Aluguel de becas → 🖨️ Relatório: antes de gerar, a pessoa escolhe ano, colégio, turma e situação, e se a lista sai
 // separada por colégio ou por colégio e turma.
+import { textoRecepcionista } from "./recepcionista.js";
 import { title } from "./ui.js";
 import * as U from "./util.js";
 import { ocultoParaMim } from "./confirmar.js";
@@ -235,7 +236,10 @@ export async function relatorioAluguel(C, lista, filtro, insts = []) {
         .sort((a, b) => a[0].localeCompare(b[0], "pt-BR"))
         .map(([c, l]) => ({
           titulo: title(c),
-          nota: `${l.length} aluno${l.length === 1 ? "" : "s"}`,
+          // (24/11/2026) quem coloca as becas: "Recepcionista: Carla (21) 9…" ou "Recepcionista: não tem"
+          nota: [`${l.length} aluno${l.length === 1 ? "" : "s"}`, textoRecepcionista(contratos[`${l[0].instId}_${l[0].ano}`], false)]
+            .filter(Boolean)
+            .join(" · "),
           tabela: { cols: cs, linhas: l.sort(ordemCodigo).map(ln) }
         }))
     ]

@@ -226,11 +226,13 @@ export function resumoDinheiro(pags, contrato, alunos, P, isDono) {
   const nAlunos = (alunos || []).length;
   const temPrecos = temPreco(c);
   const combinado =
-    c.quemPaga === "colegio"
+    (c.quemPaga === "colegio"
       ? Number(c.valor) || 0
       : temPrecos
         ? reais((alunos || []).reduce((t, a) => t + centavos(precoAluno(a, c)), 0))
-        : reais(centavos(c.valor) * nAlunos);
+        : reais(centavos(c.valor) * nAlunos)) +
+    // (24/11/2026) a recepcionista que coloca as becas (recepcionista.js) soma no total
+    (c.recepcionista && c.recepcionista.tem ? Number(c.recepcionista.valor) || 0 : 0);
   // comissão item por item, sobre o que está no caixa e conferido
   const sem = semComissao(contrato, isDono);
   const conf = lst.filter(p => ondeEsta(p) === "caixa" && p.conferido);

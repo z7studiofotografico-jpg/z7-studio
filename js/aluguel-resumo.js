@@ -1,6 +1,7 @@
 // Aluguel de becas · resumo dos valores (17/11/2026): Valor total (o que os alunos fecharam) e A receber (o total
 // menos os pagamentos lançados nos contratos dos colégios), com o filtro de tipo de instituição (particular, público,
 // faculdade e curso, ou todas) e o botão de cadastrar uma instituição. Os valores ficam apagados até tocar no olho.
+import { textoRecepcionista } from "./recepcionista.js";
 import { el, sheet } from "./ui.js";
 import * as U from "./util.js";
 import { brl } from "./regras.js";
@@ -37,6 +38,16 @@ function contratoDe(C, id) {
   cacheC.set(id, { em: Date.now(), p });
   return p;
 }
+// (24/11/2026) etiqueta da recepcionista na faixa do colégio (chega depois de ler o contrato)
+export function etiquetaRecep(C, id) {
+  const t = el("span", "tag");
+  t.hidden = true;
+  contratoDe(C, id).then(c => {
+    const x = textoRecepcionista(c);
+    if (x) (t.textContent = "💁 " + x), (t.hidden = false);
+  });
+  return t;
+}
 // pagamentos e contrato lidos de novo (depois de lançar uma entrada)
 export const limparCacheValores = () => (cache.clear(), cacheC.clear());
 
@@ -46,7 +57,8 @@ export function kpisValores(C, k, alunos) {
   const vai = alunos.filter(a => !a.naoParticipa);
   const total = vai.reduce((t, a) => t + (Number(a.valor) || 0), 0);
   const kT = el("div", "kpi");
-  kT.append(el("small", null, "Valor total"), el("b", null, brl(total)));
+  const bT = el("b", null, brl(total));
+  kT.append(el("small", null, "Valor total"), bT);
   const bRec = el("b", null, "…");
   const kRec = el("div", "kpi ok");
   kRec.append(el("small", null, "Recebido"), bRec);
@@ -62,11 +74,13 @@ export function kpisValores(C, k, alunos) {
   }
   const ids = [...new Set(vai.map(a => `${a.instId}_${a.ano}`))];
   const deles = new Set(vai.map(a => a.id));
-  Promise.all(ids.map(id => Promise.all([pagamentosDe(C, id), C.isAdmin ? contratoDe(C, id) : null]))).then(async ls => {
+  Promise.all(ids.map(id => Promise.all([pagamentosDe(C, id), contratoDe(C, id)]))).then(async ls => {
     const R = C.isAdmin ? await import("./contrato-colegio-regras.js") : null;
     let recebido = 0;
     let comissao = 0;
+    let recep = 0; // (24/11/2026) a recepcionista do contrato soma no total
     ls.forEach(([pags, contrato]) => {
+      if (contrato && contrato.recepcionista && contrato.recepcionista.tem) recep += Number(contrato.recepcionista.valor) || 0;
       // só os pagamentos dos alunos desta lista (ou do colégio inteiro: entrada, antecipação, colégio que paga)
       const dele = pags.filter(p => !p.excluido && (!p.alunoId || deles.has(p.alunoId)));
       recebido += dele.reduce((t, p) => t + (Number(p.valor) || 0), 0);
@@ -75,8 +89,9 @@ export function kpisValores(C, k, alunos) {
           .filter(p => R.ondeEsta(p) === "caixa" && p.conferido && !p.comissaoPagaEm)
           .reduce((t, p) => t + R.comissaoPagamento(p, C.P, contrato) / 100, 0);
     });
+    bT.textContent = brl(total + recep);
     bRec.textContent = brl(recebido);
-    bR.textContent = brl(Math.max(0, total - recebido));
+    bR.textContent = brl(Math.max(0, total + recep - recebido));
     bC.textContent = brl(comissao);
   });
 }

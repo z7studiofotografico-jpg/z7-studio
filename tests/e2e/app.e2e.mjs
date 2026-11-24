@@ -4193,6 +4193,41 @@ await cenario("Aluguel de becas: entrada / antecipação do colégio, Recebido e
   if (process.env.FOTOS) await pg.locator("#viewBecas").screenshot({ path: process.env.FOTOS + "/becas-topo.png" });
   ok(!erros.length, "sem erros" + (erros.length ? ": " + erros.join(" | ") : ""));
 });
+await cenario("Contrato do colégio: recepcionista que coloca as becas (soma no total, aparece na faixa)", async () => {
+  const Y = new Date().getFullYear();
+  const al = nome => ({ instId: "i1", instNome: "COLEGIO ALFA", ano: Y, nome, serie: "5º ano", status: "Cadastrado", produtos: [], historico: [], pacote: ["beca"], valor: 100, respEmail: ADRIANO });
+  const d = Object.assign({}, migrar(base), {
+    "alugueis/c1": al("Joao Lucas"),
+    "alugueis/c2": al("Miguel Augusto"),
+    [`contratosColegio/i1_${Y}`]: { instId: "i1", instNome: "COLEGIO ALFA", ano: Y, respEmail: ADRIANO, respNome: "Adriano", quemPaga: "alunos", recebePadrao: "estudio", valor: 100, parcelas: 1, precos: { beca: 100 }, pacotePadrao: ["beca"] }
+  });
+  const { pg, erros, store } = await abrir(ADRIANO, d);
+  await ir(pg, "#becas");
+  await pg.waitForFunction(() => /Joao Lucas/i.test(document.getElementById("viewBecas").textContent), null, { timeout: 8000 });
+  await pg.locator("#alFiltros select").nth(2).selectOption("i1");
+  await calmo(pg);
+  await pg.getByRole("button", { name: "📄 Contrato do colégio" }).click();
+  await pg.locator(".sheet").last().getByRole("button", { name: "Editar contrato" }).click();
+  const f = pg.locator(".sheet").last();
+  await f.getByRole("button", { name: "Tem recepcionista" }).click();
+  await f.getByLabel("Nome", { exact: true }).fill("Carla Souza");
+  await f.getByLabel("Valor (R$)").fill("200");
+  if (process.env.FOTOS) await f.screenshot({ path: process.env.FOTOS + "/recep-form.png" });
+  await f.locator("button[type=submit]").click();
+  await calmo(pg);
+  const st = await store();
+  const c = st[`contratosColegio/i1_${Y}`];
+  ok(c.recepcionista && c.recepcionista.tem && c.recepcionista.nome === "Carla Souza" && c.recepcionista.valor === 200, "recepcionista gravada no contrato");
+  const painel = pg.locator(".sheet").last();
+  ok(/Recepcionista\s*Carla Souza/.test(await painel.textContent()) && /Falta receber\s*R\$\s*400/.test(await painel.textContent()), "aparece no contrato e soma no Falta receber (200 + 200)");
+  await painel.getByRole("button", { name: "Fechar" }).click();
+  await calmo(pg);
+  await pg.waitForTimeout(800);
+  ok(/Recepcionista: Carla Souza/.test(await pg.textContent("#alResumo")), "etiqueta na faixa do colégio");
+  ok(/Valor total\s*R\$\s*400/.test(await pg.locator("#viewBecas .kpis").first().textContent()), "topo: Valor total com a recepcionista");
+  if (process.env.FOTOS) await pg.locator("#alResumo").screenshot({ path: process.env.FOTOS + "/recep-faixa.png" });
+  ok(!erros.length, "sem erros" + (erros.length ? ": " + erros.join(" | ") : ""));
+});
 await cenario("Formaturas · abas Linha de Frente / Repasse / Venda Antecipada, virada e Pix", async () => {
   const Y = new Date().getFullYear();
   const aluno = (nome, escola, ano, seg, etapa = "NA FILA") => ({
