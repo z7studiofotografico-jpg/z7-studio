@@ -5,7 +5,7 @@ import { el, title, sheet } from "./ui.js";
 import * as U from "./util.js";
 import { confirmar } from "./confirmar.js";
 import { USO, idUso } from "./becas-uso.js";
-import { STATUS_ALUGUEL, proximoStatus, anteriorStatus } from "./aluguel-alunos.js";
+import { STATUS_ALUGUEL, proximoStatus, anteriorStatus, faltaNoDia } from "./aluguel-alunos.js";
 
 // as etapas que têm alunos no colégio: [de, para, alunos]
 export function etapasDoColegio(alunos, voltar = false) {
@@ -138,7 +138,7 @@ async function sugerirTrocas(C, travados, para, mudarStatus, msg) {
   const T = await import("./aluguel-troca.js");
   const sug = [];
   for (const a of travados) {
-    const z = T.sugerirTamanho(a);
+    const z = T.sugerirTamanho(a, faltaNoDia);
     if (z) sug.push([a, z]);
   }
   if (!sug.length) return msg.append(el("p", "hint", "Não tem outro tamanho livre nessa beca: acerte o estoque ou troque a beca."));
@@ -150,7 +150,7 @@ async function sugerirTrocas(C, travados, para, mudarStatus, msg) {
     const nao = [];
     // um por vez: a sugestão é refeita na hora, já com as trocas anteriores contando no estoque
     for (const [a] of sug) {
-      const z = T.sugerirTamanho(a);
+      const z = T.sugerirTamanho(a, faltaNoDia);
       const r = z ? await T.trocarEAvancar(C, a, z, para, mudarStatus) : "sem tamanho livre";
       if (r === "ok") ok++;
       else nao.push(`${title(a.nome)}: ${r}`);
@@ -163,7 +163,7 @@ export async function avisoSemEstoque(dia, falta, abrirEstoque, a = null, para =
   const txt = `No dia ${dia.slice(8, 10)}/${dia.slice(5, 7)} não tem livre: ${falta.join(", ")}.`;
   // (24/11/2026) o estoque é o limite: sugere o tamanho mais perto que tem livre e troca com um toque
   const T = a && para && C ? await import("./aluguel-troca.js") : null;
-  const z = T ? T.sugerirTamanho(a) : "";
+  const z = T ? T.sugerirTamanho(a, faltaNoDia) : "";
   if (z) {
     const sim = await confirmar("Sem estoque nesse dia", `${txt} Tem ${z} livre: trocar ${title(a.nome)} de ${a.tamanho} para ${z}?`, {
       sim: `🔁 Trocar para ${z}`,

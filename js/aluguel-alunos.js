@@ -6,6 +6,7 @@
 // Status: Cadastrado → Beca medida (reserva beca, faixa e capelo) → Produtos em produção (se comprou algum) →
 // Pronto para retirada → Retirou a beca (baixa o estoque dos produtos) → Devolvida (beca volta ao estoque).
 // "Atrasado na devolução": retirou e passou da data de devolução (destaque para o Adriano).
+import { problemaCadastro } from "./aluguel-troca.js";
 import { ordemCodigo, telRelatorio } from "./aluno-id.js";
 import { kpisValores, limparCacheValores, etiquetaRecep, TIPOS_FILTRO, tipoDoAluno, botaoNovaInstituicao } from "./aluguel-resumo.js";
 import { cartaoDoTipo } from "./instituicoes-dados.js";
@@ -38,7 +39,6 @@ import { avisoPrecoAluguel } from "./precos-colegio.js";
 import { ouvirUso, espelhar, donoDoAluguel, equipePode, AVISO_RESERVA, faltaDoAlunoNoDia } from "./becas-uso.js";
 import { abrirJanela } from "./janela.js";
 import { abaColegio, abaHistorico } from "./aluguel-janela.js";
-
 export { STATUS_ALUGUEL, temProducao, semBeca, etapasDe, proximoStatus, anteriorStatus, nomeEtapa } from "./aluguel-etapas.js";
 import { STATUS_ALUGUEL, temProducao, semBeca, etapasDe, proximoStatus, anteriorStatus, nomeEtapa, rotuloEtapa } from "./aluguel-etapas.js";
 const anoSerie = a => [a.ano, a.serie, a.turma && "turma " + a.turma].filter(Boolean).join(" · ");
@@ -355,8 +355,8 @@ export function corAluguel(a, hoje = U.todayStr()) {
 const becaTxt = a => (a.becaTipo ? `👘 Beca ${tamanhoBeca(a).replace(/^\w/, c => c.toLowerCase())} · ${modeloBeca(a.becaTipo)}` : "");
 function passoAluguel(a, hoje) {
   if (atrasadoAluguel(a, hoje)) return "⚠️ Devolução atrasada desde " + U.fmtDate(a.devolucao);
-  const st = a.status || "Cadastrado"; // (24/11/2026) esperaBeca: falta a beca no estoque (aviso em vermelho)
-  if (st === "Cadastrado" && a.esperaBeca) return `⏳ Esperando a beca ideal (${a.esperaBeca}) · se não chegar: Avançar → 🔁 Trocar`;
+  const st = a.status || "Cadastrado"; // (24/11/2026) o problema de quem está em Cadastrado, em vermelho
+  if (problemaCadastro(a, faltaNoDia)) return problemaCadastro(a, faltaNoDia);
   if (st === "Retirou a beca" && a.devolucao) return "Devolver até " + U.fmtDate(a.devolucao);
   if (st === "Pronto para retirada") return "Retirar" + (a.retirada ? " dia " + U.fmtDate(a.retirada) : "");
   const prox = proximoStatus(a);
@@ -378,7 +378,7 @@ function linha(a) {
       .filter(Boolean)
       .join(" · "),
     passo: a.naoParticipa ? "" : passoAluguel(a, hoje),
-    passoCls: at || ((a.status || "Cadastrado") === "Cadastrado" && a.esperaBeca) ? "late" : (a.status || "") === "Pronto para retirada" ? "today" : "",
+    passoCls: at || problemaCadastro(a, faltaNoDia) ? "late" : (a.status || "") === "Pronto para retirada" ? "today" : "",
     selo: at ? "ATRASADO" : a.naoParticipa ? "NÃO VAI PARTICIPAR" : nomeEtapa(a, a.status || "Cadastrado").toUpperCase(),
     card: () => card(a),
     abrir: () => janela(a)
