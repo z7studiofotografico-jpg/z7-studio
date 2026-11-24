@@ -3,7 +3,7 @@
 // dinheiro (recebido no estúdio, falta repassar com o colégio e com o representante, comissão), pagamentos dos alunos
 // (quem recebeu cada um), alunos e pacotes (um por um ou vários de uma vez) e o relatório de produção.
 // Quem mexe: o admin e o representante que fechou. Cada mudança guarda quem fez e quando. Regras em contrato-colegio-regras.js.
-import { el, title, field, inp, inpReais, sel, sheet, botoes, bloco } from "./ui.js";
+import { el, title, field, inp, inpReais, sel, sheet, botoes, bloco, blocosDesde } from "./ui.js";
 import * as U from "./util.js";
 import { lerReais, brl } from "./regras.js";
 import { confirmar } from "./confirmar.js";
@@ -454,7 +454,14 @@ function formPagamento(pg, st, ref, pre = {}) {
     r2.append(field("Data", data), field("Forma", forma), field("Quem recebeu", recebe));
     const err = el("p", "err");
     err.hidden = true;
-    p.append(r1, r2, field("Comprovante", comp), lOk);
+    const fComp = field("Comprovante", comp);
+    p.append(r1, r2, fComp, lOk);
+    // (24/11/2026) blocos numerados, no padrão do Cadastrar aluno
+    blocosDesde(p, [
+      [r1, porAluno ? "Aluno e valor" : "Valor"],
+      [r2, "Quando, como e quem recebeu"],
+      [fComp, "Comprovante"]
+    ]);
     if (pg && C.isAdmin) {
       const apagar = U.mkBtn("🗑️ Apagar pagamento", "btn-danger btn-sm", async () => {
         if (

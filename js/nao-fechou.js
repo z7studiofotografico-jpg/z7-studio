@@ -1,6 +1,6 @@
 // Instituição que "Não fechou" (item 2.2): motivo (lista + texto livre), concorrente e data de retorno no ano
 // seguinte (o Adriano é avisado antes dessa data). E a lista de todas as que não fecharam, com os motivos.
-import { el, field, sel, sheet, botoes, title } from "./ui.js";
+import { el, field, sel, sheet, botoes, title, bloco } from "./ui.js";
 import * as U from "./util.js";
 
 export const MOTIVOS_NAO_FECHOU = [
@@ -33,14 +33,16 @@ export function abrirNaoFechou(C, it, salvar) {
     ret.type = "date";
     ret.required = true;
     ret.value = nf.retorno || retornoPadrao();
-    p.append(
-      field("Motivo", mot),
-      field("Detalhe do motivo", txt),
-      field("Concorrente (se houver)", conc),
+    // (24/11/2026) blocos numerados, no padrão do Cadastrar aluno
+    p.classList.add("cad");
+    const b1 = bloco(1, "Por que não fechou");
+    b1.append(field("Motivo", mot), field("Detalhe do motivo", txt), field("Concorrente (se houver)", conc));
+    const b2 = bloco(2, "Quando voltar a procurar");
+    b2.append(
       field("Voltar a procurar em", ret),
-      el("p", "hint", "O Adriano recebe o aviso uma semana antes dessa data, e o colégio volta para “Para hoje” no dia."),
-      botoes(close, "Salvar")
+      el("p", "hint", "O Adriano recebe o aviso uma semana antes dessa data, e o colégio volta para “Para hoje” no dia.")
     );
+    p.append(b1, b2, botoes(close, "Salvar"));
     p.addEventListener("submit", ev => {
       ev.preventDefault();
       if (!mot.value || !ret.value) return;

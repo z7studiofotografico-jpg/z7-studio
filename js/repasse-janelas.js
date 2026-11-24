@@ -1,5 +1,5 @@
 // PR: janelinhas do contato: registrar a venda, entrega (endereço e data) e notas
-import { el, title, sheet as abrirSheet, field, botoes } from "./ui.js";
+import { el, title, sheet as abrirSheet, field, botoes, blocosDesde } from "./ui.js";
 import * as U from "./util.js";
 import { C, segDe, assumir, save, precos, semPreco, vendaDe, NOME_VENDA } from "./repasse-estado.js";
 import { avisoSemPreco } from "./precos-colegio.js";
@@ -73,12 +73,19 @@ export function openPago(it) {
     const comp = el("input");
     comp.maxLength = 120;
     comp.placeholder = "ex.: Pix de Maria às 14h, ou nº do comprovante";
-    p.append(field("Comprovante", comp));
+    const fComp = field("Comprovante", comp);
+    p.append(fComp);
     if (!C.isAdmin)
       p.append(
         el("p", "hint", "A venda entra como “a conferir”. A comissão conta depois que o Adriano ou a Luciana conferem o comprovante.")
       );
-    p.append(entregaCampos(p, it, { venda: true }));
+    const ent = entregaCampos(p, it, { venda: true });
+    p.append(ent);
+    // (24/11/2026) blocos numerados, no padrão do Cadastrar aluno
+    blocosDesde(p, [
+      [r, "Valor e pagamento"],
+      [ent, "Entrega", "endereço completo"]
+    ]);
     p.append(actions(close, "Salvar venda"));
     p.addEventListener("submit", ev => {
       ev.preventDefault();

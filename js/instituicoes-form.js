@@ -1,5 +1,5 @@
 // Instituições: cadastro (nova / editar) e registro de visita ou contato, com o próximo passo.
-import { el, emBlocos, title, field, inp, sel, sheet, botoes as actions, parseTel } from "./ui.js";
+import { el, emBlocos, blocosDesde, title, field, inp, sel, sheet, botoes as actions, parseTel } from "./ui.js";
 import { reservarVarios, msgErroData, camposEvento, produtos, avisarColegioPorEmail } from "./eventos.js";
 import * as U from "./util.js";
 import { siglaDe } from "./aluno-id.js";
@@ -352,7 +352,18 @@ export function openVisita(it) {
     obs.rows = 3;
     obs.maxLength = 2000;
     obs.placeholder = "Ex.: pediu retorno dia 16; tem interesse em aluguel de beca";
-    p.append(field("Observação", obs));
+    const fObs = field("Observação", obs);
+    p.append(fObs);
+    // (24/11/2026) blocos numerados, no padrão do Cadastrar aluno
+    const tApres = [...p.children].find(e => e.tagName === "H3");
+    if (tApres) tApres.remove();
+    blocosDesde(p, [
+      [r0, "Como foi o contato", "data e o jeito"],
+      [r1, "Com quem falou"],
+      [prodBox.previousElementSibling || prodBox, "O que apresentou"],
+      [res.closest(".field") || res, "Resultado e próximo passo"],
+      [fObs, "Observação"]
+    ]);
     p.append(actions(close, "Salvar visita"));
     p.addEventListener("submit", async ev => {
       ev.preventDefault();
