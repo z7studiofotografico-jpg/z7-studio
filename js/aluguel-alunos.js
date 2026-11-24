@@ -342,7 +342,6 @@ function render() {
   arr.slice(0, 400).forEach(a => corpo.append(linha(a)));
   if (arr.length > 400) corpo.append(el("p", "hint", `Mostrando 400 de ${arr.length}. Escolha um colégio para ver os outros.`));
 }
-
 // Lista compacta (o mesmo formato do PR, Formatura e Instituições): uma linha por aluno; tocar abre a janela
 // Cores: vermelho atrasado na devolução · amarelo pronto para retirada · azul com a beca · verde devolvida · cinza o resto
 export function corAluguel(a, hoje = U.todayStr()) {
@@ -356,7 +355,8 @@ export function corAluguel(a, hoje = U.todayStr()) {
 const becaTxt = a => (a.becaTipo ? `👘 Beca ${tamanhoBeca(a).replace(/^\w/, c => c.toLowerCase())} · ${modeloBeca(a.becaTipo)}` : "");
 function passoAluguel(a, hoje) {
   if (atrasadoAluguel(a, hoje)) return "⚠️ Devolução atrasada desde " + U.fmtDate(a.devolucao);
-  const st = a.status || "Cadastrado";
+  const st = a.status || "Cadastrado"; // (24/11/2026) esperaBeca: falta a beca no estoque (aviso em vermelho)
+  if (st === "Cadastrado" && a.esperaBeca) return `⏳ Esperando a beca ideal (${a.esperaBeca}) · se não chegar: Avançar → 🔁 Trocar`;
   if (st === "Retirou a beca" && a.devolucao) return "Devolver até " + U.fmtDate(a.devolucao);
   if (st === "Pronto para retirada") return "Retirar" + (a.retirada ? " dia " + U.fmtDate(a.retirada) : "");
   const prox = proximoStatus(a);
@@ -378,7 +378,7 @@ function linha(a) {
       .filter(Boolean)
       .join(" · "),
     passo: a.naoParticipa ? "" : passoAluguel(a, hoje),
-    passoCls: at ? "late" : (a.status || "") === "Pronto para retirada" ? "today" : "",
+    passoCls: at || ((a.status || "Cadastrado") === "Cadastrado" && a.esperaBeca) ? "late" : (a.status || "") === "Pronto para retirada" ? "today" : "",
     selo: at ? "ATRASADO" : a.naoParticipa ? "NÃO VAI PARTICIPAR" : nomeEtapa(a, a.status || "Cadastrado").toUpperCase(),
     card: () => card(a),
     abrir: () => janela(a)

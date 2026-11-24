@@ -14,6 +14,7 @@ export async function agendarColegio(ctx, dia) {
   try {
     lista = (await FS.getDocs(C.carteira("instituicoes", FS.limit(3000)))).docs
       .map(d => Object.assign({ id: d.id }, d.data()))
+      .filter(i => !i.arquivado && !(i.excluido && i.excluido.em)) // (24/11/2026) sem os juntados e arquivados (repetidos)
       .sort((a, b) => (a.nome || "").localeCompare(b.nome || "", "pt-BR"));
   } catch (e) {
     C.handleErr(e);

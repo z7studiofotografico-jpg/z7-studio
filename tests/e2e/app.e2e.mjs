@@ -4236,15 +4236,20 @@ await cenario("Aluguel de becas: o estoque é o limite e o sistema sugere a troc
     "config/app": Object.assign({}, base["config/app"], { estoque: { becas: { tradPreta: 6 }, tamanhos: { tradPreta: { P: 1, M: 5 } } } }),
     "alugueis/a1": al("Ana Primeira", "P"),
     "alugueis/a2": al("Bia Segunda", "P"),
+    "alugueis/a3": Object.assign(al("Caio Espera", ""), { esperaBeca: "PP azul" }),
     "becasUso/evento_i1_diaBecas": { tipo: "evento", status: "reservado", instId: "i1", instNome: "COLEGIO ALFA", campo: "diaBecas", retirada: `${Y}-12-07`, devolucao: `${Y}-12-07`, becasQtd: {}, tamanhosQtd: {}, faixasQtd: {}, capelosQtd: {} }
   });
   const { pg, erros, store } = await abrir(ADRIANO, d);
   await ir(pg, "#becas");
   await pg.waitForFunction(() => /Ana Primeira/i.test(document.getElementById("viewBecas").textContent), null, { timeout: 8000 });
   await pg.locator("#alFiltros select").nth(2).selectOption("i1");
+  await calmo(pg);
+  const esp = pg.locator("#alLista .lc-item", { hasText: "Caio Espera" }).locator(".lc-passo");
+  ok(/Esperando a beca ideal \(PP azul\)/.test(await esp.textContent()) && /late/.test(await esp.getAttribute("class")), "aviso vermelho: esperando a beca ideal");
+  if (process.env.FOTOS) await pg.locator("#alLista").screenshot({ path: process.env.FOTOS + "/esperando-beca.png" });
   await pg.getByRole("button", { name: "⏩ Avançar o colégio inteiro" }).click();
   const sh = pg.locator(".sheet").filter({ hasText: "Avançar o colégio inteiro" });
-  await sh.getByRole("button", { name: "Cadastrado (2) → Beca medida" }).click();
+  await sh.getByRole("button", { name: "Cadastrado (3) → Beca medida" }).click();
   await pg.locator(".sheet").last().getByRole("button", { name: "Sim, passar todos" }).click();
   await sh.getByText(/1 aluno em/).waitFor({ timeout: 8000 });
   let st = await store();
