@@ -94,6 +94,9 @@ export function avancarColegio(C, alunos, mudarStatus, voltar = false, abrirEsto
         )) {
           msg.textContent = `Passando ${feitos + pulados.length + 1} de ${als.length}…`;
           const r = await mudarStatus(a, para, true);
+          // (24/11/2026) a próxima conta do estoque já vê este aluno reservado (sem esperar a lista atualizar):
+          // antes, no "Avançar o colégio inteiro", dois alunos podiam pegar a última beca do mesmo tamanho
+          if (r === "ok") a.status = para;
           if (r === "ok") feitos++;
           else pulados.push(`${a.codigo ? a.codigo + " · " : ""}${title(a.nome)}: ${r}`);
         }
