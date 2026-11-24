@@ -198,6 +198,7 @@ export function situacaoTxt(it, s) {
   const r = it.retorno;
   if (ABERTAS.includes(it.etapa) && r && r.data && r.hora)
     return `${s === "late" ? "⚠️ " : ""}📅 ${dia(r.data)}/${r.data.slice(0, 4)} às ${r.hora} – entrar em contato com ${r.com || "o cliente"} para confirmar a venda`;
+  if (it.etapa === "INTERESSADO") return "⚠️ Sem data de retorno: marque o dia e a hora em 📅 Data de retorno";
   if (ABERTAS.includes(it.etapa))
     return it.followup
       ? s === "late"

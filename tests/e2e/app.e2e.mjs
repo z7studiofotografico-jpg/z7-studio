@@ -5055,6 +5055,19 @@ await cenario("Provável venda: data e hora do retorno, com quem falar", async (
         { tipo: "Mãe", nome: "ROSA MORAIS", tel: "21977770002" }
       ],
       telefones: ["21977770001", "21977770002"]
+    },
+    "repasse/rv2": {
+      nome: "FLAVIA CRISTINA DE OLIVEIRA",
+      nomeBusca: "FLAVIA CRISTINA DE OLIVEIRA",
+      escola: "COLEGIO BETA",
+      ano: Y,
+      etapa: "INTERESSADO",
+      resp: "Adriano",
+      respEmail: ADRIANO,
+      separadoEm: dia(-5),
+      followup: dia(-3),
+      contatos: [{ tipo: "Formando", tel: "21977770003" }],
+      telefones: ["21977770003"]
     }
   });
   const { pg, erros, store } = await abrir(ADRIANO, migrar(d));
@@ -5081,9 +5094,11 @@ await cenario("Provável venda: data e hora do retorno, com quem falar", async (
   await calmo(pg);
   const txt = await pg.locator("#rList").textContent();
   ok(/PROVÁVEL VENDA/.test(txt) && /às 15:30 – entrar em contato com mãe de Rayane \(Rosa\)/.test(txt), "aparece embaixo do nome: dia, hora e com quem falar");
+  ok(new RegExp("📅 " + dia(1).slice(8, 10) + "/" + dia(1).slice(5, 7)).test(txt), "a aba fica separada pelo dia do retorno");
+  ok(/Sem data de retorno/.test(txt) && txt.indexOf("Flavia") < txt.indexOf("Rayane"), "quem não tem retorno marcado fica no topo, para marcar");
   if (process.env.FOTOS) {
     await pg.waitForTimeout(3500);
-    await pg.locator("article", { hasText: "Rayane" }).first().screenshot({ path: process.env.FOTOS + "/provavel-venda.png" });
+    await pg.locator("#rList").screenshot({ path: process.env.FOTOS + "/provavel-venda.png" });
   }
   ok((await pg.locator("article", { hasText: "Rayane" }).first().getByRole("button", { name: "📅 Remarcar retorno" }).count()) === 1, "o botão vira Remarcar retorno");
   ok(!erros.length, "sem erros" + (erros.length ? ": " + erros.join(" | ") : ""));

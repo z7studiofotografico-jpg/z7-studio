@@ -8,6 +8,7 @@
 // repasse-janelas.js (venda, entrega, notas), repasse-form.js (dados e "+ Aluno"), repasse-lote.js (números e lote).
 import { el, title, emPartes, clicavel } from "./ui.js";
 import * as U from "./util.js";
+import { renderProvavel } from "./repasse-agenda.js";
 import { norm, situacaoTxt } from "./repasse-dados.js";
 import { linhaCompacta } from "./lista-compacta.js";
 import { abrirJanela } from "./janela-aluno.js";
@@ -751,8 +752,8 @@ function renderList(loading, emptyMsg) {
     const rank = { late: 0, today: 1, later: 2, none: 3, won: 4 };
     arr.sort((a, b) => rank[status(a)] - rank[status(b)] || (a.followup || "").localeCompare(b.followup || ""));
   }
-  // (24/11/2026) provável venda: em ordem do retorno marcado (o mais perto primeiro)
-  if (tab === "interessados") arr.sort((a, b) => (a.retornoAvisar || a.followup || "9").localeCompare(b.retornoAvisar || b.followup || "9"));
+  // (24/11/2026) provável venda: agenda pela data e hora do retorno (repasse-agenda.js)
+  if (tab === "interessados") return renderProvavel(list, arr, linha, ordemBusca(true));
   if (tab === "entregas") {
     const grpOf = it =>
       !it.entregaTipo || it.entregaTipo.startsWith("A combinar")
