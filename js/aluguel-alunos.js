@@ -7,6 +7,7 @@
 // Pronto para retirada → Retirou a beca (baixa o estoque dos produtos) → Devolvida (beca volta ao estoque).
 // "Atrasado na devolução": retirou e passou da data de devolução (destaque para o Adriano).
 import { problemaCadastro } from "./aluguel-troca.js";
+import { botoesContratoColegio } from "./contrato-imprimir.js";
 import { ordemCodigo, telRelatorio } from "./aluno-id.js";
 import { kpisValores, limparCacheValores, etiquetaRecep, TIPOS_FILTRO, tipoDoAluno, botaoNovaInstituicao } from "./aluguel-resumo.js";
 import { cartaoDoTipo } from "./instituicoes-dados.js";
@@ -260,9 +261,7 @@ function render() {
     r.append(
       " ",
       ...[etiquetaRecep(C, `${filtro.inst}_${filtro.ano || ANO()}`), " "],
-      U.mkBtn("📄 Contrato do colégio", "btn-primary btn-sm", () => abrirContratoCol(inst, doCol)),
-      " ",
-      U.mkBtn("💰 Lançar entrada / antecipação", "btn-sm btn-ok", () => abrirContratoCol(inst, doCol, { entrada: true }))
+      ...botoesContratoColegio(C, inst, doCol, abrirContratoCol, filtro.inst, filtro.ano || ANO())
     );
     // (24/11/2026) alunos do cadastro automático (PR) que ainda não estão no contrato: trazer com um toque
     import("./aluguel-do-pr.js")

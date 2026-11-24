@@ -4190,6 +4190,17 @@ await cenario("Aluguel de becas: entrada / antecipação do colégio, Recebido e
   await pg.waitForTimeout(800);
   const topo = await pg.locator("#viewBecas .kpis").first().textContent();
   ok(/já paga: R\$\s*7,20/.test(topo), "topo: a comissão já paga aparece embaixo");
+  // (24/11/2026) 🖨️ Gerar contrato: abre o contrato de locação de becas numa aba nova, com a entrada abatida
+  await pg.evaluate(() => {
+    window.open = () => {
+      const w = { html: "", document: { write: h => (w.html += h), open: () => (w.html = ""), close: () => {} }, close: () => {} };
+      return (window.__aba = w);
+    };
+  });
+  await pg.getByRole("button", { name: "🖨️ Gerar contrato" }).click();
+  await pg.waitForFunction(() => window.__aba && /CONTRATO DE LOCAÇÃO DE BECAS/.test(window.__aba.html), null, { timeout: 8000 });
+  const txt = await pg.evaluate(() => window.__aba.html);
+  ok(/COLEGIO ALFA/.test(txt) && /Entrada já paga em 01\/05/.test(txt) && /3 alunos/.test(txt), "contrato do colégio sai com os alunos e a entrada");
   ok(/Recebido\s*R\$\s*72/.test(topo) && /A receber\s*R\$\s*168/.test(topo), "topo: Recebido R$ 72 e A receber R$ 168");
   if (process.env.FOTOS) await pg.locator("#viewBecas").screenshot({ path: process.env.FOTOS + "/becas-topo.png" });
   ok(!erros.length, "sem erros" + (erros.length ? ": " + erros.join(" | ") : ""));

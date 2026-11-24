@@ -7,6 +7,7 @@ import { ENDERECO, ESTUDIO } from "./mensagens.js";
 import { lerReais, centavos, reais, brl } from "./regras.js";
 import * as U from "./util.js";
 import { botaoRelatorio } from "./relatorio.js";
+import { contratoAvulso } from "./contrato-imprimir.js";
 import { contatoRel } from "./aluno-id.js";
 import { BECAS, TAMANHOS, FAIXAS, CAPELOS, nomeFaixa, nomeCapelo, abrirEstoqueBecas, somarUso, usoDosAlunos } from "./becas-estoque.js";
 import { ouvirUso, espelhar, acertarBecas, usoNoDia } from "./becas-uso.js";
@@ -333,6 +334,7 @@ function card(x) {
         .catch(e => C.handleErr(e))
     )
   );
+  act.append(U.mkBtn("🖨️ Contrato", "", () => contratoAvulso(C, x)));
   if (x.status === "reservado") {
     if (C.isAdmin)
       act.append(

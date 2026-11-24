@@ -74,7 +74,9 @@ export function openForm(it) {
     r1.append(field("Endereço", rua), field("Número", num));
     const r2 = el("div", "row2");
     r2.append(field("Bairro", bai), field("Cidade", cid));
-    p.append(r1, r2);
+    // (24/11/2026) CNPJ: sai no contrato de aluguel de becas (sem ele, o contrato sai com a linha em branco)
+    const cnpj = inp(it && it.cnpj, "00.000.000/0000-00");
+    p.append(r1, r2, field("CNPJ (para o contrato)", cnpj));
     const fot = sel(FOTOGRAFO, it && it.fotografoHoje, "—");
     p.append(field("Fotógrafo hoje", fot));
     const m1 = p.children.length;
@@ -193,6 +195,7 @@ export function openForm(it) {
         sigla: sigla.value.replace(/[^A-Za-z0-9]/g, "").toUpperCase(),
         tipo: tipoK,
         endereco: { rua: rua.value.trim(), numero: num.value.trim(), bairro: bai.value.trim(), cidade: cid.value.trim() },
+        cnpj: cnpj.value.trim(),
         mediaAlunos: somar() || null,
         alunosPorSerie: Object.fromEntries(segChk.map(([k, c, q]) => [k, c.checked ? Number(q.value) || 0 : 0])),
         alunosOutros: Number(extraQ.value) || 0,
