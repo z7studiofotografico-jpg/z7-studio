@@ -8,6 +8,7 @@
 // "Atrasado na devolução": retirou e passou da data de devolução (destaque para o Adriano).
 import { ordemCodigo, telRelatorio } from "./aluno-id.js";
 import { kpisValores, TIPOS_FILTRO, tipoDoAluno, botaoNovaInstituicao } from "./aluguel-resumo.js";
+import { cartaoDoTipo } from "./instituicoes-dados.js";
 import { bloco, el, title, field, inp, inpReais, sel, sheet, botoes, wa, clicavel } from "./ui.js";
 import * as U from "./util.js";
 import { lerReais, brl } from "./regras.js";
@@ -21,8 +22,6 @@ import {
   nomeFaixa,
   nomeCapelo,
   usoDosAlunos,
-  faltaParaAluno,
-  somarUso,
   tamanhoBeca,
   modeloBeca,
   semTamanho,
@@ -36,7 +35,7 @@ import { ITENS_PACOTE, nomeItem, lerPacote, valorDoPacote } from "./contrato-col
 import { linhaGenerica } from "./lista-compacta.js";
 import { chipItem, lerQtd } from "./itens-qtd.js";
 import { avisoPrecoAluguel } from "./precos-colegio.js";
-import { ouvirUso, espelhar, donoDoAluguel, somaAvulsos, equipePode, AVISO_RESERVA } from "./becas-uso.js";
+import { ouvirUso, espelhar, donoDoAluguel, equipePode, AVISO_RESERVA, faltaDoAlunoNoDia } from "./becas-uso.js";
 import { abrirJanela } from "./janela.js";
 import { abaColegio, abaHistorico } from "./aluguel-janela.js";
 
@@ -75,8 +74,11 @@ let lista = [],
   eventosUso = [], // (19/11/2026) agendamentos de becas dos colégios: as becas saem na entrega e voltam na devolução
   filtro = { ano: String(ANO()), tipo: "", inst: "", status: "Cadastrado", q: "" };
 const $ = id => document.getElementById(id);
-// o uso sem o próprio colégio do aluno (o agendamento dele já inclui a beca dele)
-const usoSemColegio = a => somaAvulsos(avulsosLista.filter(x => !(x.tipo === "evento" && x.instId === a.instId)));
+// (23/11/2026) as becas valem por dia: confere só o dia das becas do colégio (ver becas-uso.js)
+let abrirEst = null; // abre o Estoque (vem do Aluguel de becas)
+const fmtDia = d => (d ? d.slice(8, 10) + "/" + d.slice(5, 7) : "");
+export const faltaNoDia = a => faltaDoAlunoNoDia(C.P.estoque || {}, avulsosLista, lista, a);
+const avisoSemEstoque = (dia, falta) => import("./aluguel-lote.js").then(m => m.avisoSemEstoque(dia, falta, abrirEst));
 // Agenda → Aluguel de becas: abre os alunos já filtrados no colégio e ano
 export function pedirColegio(instId, ano) {
   filtro.inst = instId || "";
@@ -90,6 +92,7 @@ export function mostrarAlunos(ctx, v, o) {
   C = ctx;
   FS = ctx.FS;
   db = ctx.db;
+  abrirEst = o && o.abrirEstoque;
   col = FS.collection(db, "alugueis");
   const head = el("div", "vhead");
   head.append(el("h2", null, "Aluguel de becas · alunos"));
@@ -238,7 +241,10 @@ function render() {
   };
   const cont = {};
   doAno.forEach(a => (cont[a.instId] = (cont[a.instId] || 0) + 1));
-  const opcoes = Object.keys(cont).map(id => [id, `${title((lista.find(a => a.instId === id) || {}).instNome || "?")} (${cont[id]})`]);
+  // (23/11/2026) todos os colégios cadastrados aparecem (mesmo sem aluno ainda), não só os que já têm aluno
+  const ids = new Set([...Object.keys(cont), ...insts.filter(i => !filtro.tipo || cartaoDoTipo(i.tipo || "") === filtro.tipo).map(i => i.id)]);
+  const nomeDe = id => (insts.find(i => i.id === id) || {}).nome || (lista.find(a => a.instId === id) || {}).instNome || "?";
+  const opcoes = [...ids].map(id => [id, `${title(nomeDe(id))}${cont[id] ? ` (${cont[id]})` : ""}`]);
   const sInst = sel(
     opcoes.sort((a, b) => a[1].localeCompare(b[1], "pt-BR")),
     filtro.inst,
@@ -287,7 +293,7 @@ function render() {
     r.append(
       " ",
       U.mkBtn("⏩ Avançar o colégio inteiro", "btn-sm", () =>
-        import("./aluguel-lote.js").then(m => m.avancarColegio(C, doCol, mudarStatus)).catch(e => C.handleErr(e))
+        import("./aluguel-lote.js").then(m => m.avancarColegio(C, doCol, mudarStatus, false, abrirEst)).catch(e => C.handleErr(e))
       ),
       " ",
       U.mkBtn("⏪ Voltar o colégio inteiro", "btn-sm", () =>
@@ -565,16 +571,10 @@ export async function mudarStatus(a, para, lote = false) {
   }
   // reservar a beca: confere se tem livre (sem contar o próprio aluno)
   if (!a.soPaspatur && iDe < 1 && iPara >= 1) {
-    const uso = somarUso(usoSemColegio(a), usoDosAlunos(alunosUso.filter(x => x.id !== a.id)));
-    const falta = faltaParaAluno(C.P.estoque || {}, uso, a);
+    const { dia, falta } = faltaNoDia(a);
     if (falta.length) {
-      if (lote) return "sem estoque: " + falta.join(", ");
-      await confirmar(
-        "Sem estoque",
-        "Não tem livre: " + falta.join(", ") + ". Troque o tamanho/faixa/capelo (Editar) ou confira o estoque.",
-        { sim: "Entendi", nao: "Fechar" }
-      );
-      return;
+      if (lote) return `sem estoque no dia ${fmtDia(dia)}: ` + falta.join(", ");
+      return avisoSemEstoque(dia, falta);
     }
   }
   // indo para a produção: a foto do aluno já foi tirada? (as fotos não vêm para o app; é o acordo com o colégio)
@@ -815,10 +815,9 @@ export function form(a, pre = {}) {
       try {
         // já reservado: a troca de tamanho/faixa/capelo também precisa ter livre
         if (a && STATUS_ALUGUEL.indexOf(a.status) >= 1 && a.status !== "Devolvida") {
-          const uso = somarUso(usoSemColegio(a), usoDosAlunos(alunosUso.filter(y => y.id !== a.id)));
-          const falta = faltaParaAluno(C.P.estoque || {}, uso, body);
+          const { dia, falta } = faltaNoDia(Object.assign({}, a, body));
           if (falta.length) {
-            err.textContent = "Não tem livre: " + falta.join(", ");
+            err.textContent = `No dia ${fmtDia(dia)} não tem livre: ` + falta.join(", ");
             err.hidden = false;
             return;
           }

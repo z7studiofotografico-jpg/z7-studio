@@ -122,23 +122,32 @@ export async function relatorioAluguel(C, lista, filtro, insts = []) {
     )
   );
   // o kit: quem não vai participar não tem kit (não usa o padrão do contrato); só o Paspatur é o Paspatur
-  const kit = a =>
-    a.naoParticipa
-      ? "Sem kit"
-      : a.soPaspatur
-        ? "Só o Paspatur"
-        : textoPacote(pacoteDoAluno(a, contratos[`${a.instId}_${a.ano}`]).itens, a.pacoteQtd) || "Sem kit";
-  const cols = ["ID", "Aluno", "Contato", "Turma", "Kit", "Beca", "Faixa / capelo", "Status", "Devolução"];
+  // (23/11/2026) o kit mostra o que foi vendido de verdade (paspatur, canudo, certificado, fotos…); quem é só do
+  // Paspatur mostra os itens dele (não "beca adulta sem tamanho")
+  const itensDe = a => {
+    if (a.naoParticipa) return [];
+    const it = pacoteDoAluno(a, contratos[`${a.instId}_${a.ano}`]).itens;
+    return a.soPaspatur ? (it.filter(k => k !== "beca" && k !== "pelerine").length ? it.filter(k => k !== "beca" && k !== "pelerine") : ["paspatur"]) : it;
+  };
+  const kit = a => (a.naoParticipa ? "Sem kit" : textoPacote(itensDe(a), a.pacoteQtd) || "Sem kit");
+  const usaBeca = a => !a.naoParticipa && !a.soPaspatur && (itensDe(a).some(k => k === "beca" || k === "pelerine") || !!a.becaTipo);
+  // nenhum aluno com beca (ex.: contrato só de Paspatur): as colunas de beca e devolução saem do relatório
+  const comBeca = arr.some(usaBeca);
+  const cols = ["ID", "Aluno", "Contato", "Turma", "Kit", ...(comBeca ? ["Beca", "Faixa / capelo"] : []), "Status", ...(comBeca ? ["Devolução"] : [])];
   const linha = a => [
     a.codigo || "",
     title(a.nome || ""),
     contatoRel(a.tel, ""),
     [a.serie, a.turma].filter(Boolean).join(" · "),
     kit(a),
-    a.becaTipo ? tamanhoBeca(a).replace(" · sem tamanho", " (sem tamanho)") : "—",
-    [a.faixa && nomeFaixa(a.faixa), a.capelo && nomeCapelo(a.capelo)].filter(Boolean).join(" · "),
-    situacaoAluguel(a, hoje),
-    a.devolucao ? U.fmtDate(a.devolucao) : ""
+    ...(comBeca
+      ? [
+          usaBeca(a) ? (a.becaTipo ? tamanhoBeca(a).replace(" · sem tamanho", " (sem tamanho)") : "a medir") : "—",
+          usaBeca(a) ? [a.faixa && nomeFaixa(a.faixa), a.capelo && nomeCapelo(a.capelo)].filter(Boolean).join(" · ") : ""
+        ]
+      : []),
+    situacaoAluguel(a, hoje).replace(/^Só o Paspatur · /, ""),
+    ...(comBeca ? [usaBeca(a) && a.devolucao ? U.fmtDate(a.devolucao) : ""] : [])
   ];
   // separa por colégio, ou por colégio e turma (a turma sai em cada linha também)
   const porTurma = f.por === "turma";
@@ -154,7 +163,7 @@ export async function relatorioAluguel(C, lista, filtro, insts = []) {
   const nomeInst = f.inst ? title((arr[0] || base.find(a => a.instId === f.inst) || {}).instNome || "") : "";
   const sit = (SIT_REL.find(x => x[0] === f.sit) || [])[1];
   return {
-    titulo: "Aluguel de becas · alunos" + (f.ano ? " · " + f.ano : ""),
+    titulo: (comBeca ? "Aluguel de becas" : "Kits do colégio (sem beca)") + " · alunos" + (f.ano ? " · " + f.ano : ""),
     subtitulo: [
       f.tipo ? (TIPOS_REL.find(x => x[0] === f.tipo) || [])[1] : "",
       nomeInst,
@@ -168,9 +177,13 @@ export async function relatorioAluguel(C, lista, filtro, insts = []) {
         titulo: "Resumo",
         kpis: [
           ["Alunos", arr.length],
-          ["Becas reservadas", u.reservado],
-          ["Becas fora", u.fora],
-          ["Atrasados", arr.filter(a => atrasadoAluguel(a, hoje)).length],
+          ...(comBeca
+            ? [
+                ["Becas reservadas", u.reservado],
+                ["Becas fora", u.fora],
+                ["Atrasados", arr.filter(a => atrasadoAluguel(a, hoje)).length]
+              ]
+            : []),
           ["Não vai participar", arr.filter(a => a.naoParticipa).length],
           ["Só o Paspatur", arr.filter(a => a.soPaspatur && !a.naoParticipa).length],
           ["Valor total", brl(arr.filter(a => !a.naoParticipa).reduce((t, a) => t + (Number(a.valor) || 0), 0))]

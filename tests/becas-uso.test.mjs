@@ -69,3 +69,19 @@ test("donos: aluno com quem fechou o contrato; avulso com quem registrou", () =>
     ["v2", ""]
   ]);
 });
+
+// (23/11/2026) estoque por dia
+import { usoNoDia, diaDoColegio, diaDoUso } from "../js/becas-uso.js";
+test("as becas valem por dia: só conta o que está no mesmo dia", () => {
+  const av = [
+    { id: "a1", tipo: "avulso", retirada: "2026-12-05", dataEvento: "2026-12-06", becasQtd: { tradPreta: 10 } },
+    { id: "e1", tipo: "evento", instId: "x", retirada: "2026-12-06", becasQtd: { tradPreta: 40 } },
+    { id: "e2", tipo: "evento", instId: "y", retirada: "2026-12-07", becasQtd: { tradPreta: 99 } }
+  ];
+  assert.equal(diaDoUso(av[0]), "2026-12-06");
+  assert.equal(usoNoDia(av, "2026-12-06").becas.tradPreta, 50);
+  assert.equal(usoNoDia(av, "2026-12-06", { semInst: "x" }).becas.tradPreta, 10);
+  assert.equal(usoNoDia(av, "2026-12-08").becas.tradPreta, undefined);
+  assert.equal(diaDoColegio(av, "y", 2026), "2026-12-07");
+  assert.equal(diaDoColegio(av, "z", 2026), "");
+});

@@ -370,20 +370,54 @@ export function abrirCadastroAluno(C, o = {}) {
       const dBecas = el("div", "cad-mod");
       const rb1 = el("div", "cad-g3"),
         rb2 = el("div", "cad-g3");
-      rb1.append(field("Beca", bTipo), field("Tamanho", bTam), field("Valor do aluguel", bValor));
+      rb1.append(field("Beca", bTipo), field("Tamanho", bTam), field("Valor do kit", bValor));
       rb2.append(field("Faixa", bFaixa), field("Capelo", bCap), lMenos);
       // (17/11/2026) o kit do colégio (Contrato do colégio → Kits): itens e preço fechado, pela turma
       const bKit = sel([], "", "Kit (vazio = pacote padrão)");
       bKit.setAttribute("aria-label", "Kit do aluguel");
-      let kitsCol = [];
+      let kitsCol = [],
+        contratoCol = null;
+      // (23/11/2026) o que o aluno comprou (beca, certificado, canudo, paspatur, fotos, quadro, PR…): vem marcado
+      // com o kit do contrato e dá para tirar ou pôr item; o valor é o do kit (+ o item vendido a mais)
+      const bItens = el("div", "chips cad-itens");
+      const { ITENS_PACOTE } = await import("./contrato-colegio-regras.js");
+      const { chipItem, lerQtd } = await import("./itens-qtd.js");
+      const cxItens = ITENS_PACOTE.map(([k, nm]) => {
+        const it = chipItem(k, nm, false, 1);
+        bItens.append(it.l);
+        return [k, it.cb];
+      });
+      const marcarItens = (itens, qtd = {}) =>
+        cxItens.forEach(([k, cb]) => {
+          cb.checked = (itens || []).includes(k);
+          cb._qtd.hidden = !cb.checked;
+          cb._qtd.value = String(Number(qtd[k]) || 1);
+        });
+      const itensMarcados = () => cxItens.filter(([, cb]) => cb.checked).map(([k]) => k);
+      const recalcular = async () => {
+        if (!contratoCol) return;
+        const R = await import("./contrato-colegio-regras.js");
+        const v = R.valorDoPacote(itensMarcados(), serieTxt(), contratoCol, lerQtd(cxItens));
+        if (v) bValor.value = String(v.toFixed(2)).replace(".", ",");
+      };
+      bItens.addEventListener("change", () => {
+        bKit.value = "";
+        recalcular();
+      });
       const lerKits = async () => {
         kitsCol = [];
+        contratoCol = null;
         bKit.replaceChildren(el("option", null, "Kit (vazio = pacote padrão)"));
         bKit.options[0].value = "";
         if (!sCol.value) return;
         const R = await import("./contrato-colegio-regras.js");
         const s = await C.FS.getDoc(C.FS.doc(C.db, "contratosColegio", R.idContrato(sCol.value, Number(ano.value)))).catch(() => null);
-        kitsCol = R.kitsDo(s && s.exists() ? s.data() : null).filter(
+        contratoCol = s && s.exists() ? s.data() : null;
+        if (contratoCol && !itensMarcados().length) {
+          marcarItens(contratoCol.pacotePadrao || [], contratoCol.pacotePadraoQtd || {});
+          recalcular();
+        }
+        kitsCol = R.kitsDo(contratoCol).filter(
           k => !k.serie || !serieTxt() || U.chave(k.serie).replace(/\W/g, "") === U.chave(serieTxt()).replace(/\W/g, "")
         );
         kitsCol.forEach((k, i) => {
@@ -394,10 +428,13 @@ export function abrirCadastroAluno(C, o = {}) {
       };
       bKit.onchange = () => {
         const k = kitsCol[Number(bKit.value)];
-        if (k && bKit.value !== "") bValor.value = String(k.valor).replace(".", ",");
+        if (k && bKit.value !== "") {
+          bValor.value = String(k.valor).replace(".", ",");
+          marcarItens(k.itens, k.qtd || {});
+        }
       };
       [sCol, ano, turma].forEach(x => x.addEventListener("change", lerKits));
-      dBecas.append(el("b", null, "👘 Aluguel de becas"), rb1, field("Kit", bKit), rb2);
+      dBecas.append(el("b", null, "👘 Aluguel de becas"), rb1, field("Kit", bKit), field("O que comprou (marque os itens)", bItens), rb2);
       s3.append(grade, fFrente, dBecas);
       const erro = el("p", "err");
       erro.hidden = true;
@@ -560,8 +597,8 @@ export function abrirCadastroAluno(C, o = {}) {
                 faixa: bFaixa.value,
                 capelo: bCap.value,
                 valor: lerReais(bValor.value),
-                pacote: bKit.value !== "" && kitsCol[Number(bKit.value)] ? kitsCol[Number(bKit.value)].itens.slice() : [],
-                pacoteQtd: bKit.value !== "" && kitsCol[Number(bKit.value)] ? kitsCol[Number(bKit.value)].qtd || {} : {}
+                pacote: itensMarcados(),
+                pacoteQtd: lerQtd(cxItens)
               })
             );
           if (fazer.includes("pr")) feitos.push(await criarPR(C, "repasse", d, "pr"));

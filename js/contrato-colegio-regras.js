@@ -31,7 +31,10 @@ export const ITENS_PACOTE = [
 export const nomeItem = id => (ITENS_PACOTE.find(([k]) => k === id) || [id, id])[1];
 export const QUEM_PAGA = [
   ["colegio", "O colégio paga tudo"],
-  ["alunos", "Cada aluno paga"]
+  ["alunos", "Cada aluno paga"],
+  // (23/11/2026) ex.: C.E. João Paulo II: a beca vai emprestada em troca da foto; as fotos são vendidas depois e o
+  // valor do kit é o valor para trabalhar cada aluno
+  ["troca", "Beca emprestada em troca da foto (vendemos as fotos depois)"]
 ];
 export const RECEBE = [
   ["estudio", "Estúdio"],
@@ -123,12 +126,22 @@ export function kitDaPlanilha(txt, serie, contrato) {
 // O valor de um pacote: o preço do kit, se for um kit do colégio; se não, a soma dos itens
 // qtd = { item: quantidade } (ex.: 2 PR): na soma dos avulsos, o preço do item vezes a quantidade
 // o contrato tem preço: algum item com valor ou algum kit com valor (17/11/2026: só com kits também vale)
-export const temPreco = c => !!c && (Object.values(c.precos || {}).some(v => Number(v) > 0) || kitsDo(c).some(k => Number(k.valor) > 0));
+// (23/11/2026) ou o valor do kit combinado (valorKit)
+export const temPreco = c =>
+  !!c && (Number(c.valorKit) > 0 || Object.values(c.precos || {}).some(v => Number(v) > 0) || kitsDo(c).some(k => Number(k.valor) > 0));
+// (23/11/2026) Valor do kit (contrato.valorKit): o combinado com o colégio é o preço do KIT INTEIRO por aluno; os
+// itens (beca, certificado, canudo…) são só para constar. Quem tem o kit padrão paga o valorKit; o que for vendido
+// a mais depois (paspatur, PR, quadro, fotos) soma o preço daquele item.
 export function valorDoPacote(itens, serie, contrato, qtd) {
   const k = kitDosItens(itens, serie, contrato);
   if (k) return Number(k.valor) || 0;
   const pr = (contrato && contrato.precos) || {};
-  return reais(lerPacote(itens || []).reduce((t, x) => t + centavos(pr[x] || 0) * (Number((qtd || {})[x]) || 1), 0));
+  const it = lerPacote(itens || []);
+  const soma = l => l.reduce((t, x) => t + centavos(pr[x] || 0) * (Number((qtd || {})[x]) || 1), 0);
+  const vk = centavos((contrato && contrato.valorKit) || 0);
+  const pad = lerPacote((contrato && contrato.pacotePadrao) || []);
+  if (vk && pad.length && pad.every(x => it.includes(x))) return reais(vk + soma(it.filter(x => !pad.includes(x))));
+  return reais(soma(it));
 }
 // Preço do pacote de um aluno (o kit, ou a soma dos itens); 0 quando o contrato não tem preço
 export function precoAluno(a, contrato) {
@@ -258,7 +271,7 @@ export function producao(alunos, contrato) {
 // Quem pode mexer: admin, ou o representante que fechou o contrato
 export const podeEditar = (C, contrato) => !!C && (C.isAdmin || (!!contrato && !!contrato.respEmail && contrato.respEmail === C.email));
 // O representante não muda o valor, as parcelas nem quem fechou; isso é do admin
-export const CAMPOS_SO_ADMIN = ["valor", "precos", "parcelas", "respEmail", "respNome", "quemPaga"];
+export const CAMPOS_SO_ADMIN = ["valor", "precos", "parcelas", "respEmail", "respNome", "quemPaga", "valorKit"];
 // Pagamento: o representante não confirma o repasse do dinheiro que está com ele, nem confere
 export function repPodeMexer(p) {
   if (!p) return true;

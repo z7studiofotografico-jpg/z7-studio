@@ -367,7 +367,7 @@ service cloud.firestore {
       allow create: if admin() || (pode('becas') && request.resource.data.get('respEmail', '') == email()
         && request.resource.data.get('comissaoPct', 0) == 0);
       allow update: if admin() || (pode('becas') && resource.data.get('respEmail', '') == email()
-        && !mudou(['valor', 'precos', 'parcelas', 'respEmail', 'respNome', 'quemPaga', 'instId', 'ano', 'kits', 'comissaoPct']));
+        && !mudou(['valor', 'precos', 'parcelas', 'respEmail', 'respNome', 'quemPaga', 'instId', 'ano', 'kits', 'comissaoPct', 'valorKit']));
       allow delete: if admin();
       match /pagamentos/{pid} {
         allow read: if admin() || (pode('becas') && meuContrato(cid));

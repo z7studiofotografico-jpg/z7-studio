@@ -25,7 +25,7 @@ export function etapasDoColegio(alunos, voltar = false) {
   return [...m.values()].sort((x, y) => ordem(x[0]) - ordem(y[0]));
 }
 
-export function avancarColegio(C, alunos, mudarStatus, voltar = false) {
+export function avancarColegio(C, alunos, mudarStatus, voltar = false, abrirEstoque = null) {
   const etapas = etapasDoColegio(alunos, voltar);
   const nome = title((alunos[0] || {}).instNome || "Colégio");
   sheet(voltar ? "⏪ Voltar o colégio inteiro" : "⏩ Avançar o colégio inteiro", (p, close) => {
@@ -104,12 +104,35 @@ export function avancarColegio(C, alunos, mudarStatus, voltar = false) {
           const ul = el("ul");
           pulados.forEach(t => ul.append(el("li", null, t)));
           msg.append(ul);
+          // (23/11/2026) travou por estoque: leva direto para o estoque daquele dia
+          const sem = pulados.find(t => /sem estoque no dia (\d\d)\/(\d\d)/.test(t));
+          if (sem && abrirEstoque) {
+            const [, dd, mm] = sem.match(/sem estoque no dia (\d\d)\/(\d\d)/);
+            const ano = String((alunos[0] || {}).ano || new Date().getFullYear());
+            msg.append(
+              el("p", "notice", "Alguns travaram por falta de beca no dia. Quer ver o estoque desse dia para entender?"),
+              U.mkBtn("📦 Abrir o estoque do dia " + dd + "/" + mm, "btn-primary", () => {
+                close();
+                abrirEstoque(`${ano}-${mm}-${dd}`, `${pulados.length} aluno(s) de ${nome} travaram por falta de estoque.`);
+              })
+            );
+          }
         }
       });
       lista.append(b);
     });
     p.append(lista, msg, U.mkBtn("Fechar", "", close));
   });
+}
+
+// (23/11/2026) janela "sem estoque nesse dia" com o botão para abrir o estoque daquele dia
+export async function avisoSemEstoque(dia, falta, abrirEstoque) {
+  const txt = `No dia ${dia.slice(8, 10)}/${dia.slice(5, 7)} não tem livre: ${falta.join(", ")}.`;
+  const ver = await confirmar("Sem estoque nesse dia", txt + " Quer abrir o estoque para ver o que está acontecendo?", {
+    sim: "📦 Abrir o estoque",
+    nao: "Fechar"
+  });
+  if (ver && abrirEstoque) abrirEstoque(dia, txt);
 }
 
 // Não vai participar (fez a foto, não vai à formatura) · Só o Paspatur (os pais só querem o Paspatur) · Vai participar

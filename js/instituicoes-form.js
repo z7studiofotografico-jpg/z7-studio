@@ -210,6 +210,19 @@ export function openForm(it) {
         Object.assign(body, { cadastroPendente: false, cadastroOkEm: new Date().toISOString(), cadastroOkPor: C.me || "" });
         completou = true;
       }
+      // (23/11/2026) colégio novo: antes, confere se já não está cadastrado com outro jeito de escrever
+      if (!it) {
+        let todas = items;
+        try {
+          todas = (await FS.getDocs(C.carteira("instituicoes", FS.limit(3000)))).docs.map(d => Object.assign({ id: d.id }, d.data()));
+        } catch (_) {}
+        const r = await import("./colegio-repetido.js").then(m => m.perguntarSeRepetido(C, body.nome, todas));
+        if (r && r.usar) {
+          close();
+          U.toast("Abrindo o colégio já cadastrado");
+          return openForm(r.usar);
+        }
+      }
       try {
         if (it) await FS.updateDoc(FS.doc(db, "instituicoes", it.id), body);
         else

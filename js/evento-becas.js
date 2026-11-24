@@ -58,7 +58,7 @@ export function blocoBecasEvento(C, it, kind, ev, campo, fechar) {
   const fm = formaturaDepois(it, ret.value);
   dev.value = b0.devolucao || (fm ? maisDias(fm, 1) : "");
   const r = el("div", "row2");
-  r.append(field("Saída das becas (entrega)", ret), field("Devolução (recolher)", dev));
+  r.append(field("Saída das becas (entrega)", ret), field("Devolução (opcional)", dev));
   box.append(r);
   if (!b0.devolucao)
     box.append(
@@ -156,18 +156,18 @@ export function blocoBecasEvento(C, it, kind, ev, campo, fechar) {
     est.innerHTML = "";
     const total = soma(p.becasQtd);
     const topo = el("div", "eb-topo");
-    topo.append(el("b", null, "📦 Estoque no período"));
+    topo.append(el("b", null, "📦 Estoque no dia"));
     est.append(topo);
     const aviso = (cls, t) => est.append(el("p", "hint eb-vazio" + (cls ? " " + cls : ""), t));
     if (!copias) return aviso("", "Carregando o estoque…");
-    if (!ret.value || !dev.value) return aviso("", "Escolha a saída e a devolução para conferir o estoque.");
-    if (dev.value < ret.value) return aviso("err", "A devolução precisa ser depois da saída.");
+    // (23/11/2026) as becas valem por dia: só o dia da entrega conta; a devolução não trava o estoque
+    if (!ret.value) return aviso("", "Escolha o dia para conferir o estoque.");
     // os alunos deste colégio não contam contra ele (as becas deles são as deste agendamento)
     const semEste = copias.filter(c => !(c.tipo === "aluno" && c.instId === it.id && String(c.ano) === ano));
     const { uso, outros } = usoNoPeriodo(semEste, ret.value, dev.value, idEvento(it.id, campo));
     const linhas = conferirPedido(E, uso, p);
     topo.append(
-      el("small", null, `${U.fmtDate(ret.value)} a ${U.fmtDate(dev.value)}${total ? ` · ${total} beca${total > 1 ? "s" : ""}` : ""}`)
+      el("small", null, `${U.fmtDate(ret.value)}${total ? ` · ${total} beca${total > 1 ? "s" : ""}` : ""}`)
     );
     if (!linhas.length) return aviso("", "Coloque as quantidades acima para conferir o estoque.");
     const faltam = linhas.filter(x => x.falta);
@@ -194,7 +194,7 @@ export function blocoBecasEvento(C, it, kind, ev, campo, fechar) {
     });
     est.append(tb);
     if (outros.length) {
-      est.append(el("div", "eb-sub", "Também usando becas nesses dias"));
+      est.append(el("div", "eb-sub", "Também usando becas nesse dia"));
       const ul = el("div", "eb-outros");
       outros.forEach(o => {
         const l = el("div", "eb-outro");
@@ -218,10 +218,11 @@ export function blocoBecasEvento(C, it, kind, ev, campo, fechar) {
     err.hidden = true;
     const p = ler();
     if (junto && !mexeu) return;
-    if (soma(p.becasQtd) && (!ret.value || !dev.value || dev.value < ret.value)) {
-      err.textContent = "Coloque a saída e a devolução (a devolução depois da saída).";
+    // (23/11/2026) só o dia da entrega é obrigatório; a devolução é opcional (não entra no estoque)
+    if (soma(p.becasQtd) && (!ret.value || (dev.value && dev.value < ret.value))) {
+      err.textContent = !ret.value ? "Coloque o dia da entrega das becas." : "A devolução precisa ser depois da entrega.";
       err.hidden = false;
-      if (junto) U.toast("As becas não foram salvas: falta a devolução.");
+      if (junto) U.toast("As becas não foram salvas: falta o dia da entrega.");
       return;
     }
     const becas = Object.assign(p, { retirada: ret.value, devolucao: dev.value, atualizadoEm: new Date().toISOString(), por: C.me || "" });

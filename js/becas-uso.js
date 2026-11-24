@@ -3,7 +3,7 @@
 // números na coleção "becasUso" (tipo, tamanho, faixa, capelo, datas), sem nome, telefone ou valor. A equipe confere
 // o estoque por ela. O app grava a cópia junto com o aluguel; ao abrir as becas, o admin acerta o que ficou diferente
 // (aluguel apagado, planilha importada…).
-import { RESERVA, FORA, usoDosAlunos, nomeBeca, nomeFaixa, nomeCapelo, semTamanho } from "./becas-estoque.js";
+import { RESERVA, FORA, usoDosAlunos, nomeBeca, nomeFaixa, nomeCapelo, semTamanho, somarUso, faltaParaAluno } from "./becas-estoque.js";
 
 export const USO = "becasUso";
 const AVULSO_ATIVO = ["reservado", "retirado"];
@@ -47,6 +47,7 @@ export function usoDeAvulso(x) {
     respEmail: x.respEmail || "",
     retirada: x.retirada || "",
     devolucao: x.devolucao || "",
+    dataEvento: x.dataEvento || "", // (23/11/2026) o estoque vale por dia: conta o dia do evento
     becasQtd: num(x.becasQtd),
     faixasQtd: num(x.faixasQtd),
     capelosQtd: num(x.capelosQtd),
@@ -139,7 +140,7 @@ export async function acertarBecas(C, hoje) {
   if (!C.isAdmin || C.verComo) return 0;
   const chave = "z7becasAcerto";
   try {
-    if (localStorage.getItem(chave) === hoje + "c") return 0;
+    if (localStorage.getItem(chave) === hoje + "d") return 0;
   } catch (_) {}
   const { FS, db } = C;
   const ler = async q => (await FS.getDocs(q)).docs.map(d => Object.assign({ id: d.id }, d.data()));
@@ -161,7 +162,7 @@ export async function acertarBecas(C, hoje) {
     await b.commit();
   }
   try {
-    localStorage.setItem(chave, hoje + "c"); // "c" (19/11/2026): a cópia passou a levar colégio, ano e de quem é
+    localStorage.setItem(chave, hoje + "d"); // "d" (23/11/2026): a cópia do avulso passou a levar o dia do evento; "c" (19/11/2026): a cópia passou a levar colégio, ano e de quem é
   } catch (_) {}
   return ops.length;
 }
@@ -253,29 +254,47 @@ export function somaAvulsos(arr) {
   return t;
 }
 
-// (19/11/2026) Estoque no período de um agendamento de becas: o que já está comprometido entre "de" e "ate"
+// (23/11/2026) As becas valem POR DIA: cada aluguel usa as becas só no dia do evento; no dia seguinte elas estão de
+// volta no estoque (a devolução fica com a Luciana e o Adriano, fora do sistema, e não trava outro aluguel).
+// O dia de cada um: agendamento do colégio = a data da entrega (retirada); avulso = o dia do evento (senão a retirada).
+export const diaDoUso = x => String((x && (x.tipo === "evento" ? x.retirada : x.dataEvento || x.retirada)) || "").slice(0, 10);
+// o que já está comprometido num dia: agendamentos dos colégios + avulsos daquele dia
+// avulsos = a parte "avulsos" de separarUso (avulsos + agendamentos); ignora = id a não contar; semInst = colégio a não contar
+export function usoNoDia(avulsos, dia, o = {}) {
+  const doDia = (avulsos || []).filter(
+    x => diaDoUso(x) === dia && x.id !== o.ignora && !(o.semInst && x.tipo === "evento" && x.instId === o.semInst)
+  );
+  const s = somaAvulsos(doDia);
+  return { becas: s.becas, faixas: s.faixas, capelos: s.capelos, tamanhos: s.tamanhos, menosLonga: {}, lista: doDia };
+}
+// o dia das becas do colégio (agendamento na Agenda) naquele ano: "" = ainda sem dia marcado
+export function diaDoColegio(avulsos, instId, ano) {
+  const ev = (avulsos || [])
+    .filter(x => x.tipo === "evento" && x.instId === instId && (!ano || String(x.retirada || "").slice(0, 4) === String(ano)))
+    .sort((a, b) => String(a.retirada).localeCompare(String(b.retirada)));
+  return ev.length ? diaDoUso(ev[0]) : "";
+}
+// O que falta para o aluno no dia das becas do colégio dele: { dia, falta: [textos] }. Conta o que está separado no
+// mesmo dia (outros colégios e avulsos) + os colegas do mesmo colégio e ano. Sem dia marcado na Agenda, não trava.
+export function faltaDoAlunoNoDia(E, avulsos, alunos, a) {
+  const dia = diaDoColegio(avulsos, a.instId, a.ano);
+  if (!dia) return { dia: "", falta: [] };
+  const { lista: _l, ...u } = usoNoDia(avulsos, dia, { semInst: a.instId });
+  const colegas = (alunos || []).filter(x => x.id !== a.id && x.instId === a.instId && String(x.ano) === String(a.ano));
+  return { dia, falta: faltaParaAluno(E, somarUso(u, usoDosAlunos(colegas)), a) };
+}
+
+// Estoque de um agendamento de becas: o que já está comprometido no MESMO DIA (23/11/2026: antes contava o período
+// inteiro até a devolução e os alunos de todos os colégios, e travava aluguéis que não se cruzam).
 // copias = os documentos de becasUso (com id); ignora = id da cópia do próprio agendamento.
-// Devolve { uso, outros: [{ nome, de, ate, n }] } (outros = colégios e avulsos no mesmo período).
+// Devolve { uso, outros: [{ nome, de, ate, n }] } (outros = colégios e avulsos no mesmo dia).
 export function usoNoPeriodo(copias, de, ate, ignora) {
-  // os alunos do próprio colégio continuam fora (o agendamento toma o lugar deles); só a cópia dele não conta
   const sep = separarUso(copias);
-  const alunos = sep.alunos,
-    avulsos = sep.avulsos.filter(c => c.id !== ignora);
-  const uso = Object.assign({ tamanhos: {} }, usoDosAlunos(alunos));
-  const soma = somaAvulsos(avulsos.filter(x => x.retirada && x.retirada <= ate && (x.devolucao || "9999") >= de));
-  ["becas", "faixas", "capelos"].forEach(k => Object.entries(soma[k]).forEach(([z, v]) => (uso[k][z] = n0(uso[k][z]) + n0(v))));
-  Object.entries(soma.tamanhos).forEach(([tp, zs]) => {
-    const o = (uso.tamanhos[tp] = uso.tamanhos[tp] || {});
-    Object.entries(zs).forEach(([z, v]) => (o[z] = n0(o[z]) + n0(v)));
-  });
+  const { lista, ...uso } = usoNoDia(sep.avulsos, de, { ignora });
   const tot = x => Object.values(x.becasQtd || {}).reduce((s, v) => s + n0(v), 0);
-  const outros = avulsos
-    .filter(x => x.tipo === "evento" && x.retirada <= ate && (x.devolucao || "9999") >= de)
-    .map(x => ({ nome: x.instNome || "Colégio", de: x.retirada, ate: x.devolucao || "", n: tot(x) }));
-  const av = avulsos.filter(x => x.tipo !== "evento" && x.retirada && x.retirada <= ate && (x.devolucao || "9999") >= de);
+  const outros = lista.filter(x => x.tipo === "evento").map(x => ({ nome: x.instNome || "Colégio", de: x.retirada, ate: "", n: tot(x) }));
+  const av = lista.filter(x => x.tipo !== "evento");
   if (av.length) outros.push({ nome: `Aluguéis avulsos (${av.length})`, de: "", ate: "", n: av.reduce((s, x) => s + tot(x), 0) });
-  const nAl = alunos.length;
-  if (nAl) outros.push({ nome: "Alunos de colégios sem agendamento (medidos ou com a beca)", de: "", ate: "", n: nAl });
   return { uso, outros };
 }
 // Confere o pedido (becasQtd, tamanhosQtd, faixasQtd, capelosQtd) com o estoque E menos o uso:

@@ -30,13 +30,13 @@ test("o agendamento toma o lugar dos alunos do mesmo colégio e ano", () => {
     ["2"]
   );
   assert.equal(s.eventos.length, 1);
-  // conta só nos dias do agendamento
-  const dentro = usoNoPeriodo(copias, "2026-12-10", "2026-12-12", "x");
-  assert.equal(dentro.uso.tamanhos.tradPreta.P, 3); // 2 do agendamento + 1 aluno de outro colégio
-  const fora = usoNoPeriodo(copias, "2026-12-20", "2026-12-22", "x");
-  assert.equal(fora.uso.tamanhos.tradPreta.P, 1);
+  // (23/11/2026) as becas valem por dia: conta só no dia da entrega; aluno sem dia (colégio sem agenda) não conta
+  const noDia = usoNoPeriodo(copias, "2026-12-07", "", "x");
+  assert.equal(noDia.uso.tamanhos.tradPreta.P, 2);
+  const outroDia = usoNoPeriodo(copias, "2026-12-10", "", "x");
+  assert.equal((outroDia.uso.tamanhos.tradPreta || {}).P, undefined);
   // o próprio agendamento não conta contra ele
-  assert.equal(usoNoPeriodo(copias, "2026-12-10", "2026-12-12", "evento_pec_diaBecas").uso.tamanhos.tradPreta.P, 1);
+  assert.equal((usoNoPeriodo(copias, "2026-12-07", "", "evento_pec_diaBecas").uso.tamanhos.tradPreta || {}).P, undefined);
 });
 
 test("confere o pedido com o estoque e mostra o que falta", () => {

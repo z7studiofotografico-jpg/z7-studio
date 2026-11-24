@@ -65,6 +65,20 @@ export function show(t) {
       e => C.handleErr(e)
     )
   );
+  // (23/11/2026) admin: colégios cadastrados mais de uma vez → junta num só
+  if (C.isAdmin)
+    hb.append(
+      U.mkBtn("🔀 Colégios repetidos", "", async () => {
+        try {
+          const todas = (await FS.getDocs(FS.query(FS.collection(C.db, "instituicoes"), FS.limit(3000)))).docs.map(d =>
+            Object.assign({ id: d.id }, d.data())
+          );
+          (await import("./colegio-repetido.js")).abrirRepetidos(C, todas);
+        } catch (e) {
+          C.handleErr(e);
+        }
+      })
+    );
   hb.append(U.mkBtn("❌ Não fecharam: motivos", "", () => listaNaoFecharam(items.filter(i => !ocultoParaMim(C, i)))));
   head.append(hb);
   v.append(head);

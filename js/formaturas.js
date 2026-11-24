@@ -409,6 +409,8 @@ function render() {
   const cob = cobrancas(cf);
   chips.innerHTML = "";
   [
+    // (23/11/2026) todos os alunos do colégio, numa lista só, em primeiro
+    ["todos", "👥 Todos", tudoCarregado ? fs.length : ""],
     ["cobrancas", "Cobranças", cob.length],
     ["adesao", "🎓 Adesão (Kit 01)", tudoCarregado ? col.length : ""],
     ["album", "📘 Kits 02 a 05", tudoCarregado ? alb.length : ""],
@@ -465,18 +467,21 @@ function resumoInst(i, lst) {
 }
 // Adesão (Kit 01) e Kits 02 a 05: uma linha por aluno, com busca e colégio (o mesmo desenho das Cobranças)
 function renderContrato(corpo, tipo) {
-  const adesao = tipo === "adesao";
+  const adesao = tipo === "adesao",
+    todos = tipo === "todos";
   corpo.append(
     el(
       "p",
       "hint",
-      adesao
-        ? "Kit 01 (beca + canudo) é a adesão da formatura. A comissão é sobre cada parcela paga (taxa em Ajustes)."
-        : "Kits 02 a 05 do contrato (e outros kits). Preços em “📋 Kits e preços”."
+      todos
+        ? "Todos os alunos dos colégios, com o kit (adesão ou kits 02 a 05) e as parcelas de cada um."
+        : adesao
+          ? "Kit 01 (beca + canudo) é a adesão da formatura. A comissão é sobre cada parcela paga (taxa em Ajustes)."
+          : "Kits 02 a 05 do contrato (e outros kits). Preços em “📋 Kits e preços”."
     )
   );
   const ids = new Set(minhasInsts().map(i => i.id));
-  const fs = meusForms().filter(f => ids.has(f.instId) && ativo(f) && (adesao ? ehKit01(f) : !ehKit01(f)));
+  const fs = meusForms().filter(f => ids.has(f.instId) && ativo(f) && (todos || (adesao ? ehKit01(f) : !ehKit01(f))));
   renderAlunosVA(corpo, fs, { C, insts, abrirTurma, ajuda }, tipo);
 }
 function renderTurmas(corpo) {
@@ -703,6 +708,46 @@ async function relatorioFormaturas() {
         titulo: "Por turma",
         tabela: { cols: ["Colégio", "Kits", "Vendido", "Recebido", "Em aberto", "Atrasados"], linhas },
         vazio: "Nenhuma turma neste bloco."
+      },
+      // (23/11/2026) relatório completo: kits vendidos por tipo e todos os alunos (o que sai se escolhe na hora)
+      {
+        titulo: "Kits vendidos",
+        tabela: {
+          cols: ["Kit", "Alunos", "Vendido", "Recebido", "Em aberto"],
+          linhas: Object.entries(
+            fs.reduce((m, f) => {
+              const k = f.kit || (ehKit01(f) ? "Kit 01" : "Kit");
+              (m[k] = m[k] || []).push(f);
+              return m;
+            }, {})
+          )
+            .sort((a, b) => a[0].localeCompare(b[0], "pt-BR", { numeric: true }))
+            .map(([k, l]) => [k, l.length, moeda(somar(l.map(f => f.valor))), moeda(somar(l.map(recebidoDe))), moeda(somar(l.map(emAberto)))])
+        },
+        vazio: "Nenhum kit vendido."
+      },
+      {
+        titulo: "Todos os alunos",
+        tabela: {
+          cols: ["ID", "Aluno", "Colégio", "Turma", "WhatsApp", "Kit", "Valor", "Pago", "Em aberto", "Parcelas", "Situação"],
+          linhas: fs
+            .slice()
+            .sort((a, b) => String(a.codigo || "~").localeCompare(String(b.codigo || "~"), "pt-BR", { numeric: true }))
+            .map(f => [
+              f.codigo || "",
+              title(f.nome),
+              title(f.instNome),
+              f.turma || f.serie || "",
+              contatoRel(f.tel, f.email),
+              f.kit || (ehKit01(f) ? "Kit 01" : "Kit"),
+              moeda(f.valor),
+              moeda(recebidoDe(f)),
+              moeda(emAberto(f)),
+              `${pagasDe(f)}/${nParcelas(f)}`,
+              quitado(f) ? "Quitado" : atrasado(f) ? "Atrasado" : "Em dia"
+            ])
+        },
+        vazio: "Nenhum aluno."
       },
       {
         titulo: "Cobranças em atraso",

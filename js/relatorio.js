@@ -46,7 +46,14 @@ export function abrirRelatorio(conteudo, quem) {
   );
   folha.append(cab);
   const corpo = el("div");
-  const desenhar = () => corpo.replaceChildren(...(conteudo.secoes || []).map(s => secao(ordem ? ordem.aplicar(s) : s)));
+  // (23/11/2026) ✂️ o que sai: cada parte do relatório liga/desliga, e "sem valores" tira tudo que é R$ (ex.: a
+  // lista para o diretor do colégio). A escolha não sai na folha.
+  const esc = escolherPartes(conteudo, () => desenhar());
+  barra.prepend(esc.caixa);
+  const desenhar = () =>
+    corpo.replaceChildren(
+      ...(conteudo.secoes || []).filter((s, i) => !esc.fora.has(i)).map(s => secao(esc.limpar(ordem ? ordem.aplicar(s) : s)))
+    );
   if (ordem) ordem.mudou = desenhar;
   desenhar();
   folha.append(corpo);
@@ -55,6 +62,49 @@ export function abrirRelatorio(conteudo, quem) {
   document.body.append(r);
   document.body.classList.add("imprimindo");
   return r;
+}
+// ✂️ Escolher o que sai no relatório: as partes (seções) e "sem valores (R$)"
+const DINHEIRO_COL = /^(valor|vendido|recebido|em aberto|pago|a receber|comiss[ãa]o|pre[çc]o)/i;
+const temReais = v => /R\$\s?-?\d/.test(String(v == null ? "" : v));
+export function semValores(s) {
+  const out = Object.assign({}, s);
+  if (s.kpis) out.kpis = s.kpis.filter(([, val]) => !temReais(val));
+  if (s.tabela && s.tabela.cols) {
+    const { cols, linhas } = s.tabela;
+    const tira = cols.map((c, i) => linhas.some(l => temReais(l[i])) || DINHEIRO_COL.test(String(c)));
+    out.tabela = { cols: cols.filter((_, i) => !tira[i]), linhas: linhas.map(l => l.filter((_, i) => !tira[i])) };
+  }
+  return out;
+}
+function escolherPartes(conteudo, mudou) {
+  const fora = new Set();
+  let sem = false;
+  const caixa = el("details", "rel-escolha");
+  caixa.append(el("summary", null, "✂️ O que sai"));
+  const box = el("div", "rel-escolha-box");
+  (conteudo.secoes || []).forEach((s, i) => {
+    if (!s.titulo) return;
+    const l = el("label", "chk");
+    const cb = el("input");
+    cb.type = "checkbox";
+    cb.checked = true;
+    cb.onchange = () => (cb.checked ? fora.delete(i) : fora.add(i), mudou());
+    l.append(cb, document.createTextNode(" " + s.titulo));
+    box.append(l);
+  });
+  const temDinheiro = (conteudo.secoes || []).some(
+    s => (s.kpis || []).some(([, v]) => temReais(v)) || ((s.tabela || {}).linhas || []).some(l => l.some(temReais))
+  );
+  if (temDinheiro) {
+    const l = el("label", "chk rel-sem-valor");
+    const cb = el("input");
+    cb.type = "checkbox";
+    cb.onchange = () => ((sem = cb.checked), mudou());
+    l.append(cb, document.createTextNode(" 🙈 Sem valores (R$) — ex.: para entregar ao diretor"));
+    box.append(l);
+  }
+  caixa.append(box);
+  return { caixa, fora, limpar: s => (sem ? semValores(s) : s) };
 }
 // a página da impressora: deitada (paisagem) ou em pé, com margem pequena
 function folhaDeitada(r, pais) {

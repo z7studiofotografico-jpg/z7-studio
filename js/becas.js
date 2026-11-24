@@ -9,7 +9,7 @@ import * as U from "./util.js";
 import { botaoRelatorio } from "./relatorio.js";
 import { contatoRel } from "./aluno-id.js";
 import { BECAS, TAMANHOS, FAIXAS, CAPELOS, nomeFaixa, nomeCapelo, abrirEstoqueBecas, somarUso, usoDosAlunos } from "./becas-estoque.js";
-import { ouvirUso, espelhar, acertarBecas } from "./becas-uso.js";
+import { ouvirUso, espelhar, acertarBecas, usoNoDia } from "./becas-uso.js";
 export { BECAS, TAMANHOS, FAIXAS, CAPELOS };
 let C,
   FS,
@@ -176,31 +176,13 @@ const foraColegios = (hoje = U.todayStr()) =>
   avulsosUso
     .filter(x => x.tipo === "evento" && x.retirada <= hoje && (!x.devolucao || x.devolucao >= hoje))
     .reduce((s, x) => s + totBecas(x), 0);
-// Quantas becas estão comprometidas entre duas datas (para conferir o estoque)
+// (23/11/2026) Quantas becas estão comprometidas NUM DIA: as becas valem por dia (no dia seguinte voltam ao estoque),
+// então só contam os agendamentos dos colégios e os avulsos daquele dia. A devolução não trava outro aluguel.
 let alunosAtivos = [], // alunos de aluguel com beca reservada ou fora (da cópia do estoque, de todos)
-  avulsosUso = []; // avulsos reservados ou fora (da cópia do estoque, de todos)
-function emUso(de, ate, ignora) {
-  const out = somarUso({ becas: {}, faixas: {}, capelos: {}, tamanhos: {} }, usoDosAlunos(alunosAtivos));
-  avulsosUso
-    .filter(x => x.id !== ignora && ativo(x) && x.retirada && x.devolucao && x.retirada <= ate && x.devolucao >= de)
-    .forEach(x => {
-      Object.entries(x.becasQtd || {}).forEach(([k, v]) => {
-        out.becas[k] = (out.becas[k] || 0) + n0(v);
-      });
-      Object.entries(x.faixasQtd || {}).forEach(([k, v]) => {
-        out.faixas[k] = (out.faixas[k] || 0) + n0(v);
-      });
-      Object.entries(x.capelosQtd || {}).forEach(([k, v]) => {
-        out.capelos[k] = (out.capelos[k] || 0) + n0(v);
-      });
-      Object.entries(porTipo(x.tamanhosQtd)).forEach(([tp, zs]) => {
-        const o = (out.tamanhos[tp] = out.tamanhos[tp] || {});
-        Object.entries(zs).forEach(([z, v]) => {
-          o[z] = (o[z] || 0) + n0(v);
-        });
-      });
-    });
-  return out;
+  avulsosUso = []; // avulsos e agendamentos dos colégios (da cópia do estoque, de todos)
+function emUso(dia, ignora) {
+  const { lista: _l, ...u } = usoNoDia(avulsosUso, dia, { ignora });
+  return u;
 }
 
 function render() {
@@ -446,10 +428,11 @@ function devolver(x) {
   });
 }
 
-// Estoque: becas, tamanhos (com "menos longa"), faixas e capelos; mostra o que está em uso agora (avulsos + alunos)
-function openEstoque() {
-  const hoje = U.todayStr();
-  abrirEstoqueBecas(C, emUso(hoje, "9999-12-31"), render);
+// Estoque: becas, tamanhos (com "menos longa"), faixas e capelos; ao lado, o que está separado no dia escolhido
+// (23/11/2026: por dia; hoje, se não escolher). motivo = o aviso de quem chegou aqui por falta de estoque.
+export function openEstoque(dia, motivo) {
+  const d = dia || U.todayStr();
+  abrirEstoqueBecas(C, emUso(d), render, { dia: d, motivo, trocarDia: nd => openEstoque(nd, motivo) });
 }
 
 export function form(x, pre) {
@@ -612,8 +595,9 @@ export function form(x, pre) {
     p.append(err);
     // Confere o estoque de cada tipo no período
     function faltas() {
-      if (!ret.value || !dev.value) return [];
-      const u = emUso(ret.value, dev.value, x && x.id),
+      const dia = dEv.value || ret.value; // (23/11/2026) vale o dia do evento
+      if (!dia) return [];
+      const u = emUso(dia, x && x.id),
         E = estoque(),
         out = [];
       qB.forEach(([k, q]) => {
@@ -661,15 +645,15 @@ export function form(x, pre) {
       if (!err || !info) return;
       err.hidden = true;
       p._ok = false;
-      if (!ret.value || !dev.value) {
+      if (!(dEv.value || ret.value)) {
         info.hidden = true;
         return;
       }
       const f = faltas();
-      info.textContent = f.length ? "⚠️ Falta no estoque nesse período:\n" + f.join("\n") : "Estoque OK para esse período ✅";
+      info.textContent = f.length ? "⚠️ Falta no estoque nesse dia:\n" + f.join("\n") : "Estoque OK para esse dia ✅";
       info.hidden = false;
     }
-    [ret, dev].forEach(i => i.addEventListener("change", checa));
+    [ret, dev, dEv].forEach(i => i.addEventListener("change", checa));
     if (x) checa();
     // blocos numerados, no padrão do Cadastrar aluno (11/11/2026)
     {

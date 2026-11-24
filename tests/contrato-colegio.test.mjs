@@ -186,3 +186,13 @@ test("kits do colégio: preço fechado por turma, planilha com Kit 1/Kit 2, comi
   assert.equal(R.kitDaPlanilha("Kit 2", "5º ano", c), null);
   assert.equal(R.comissaoPagamento({ valor: 230, itens: { paspatur: 130 } }, {}, c), 4600);
 });
+
+// (23/11/2026) valor do kit combinado: o kit inteiro tem um preço; o que se vende depois soma
+import { valorDoPacote as vdp, temPreco as tp } from "../js/contrato-colegio-regras.js";
+test("valor do kit: o padrão vale o combinado e o item vendido depois soma", () => {
+  const c = { valorKit: 225, pacotePadrao: ["beca", "certificado", "canudo"], precos: { paspatur: 80 } };
+  assert.equal(tp(c), true);
+  assert.equal(vdp(["beca", "certificado", "canudo"], "", c), 225);
+  assert.equal(vdp(["beca", "certificado", "canudo", "paspatur"], "", c), 305);
+  assert.equal(vdp(["paspatur"], "", c), 80);
+});

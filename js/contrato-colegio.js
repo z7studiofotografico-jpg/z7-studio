@@ -121,12 +121,24 @@ function render(corpo, st, inst, ano, ref) {
   grade.append(
     linha("Quem fechou", c.respNome || "—"),
     linha("Quem paga", (R.QUEM_PAGA.find(([k]) => k === c.quemPaga) || [, "—"])[1]),
+    linha("Valor do kit por aluno", c.valorKit ? brl(c.valorKit) + (Number(c.parcelas) > 1 ? ` · em ${c.parcelas}x` : "") : ""),
     linha(
-      "Preço por item",
-      R.ITENS_PACOTE.filter(([k]) => Number((c.precos || {})[k]))
-        .map(([k, n]) => `${n} ${brl(c.precos[k])}`)
-        .join(" · ") + (Number(c.parcelas) > 1 ? ` · em ${c.parcelas}x` : "")
+      "Entrada",
+      c.entrada && c.entrada.valor
+        ? `${brl(c.entrada.valor)} por aluno · paga a ${(R.RECEBE.find(([k]) => k === c.entrada.recebe) || [, "?"])[1].toLowerCase()}` +
+            (c.valorKit ? ` · falta ${brl(Math.max(0, c.valorKit - c.entrada.valor))} por aluno` : "")
+        : ""
     ),
+    ...(R.ITENS_PACOTE.some(([k]) => Number((c.precos || {})[k]))
+      ? [
+          linha(
+            "Preço de item vendido à parte",
+            R.ITENS_PACOTE.filter(([k]) => Number((c.precos || {})[k]))
+              .map(([k, n]) => `${n} ${brl(c.precos[k])}`)
+              .join(" · ")
+          )
+        ]
+      : []),
     ...(c.quemPaga === "colegio"
       ? [
           linha("Valor combinado (total)", c.valor ? brl(c.valor) : ""),
@@ -137,7 +149,7 @@ function render(corpo, st, inst, ano, ref) {
     linha("Quem costuma receber", c.quemPaga === "colegio" ? "—" : (R.RECEBE.find(([k]) => k === c.recebePadrao) || [, "Estúdio"])[1]),
     linha("Contato do colégio", [ct.nome, ct.cargo && ct.cargo.replace("(a)", "").toLowerCase(), ct.tel].filter(Boolean).join(" · ")),
     linha("Entrega combinada", ent.data ? `${dataBR(ent.data)}${ent.com ? " com " + ent.com : ""}` : ""),
-    linha("Pacote padrão", R.textoPacote(c.pacotePadrao, c.pacotePadraoQtd) || "—"),
+    linha("O que vem no kit", R.textoPacote(c.pacotePadrao, c.pacotePadraoQtd) || "—"),
     linha("Unidade", c.unidade || "")
   );
   dados.append(grade);
@@ -179,6 +191,12 @@ function render(corpo, st, inst, ano, ref) {
   // contrato sem preço (cada aluno paga e nenhum item tem valor): não lança pagamento até o Adriano precificar
   const semPrecoC = c.quemPaga !== "colegio" && !R.temPreco(c);
   if (pode && !semPrecoC) hp.append(U.mkBtn("+ Pagamento", "btn-primary btn-sm", () => formPagamento(null, st, ref)));
+  // (23/11/2026) a entrada de todos de uma vez (quem ainda não tem nenhum pagamento lançado)
+  if (pode && c.quemPaga !== "colegio" && c.entrada && c.entrada.valor > 0) {
+    const pagos = new Set(st.pags.filter(x => !x.excluido).map(x => x.alunoId));
+    const semEnt = st.alunos.filter(a => !a.naoParticipa && !pagos.has(a.id));
+    if (semEnt.length) hp.append(U.mkBtn(`✅ Lançar a entrada (${semEnt.length})`, "btn-sm", () => lancarEntradas(semEnt, c)));
+  }
   corpo.append(hp);
   if (semPrecoC)
     corpo.append(
@@ -246,7 +264,12 @@ function render(corpo, st, inst, ano, ref) {
         el(
           "small",
           null,
-          [a.serie, R.precoAluno(a, c) ? "pacote " + brl(R.precoAluno(a, c)) : "", pago[a.id] ? "pagou " + brl(pago[a.id]) : ""]
+          [
+            a.serie,
+            R.precoAluno(a, c) ? "kit " + brl(R.precoAluno(a, c)) : "",
+            pago[a.id] ? "pagou " + brl(pago[a.id]) : "",
+            R.precoAluno(a, c) && !a.naoParticipa ? "falta " + brl(Math.max(0, R.precoAluno(a, c) - (pago[a.id] || 0))) : ""
+          ]
             .filter(Boolean)
             .join(" · ")
         )
@@ -304,173 +327,12 @@ async function gravarPacotes(ids, itens, qtd = {}, contrato = (stAtual && stAtua
 }
 
 // Escolher os itens do pacote (nenhum marcado = pacote padrão do contrato), com os kits do colégio
+const formContrato = (...a) => import("./contrato-form.js").then(m => (m.usar(C), m.formContrato(...a))).catch(e => C.handleErr(e));
+const lancarEntradas = (...a) => import("./contrato-form.js").then(m => (m.usar(C), m.lancarEntradas(...a))).catch(e => C.handleErr(e));
 const escolherPacote = (tit, atual, aoSalvar, o = {}) =>
   import("./contrato-kits.js").then(m =>
     m.escolherPacote(tit, atual, aoSalvar, Object.assign({ contrato: stAtual && stAtual.contrato }, o))
   );
-
-// Cadastro / edição do contrato
-function formContrato(c, inst, ano, ref) {
-  const x = c || {};
-  const admin = C.isAdmin;
-  sheet(c ? "Editar contrato" : "Novo contrato do colégio", async (p, close) => {
-    p.append(el("p", "hint", `${title(inst.nome || "")} · ${ano}`));
-    // quem fechou: o admin escolhe; quem é da equipe fecha em nome próprio
-    const pessoas = Object.entries(C.usuarios || {})
-      .filter(([, u]) => u && u.ativo !== false && u.nome)
-      .map(([em, u]) => [em, u.nome])
-      .sort((a, b) => a[1].localeCompare(b[1], "pt-BR"));
-    if (C.email && !pessoas.some(([em]) => em === C.email)) pessoas.unshift([C.email, C.me || C.email]);
-    const sResp = sel(pessoas, x.respEmail || C.email || "", "quem fechou");
-    sResp.required = true;
-    sResp.disabled = !admin;
-    const quem = sel(R.QUEM_PAGA, x.quemPaga || "alunos");
-    const recebe = sel(R.RECEBE, x.recebePadrao || "estudio");
-    const valor = inpReais(x.valor != null ? x.valor : "", "0,00");
-    const parc = inp(String(x.parcelas || 1), "1", 2);
-    parc.inputMode = "numeric";
-    // preço de cada item: o valor do aluno é a soma dos itens do pacote dele (e a comissão sai item por item)
-    const precos = el("div", "row2");
-    const precoCx = R.ITENS_PACOTE.map(([k, n]) => {
-      const i = inpReais((x.precos || {})[k] != null ? x.precos[k] : "", "0,00");
-      precos.append(field(n + " (R$)", i));
-      return [k, i];
-    });
-    if (c && !admin) {
-      quem.disabled = true;
-      valor.disabled = true;
-      parc.disabled = true;
-      precoCx.forEach(([, i]) => (i.disabled = true));
-    }
-    const fValor = field("Valor total (o colégio paga)", valor);
-    const fRecebe = field("Quem costuma receber", recebe);
-    const sync = () => {
-      fValor.hidden = quem.value !== "colegio";
-      fRecebe.hidden = quem.value === "colegio";
-    };
-    quem.onchange = sync;
-    sync();
-    const r1 = el("div", "row2");
-    r1.append(field("Quem fechou", sResp), field("Quem paga", quem));
-    const r2 = el("div", "row3");
-    r2.append(field("Parcelas", parc), fRecebe, fValor);
-    const ct = x.contato || {};
-    const cNome = inp(ct.nome || "", "nome");
-    const cCargo = sel(R.CARGOS, ct.cargo || "Diretor(a)");
-    const cTel = inp(ct.tel || "", "(21) 9…", 30);
-    cTel.inputMode = "tel";
-    const r3 = el("div", "row3");
-    r3.append(field("Contato do colégio", cNome), field("Cargo", cCargo), field("WhatsApp", cTel));
-    const en = x.entrega || {};
-    const eData = el("input");
-    eData.type = "date";
-    eData.value = en.data || "";
-    const eCom = inp(en.com || "", "ex.: Márcia (coordenadora)");
-    const r4 = el("div", "row2");
-    r4.append(field("Entrega combinada (dia/mês/ano)", eData), field("Combinada com", eCom));
-    const unidade = inp(x.unidade || "", "se o colégio tiver mais de uma");
-    const obs = el("textarea");
-    obs.rows = 2;
-    obs.maxLength = 600;
-    obs.value = x.obs || "";
-    const pacote = el("div", "chips");
-    // cada item com a quantidade (ex.: 2 PR 15x10) (17/11/2026)
-    const caixas = R.ITENS_PACOTE.map(([k, nome]) => {
-      const it = chipItem(k, nome, (x.pacotePadrao || ["paspatur", "certificado", "canudo"]).includes(k), (x.pacotePadraoQtd || {})[k]);
-      pacote.append(it.l);
-      return [k, it.cb];
-    });
-    const err = el("p", "err");
-    err.hidden = true;
-    // blocos numerados, no padrão do ➕ Cadastrar aluno
-    p.classList.add("cad");
-    const b1 = bloco(1, "Quem fechou e quem paga");
-    b1.append(r1, r2);
-    const b2 = bloco(2, "Preços e pacote", "o aluno paga a soma dos itens do pacote dele");
-    const kitsMod = await import("./contrato-kits.js");
-    const kitsEd = kitsMod.editorKits(x, admin);
-    b2.append(
-      field("Preço de cada item, por aluno (também quando o colégio paga: dá o valor de cada aluno)", precos),
-      field("Pacote padrão (quem não tiver PACOTE na planilha)", pacote),
-      kitsEd.box
-    );
-    const b3 = bloco(3, "Contato do colégio");
-    b3.append(r3, field("Unidade", unidade));
-    const b4 = bloco(4, "Entrega e observações");
-    b4.append(r4, field("Observação", obs));
-    p.append(b1, b2, b3, b4, err, botoes(close, c ? "Salvar" : "Criar contrato"));
-    p.addEventListener("submit", async ev => {
-      ev.preventDefault();
-      const nomeResp = (pessoas.find(([em]) => em === sResp.value) || [, ""])[1];
-      if (!sResp.value) {
-        err.textContent = "Escolha quem fechou.";
-        err.hidden = false;
-        return;
-      }
-      if (cTel.value && U.digits(cTel.value).length < 10) {
-        err.textContent = "WhatsApp do contato incompleto (DDD + número).";
-        err.hidden = false;
-        return;
-      }
-      const body = {
-        recebePadrao: quem.value === "colegio" ? "colegio" : recebe.value,
-        contato: { nome: cNome.value.trim(), cargo: cCargo.value, tel: U.digits(cTel.value) },
-        entrega: { data: eData.value, com: eCom.value.trim() },
-        pacotePadrao: caixas.filter(([, cb]) => cb.checked).map(([k]) => k),
-        pacotePadraoQtd: lerQtd(caixas),
-        unidade: unidade.value.trim(),
-        obs: obs.value.trim(),
-        atualizadoEm: agora()
-      };
-      if (!c || admin)
-        Object.assign(body, {
-          respEmail: sResp.value,
-          respNome: nomeResp,
-          quemPaga: quem.value,
-          valor: quem.value === "colegio" ? lerReais(valor.value) || 0 : 0,
-          precos: Object.fromEntries(precoCx.map(([k, i]) => [k, lerReais(i.value) || 0])),
-          ...kitsEd.ler(),
-          parcelas: Math.max(1, parseInt(parc.value, 10) || 1)
-        });
-      try {
-        if (c) {
-          const mud = [];
-          if (body.entrega.data !== (en.data || "") || body.entrega.com !== (en.com || ""))
-            mud.push("entrega " + dataBR(body.entrega.data));
-          if (body.valor != null && Number(body.valor) !== Number(x.valor || 0)) mud.push("valor " + brl(body.valor));
-          if (body.precos && JSON.stringify(body.precos) !== JSON.stringify(x.precos || {})) mud.push("preços dos itens");
-          if (body.quemPaga && body.quemPaga !== x.quemPaga) mud.push("quem paga");
-          if (body.respEmail && body.respEmail !== x.respEmail) mud.push("quem fechou: " + nomeResp);
-          if (body.contato.nome !== (ct.nome || "") || body.contato.tel !== (ct.tel || "")) mud.push("contato");
-          if (R.textoPacote(body.pacotePadrao, body.pacotePadraoQtd) !== R.textoPacote(x.pacotePadrao, x.pacotePadraoQtd))
-            mud.push("pacote padrão");
-          body.historico = histMais(x.historico, "editou o contrato" + (mud.length ? " (" + mud.join(", ") + ")" : ""));
-          await FS.updateDoc(ref, body);
-        } else
-          await FS.setDoc(
-            ref,
-            Object.assign(body, {
-              instId: inst.id,
-              instNome: inst.nome || "",
-              ano: Number(ano),
-              criadoEm: agora(),
-              criadoPor: C.me || "",
-              historico: [reg("criou o contrato")]
-            })
-          );
-        // os alunos de aluguel do colégio/ano ficam com quem fechou o contrato
-        if (body.respEmail && (!c || body.respEmail !== x.respEmail))
-          await (await import("./becas-uso.js")).passarAlugueis(C, inst.id, ano, body.respEmail).catch(e => console.warn("[Z7] donos", e));
-        // alunos que ficaram sem valor (colégio ainda sem preço) ganham o valor do kit ou dos itens
-        if (C.isAdmin) await kitsMod.valorDosZerados(C, inst.id, ano, Object.assign({}, x, body)).catch(e => console.warn(e));
-        U.toast(c ? "Contrato salvo" : "Contrato criado ✅");
-        close();
-      } catch (e) {
-        C.handleErr(e);
-      }
-    });
-  });
-}
 
 // Uma linha de pagamento, com os botões que a pessoa pode usar
 function linhaPagamento(pg, st, ref, pode) {

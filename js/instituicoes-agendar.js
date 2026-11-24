@@ -183,7 +183,12 @@ export async function agendarColegio(ctx, dia) {
           media.focus();
           return;
         }
-        const repetido = lista.find(i => norm(i.nome) === norm(nm));
+        // (23/11/2026) parecido (E.M. × Escola Municipal, sem acento…): pergunta se é o mesmo
+        let repetido = lista.find(i => norm(i.nome) === norm(nm));
+        if (!repetido) {
+          const r = await import("./colegio-repetido.js").then(m => m.perguntarSeRepetido(C, nm, lista));
+          if (r && r.usar) repetido = r.usar;
+        }
         if (repetido) {
           it = repetido;
         } else {

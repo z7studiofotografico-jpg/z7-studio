@@ -147,20 +147,31 @@ export function faltaParaAluno(E, uso, a) {
   return out;
 }
 
-// Tela do estoque (só o admin muda). uso = o que está reservado/fora agora (avulsos + alunos)
-export function abrirEstoqueBecas(C, uso, aoSalvar) {
+// Tela do estoque (só o admin muda). uso = o que está separado no dia o.dia (agendamentos dos colégios + avulsos).
+// (23/11/2026) As becas valem por dia: o número ao lado é só daquele dia; no dia seguinte voltam ao estoque.
+export function abrirEstoqueBecas(C, uso, aoSalvar, o = {}) {
   sheet("📦 Estoque de becas, faixas e capelos", (p, close) => {
     const E = C.P.estoque || {};
+    if (o.motivo) p.append(el("p", "notice", "⚠️ " + o.motivo));
     p.append(
       el(
         "p",
         "hint",
-        C.isAdmin
-          ? "Quantas peças vocês têm de cada tipo. Ao lado de cada número aparece quanto está reservado ou fora agora."
-          : "Só administradores mudam o estoque."
+        (C.isAdmin ? "Quantas peças vocês têm de cada tipo (o total, que volta todo dia). " : "Só administradores mudam o estoque. ") +
+          "Ao lado de cada número aparece quanto já está separado para o dia escolhido (colégios agendados e aluguéis avulsos daquele dia)."
       )
     );
-    const fora = (o, k) => (n0((o || {})[k]) ? ` · ${n0(o[k])} em uso` : "");
+    if (o.trocarDia) {
+      const d = el("input");
+      d.type = "date";
+      d.value = o.dia || "";
+      d.onchange = () => d.value && (close(), o.trocarDia(d.value));
+      const f = el("div", "field");
+      f.append(el("label", null, "Ver o dia"), d);
+      p.append(f);
+    }
+    const dm = o.dia ? " " + o.dia.slice(8, 10) + "/" + o.dia.slice(5, 7) : "";
+    const fora = (o2, k) => (n0((o2 || {})[k]) ? ` · ${n0(o2[k])} separadas${dm}` : "");
     const tab = (titulo, tipos, atual, emUso) => {
       const f = el("div", "field");
       f.append(el("label", null, titulo));
@@ -194,7 +205,7 @@ export function abrirEstoqueBecas(C, uso, aoSalvar) {
         q.disabled = !C.isAdmin;
         q.setAttribute("aria-label", `Estoque ${nm} ${z}`);
         const u = n0(((uso.tamanhos || {})[tp] || {})[z]);
-        r.append(el("span", null, z + (u ? ` · ${u} em uso` : "")), q);
+        r.append(el("span", null, z + (u ? ` · ${u} separadas${dm}` : "")), q);
         let q1 = null;
         if (ml) {
           q1 = el("input");
