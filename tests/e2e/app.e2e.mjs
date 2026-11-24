@@ -1534,8 +1534,28 @@ await cenario("Adriano (admin), com os dados já atualizados no servidor", async
     await calmo(pg);
     ok(/🖨️ Gerar contrato.*📏 Link das medidas/.test(await pg.locator(".sheet").last().textContent()), "avulso: a janela abre com o cartão, o contrato e o link das medidas");
     if (process.env.FOTOS) await pg.locator(".sheet").last().screenshot({ path: process.env.FOTOS + "/avulsos-janela.png" });
-    await pg.keyboard.press("Escape");
+    // (24/11/2026) Retirou sem querer → "Voltar: Reservado" (com Sim / Não)
+    await pg.locator(".sheet").last().getByRole("button", { name: "📦 Retirou" }).click();
+    await calmo(pg);
+    await pg.locator(".sheet").last().getByRole("button", { name: "Voltar: Reservado" }).click();
+    await pg.getByRole("button", { name: "Sim" }).last().click();
+    await calmo(pg);
+    s = await store();
+    ok(Object.values(s).find(x => x.cliente === "Igreja Central").status === "reservado", "avulso: Voltar desfaz o Retirou");
+    await pg.locator(".sheet").last().getByRole("button", { name: /Voltar para a lista/ }).click();
+    await calmo(pg);
     await pg.evaluate(() => (window.__z7CartaoNaLista = true));
+    // retirada e devolução no dia do evento (marcado por padrão)
+    await pg.getByRole("button", { name: "+ Aluguel" }).click();
+    await calmo(pg);
+    sh = pg.locator(".sheet").last();
+    await sh.getByLabel("Data do evento").fill(dia(12));
+    await sh.getByLabel("Data do evento").dispatchEvent("change");
+    ok((await sh.getByLabel("Retirada", { exact: true }).inputValue()) === dia(12) && (await sh.getByLabel("Devolução").inputValue()) === dia(12) && !(await sh.getByLabel("Retirada", { exact: true }).isVisible()), "retirada e devolução no dia do evento");
+    if (process.env.FOTOS) await sh.screenshot({ path: process.env.FOTOS + "/avulso-form.png" });
+    await sh.getByText("Retira e devolve no dia do evento").click();
+    ok((await sh.getByLabel("Retirada", { exact: true }).isVisible()) && (await sh.getByLabel("Retirada", { exact: true }).inputValue()) === dia(11), "desmarcado: escolhe as datas (sugere a véspera)");
+    await pg.keyboard.press("Escape");
   });
   ok(erros.length === 0, "sem erros no console" + (erros.length ? ": " + erros.slice(0, 3).join(" | ") : ""));
 });

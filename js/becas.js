@@ -10,6 +10,7 @@ import { botaoRelatorio } from "./relatorio.js";
 import { contratoAvulso } from "./contrato-imprimir.js";
 import { linhaGenerica } from "./lista-compacta.js";
 import { linkMedidas } from "./medidas-link.js";
+import { botaoVoltar, ligarDatas } from "./becas-ajustes.js";
 import { abrirJanela } from "./janela.js";
 import { contatoRel } from "./aluno-id.js";
 import { BECAS, TAMANHOS, FAIXAS, CAPELOS, nomeFaixa, nomeCapelo, abrirEstoqueBecas, somarUso, usoDosAlunos } from "./becas-estoque.js";
@@ -411,7 +412,7 @@ function card(x) {
       );
   }
   // (19/11/2026) depois da reserva, só a Luciana e o Adriano mudam o aluguel (retirada, devolução, valores)
-  if (C.isAdmin) act.append(U.mkBtn("Editar", "", () => form(x)));
+  if (C.isAdmin) act.append(...[botaoVoltar(x, salvar), U.mkBtn("Editar", "", () => form(x))].filter(Boolean));
   e.append(act);
   return e;
 }
@@ -536,23 +537,14 @@ export function form(x, pre) {
     dev.required = true;
     dev.value = x ? x.devolucao || "" : "";
     const r3 = el("div", "row2");
-    r3.append(field("Retirada", ret), field("Horário da retirada", retH));
+    r3.append(field("Data do evento", dEv), field("Horário da retirada", retH));
     const r4 = el("div", "row2");
-    r4.append(field("Data do evento", dEv), field("Devolução", dev));
-    p.append(r3, r4);
-    dEv.addEventListener("change", () => {
-      if (dEv.value && !dev.value) {
-        const [y, m, d] = dEv.value.split("-").map(Number);
-        const t = new Date(y, m - 1, d + 1);
-        dev.value = `${t.getFullYear()}-${U.pad(t.getMonth() + 1)}-${U.pad(t.getDate())}`;
-      }
-      if (dEv.value && !ret.value) {
-        const [y, m, d] = dEv.value.split("-").map(Number);
-        const t = new Date(y, m - 1, d - 1);
-        ret.value = `${t.getFullYear()}-${U.pad(t.getMonth() + 1)}-${U.pad(t.getDate())}`;
-      }
-      checa();
-    });
+    r4.append(field("Retirada", ret), field("Devolução", dev));
+    p.append(
+      r3,
+      ligarDatas(dEv, ret, dev, x, () => checa()),
+      r4
+    );
     // Quantidade por tipo de beca e por cor de faixa
     const grade = (titulo, tipos, atual, sufixo) => {
       const f = el("div", "field");
