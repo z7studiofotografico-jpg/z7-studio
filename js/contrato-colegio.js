@@ -149,6 +149,7 @@ function render(corpo, st, inst, ano, ref) {
     linha("Quem costuma receber", c.quemPaga === "colegio" ? "—" : (R.RECEBE.find(([k]) => k === c.recebePadrao) || [, "Estúdio"])[1]),
     linha("Contato do colégio", [ct.nome, ct.cargo && ct.cargo.replace("(a)", "").toLowerCase(), ct.tel].filter(Boolean).join(" · ")),
     linha("Entrega combinada", ent.data ? `${dataBR(ent.data)}${ent.com ? " com " + ent.com : ""}` : ""),
+    linha("Séries e turmas", R.textoTurmas(c.turmas)),
     linha("O que vem no kit", R.textoPacote(c.pacotePadrao, c.pacotePadraoQtd) || "—"),
     linha("Unidade", c.unidade || "")
   );

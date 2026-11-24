@@ -225,10 +225,22 @@ export function abrirCadastroAluno(C, o = {}) {
       // (17/11/2026) a turma de verdade (901, 502, "3001"…), junto com a série (essencial, mas não trava o salvar)
       const sala = inp(o.turma || "", "ex.: 901", 20);
       sala.setAttribute("aria-label", "Turma");
+      // (24/11/2026) as turmas cadastradas no contrato do colégio viram uma lista para escolher (dá para digitar outra)
+      const dlT = el("datalist");
+      dlT.id = "cadTurmas" + Date.now();
+      sala.setAttribute("list", dlT.id);
+      let turmasCol = {};
+      const pintarTurmas = () => {
+        const se = turma.value === "outra" ? "" : turma.value;
+        const l = se && turmasCol[se] ? turmasCol[se] : Object.values(turmasCol).flat();
+        dlT.replaceChildren(...l.map(t => Object.assign(el("option"), { value: t })));
+        sala.placeholder = l.length ? "escolha: " + l.slice(0, 4).join(", ") + (l.length > 4 ? "…" : "") : "ex.: 901";
+      };
+      turma.addEventListener("change", pintarTurmas);
       const turmaOutra = inp(TURMAS.includes(o.serie) ? "" : o.serie || "", "ex.: 3º ano A", 40);
       turmaOutra.setAttribute("aria-label", "Outra turma");
       const r1 = el("div", "cad-g3");
-      r1.append(field("Colégio", sCol), field("Ano", ano), field("Série", turma), field("Turma", sala));
+      r1.append(field("Colégio", sCol), field("Ano", ano), field("Série", turma), field("Turma", sala), dlT);
       const fOutra = field("Qual série?", turmaOutra);
       const trava = el("p", "cad-trava");
       const novoCol = U.mkBtn("🏫 Não está na lista? Cadastrar o colégio", "btn-sm", () => {
@@ -407,12 +419,19 @@ export function abrirCadastroAluno(C, o = {}) {
       const lerKits = async () => {
         kitsCol = [];
         contratoCol = null;
+        turmasCol = {};
+        pintarTurmas();
         bKit.replaceChildren(el("option", null, "Kit (vazio = pacote padrão)"));
         bKit.options[0].value = "";
         if (!sCol.value) return;
         const R = await import("./contrato-colegio-regras.js");
         const s = await C.FS.getDoc(C.FS.doc(C.db, "contratosColegio", R.idContrato(sCol.value, Number(ano.value)))).catch(() => null);
         contratoCol = s && s.exists() ? s.data() : null;
+        turmasCol = (contratoCol && contratoCol.turmas) || {};
+        // só uma série no colégio: já vem escolhida
+        const sers = Object.keys(turmasCol);
+        if (sers.length === 1 && !turma.value && [...turma.options].some(op => op.value === sers[0])) turma.value = sers[0];
+        pintarTurmas();
         if (contratoCol && !itensMarcados().length) {
           marcarItens(contratoCol.pacotePadrao || [], contratoCol.pacotePadraoQtd || {});
           recalcular();

@@ -156,7 +156,30 @@ export function formContrato(c, inst, ano, ref) {
     p.classList.add("cad");
     const b1 = bloco(1, "Quem fechou e quem paga");
     b1.append(r1, r2);
-    const b2 = bloco(2, "O kit e o valor", "o combinado é o valor do kit inteiro, por aluno");
+    // (24/11/2026) séries e turmas do colégio neste ano: depois, no + Aluno, a turma vira uma lista para escolher
+    const bT = bloco(2, "Séries e turmas", "marque as séries e escreva as turmas (ex.: 901, 902)");
+    const gT = el("div", "ct-turmas");
+    const linhasT = R.SERIES_COLEGIO.map(se => {
+      const l = el("div", "ct-turma");
+      const lb = el("label", "chk");
+      const cb = el("input");
+      cb.type = "checkbox";
+      cb.checked = !!(x.turmas && x.turmas[se]);
+      lb.append(cb, document.createTextNode(" " + se));
+      const tx = inp(((x.turmas || {})[se] || []).join(", "), "turmas: 901, 902", 120);
+      tx.setAttribute("aria-label", "Turmas do " + se);
+      tx.disabled = !cb.checked;
+      cb.onchange = () => {
+        tx.disabled = !cb.checked;
+        if (cb.checked) tx.focus();
+      };
+      tx.addEventListener("input", () => tx.value.trim() && (cb.checked = true));
+      l.append(lb, tx);
+      gT.append(l);
+      return [se, cb, tx];
+    });
+    bT.append(gT);
+    const b2 = bloco(3, "O kit e o valor", "o combinado é o valor do kit inteiro, por aluno");
     const kitsMod = await import("./contrato-kits.js");
     const kitsEd = kitsMod.editorKits(x, admin);
     const rK = el("div", "row2");
@@ -168,11 +191,11 @@ export function formContrato(c, inst, ano, ref) {
     det.append(el("summary", null, "Preço de cada item e outros kits (opcional: para vender item separado depois)"), precos, kitsEd.box);
     if (Object.values(x.precos || {}).some(v => Number(v) > 0) || (x.kits || []).length) det.open = true;
     b2.append(rK, field("O que vem no kit (só para constar)", pacote), rE, ePct, det);
-    const b3 = bloco(3, "Contato do colégio");
+    const b3 = bloco(4, "Contato do colégio");
     b3.append(r3, field("Unidade", unidade));
-    const b4 = bloco(4, "Entrega e observações");
+    const b4 = bloco(5, "Entrega e observações");
     b4.append(r4, field("Observação", obs));
-    p.append(b1, b2, b3, b4, err, botoes(close, c ? "Salvar" : "Criar contrato"));
+    p.append(b1, bT, b2, b3, b4, err, botoes(close, c ? "Salvar" : "Criar contrato"));
     p.addEventListener("submit", async ev => {
       ev.preventDefault();
       const nomeResp = (pessoas.find(([em]) => em === sResp.value) || [, ""])[1];
@@ -193,6 +216,7 @@ export function formContrato(c, inst, ano, ref) {
         pacotePadrao: caixas.filter(([, cb]) => cb.checked).map(([k]) => k),
         pacotePadraoQtd: lerQtd(caixas),
         entrada: { valor: lerReais(eVal.value) || 0, recebe: eRec.value },
+        turmas: Object.fromEntries(linhasT.filter(([, cb]) => cb.checked).map(([se, , tx]) => [se, R.lerTurmas(tx.value)])),
         unidade: unidade.value.trim(),
         obs: obs.value.trim(),
         atualizadoEm: agora()
@@ -216,6 +240,7 @@ export function formContrato(c, inst, ano, ref) {
           if (body.valor != null && Number(body.valor) !== Number(x.valor || 0)) mud.push("valor " + brl(body.valor));
           if (body.precos && JSON.stringify(body.precos) !== JSON.stringify(x.precos || {})) mud.push("preços dos itens");
           if (body.valorKit != null && Number(body.valorKit) !== Number(x.valorKit || 0)) mud.push("valor do kit " + brl(body.valorKit));
+          if (R.textoTurmas(body.turmas) !== R.textoTurmas(x.turmas)) mud.push("séries e turmas");
           if (Number(body.entrada.valor) !== Number((x.entrada || {}).valor || 0)) mud.push("entrada " + brl(body.entrada.valor));
           if (body.quemPaga && body.quemPaga !== x.quemPaga) mud.push("quem paga");
           if (body.respEmail && body.respEmail !== x.respEmail) mud.push("quem fechou: " + nomeResp);

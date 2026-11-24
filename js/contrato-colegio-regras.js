@@ -41,6 +41,14 @@ export const RECEBE = [
   ["colegio", "Contato do colégio"],
   ["representante", "Representante"]
 ];
+// (24/11/2026) séries e turmas do colégio no ano: { "5º ano": ["501", "502"], "9º ano": ["901"] }
+export const SERIES_COLEGIO = ["Pré", "5º ano", "9º ano", "Ensino Médio", "EJA", "Profissionalizante"];
+// "501, 502 / 503" → ["501", "502", "503"] (sem repetir)
+export const lerTurmas = t => [...new Set(String(t || "").split(/[\s,;/]+/).map(x => x.trim().toUpperCase()).filter(Boolean))];
+export const textoTurmas = tm =>
+  Object.entries(tm || {})
+    .map(([s, l]) => s + ((l || []).length ? ": " + l.join(", ") : ""))
+    .join(" · ");
 export const CARGOS = ["Diretor(a)", "Coordenador(a)", "Secretaria", "Comercial", "Outro"];
 export const FORMAS_CONTRATO = ["Dinheiro", "Pix", "Link", "Cartão", "Boleto"];
 
