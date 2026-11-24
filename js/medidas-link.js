@@ -6,7 +6,7 @@ import * as U from "./util.js";
 // (24/11/2026) a página aberta de medidas: o cliente mede, vê o tamanho ideal e manda pelo WhatsApp do estúdio
 export function linkMedidas(x) {
   const inf = Object.keys(x.becasQtd || {}).some(k => /^inf/.test(k) && Number(x.becasQtd[k]));
-  const url = `${location.origin}/medidas.html${inf ? "?tipo=infantil" : ""}`;
+  const url = `${location.origin}/medidas.html?a=${x.id}${inf ? "&tipo=infantil" : ""}`;
   const msg = `Oi, ${U.first(title(x.cliente || ""))}! Aqui é do ${ESTUDIO.nome} 📸 Para acertar o tamanho da beca, tire as medidas por este link (mostra como medir e já calcula o tamanho ideal): ${url}`;
   if (x.tel) return abrirWa(x.tel, msg, U.toast);
   navigator.clipboard.writeText(url).then(

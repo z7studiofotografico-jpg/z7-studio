@@ -148,6 +148,21 @@ service cloud.firestore {
         && exclusaoOk());
       allow delete: if admin();
     }
+    // Medidas da beca (24/11/2026): o cliente manda pela página aberta medidas.html?a=<aluguel>, sem login.
+    // Só cria, e só para um aluguel que existe; campos e tamanhos travados. Só a Luciana e o Adriano leem e apagam.
+    match /medidasBeca/{id} {
+      allow create: if request.resource.data.keys().hasOnly(['aluguelId', 'nome', 'tipo', 'manga', 'comp', 'larg', 'tamanho', 'em'])
+        && request.resource.data.aluguelId is string && request.resource.data.aluguelId.size() > 0 && request.resource.data.aluguelId.size() <= 40
+        && exists(/databases/$(database)/documents/becas/$(request.resource.data.aluguelId))
+        && request.resource.data.nome is string && request.resource.data.nome.size() > 0 && request.resource.data.nome.size() <= 80
+        && request.resource.data.tipo in ['adulto', 'infantil']
+        && request.resource.data.manga is number && request.resource.data.manga > 0 && request.resource.data.manga < 300
+        && request.resource.data.comp is number && request.resource.data.comp > 0 && request.resource.data.comp < 300
+        && request.resource.data.larg is number && request.resource.data.larg >= 0 && request.resource.data.larg < 400
+        && request.resource.data.tamanho is string && request.resource.data.tamanho.size() <= 4
+        && request.resource.data.em == request.time;
+      allow read, delete: if admin();
+    }
     // Estoque de becas (11/11/2026): uma cópia só com os números de cada aluguel que segura beca (sem nome, telefone
     // nem valor). Todos com o módulo de becas leem (o estoque é de todos) e o app grava junto com o aluguel.
     match /becasUso/{id} {

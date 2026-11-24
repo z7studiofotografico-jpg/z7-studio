@@ -5162,6 +5162,26 @@ await cenario("Aluguel de becas: avançar o colégio inteiro (Cadastrado → Bec
   await sp2.getByRole("button", { name: "Fechar" }).click();
   ok(!erros.length, "sem erros" + (erros.length ? ": " + erros.join(" | ") : ""));
 });
+await cenario("Aluguel avulso: medidas recebidas pelo link entram no aluguel (24/11/2026)", async () => {
+  const d = Object.assign({}, migrar(base), {
+    "becas/b1": { cliente: "Paula Teste", status: "reservado", tipoEvento: "outro", becasQtd: { infAzul: 2 }, qtd: 2, retirada: dia(5), devolucao: dia(5), dataEvento: dia(5), valor: 100, pago: 0 },
+    "medidasBeca/m1": { aluguelId: "b1", nome: "Ana Clara", tipo: "infantil", manga: 45, comp: 104, larg: 0, tamanho: "P", em: new Date().toISOString() },
+    "medidasBeca/m2": { aluguelId: "b1", nome: "Joao", tipo: "infantil", manga: 47, comp: 109, larg: 0, tamanho: "M", em: new Date().toISOString() }
+  });
+  const { pg, store } = await abrir(ADRIANO, d);
+  await ir(pg, "#becas");
+  await calmo(pg);
+  await pg.locator("#viewBecas .seg", { hasText: "Aluguéis avulsos" }).click();
+  await calmo(pg);
+  ok(/📏 2 medidas/.test(await pg.textContent("#bcLista")), "a linha mostra as medidas recebidas");
+  ok(/Ana Clara: P/.test(await pg.textContent("#bcLista")), "o cartão lista quem mandou e o tamanho");
+  if (process.env.FOTOS) await pg.locator("#bcLista").screenshot({ path: process.env.FOTOS + "/medidas-recebidas.png" });
+  await pg.getByRole("button", { name: /Usar os tamanhos recebidos/ }).click();
+  await calmo(pg);
+  const st = await store();
+  ok(st["becas/b1"].tamanhosQtd.infAzul.P === 1 && st["becas/b1"].tamanhosQtd.infAzul.M === 1 && /infantil azul: 1 P, 1 M/.test(st["becas/b1"].tamanhos), "os tamanhos entram no aluguel");
+});
+
 await cenario("Provável venda: data e hora do retorno, com quem falar", async () => {
   const Y = new Date().getFullYear();
   const dia = n => new Date(Date.now() + n * 864e5).toISOString().slice(0, 10);

@@ -11,6 +11,7 @@ import { contratoAvulso } from "./contrato-imprimir.js";
 import { linhaGenerica } from "./lista-compacta.js";
 import { linkMedidas } from "./medidas-link.js";
 import { botaoVoltar, ligarDatas } from "./becas-ajustes.js";
+import { ouvirMedidas, medidasDo, blocoMedidas } from "./medidas-recebidas.js";
 import { abrirJanela } from "./janela.js";
 import { contatoRel } from "./aluno-id.js";
 import { BECAS, TAMANHOS, FAIXAS, CAPELOS, nomeFaixa, nomeCapelo, abrirEstoqueBecas, somarUso, usoDosAlunos } from "./becas-estoque.js";
@@ -154,6 +155,7 @@ export function show() {
     );
     return;
   }
+  unsubs.push(ouvirMedidas(C, () => render()));
   unsubs.push(
     FS.onSnapshot(
       FS.query(col, FS.where("devolucao", ">=", desde), FS.orderBy("devolucao"), FS.limit(800)),
@@ -295,7 +297,8 @@ function linha(x) {
       ...BECAS.filter(([k]) => n0((x.becasQtd || {})[k])).map(([, t]) => t.replace("Beca ", "")),
       x.evento || (x.tipoEvento === "nosso" ? "Nosso evento" : "Outro evento"),
       x.dataEvento ? "evento " + U.fmtDate(x.dataEvento) : "",
-      pend ? "falta " + brl(pend) : n0(x.valor) ? "pago ✓" : ""
+      pend ? "falta " + brl(pend) : n0(x.valor) ? "pago ✓" : "",
+      medidasDo(x).length ? `📏 ${medidasDo(x).length} medida${medidasDo(x).length > 1 ? "s" : ""}` : ""
     ]
       .filter(Boolean)
       .join(" · "),
@@ -370,6 +373,8 @@ function card(x) {
     .filter(Boolean)
     .join("\n");
   if (notas) e.append(el("p", "notes", notas));
+  const bm = blocoMedidas(x, salvar);
+  if (bm) e.append(bm);
   const act = el("div", "actions");
   act.append(
     U.mkBtn("🆘 Ajuda de vendas", "", () =>

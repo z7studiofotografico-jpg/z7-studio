@@ -66,6 +66,8 @@ footer{text-align:center;font-size:13px;color:#555;padding:20px 16px;border-top:
 <div id="boxLarg"><label for="larg">Largura (a maior volta)</label><input id="larg" inputmode="decimal" placeholder="ex.: 110"></div>
 
 <div class="res" id="res"><div>Tamanho ideal</div><div class="tam" id="tam">—</div><div id="porque" class="obs"></div>
+<button class="zap" id="enviar" type="button" hidden>Enviar minhas medidas para o estúdio</button>
+<div id="ok" class="obs" hidden style="font-size:16px;color:#1b7f3b;margin-top:10px"><b>✓ Recebemos suas medidas!</b> Elas já estão no seu aluguel. Se quiser, avise também pelo WhatsApp.</div>
 <button class="zap" id="zap" type="button">Enviar minhas medidas pelo WhatsApp</button></div>
 
 <h2>Tabela de medidas das becas (cm)</h2>
@@ -74,6 +76,7 @@ footer{text-align:center;font-size:13px;color:#555;padding:20px 16px;border-top:
 </main>
 <footer>Z7 Studio Fotográfico · Estrada Dr. Rufino Gonçalves Ferreira, 290 – Centro, Nilópolis/RJ · WhatsApp (21) 99881-7771</footer>
 
+<script src="config.js"></script>
 <script>
 // medidas das becas do estúdio (cm): [tamanho, manga, comprimento, largura]
 const BECAS = {
@@ -129,6 +132,39 @@ $("zap").onclick = () => {
 const p = new URLSearchParams(location.search);
 trocar(p.get("tipo") === "infantil" ? "infantil" : "adulto");
 if (p.get("nome")) $("nome").value = p.get("nome");
+// (24/11/2026) com o link do aluguel (?a=), as medidas entram direto no aluguel do sistema (coleção medidasBeca)
+const ALUGUEL = (p.get("a") || "").replace(/[^A-Za-z0-9]/g, "").slice(0, 40);
+if (ALUGUEL) {
+  $("enviar").hidden = false;
+  $("zap").textContent = "Avisar também pelo WhatsApp";
+  $("zap").style.background = "#fff";
+  $("zap").style.color = "#1b7f3b";
+  $("zap").style.border = "2px solid #25d366";
+}
+$("enviar").onclick = async () => {
+  const nome = $("nome").value.trim();
+  const m = num("manga"), c = num("comp"), l = tipo === "adulto" ? num("larg") : 0;
+  if (!nome) return alert("Escreva o nome do formando(a).");
+  if (!m || !c) return alert("Preencha a manga e o comprimento.");
+  const b = $("enviar");
+  b.disabled = true;
+  b.textContent = "Enviando…";
+  try {
+    const A = await import("https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js");
+    const F = await import("https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js");
+    const app = A.getApps().length ? A.getApp() : A.initializeApp(self.Z7_CONFIG.firebase);
+    const r = tamanhoIdeal(tipo, m, c, l);
+    await F.addDoc(F.collection(F.getFirestore(app), "medidasBeca"), {
+      aluguelId: ALUGUEL, nome: nome.slice(0, 80), tipo, manga: m, comp: c, larg: l, tamanho: r ? r[0] : "?", em: F.serverTimestamp()
+    });
+    b.hidden = true;
+    $("ok").hidden = false;
+  } catch (e) {
+    b.disabled = false;
+    b.textContent = "Enviar minhas medidas para o estúdio";
+    alert("Não deu para enviar agora. Mande pelo WhatsApp, logo abaixo.");
+  }
+};
 </script>
 </body>
 </html>
