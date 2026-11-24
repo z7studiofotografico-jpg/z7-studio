@@ -1532,7 +1532,7 @@ await cenario("Adriano (admin), com os dados já atualizados no servidor", async
     }
     await lin.click();
     await calmo(pg);
-    ok(/🖨️ Contrato/.test(await pg.locator(".sheet").last().textContent()), "avulso: a janela abre com o cartão e o botão do contrato");
+    ok(/🖨️ Gerar contrato/.test(await pg.locator(".sheet").last().textContent()), "avulso: a janela abre com o cartão e o botão do contrato");
     if (process.env.FOTOS) await pg.locator(".sheet").last().screenshot({ path: process.env.FOTOS + "/avulsos-janela.png" });
     await pg.keyboard.press("Escape");
     await pg.evaluate(() => (window.__z7CartaoNaLista = true));

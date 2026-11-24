@@ -376,7 +376,7 @@ function card(x) {
         .catch(e => C.handleErr(e))
     )
   );
-  act.append(U.mkBtn("🖨️ Contrato", "", () => contratoAvulso(C, x)));
+  act.append(U.mkBtn("🖨️ Gerar contrato", "", () => contratoAvulso(C, x)));
   if (x.status === "reservado") {
     if (C.isAdmin)
       act.append(
