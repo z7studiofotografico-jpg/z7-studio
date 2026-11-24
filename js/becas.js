@@ -9,6 +9,7 @@ import * as U from "./util.js";
 import { botaoRelatorio } from "./relatorio.js";
 import { contratoAvulso } from "./contrato-imprimir.js";
 import { linhaGenerica } from "./lista-compacta.js";
+import { linkMedidas } from "./medidas-link.js";
 import { abrirJanela } from "./janela.js";
 import { contatoRel } from "./aluno-id.js";
 import { BECAS, TAMANHOS, FAIXAS, CAPELOS, nomeFaixa, nomeCapelo, abrirEstoqueBecas, somarUso, usoDosAlunos } from "./becas-estoque.js";
@@ -376,7 +377,10 @@ function card(x) {
         .catch(e => C.handleErr(e))
     )
   );
-  act.append(U.mkBtn("🖨️ Gerar contrato", "", () => contratoAvulso(C, x)));
+  act.append(
+    U.mkBtn("🖨️ Gerar contrato", "", () => contratoAvulso(C, x)),
+    U.mkBtn("📏 Link das medidas", "", () => linkMedidas(x))
+  );
   if (x.status === "reservado") {
     if (C.isAdmin)
       act.append(
@@ -471,14 +475,12 @@ function devolver(x) {
     });
   });
 }
-
 // Estoque: becas, tamanhos (com "menos longa"), faixas e capelos; ao lado, o que está separado no dia escolhido
 // (23/11/2026: por dia; hoje, se não escolher). motivo = o aviso de quem chegou aqui por falta de estoque.
 export function openEstoque(dia, motivo) {
   const d = dia || U.todayStr();
   abrirEstoqueBecas(C, emUso(d), render, { dia: d, motivo, trocarDia: nd => openEstoque(nd, motivo) });
 }
-
 export function form(x, pre) {
   pre = pre || {};
   sheet(x ? "Editar aluguel" : "Novo aluguel de becas", (p, close) => {
@@ -808,7 +810,6 @@ export function form(x, pre) {
     setTimeout(() => cli.focus(), 30);
   });
 }
-
 // Relatório para reunião: o que está fora, atrasado e reservado, com o que falta receber
 function relatorioBecas() {
   const hoje = U.todayStr();
