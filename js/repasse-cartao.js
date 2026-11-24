@@ -8,6 +8,7 @@ import { avisoTel } from "./aluno-id.js";
 import { fmtTel } from "./numeros.js";
 import { whatsAtivo } from "./numeros-tela.js";
 import { linhasRetorno, abrirRetorno } from "./retorno.js";
+import { nomeEtapaPR } from "./repasse-dados.js";
 import {
   colNome,
   ehFormatura,
@@ -70,7 +71,7 @@ export function card(it) {
       // apaga e já tira o aluno da lista de colégios (e do índice de telefones)
       apagar: () => import("./juntar-colegio.js").then(m => m.apagarAluno(C, colNome(), it))
     });
-  top.append(el("h3", "name", title(it.nome) || "Sem nome"), el("span", "stage", it.etapa), bx);
+  top.append(el("h3", "name", title(it.nome) || "Sem nome"), el("span", "stage", nomeEtapaPR(it.etapa)), bx);
   e.append(top);
 
   const meta = el("div", "meta");
@@ -437,6 +438,24 @@ function acoesDoCartao(it, li, e) {
       )
     );
   // pediu para falar outro dia (ex.: não consegue pagar agora): motivo + data; nesse dia volta para a lista
+  // (24/11/2026) provável venda: o dia, a hora e com quem falar para fechar (aviso no celular na hora)
+  if (ABERTAS.includes(it.etapa) && !it.naoContatar)
+    act.append(
+      U.mkBtn(it.retorno && it.retorno.hora ? "📅 Remarcar retorno" : "📅 Data de retorno", "btn-primary", () =>
+        abrirRetorno(
+          C,
+          it,
+          patch =>
+            save(
+              it,
+              Object.assign(patch, { followup: patch.retorno.data, atendendo: null, etapa: "INTERESSADO" }, !it.resp && !it.respEmail && C.me ? assumir(it) : {}),
+              `Retorno marcado: ${U.fmtDate(patch.retorno.data)} às ${patch.retorno.hora}`,
+              { semConfirmar: true }
+            ),
+          { venda: true, contatos: it.contatos || [], contato: contatoAtual(it) }
+        )
+      )
+    );
   if ((ABERTAS.includes(it.etapa) || ["NÃO QUER", "SEM CONTATO"].includes(it.etapa)) && !it.naoContatar)
     act.append(
       U.mkBtn("📅 Pediu contato depois", "", () =>

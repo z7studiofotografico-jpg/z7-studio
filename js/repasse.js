@@ -274,7 +274,7 @@ function mount() {
   const st = el("section", "stats");
   st.innerHTML = `<div class="stat today"><b id="rsHoje">–</b><small>Negociando</small></div>
     <div class="stat"><b id="rsFila">–</b><small>Na fila</small></div>
-    <div class="stat"><b id="rsInt">–</b><small>Interessados</small></div>
+    <div class="stat"><b id="rsInt">–</b><small>Provável venda</small></div>
     <div class="stat won"><b id="rsMes">–</b><small>Vendido no mês</small></div>`;
   v.append(st);
 
@@ -493,7 +493,7 @@ function renderChips() {
     ["buscar", "Buscar"],
     ["trabalhar", "A trabalhar"],
     ["hoje", "Negociando"],
-    ["interessados", "Interessados"]
+    ["interessados", "Provável venda"]
   ];
   // (ordem de 10/11; depois vêm A conferir · Vendido/Entregar · Entregues · botões da equipe)
   if (C.isAdmin) tabs.push(["conferir", "A conferir"]);
@@ -751,6 +751,8 @@ function renderList(loading, emptyMsg) {
     const rank = { late: 0, today: 1, later: 2, none: 3, won: 4 };
     arr.sort((a, b) => rank[status(a)] - rank[status(b)] || (a.followup || "").localeCompare(b.followup || ""));
   }
+  // (24/11/2026) provável venda: em ordem do retorno marcado (o mais perto primeiro)
+  if (tab === "interessados") arr.sort((a, b) => (a.retornoAvisar || a.followup || "9").localeCompare(b.retornoAvisar || b.followup || "9"));
   if (tab === "entregas") {
     const grpOf = it =>
       !it.entregaTipo || it.entregaTipo.startsWith("A combinar")
@@ -780,7 +782,7 @@ const NOMES_ABA = {
   hoje: "Negociando",
   trabalhar: "A trabalhar",
   equipe: "Equipe",
-  interessados: "Interessados",
+  interessados: "Provável venda",
   entregas: "Vendido/Entregar",
   buscar: "Busca",
   conferir: "A conferir",
@@ -812,7 +814,7 @@ export function relatorioPR() {
         kpis: [
           ["Negociando", txt("rsHoje")],
           ["Na fila", txt("rsFila")],
-          ["Interessados", txt("rsInt")],
+          ["Provável venda", txt("rsInt")],
           ["Vendido no mês", txt("rsMes")]
         ]
       },

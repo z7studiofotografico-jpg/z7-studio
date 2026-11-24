@@ -4633,7 +4633,7 @@ await cenario("PR lista única: filtro PR/Paspatur, pessoa da equipe e chave na 
     await ir(pg, "#pr");
     await pg.locator("#rSegs").getByText("Repasse").click();
     await calmo(pg);
-    await pg.locator("#rChips").getByText("Interessados").click();
+    await pg.locator("#rChips").getByText("Provável venda").click();
     await calmo(pg);
     const lista = () => pg.textContent("#rList");
     ok(/Joao Pr/i.test(await lista()) && /Maria Paspatur/i.test(await lista()), "Todos: PR e Paspatur na mesma lista");
@@ -4666,7 +4666,7 @@ await cenario("PR lista única: filtro PR/Paspatur, pessoa da equipe e chave na 
   {
     const { pg, erros, store } = await abrir(ANA, migrar(d), { compacta: true });
     await ir(pg, "#pr");
-    await pg.locator("#rChips").getByText("Interessados").click();
+    await pg.locator("#rChips").getByText("Provável venda").click();
     await calmo(pg);
     await pg.locator("#rList button.lc-linha", { hasText: /Joao Pr/i }).click();
     let ja = pg.locator(".sheet.janela-aluno, .janela-aluno").last();
@@ -4987,6 +4987,58 @@ await cenario("Aluguel de becas: avançar o colégio inteiro (Cadastrado → Bec
   await sp2.getByRole("button", { name: "Fechar" }).click();
   ok(!erros.length, "sem erros" + (erros.length ? ": " + erros.join(" | ") : ""));
 });
+await cenario("Provável venda: data e hora do retorno, com quem falar", async () => {
+  const Y = new Date().getFullYear();
+  const dia = n => new Date(Date.now() + n * 864e5).toISOString().slice(0, 10);
+  const d = Object.assign({}, base, {
+    "repasse/rv1": {
+      nome: "RAYANE MORAIS FERREIRA",
+      nomeBusca: "RAYANE MORAIS FERREIRA",
+      escola: "COLEGIO BETA",
+      ano: Y,
+      etapa: "CONTATADO",
+      resp: "Adriano",
+      respEmail: ADRIANO,
+      separadoEm: dia(-1),
+      followup: dia(0),
+      contatos: [
+        { tipo: "Formando", tel: "21977770001" },
+        { tipo: "Mãe", nome: "ROSA MORAIS", tel: "21977770002" }
+      ],
+      telefones: ["21977770001", "21977770002"]
+    }
+  });
+  const { pg, erros, store } = await abrir(ADRIANO, migrar(d));
+  await ir(pg, "#pr");
+  await calmo(pg);
+  await pg.locator("#rChips").getByText("Negociando").click();
+  await calmo(pg);
+  const art = pg.locator("article", { hasText: "Rayane" }).first();
+  await art.getByRole("button", { name: "📅 Data de retorno" }).click();
+  const sh = pg.locator(".sheet:visible").last();
+  await sh.getByLabel("Entrar em contato com (o WhatsApp da conversa)").selectOption({ label: "mãe de Rayane (Rosa) · 21977770002" });
+  await sh.getByLabel("Dia do retorno").fill(dia(1));
+  await sh.getByLabel("Hora").fill("15:30");
+  await sh.getByLabel("Observação (opcional)").fill("a mãe recebe amanhã");
+  if (process.env.FOTOS) await sh.screenshot({ path: process.env.FOTOS + "/retorno-janela.png" });
+  await sh.getByRole("button", { name: "Salvar" }).click();
+  await calmo(pg);
+  const x = (await store())["repasse/rv1"];
+  ok(
+    x.etapa === "INTERESSADO" && x.retorno.hora === "15:30" && x.retornoAvisar === dia(1) + "T15:30" && /mãe de Rayane \(Rosa\)/.test(x.retorno.com) && x.followup === dia(1),
+    "retorno gravado: provável venda, dia, hora, com quem falar e o aviso"
+  );
+  await pg.locator("#rChips").getByText("Provável venda").click();
+  await calmo(pg);
+  const txt = await pg.locator("#rList").textContent();
+  ok(/PROVÁVEL VENDA/.test(txt) && /às 15:30 – entrar em contato com mãe de Rayane \(Rosa\)/.test(txt), "aparece embaixo do nome: dia, hora e com quem falar");
+  if (process.env.FOTOS) {
+    await pg.waitForTimeout(3500);
+    await pg.locator("article", { hasText: "Rayane" }).first().screenshot({ path: process.env.FOTOS + "/provavel-venda.png" });
+  }
+  ok((await pg.locator("article", { hasText: "Rayane" }).first().getByRole("button", { name: "📅 Remarcar retorno" }).count()) === 1, "o botão vira Remarcar retorno");
+  ok(!erros.length, "sem erros" + (erros.length ? ": " + erros.join(" | ") : ""));
+});
 await cenario("Colégio sem preço: aviso vermelho e venda bloqueada", async () => {
   const Y = new Date().getFullYear();
   const d = Object.assign({}, base, {
@@ -5008,7 +5060,7 @@ await cenario("Colégio sem preço: aviso vermelho e venda bloqueada", async () 
   const { pg, erros, store } = await abrir(ADRIANO, migrar(d));
   await ir(pg, "#pr");
   await calmo(pg);
-  await pg.locator("#rChips").getByText("Interessados").click();
+  await pg.locator("#rChips").getByText("Provável venda").click();
   await calmo(pg);
   const art = pg.locator("article", { hasText: "Bruna" }).first();
   ok(/está sem preço/.test(await art.textContent()), "cartão do aluno avisa que o colégio está sem preço");
@@ -5059,7 +5111,7 @@ await cenario("Registrar venda: endereço completo obrigatório e CEP preenche a
   );
   await ir(pg, "#pr");
   await calmo(pg);
-  await pg.locator("#rChips").getByText("Interessados").click();
+  await pg.locator("#rChips").getByText("Provável venda").click();
   await calmo(pg);
   await pg.locator("article", { hasText: "Luana" }).first().getByRole("button", { name: "Pagou 💰" }).click();
   const sh = pg.locator(".sheet:visible").last();

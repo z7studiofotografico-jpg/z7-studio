@@ -36,7 +36,7 @@ export function linhaCompacta(it, o) {
   nome.append(el("small", null, [title(it.escola), [it.curso, it.turma].filter(Boolean).join(" "), it.ano].filter(Boolean).join(" · ")));
   const passo = el("small", "lc-passo" + (s === "late" ? " late" : s === "today" ? " today" : ""), o.situacao(it, s));
   nome.append(passo);
-  l.append(nome, el("span", "lc-selo", it.etapa || ""));
+  l.append(nome, el("span", "lc-selo", (it.etapa === "INTERESSADO" ? "PROVÁVEL VENDA" : it.etapa) || ""));
   box.append(l);
   let cartao = null;
   const abrir = sim => {

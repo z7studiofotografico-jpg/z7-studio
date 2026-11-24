@@ -19,7 +19,7 @@ export function atividadeDoPatch(it, patch, hoje) {
   const quem = [title1(it.nome) || "um aluno", it.escola ? `(${title1(it.escola)})` : ""].filter(Boolean).join(" ");
   if (patch.etapa && patch.etapa !== it.etapa) {
     if (patch.etapa === "CAÍDO") return { tipo: "caido", texto: `passou ${quem} para caídos` };
-    if (patch.etapa === "INTERESSADO") return { tipo: "interessado", texto: `marcou ${quem} como interessado` };
+    if (patch.etapa === "INTERESSADO") return { tipo: "interessado", texto: `marcou ${quem} como provável venda` };
     if (patch.etapa === "PAGO") return { tipo: "venda", texto: `vendeu para ${quem}` };
   }
   if (patch.followup && patch.followup === hoje && !(it.followup && it.followup <= hoje))

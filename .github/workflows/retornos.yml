@@ -1,0 +1,30 @@
+name: Retornos da provável venda
+
+on:
+  schedule:
+    # de 15 em 15 minutos: avisa no celular os retornos marcados que chegaram (o GitHub pode atrasar alguns minutos)
+    - cron: "*/15 * * * *"
+  workflow_dispatch:
+
+concurrency:
+  group: retornos
+  cancel-in-progress: false
+
+jobs:
+  retornos:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - name: Instalar
+        working-directory: scripts
+        run: npm install --no-audit --no-fund
+      - name: Avisar os retornos
+        working-directory: scripts
+        run: node retornos.mjs
+        env:
+          FIREBASE_SERVICE_ACCOUNT: ${{ secrets.FIREBASE_SERVICE_ACCOUNT }}
+          APP_URL: ${{ vars.APP_URL }}

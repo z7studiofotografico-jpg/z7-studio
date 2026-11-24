@@ -190,9 +190,14 @@ export function historicoPlanilha(it) {
     .join(" · ");
 }
 // Texto da situação no cartão do PR (s = status do contato: "late", "today", "later" ou "none")
+// (24/11/2026) a etapa INTERESSADO aparece como "Provável venda" (o valor gravado não muda)
+export const nomeEtapaPR = e => (e === "INTERESSADO" ? "PROVÁVEL VENDA" : e || "");
 export function situacaoTxt(it, s) {
   const ABERTAS = ["SEPARADO", "CONTATADO", "INTERESSADO"];
   const dia = d => (d ? d.slice(8, 10) + "/" + d.slice(5, 7) : "");
+  const r = it.retorno;
+  if (ABERTAS.includes(it.etapa) && r && r.data && r.hora)
+    return `${s === "late" ? "⚠️ " : ""}📅 ${dia(r.data)}/${r.data.slice(0, 4)} às ${r.hora} – entrar em contato com ${r.com || "o cliente"} para confirmar a venda`;
   if (ABERTAS.includes(it.etapa))
     return it.followup
       ? s === "late"

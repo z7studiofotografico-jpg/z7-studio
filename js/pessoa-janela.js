@@ -22,7 +22,7 @@ export function chipsPessoa(hoje) {
     ["incompletos", "Incompletos", it => it.etapa === "INCOMPLETO"],
     ["trabalhar", "A trabalhar", it => aberto(it) && !deHoje(it)],
     ["hoje", "Negociando", deHoje],
-    ["interessados", "Interessados", it => it.etapa === "INTERESSADO"],
+    ["interessados", "Provável venda", it => it.etapa === "INTERESSADO"],
     ["conferir", "A conferir", it => ["PAGO", "ENTREGUE"].includes(it.etapa) && it.conferido === false],
     ["vender", "Vendido/entregar", it => it.etapa === "PAGO"],
     ["entregues", "Entregues", it => it.etapa === "ENTREGUE"]
