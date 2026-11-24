@@ -269,7 +269,11 @@ function render() {
     );
     // (24/11/2026) alunos do cadastro automático (PR) que ainda não estão no contrato: trazer com um toque
     import("./aluguel-do-pr.js")
-      .then(m => m.botaoTrazerDoPR(C, Object.assign({ id: filtro.inst }, inst), Number(filtro.ano || ANO()), doCol, r))
+      .then(m => {
+        const i0 = Object.assign({ id: filtro.inst }, inst);
+        m.botaoEnviarParaPR(C, i0, Number(filtro.ano || ANO()), doCol.filter(a => !a.naoParticipa), r);
+        return m.botaoTrazerDoPR(C, i0, Number(filtro.ano || ANO()), doCol, r);
+      })
       .catch(e => console.warn("[Z7] trazer do PR", e));
     // admin: excluir os alunos desse colégio e ano (importou errado, turma duplicada…)
     // o colégio inteiro de uma vez: medimos todo mundo no colégio, então passa todos para a próxima etapa

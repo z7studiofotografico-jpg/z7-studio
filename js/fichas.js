@@ -679,6 +679,7 @@ export async function confirmar(C, { f, lido, colNome, existentes, usados, sigla
       resp: "",
       respEmail: "",
       ...(colNome === "formaturaAlunos" ? { seg: ano >= new Date().getFullYear() ? "lf" : "rep" } : {}),
+      ...(colNome === "repasse" && f.vendaComo === "paspatur" ? { vendaComo: "paspatur" } : {}), // (24/11/2026)
       manual: true,
       daFicha: true,
       incluidoPor: C.email || "",

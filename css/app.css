@@ -612,3 +612,4 @@ body:not(.ver-valores) .vlr{filter:blur(6px);user-select:none;-webkit-user-selec
 .trava-box .btn{width:100%}
 .chips.cad-itens{flex-wrap:wrap;overflow:visible}
 .ct-turmas{display:grid;gap:6px}.ct-turma{display:grid;grid-template-columns:160px 1fr;gap:8px;align-items:center}@media(max-width:520px){.ct-turma{grid-template-columns:1fr}}
+.cad-op[aria-pressed="true"]{border-color:var(--accent);background:var(--accent-soft)}button.cad-op{text-align:left;font:inherit;color:inherit}

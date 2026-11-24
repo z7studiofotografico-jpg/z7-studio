@@ -177,17 +177,49 @@ export function abrirSepararPelaFicha(C, depois) {
       const ano = el("input");
       ano.inputMode = "numeric";
       ano.value = String(new Date().getFullYear());
-      const sCol = sel(
-        [
-          ["repasse", "PR"],
-          ["formaturaAlunos", "Formatura"],
-          ["alugueis", "Aluguel de becas"]
-        ],
-        "repasse"
-      );
+      // (24/11/2026) antes de guardar, a pergunta: para onde vão esses alunos? (sem escolha pronta: o padrão "PR"
+      // mandou o E.M. Manoel Gomes, que era contrato de certificado + canudo, para o PR)
+      const DESTINOS = [
+        ["alugueis", "📄 Contrato do colégio", "aluguel de becas, certificado, canudo, kits"],
+        ["formaturaAlunos", "🎓 Formatura", "venda antecipada (boleto)"],
+        ["repasse", "🖼️ PR", "kit quadro + porta-retratos"],
+        ["repasse:paspatur", "📒 Paspatur", "kit Paspatur (livro A4)"]
+      ];
+      const sCol = { value: "" };
+      const dest = el("div", "cad-ops");
+      const bts = DESTINOS.map(([k, t, sub]) => {
+        const b = el("button", "cad-op");
+        b.type = "button";
+        b.setAttribute("aria-pressed", "false");
+        const [ico, ...nm] = t.split(" ");
+        b.append(el("span", "cad-op-ico", ico), el("b", null, nm.join(" ")), el("small", null, sub));
+        b.onclick = () => {
+          sCol.value = k;
+          bts.forEach(x => x.setAttribute("aria-pressed", String(x === b)));
+        };
+        dest.append(b);
+        return b;
+      });
+      const dica = el("p", "notice");
+      dica.hidden = true;
+      // colégio com contrato no ano: sugere o Contrato do colégio
+      const sugerir = async () => {
+        dica.hidden = true;
+        if (!sInst.value) return;
+        const c = await C.FS.getDoc(C.FS.doc(C.db, "contratosColegio", `${sInst.value}_${Number(ano.value) || ""}`)).catch(() => null);
+        if (c && c.exists()) {
+          const R = await import("./contrato-colegio-regras.js");
+          dica.textContent = `📄 Este colégio tem contrato em ${ano.value} (${R.textoPacote(c.data().pacotePadrao) || "kit"}). Os alunos vão para o Contrato do colégio?`;
+          dica.hidden = false;
+        }
+      };
+      sInst.addEventListener("change", sugerir);
+      ano.addEventListener("change", sugerir);
       const r = el("div", "row2");
       r.append(field("Colégio", sInst), field("Ano", ano));
-      p.append(r, field("Cadastrar em", sCol));
+      const fDest = el("div", "field");
+      fDest.append(el("label", null, "Para onde vão esses alunos?"), dest, dica);
+      p.append(r, fDest);
       const msg = el("p", "hint");
       const lista = el("div", "eb-datas");
       let dir = null,
@@ -281,7 +313,8 @@ export function abrirSepararPelaFicha(C, depois) {
         const inst = insts.find(i => i.id === sInst.value);
         if (!inst) return U.toast("Escolha o colégio.");
         if (!dir || !grupos.length) return U.toast("Escolha a pasta das fotos.");
-        const colNome = sCol.value;
+        if (!sCol.value) return U.toast("Escolha para onde vão esses alunos (Contrato, Formatura, PR ou Paspatur).");
+        const [colNome, vendaComo] = sCol.value.split(":");
         const a = Number(ano.value) || null;
         let n = 0;
         for (const [i, g] of grupos.entries()) {
@@ -294,6 +327,7 @@ export function abrirSepararPelaFicha(C, depois) {
               instId: inst.id,
               ano: a,
               colNome,
+              ...(vendaComo ? { vendaComo } : {}),
               pasta,
               arquivo: g.fichas[0],
               img: foto.img,

@@ -172,8 +172,9 @@ export function camposAluguel(ja, contrato) {
     const it = chipItem(
       k,
       `${n}${Number(pr[k]) ? " · " + U.money(pr[k]) : ""}`,
-      ((ja && ja.pacote) || []).includes(k),
-      ((ja && ja.pacoteQtd) || {})[k]
+      // (24/11/2026) aluno novo: já vem marcado o kit do contrato
+      ((ja && (ja.pacote || []).length ? ja.pacote : (contrato && contrato.pacotePadrao) || []) || []).includes(k),
+      ((ja && ja.pacoteQtd) || (contrato && contrato.pacotePadraoQtd) || {})[k]
     );
     kit.append(it.l);
     return [k, it.cb];
@@ -207,6 +208,7 @@ export function camposAluguel(ja, contrato) {
 }
 
 // 3) grava no Aluguel de becas: junta com o aluno que já existe (pelo nome ou pelo número) ou cria um novo
+const kitSemBeca = p => (p || []).length > 0 && !(p || []).some(k => k === "beca" || k === "pelerine");
 export async function confirmarAluguel(C, { f, lido, extra, existentes, usados, sigla, contrato }) {
   const { FS, db } = C;
   if (!lido.nome) throw Object.assign(new Error("Falta o nome do aluno."), { aviso: true });
@@ -236,7 +238,9 @@ export async function confirmarAluguel(C, { f, lido, extra, existentes, usados, 
     nascimento: lido.nasc || "",
     email: (lido.email || "").toLowerCase(),
     endereco,
-    becaTipo: extra.becaTipo,
+    // (24/11/2026) kit sem beca (ex.: certificado + canudo): não aluga beca
+    semBeca: kitSemBeca((extra.pacote || []).length ? extra.pacote : (contrato && contrato.pacotePadrao) || []),
+    becaTipo: kitSemBeca((extra.pacote || []).length ? extra.pacote : (contrato && contrato.pacotePadrao) || []) ? "" : extra.becaTipo,
     tamanho: extra.tamanho,
     menosLonga: false,
     faixa: extra.faixa,

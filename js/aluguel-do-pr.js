@@ -133,3 +133,99 @@ export async function botaoTrazerDoPR(C, inst, ano, jaNoAluguel, box) {
   b.classList.add("trazer-pr");
   box.append(" ", b);
 }
+
+// (24/11/2026) Depois da formatura: os alunos do contrato vão para o PR ou para o Paspatur (vender as fotos).
+// Quem já está no PR (mesmo ID ou nome) fica como está. Nada sai do contrato.
+const formaturaPassou = (inst, hoje = U.todayStr()) => {
+  const ds = Object.keys(inst || {})
+    .filter(k => /^formatura\d*$/.test(k) && inst[k] && inst[k].data && inst[k].status !== "recusado")
+    .map(k => inst[k].data);
+  return { tem: ds.length > 0, passou: ds.some(d => d <= hoje), dia: ds.sort()[0] || "" };
+};
+export function prDoAluguel(a, inst, vendaComo) {
+  const agora = new Date().toISOString();
+  const contatos = (a.contatos || []).length ? a.contatos : a.tel ? [{ tipo: "Formando", nome: a.nome || "", tel: a.tel }] : [];
+  return {
+    nome: String(a.nome || "").toUpperCase(),
+    nomeBusca: U.chave(a.nome || ""),
+    escola: inst.nome || a.instNome || "",
+    ano: Number(a.ano),
+    codigo: a.codigo || "",
+    codigoBusca: a.codigoBusca || String(a.codigo || "").replace(/\W/g, "").toUpperCase(),
+    turma: a.turma || a.serie || "",
+    nascimento: a.nascimento || "",
+    email: a.email || "",
+    contatos,
+    telefones: [...new Set(contatos.map(c => U.digits(c.tel)).filter(Boolean))],
+    endereco: a.endereco || {},
+    obs: "",
+    etapa: contatos.length ? "NA FILA" : "INCOMPLETO",
+    followup: null,
+    tentativas: 0,
+    tentInteresse: 0,
+    resp: "",
+    respEmail: "",
+    ...(vendaComo === "paspatur" ? { vendaComo: "paspatur" } : {}),
+    manual: true,
+    doContrato: true,
+    importadoEm: agora,
+    atualizadoEm: agora
+  };
+}
+export async function botaoEnviarParaPR(C, inst, ano, alunos, box) {
+  if (!C.isAdmin || !(alunos || []).length) return;
+  const f = formaturaPassou(inst);
+  if (f.tem && !f.passou) {
+    box.append(" ", Object.assign(document.createElement("small"), { className: "hint", textContent: `Depois da formatura (${f.dia.slice(8, 10)}/${f.dia.slice(5, 7)}), aparece o botão de mandar os alunos para o PR ou o Paspatur.` }));
+    return;
+  }
+  const b = U.mkBtn("📤 Mandar para o PR ou Paspatur", "btn-sm", async () => {
+    const { sheet, el } = await import("./ui.js");
+    const { FS, db } = C;
+    const ja = await alunosDoPR(C, inst, ano, []); // os que já estão no PR
+    const codJa = new Set(ja.map(x => String(x.codigo || "").toUpperCase()).filter(Boolean));
+    const nomeJa = new Set(ja.map(x => U.chave(x.nome || "")));
+    const vai = alunos.filter(a => !codJa.has(String(a.codigo || "").toUpperCase()) && !nomeJa.has(U.chave(a.nome || "")));
+    sheet("📤 Depois da formatura", (p, close) => {
+      p.append(
+        el(
+          "p",
+          "hint",
+          vai.length
+            ? `${vai.length} aluno${vai.length > 1 ? "s" : ""} de ${inst.nome} (${ano}) vão para a venda das fotos. ${alunos.length - vai.length ? alunos.length - vai.length + " já estão no PR e ficam como estão." : ""} No contrato nada muda.`
+            : "Todos os alunos deste colégio já estão no PR."
+        )
+      );
+      const msg = el("p", "hint");
+      const enviar = vendaComo => async () => {
+        p.querySelectorAll("button").forEach(x => (x.disabled = true));
+        try {
+          const { docId } = await import("./repasse-dados.js");
+          const { indexarFones } = await import("./pedidos.js");
+          for (let i = 0; i < vai.length; i += 100) {
+            const bt = FS.writeBatch(db);
+            vai.slice(i, i + 100).forEach((a, j) => {
+              const d = prDoAluguel(a, inst, vendaComo);
+              const id = docId(d, Date.now() + i + j);
+              bt.set(FS.doc(db, "repasse", id), d);
+              indexarFones(FS, db, bt, id, d);
+            });
+            msg.textContent = `Mandando ${Math.min(i + 100, vai.length)} de ${vai.length}…`;
+            await bt.commit();
+          }
+          U.toast(`✅ ${vai.length} alunos no ${vendaComo === "paspatur" ? "Paspatur" : "PR"}`);
+          close();
+        } catch (e) {
+          p.querySelectorAll("button").forEach(x => (x.disabled = false));
+          C.handleErr(e);
+        }
+      };
+      const acoes = el("div", "panel-actions");
+      if (vai.length)
+        acoes.append(U.mkBtn("🖼️ Mandar para o PR", "btn-primary", enviar("pr")), U.mkBtn("📒 Mandar para o Paspatur", "btn-primary", enviar("paspatur")));
+      acoes.append(U.mkBtn("Fechar", "", close));
+      p.append(msg, acoes);
+    });
+  });
+  box.append(" ", b);
+}
