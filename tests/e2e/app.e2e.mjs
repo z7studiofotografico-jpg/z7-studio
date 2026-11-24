@@ -4189,6 +4189,7 @@ await cenario("Aluguel de becas: entrada / antecipação do colégio, Recebido e
   await calmo(pg);
   await pg.waitForTimeout(800);
   const topo = await pg.locator("#viewBecas .kpis").first().textContent();
+  ok(/já paga: R\$\s*7,20/.test(topo), "topo: a comissão já paga aparece embaixo");
   ok(/Recebido\s*R\$\s*72/.test(topo) && /A receber\s*R\$\s*168/.test(topo), "topo: Recebido R$ 72 e A receber R$ 168");
   if (process.env.FOTOS) await pg.locator("#viewBecas").screenshot({ path: process.env.FOTOS + "/becas-topo.png" });
   ok(!erros.length, "sem erros" + (erros.length ? ": " + erros.join(" | ") : ""));

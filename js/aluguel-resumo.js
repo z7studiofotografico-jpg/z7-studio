@@ -67,9 +67,10 @@ export function kpisValores(C, k, alunos) {
   kR.append(el("small", null, "A receber"), bR);
   k.append(kT, kRec, kR);
   const bC = el("b", null, "…");
+  const sC = el("small", null, ""); // (24/11/2026) a comissão já paga, embaixo
   if (C.isAdmin) {
     const kC = el("div", "kpi");
-    kC.append(el("small", null, "Comissão a pagar"), bC);
+    kC.append(el("small", null, "Comissão a pagar"), bC, sC);
     k.append(kC);
   }
   const ids = [...new Set(vai.map(a => `${a.instId}_${a.ano}`))];
@@ -78,6 +79,7 @@ export function kpisValores(C, k, alunos) {
     const R = C.isAdmin ? await import("./contrato-colegio-regras.js") : null;
     let recebido = 0;
     let comissao = 0;
+    let paga = 0;
     let recep = 0; // (24/11/2026) a recepcionista do contrato soma no total
     ls.forEach(([pags, contrato]) => {
       if (contrato && contrato.recepcionista && contrato.recepcionista.tem) recep += Number(contrato.recepcionista.valor) || 0;
@@ -85,14 +87,19 @@ export function kpisValores(C, k, alunos) {
       const dele = pags.filter(p => !p.excluido && (!p.alunoId || deles.has(p.alunoId)));
       recebido += dele.reduce((t, p) => t + (Number(p.valor) || 0), 0);
       if (R && contrato && !R.semComissao(contrato, C.isDono))
-        comissao += dele
-          .filter(p => R.ondeEsta(p) === "caixa" && p.conferido && !p.comissaoPagaEm)
-          .reduce((t, p) => t + R.comissaoPagamento(p, C.P, contrato) / 100, 0);
+        dele
+          .filter(p => R.ondeEsta(p) === "caixa" && p.conferido)
+          .forEach(p => {
+            const v = R.comissaoPagamento(p, C.P, contrato) / 100;
+            if (p.comissaoPagaEm) paga += v;
+            else comissao += v;
+          });
     });
     bT.textContent = brl(total + recep);
     bRec.textContent = brl(recebido);
     bR.textContent = brl(Math.max(0, total + recep - recebido));
     bC.textContent = brl(comissao);
+    sC.textContent = paga ? `já paga: ${brl(paga)}` : "";
   });
 }
 
