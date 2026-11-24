@@ -4229,6 +4229,34 @@ await cenario("Contrato do colégio: recepcionista que coloca as becas (soma no 
   if (process.env.FOTOS) await pg.locator("#alResumo").screenshot({ path: process.env.FOTOS + "/recep-faixa.png" });
   ok(!erros.length, "sem erros" + (erros.length ? ": " + erros.join(" | ") : ""));
 });
+await cenario("Aluguel de becas: o estoque é o limite e o sistema sugere a troca de tamanho", async () => {
+  const Y = new Date().getFullYear();
+  const al = (nome, t) => ({ instId: "i1", instNome: "COLEGIO ALFA", ano: Y, nome, serie: "5º ano", status: "Cadastrado", produtos: [], historico: [], becaTipo: "tradPreta", tamanho: t, contratoZerado: true });
+  const d = Object.assign({}, migrar(base), {
+    "config/app": Object.assign({}, base["config/app"], { estoque: { becas: { tradPreta: 6 }, tamanhos: { tradPreta: { P: 1, M: 5 } } } }),
+    "alugueis/a1": al("Ana Primeira", "P"),
+    "alugueis/a2": al("Bia Segunda", "P"),
+    "becasUso/evento_i1_diaBecas": { tipo: "evento", status: "reservado", instId: "i1", instNome: "COLEGIO ALFA", campo: "diaBecas", retirada: `${Y}-12-07`, devolucao: `${Y}-12-07`, becasQtd: {}, tamanhosQtd: {}, faixasQtd: {}, capelosQtd: {} }
+  });
+  const { pg, erros, store } = await abrir(ADRIANO, d);
+  await ir(pg, "#becas");
+  await pg.waitForFunction(() => /Ana Primeira/i.test(document.getElementById("viewBecas").textContent), null, { timeout: 8000 });
+  await pg.locator("#alFiltros select").nth(2).selectOption("i1");
+  await pg.getByRole("button", { name: "⏩ Avançar o colégio inteiro" }).click();
+  const sh = pg.locator(".sheet").filter({ hasText: "Avançar o colégio inteiro" });
+  await sh.getByRole("button", { name: "Cadastrado (2) → Beca medida" }).click();
+  await pg.locator(".sheet").last().getByRole("button", { name: "Sim, passar todos" }).click();
+  await sh.getByText(/1 aluno em/).waitFor({ timeout: 8000 });
+  let st = await store();
+  ok(st["alugueis/a1"].status === "Beca medida" && st["alugueis/a2"].status === "Cadastrado", "só 1 P no estoque: o segundo não passa do limite");
+  ok(/Bia Segunda: P → M/.test(await sh.textContent()), "sugere a troca para o tamanho mais perto com beca livre");
+  if (process.env.FOTOS) await sh.screenshot({ path: process.env.FOTOS + "/troca-tamanho.png" });
+  await sh.getByRole("button", { name: /Trocar o tamanho de 1 e avançar/ }).click();
+  await sh.getByText(/1 trocado de tamanho/).waitFor({ timeout: 8000 });
+  st = await store();
+  ok(st["alugueis/a2"].tamanho === "M" && st["alugueis/a2"].status === "Beca medida" && /P → M/.test(JSON.stringify(st["alugueis/a2"].historico)), "trocou para M, reservou e anotou no histórico");
+  ok(!erros.length, "sem erros" + (erros.length ? ": " + erros.join(" | ") : ""));
+});
 await cenario("Formaturas · abas Linha de Frente / Repasse / Venda Antecipada, virada e Pix", async () => {
   const Y = new Date().getFullYear();
   const aluno = (nome, escola, ano, seg, etapa = "NA FILA") => ({

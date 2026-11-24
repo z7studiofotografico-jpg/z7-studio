@@ -88,6 +88,7 @@ export function avancarColegio(C, alunos, mudarStatus, voltar = false, abrirEsto
           return U.toast("Tire as fotos antes de mandar para a produção.");
         lista.querySelectorAll("button").forEach(x => (x.disabled = true));
         const pulados = [];
+        const travados = []; // (24/11/2026) sem estoque no dia: para sugerir a troca de tamanho
         let feitos = 0;
         for (const a of [...als].sort((x, y) =>
           String(x.codigo || x.nome).localeCompare(String(y.codigo || y.nome), "pt-BR", { numeric: true })
@@ -99,6 +100,7 @@ export function avancarColegio(C, alunos, mudarStatus, voltar = false, abrirEsto
           if (r === "ok") a.status = para;
           if (r === "ok") feitos++;
           else pulados.push(`${a.codigo ? a.codigo + " · " : ""}${title(a.nome)}: ${r}`);
+          if (/^sem estoque/.test(String(r))) travados.push(a);
         }
         msg.textContent = "";
         msg.append(el("p", "notice", `✅ ${feitos} aluno${feitos === 1 ? "" : "s"} em “${para}”.`));
@@ -107,6 +109,8 @@ export function avancarColegio(C, alunos, mudarStatus, voltar = false, abrirEsto
           const ul = el("ul");
           pulados.forEach(t => ul.append(el("li", null, t)));
           msg.append(ul);
+          // (24/11/2026) o estoque é o limite: sugere o tamanho mais perto com beca livre e troca com um toque
+          if (travados.length) await sugerirTrocas(C, travados, para, mudarStatus, msg);
           // (23/11/2026) travou por estoque: leva direto para o estoque daquele dia
           const sem = pulados.find(t => /sem estoque no dia (\d\d)\/(\d\d)/.test(t));
           if (sem && abrirEstoque) {
@@ -129,8 +133,47 @@ export function avancarColegio(C, alunos, mudarStatus, voltar = false, abrirEsto
 }
 
 // (23/11/2026) janela "sem estoque nesse dia" com o botão para abrir o estoque daquele dia
-export async function avisoSemEstoque(dia, falta, abrirEstoque) {
+// a lista de trocas sugeridas (um de cada vez, para cada troca já contar na próxima) e o botão de trocar todas
+async function sugerirTrocas(C, travados, para, mudarStatus, msg) {
+  const T = await import("./aluguel-troca.js");
+  const sug = [];
+  for (const a of travados) {
+    const z = T.sugerirTamanho(a);
+    if (z) sug.push([a, z]);
+  }
+  if (!sug.length) return msg.append(el("p", "hint", "Não tem outro tamanho livre nessa beca: acerte o estoque ou troque a beca."));
+  const ul = el("ul");
+  sug.forEach(([a, z]) => ul.append(el("li", null, `${a.codigo ? a.codigo + " · " : ""}${title(a.nome)}: ${a.tamanho} → ${z}`)));
+  const btn = U.mkBtn(`🔁 Trocar o tamanho de ${sug.length} e avançar`, "btn-primary", async () => {
+    btn.disabled = true;
+    let ok = 0;
+    const nao = [];
+    // um por vez: a sugestão é refeita na hora, já com as trocas anteriores contando no estoque
+    for (const [a] of sug) {
+      const z = T.sugerirTamanho(a);
+      const r = z ? await T.trocarEAvancar(C, a, z, para, mudarStatus) : "sem tamanho livre";
+      if (r === "ok") ok++;
+      else nao.push(`${title(a.nome)}: ${r}`);
+    }
+    msg.append(el("p", "notice", `✅ ${ok} trocado${ok === 1 ? "" : "s"} de tamanho e em “${para}”.` + (nao.length ? ` Ficaram: ${nao.join("; ")}` : "")));
+  });
+  msg.append(el("p", "notice", "💡 O estoque é o limite. Sugestão de troca de tamanho (o mais perto com beca livre):"), ul, btn);
+}
+export async function avisoSemEstoque(dia, falta, abrirEstoque, a = null, para = "", C = null) {
   const txt = `No dia ${dia.slice(8, 10)}/${dia.slice(5, 7)} não tem livre: ${falta.join(", ")}.`;
+  // (24/11/2026) o estoque é o limite: sugere o tamanho mais perto que tem livre e troca com um toque
+  const T = a && para && C ? await import("./aluguel-troca.js") : null;
+  const z = T ? T.sugerirTamanho(a) : "";
+  if (z) {
+    const sim = await confirmar("Sem estoque nesse dia", `${txt} Tem ${z} livre: trocar ${title(a.nome)} de ${a.tamanho} para ${z}?`, {
+      sim: `🔁 Trocar para ${z}`,
+      nao: "Não trocar"
+    });
+    if (!sim) return;
+    const { mudarStatus } = await import("./aluguel-alunos.js");
+    const r = await T.trocarEAvancar(C, a, z, para, mudarStatus);
+    return U.toast(r === "ok" ? `Trocado para ${z} e reservado ✅` : String(r));
+  }
   const ver = await confirmar("Sem estoque nesse dia", txt + " Quer abrir o estoque para ver o que está acontecendo?", {
     sim: "📦 Abrir o estoque",
     nao: "Fechar"

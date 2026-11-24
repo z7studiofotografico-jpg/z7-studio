@@ -57,7 +57,7 @@ const $ = id => document.getElementById(id);
 let abrirEst = null; // abre o Estoque (vem do Aluguel de becas)
 const fmtDia = d => (d ? d.slice(8, 10) + "/" + d.slice(5, 7) : "");
 export const faltaNoDia = a => faltaDoAlunoNoDia(C.P.estoque || {}, avulsosLista, lista, a);
-const avisoSemEstoque = (dia, falta) => import("./aluguel-lote.js").then(m => m.avisoSemEstoque(dia, falta, abrirEst));
+const avisoSemEstoque = (dia, falta, a, para) => import("./aluguel-lote.js").then(m => m.avisoSemEstoque(dia, falta, abrirEst, a, para, C));
 // Agenda → Aluguel de becas: abre os alunos já filtrados no colégio e ano
 export function pedirColegio(instId, ano) {
   filtro.inst = instId || "";
@@ -575,7 +575,7 @@ export async function mudarStatus(a, para, lote = false) {
     const { dia, falta } = faltaNoDia(a);
     if (falta.length) {
       if (lote) return `sem estoque no dia ${fmtDia(dia)}: ` + falta.join(", ");
-      return avisoSemEstoque(dia, falta);
+      return avisoSemEstoque(dia, falta, a, para);
     }
   }
   // indo para a produção: a foto do aluno já foi tirada? (as fotos não vêm para o app; é o acordo com o colégio)
