@@ -1,0 +1,26 @@
+name: Contas fixas (Cora Pro)
+
+on:
+  schedule:
+    # todo dia às 9h de Brasília: avisa 3 dias antes, 1 dia antes e no dia do vencimento
+    - cron: "0 12 * * *"
+  workflow_dispatch:
+
+jobs:
+  contas:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - name: Instalar
+        working-directory: scripts
+        run: npm install --no-audit --no-fund
+      - name: Avisar as contas
+        working-directory: scripts
+        run: node contas.mjs
+        env:
+          FIREBASE_SERVICE_ACCOUNT: ${{ secrets.FIREBASE_SERVICE_ACCOUNT }}
+          APP_URL: ${{ vars.APP_URL }}
