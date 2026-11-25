@@ -28,6 +28,10 @@ import * as U from "./util.js";
 import { botaoRelatorio } from "./relatorio.js";
 import { siglaDe, contatoRel } from "./aluno-id.js";
 import { pintarSeletor } from "./numeros-tela.js";
+// (25/11/2026) a situação do aluno no relatório, a mesma do relatório para o diretor
+const SIT_REL = { desistiu: "Desistiu", reprovou: "Reprovou", semkit: "Não comprou" };
+const situacaoRel = f =>
+  SIT_REL[f.status] || (quitado(f) ? "Quitado" : !pagasDe(f) ? "Não fez o 1º pagamento" : atrasado(f) ? "Atrasado" : "Em dia");
 import { renderFechados } from "./formaturas-fechados.js";
 import { linhaGenerica } from "./lista-compacta.js";
 import { renderCobrancas as renderCobrancasVA, renderAlunosVA } from "./va-cobrancas.js";
@@ -737,14 +741,14 @@ async function relatorioFormaturas() {
               f.codigo || "",
               title(f.nome),
               title(f.instNome),
-              f.turma || f.serie || "",
+              f.turma || [f.serie, f.sala].filter(Boolean).join(" "),
               contatoRel(f.tel, f.email),
-              f.kit || (ehKit01(f) ? "Kit 01" : "Kit"),
+              String(f.kit || (ehKit01(f) ? "Kit 01" : "Kit")).split(" · ")[0],
               moeda(f.valor),
               moeda(recebidoDe(f)),
               moeda(emAberto(f)),
               `${pagasDe(f)}/${nParcelas(f)}`,
-              quitado(f) ? "Quitado" : atrasado(f) ? "Atrasado" : "Em dia"
+              situacaoRel(f)
             ])
         },
         vazio: "Nenhum aluno."

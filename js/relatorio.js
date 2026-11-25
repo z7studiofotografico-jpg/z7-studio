@@ -216,7 +216,23 @@ function ordemDasTabelas(conteudo) {
   });
   return o;
 }
-function secao(s) {
+// (25/11/2026) coluna Colégio com o mesmo colégio em todas as linhas: sai da tabela e vira uma linha acima dela
+// (sobra espaço para os nomes, principalmente na folha em pé)
+const COL_COLEGIO = /^(col[eé]gio|institui[cç][aã]o)$/i;
+export function colegioUnico(s) {
+  const t = s.tabela;
+  if (!t || !t.cols || !t.linhas || t.linhas.length < 2) return s;
+  const i = t.cols.findIndex(c => COL_COLEGIO.test(String(c).trim()));
+  if (i < 0) return s;
+  const v = String(t.linhas[0][i] == null ? "" : t.linhas[0][i]);
+  if (!v || !t.linhas.every(l => String(l[i] == null ? "" : l[i]) === v)) return s;
+  return Object.assign({}, s, {
+    nota: [s.nota, `${String(t.cols[i]).trim()}: ${v}`].filter(Boolean).join(" · "),
+    tabela: Object.assign({}, t, { cols: t.cols.filter((_, j) => j !== i), linhas: t.linhas.map(l => l.filter((_, j) => j !== i)) })
+  });
+}
+function secao(s0) {
+  const s = colegioUnico(s0);
   const box = el("section", "rel-secao");
   if (s.titulo) box.append(el("h2", null, s.titulo));
   if (s.nota) box.append(el("p", "rel-nota", s.nota));
@@ -243,9 +259,14 @@ function secao(s) {
       linhas.forEach(l => {
         const x = el("tr");
         // texto curto (ID, ano, data, valor) não quebra no meio
-        l.forEach(v => {
+        l.forEach((v, i) => {
           const t = v == null ? "" : String(v);
-          x.append(el("td", t.length <= 12 ? "curto" : null, t));
+          // (25/11/2026) o nome não fica espremido; telefone e e-mail um embaixo do outro
+          const td = el("td", COL_NOME.test(String(cols[i]).trim()) ? "nome" : t.length <= 12 ? "curto" : null);
+          const m = t.match(/^(.+?) · (\S+@\S+)$/);
+          if (m) td.append(el("span", "nw", m[1]), el("br"), el("small", null, m[2]));
+          else td.textContent = t;
+          x.append(td);
         });
         tb.append(x);
       });

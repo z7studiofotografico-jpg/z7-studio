@@ -262,6 +262,7 @@ details.tamtipo{border:1px solid var(--line,#ddd);border-radius:10px;padding:6px
 .rel-copia .kpi,.rel-copia .vdbox{min-width:0;max-width:100%}
 .rel-tab td{overflow-wrap:break-word}
 .rel-tab td.curto{white-space:nowrap}
+.rel-tab td.nome{min-width:34mm}.rel-tab td small{color:#6b6670;font-size:.9em;overflow-wrap:anywhere}.rel-tab .nw{white-space:nowrap}
 @media (max-width:600px){.rel-folha{padding:16px}.rel-tab{font-size:.78rem}.rel-tab th,.rel-tab td{padding:4px 5px}}
 .rel-paisagem .rel-folha{max-width:1180px}
 @media print{
@@ -279,6 +280,8 @@ details.tamtipo{border:1px solid var(--line,#ddd);border-radius:10px;padding:6px
   .rel-tab th,.rel-tab td{padding:2px 5px}
   .rel-tab thead{display:table-header-group}
   body.imprimindo > *:not(#relatorio){display:none!important}
+  /* 25/11/2026: nada de fora do app na folha (avisos e bordas que extensões do navegador põem na página) */
+  html > *:not(head):not(body){display:none!important}
   body.imprimindo{background:#fff}
   #relatorio{position:static;padding:0;overflow:visible;background:#fff}
   .rel-barra{display:none}
