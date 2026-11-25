@@ -235,6 +235,14 @@ export async function ver(C, id, parte = 1, zoom = 1) {
 export function fecharVer() {
   document.getElementById("z7Ficha")?.remove();
 }
+// (25/11/2026) abre o Claude com o pedido já escrito (só apertar Enter): no app do computador (claude://, que tem o
+// navegador do app para ler as fichas) ou, se pedir, no site claude.ai
+export const PEDIDO_FICHAS = "lê as fichas";
+export function abrirClaudeFichas(site) {
+  const q = encodeURIComponent(PEDIDO_FICHAS);
+  if (site) return window.open("https://claude.ai/new?q=" + q, "_blank", "noopener");
+  location.href = "claude://claude.ai/new?q=" + q;
+}
 // grava o que foi lido; duvidas = campos com letra difícil
 export async function gravarLeitura(C, id, lido, duvidas = []) {
   const limpo = {};
@@ -297,7 +305,7 @@ export function abrirCadastroAutomatico(C, colNome = "") {
         el(
           "p",
           "hint",
-          "1) Gere as prévias do colégio em “🗂️ Prévias de um colégio” (a 1ª foto de cada aluno é a ficha). 2) Toque em Pedir a leitura. 3) Escreva para o Claude: “lê as fichas”. 4) Confira aqui e confirme."
+          "1) Gere as prévias do colégio em “🗂️ Prévias de um colégio” (a 1ª foto de cada aluno é a ficha). 2) Toque em Pedir a leitura. 3) Toque em “🤖 Mandar para o Claude ler” e aperte Enter no Claude. 4) Confira aqui e confirme."
         )
       );
       const lista = el("div");
@@ -368,7 +376,7 @@ export function abrirCadastroAutomatico(C, colNome = "") {
           const b = el("div", "cad-parte");
           const st =
             ped && ped.status === "na fila"
-              ? "🔒 Na fila de leitura: escreva “lê as fichas” para o Claude"
+              ? "🔒 Na fila de leitura: toque em “🤖 Mandar para o Claude ler” e aperte Enter no Claude"
               : ped && ped.status === "conferir"
                 ? "🔒 Lido: falta conferir"
                 : "";
@@ -388,9 +396,16 @@ export function abrirCadastroAutomatico(C, colNome = "") {
                   pedidoEm: new Date().toISOString(),
                   por: C.me || ""
                 });
-                U.toast("Pedido feito. Agora escreva para o Claude: lê as fichas");
+                U.toast("Pedido feito. Abrindo o Claude com “lê as fichas”: é só apertar Enter");
+                abrirClaudeFichas();
                 montar();
               })
+            );
+          // (25/11/2026) colégio na fila: um toque abre o Claude do computador com “lê as fichas” já escrito
+          if (ped && ped.status === "na fila")
+            acoes.append(
+              U.mkBtn("🤖 Mandar para o Claude ler", "btn-sm btn-primary", () => abrirClaudeFichas()),
+              U.mkBtn("🌐 Claude no site", "btn-sm", () => abrirClaudeFichas(true))
             );
           // fichas que o Claude não conseguiu ler (foto desfocada ou sem a ficha): a equipe digita da ficha em papel
           if (g.nova) acoes.append(U.mkBtn(`✍️ Preencher à mão (${g.nova})`, "btn-sm", () => conferir(C, g, g.colNome, montar, "nova")));

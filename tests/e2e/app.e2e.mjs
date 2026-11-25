@@ -3405,6 +3405,31 @@ await cenario("Agendamento · Importação: folha da turma (20 por página, nome
   );
   ok(!erros.length, "sem erros" + (erros.length ? ": " + erros.join(" | ") : ""));
 });
+await cenario("Cadastro automático: um toque manda as fichas para o Claude ler (25/11/2026)", async () => {
+  const Y = new Date().getFullYear();
+  const d = Object.assign({}, migrar(base), {
+    "fichas/fn1": { escola: "COLEGIO BETA", ano: Y, colNome: "repasse", pasta: "26 -CB- 01 - ANA NOVA", img: "data:image/gif;base64,R0lGODlhAQABAAAAACw=", status: "nova" },
+    "fichas/fn2": { escola: "COLEGIO BETA", ano: Y, colNome: "repasse", pasta: "26 -CB- 02 - BIA NOVA", img: "data:image/gif;base64,R0lGODlhAQABAAAAACw=", status: "nova" }
+  });
+  const { pg, erros, store } = await abrir(ADRIANO, d);
+  await ir(pg, "#home");
+  await pg.locator("#tileCadastrar").click();
+  await pg.locator(".sheet .cad-fotos").getByRole("button", { name: "🤖 Cadastro automático" }).click();
+  const ca = pg.locator(".sheet").filter({ hasText: "🤖 Cadastro automático" }).last();
+  await ca.getByText(/2 para ler/).waitFor({ timeout: 8000 });
+  await ca.getByRole("button", { name: "🤖 Pedir a leitura" }).click();
+  await calmo(pg);
+  const st = await store();
+  ok(Object.keys(st).some(k => /^fichasPedidos\//.test(k) && st[k].status === "na fila"), "o pedido entra na fila");
+  await ca.getByRole("button", { name: "🤖 Mandar para o Claude ler" }).waitFor({ timeout: 8000 });
+  ok(/toque em “🤖 Mandar para o Claude ler” e aperte Enter/.test(await ca.textContent()), "o aviso diz o que fazer");
+  await pg.evaluate(() => [...document.querySelectorAll("button")].find(b => /Claude no site/.test(b.textContent)).click());
+  await pg.waitForTimeout(300);
+  ok((await pg.evaluate(() => window.__aberto)) === "https://claude.ai/new?q=l%C3%AA%20as%20fichas", "o site do Claude abre com “lê as fichas”");
+  if (process.env.FOTOS) await ca.locator(".panel").screenshot({ path: process.env.FOTOS + "/fichas-claude.png" });
+  ok(!erros.length, "sem erros" + (erros.length ? ": " + erros.join(" | ") : ""));
+});
+
 await cenario("Tabela de preço dos colégios no PR (o Juntar colégio saiu)", async () => {
   const Y = new Date().getFullYear();
   const d = Object.assign({}, migrar(base), {
