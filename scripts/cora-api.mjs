@@ -64,7 +64,17 @@ export async function conectar() {
   const f = faltando();
   if (f.length) throw new Error("Faltam os segredos da Cora no GitHub: " + f.join(", "));
   const ag = agente();
-  const t = await pedir(ag, "POST", "/token", { form: { grant_type: "client_credentials", client_id: process.env.CORA_CLIENT_ID.trim() } });
+  // o Client-id às vezes vem colado com texto em volta ("Client-id: int-… Copiar"): fica só o int-…
+  const id = (process.env.CORA_CLIENT_ID.match(/int-[A-Za-z0-9]+/) || [process.env.CORA_CLIENT_ID.trim()])[0];
+  // diagnóstico sem expor segredo: o certificado (parte pública) diz para qual Client-id e ambiente ele foi feito
+  try {
+    const c = new crypto.X509Certificate(process.env.CORA_CERT.replace(/\\n/g, "\n"));
+    console.log(`Certificado: ${c.subject.replace(/\n/g, " · ")} · válido até ${c.validTo}`);
+  } catch (e) {
+    console.log("Certificado: não consegui ler (confira se colou o certificate.pem inteiro, com as linhas BEGIN e END)");
+  }
+  console.log(`Client-id: ${id.slice(0, 6)}… (${id.length} letras) · ambiente ${AMB}`);
+  const t = await pedir(ag, "POST", "/token", { form: { grant_type: "client_credentials", client_id: id } });
   const auth = { Authorization: "Bearer " + t.access_token };
   return {
     emitir: (corpo, chave) => pedir(ag, "POST", "/v2/invoices/", { corpo, headers: Object.assign({ "Idempotency-Key": chave }, auth) }),
