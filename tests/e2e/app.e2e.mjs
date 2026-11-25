@@ -3428,7 +3428,7 @@ await cenario("Tabela de preço dos colégios no PR (o Juntar colégio saiu)", a
       }
     }
   });
-  const { pg, erros } = await abrir(ADRIANO, d);
+  const { pg, erros, store } = await abrir(ADRIANO, d);
   await ir(pg, "#pr");
   await calmo(pg);
   const valor = await pg.locator("#rLoteEscola option").evaluateAll(os => (os.find(o => /alfa/i.test(o.textContent)) || {}).value || "");
@@ -3452,6 +3452,18 @@ await cenario("Tabela de preço dos colégios no PR (o Juntar colégio saiu)", a
     await pg.waitForTimeout(300);
     await sh.locator(".panel").screenshot({ path: process.env.FOTOS + "/tabela-preco.png" });
   }
+  // (25/11/2026) tocar no "sem preço" abre o preço certo (Paspatur do Colégio Alfa); salvo, a tabela volta atualizada
+  await sh.getByText(/Paspatur: sem preço/).first().click();
+  await calmo(pg);
+  const jp = pg.locator(".sheet").last();
+  ok(/Preço · Paspatur · Linha de Frente/.test(await jp.textContent()) && /Colegio Alfa/i.test(await jp.textContent()), "abre o preço do Paspatur do colégio");
+  if (process.env.FOTOS) await jp.locator(".panel").screenshot({ path: process.env.FOTOS + "/tabela-preco-cadastrar.png" });
+  await jp.locator("input").first().fill("160");
+  await jp.getByRole("button", { name: "Salvar preço" }).click();
+  await pg.waitForTimeout(900);
+  const s2 = await store();
+  ok(Number(s2["config/precosColegio"].colegios[`${Y}|COLEGIO ALFA`].paspatur.lfPix) === 160, "o preço do Paspatur foi gravado");
+  ok(/Paspatur: Linha de Frente: Pix R\$ 160/.test(await pg.locator(".sheet").last().textContent()), "a tabela volta com o preço novo");
   ok(!erros.length, "sem erros" + (erros.length ? ": " + erros.join(" | ") : ""));
 });
 

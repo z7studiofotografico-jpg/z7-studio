@@ -2,7 +2,7 @@
 // Adriano cadastra na hora do trabalho daquele colégio. Fica em config/precosColegio:
 // { colegios: { "2026|CHAVE DO COLEGIO": { escola, ano, pr: {lfPix, ...}, paspatur: {...}, formatura: {...}, em, por } } }
 // Colégio sem preço = bloqueio: a equipe não manda mensagem com valor nem registra venda até o preço ser cadastrado.
-import { el, sheet, field, title } from "./ui.js";
+import { el, sheet, field, title, clicavel } from "./ui.js";
 import * as U from "./util.js";
 import { temPreco } from "./contrato-colegio-regras.js";
 
@@ -121,7 +121,7 @@ export function avisoSemPreco(C, it, tipo, nomeTipo, seg) {
 }
 
 // janela de preço do colégio (admin): os valores da etapa (Linha de Frente ou Repasse) e as parcelas no cartão
-export function abrirPrecoColegio(C, escola, ano, tipo, nomeTipo, seg) {
+export function abrirPrecoColegio(C, escola, ano, tipo, nomeTipo, seg, aoSalvar) {
   if (!C.isAdmin) return U.toast("Só o Adriano cadastra o preço do colégio.");
   const k = chavePreco(escola, ano);
   const atual = (mapa[k] && mapa[k][tipo]) || {};
@@ -175,6 +175,7 @@ export function abrirPrecoColegio(C, escola, ano, tipo, nomeTipo, seg) {
         );
         U.toast("Preço do colégio salvo ✅");
         close();
+        if (aoSalvar) aoSalvar();
       } catch (e) {
         C.handleErr(e);
       }
@@ -267,9 +268,11 @@ export function abrirTabelaPrecos(C, escolhido) {
     .map(([k, x]) => Object.assign({ k }, x))
     .sort((a, b) => (Number(b.ano) || 0) - (Number(a.ano) || 0) || String(a.escola).localeCompare(String(b.escola)));
   const kEsc = escolhido && escolhido.escola ? chavePreco(escolhido.escola, escolhido.ano) : "";
+  let fecharTabela = () => {};
   sheet(
     "💰 Tabela de preço dos colégios",
-    p => {
+    (p, close) => {
+      fecharTabela = close;
       p.append(el("p", "hint", "O preço de cada colégio, com a data e quem cadastrou. Colégio sem preço fica bloqueado para vender."));
       const box = el("div", "eb-datas");
       const linha = (x, atual) => {
@@ -284,7 +287,26 @@ export function abrirTabelaPrecos(C, escolhido) {
           ["formatura", "Formatura"]
         ].forEach(([t, nome]) => {
           const s = textoPreco(x[t]);
-          tx.append(el("small", s ? null : "wait", `${nome}: ${s || "sem preço"}`));
+          const it = el("small", s ? null : "wait", `${nome}: ${s || "sem preço"}`);
+          tx.append(it);
+          // (25/11/2026) tocar na linha abre o campo certo: o preço deste colégio, deste tipo (Linha de Frente);
+          // com a Linha de Frente já feita, o "+ Repasse" ao lado abre o do Repasse
+          if (!C.isAdmin) return;
+          const reabrir = () => setTimeout(() => abrirTabelaPrecos(C, { escola: x.escola, ano: x.ano }), 400);
+          const abrir = sg => {
+            fecharTabela();
+            abrirPrecoColegio(C, x.escola, x.ano, t, nome, sg, reabrir);
+          };
+          clicavel(it, () => abrir("lf"), s ? `Mudar o preço de ${nome}` : `Cadastrar o preço de ${nome}`);
+          if (!s) it.append(" · ", el("u", null, "cadastrar"));
+          else if (!/Repasse/.test(s)) {
+            const rep = el("u", null, "+ Repasse");
+            rep.onclick = e => {
+              e.stopPropagation();
+              abrir("rep");
+            };
+            it.append(" · ", rep);
+          }
         });
         if (x.por) tx.append(el("small", null, "Cadastrado por " + title(x.por)));
         l.append(dt, tx);
