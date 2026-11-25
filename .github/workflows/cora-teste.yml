@@ -1,0 +1,22 @@
+name: Cora · testar a API
+
+on:
+  workflow_dispatch:
+
+jobs:
+  teste:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - name: Testar a API da Cora (ambiente de teste)
+        working-directory: scripts
+        run: node cora-teste.mjs
+        env:
+          CORA_AMBIENTE: stage
+          CORA_CLIENT_ID: ${{ secrets.CORA_CLIENT_ID }}
+          CORA_CERT: ${{ secrets.CORA_CERT }}
+          CORA_KEY: ${{ secrets.CORA_KEY }}
