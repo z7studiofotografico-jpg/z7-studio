@@ -106,6 +106,24 @@ export function abrirJuntar(C, { grupos, de, colNome, metaNome, aoTerminar }) {
 
 // ---------- excluir e acertar a lista de colégios (a "janela cinza") ----------
 export const META_DE = { repasse: "repasse_meta", paspatur: "paspatur_meta", formaturaAlunos: "formatura_meta" };
+// (26/11/2026) aluno novo (Cadastro automático, ➕ Cadastrar aluno): o colégio entra (ou soma) na lista de colégios do
+// PR/Formatura. Antes o colégio novo não aparecia na lista (nem no relatório nem no "Procurar colégio").
+export async function somarNaLista(C, colNome, escola, ano) {
+  if (!C.isAdmin || !META_DE[colNome] || !escola || !ano) return;
+  const { FS, db } = C;
+  try {
+    const ref = FS.doc(db, "config", META_DE[colNome]);
+    const m = (await FS.getDoc(ref)).data() || {};
+    const mais = (o, k) => Object.assign({}, o, { [k]: (Number((o || {})[k]) || 0) + 1 });
+    await FS.setDoc(
+      ref,
+      { escolasAno: mais(m.escolasAno, escola + "|" + ano), escolas: mais(m.escolas, escola), anos: mais(m.anos, String(ano)) },
+      { merge: true }
+    );
+  } catch (e) {
+    console.warn("[Z7] lista de colégios", e);
+  }
+}
 // tira da lista de escolas os alunos apagados: menos = [{ escola, ano }]
 export function metaMenos(meta, menos) {
   const m = {
@@ -199,7 +217,14 @@ export async function acertarLista(C, { colNome, aoTerminar }) {
   const col = FS.collection(db, colNome);
   const escolasAno = {};
   let mudou = 0;
-  for (const k of Object.keys(m.escolasAno || {})) {
+  // (26/11/2026) também acha os colégios que ainda não estavam na lista (alunos incluídos sem a planilha)
+  const todos = await FS.getDocs(col);
+  const achados = new Set();
+  todos.forEach(d => {
+    const x = d.data();
+    if (x.escola && x.ano) achados.add(x.escola + "|" + x.ano);
+  });
+  for (const k of new Set([...Object.keys(m.escolasAno || {}), ...achados])) {
     const i = k.lastIndexOf("|");
     const escola = k.slice(0, i),
       ano = Number(k.slice(i + 1));

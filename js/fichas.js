@@ -712,6 +712,7 @@ export async function confirmar(C, { f, lido, colNome, existentes, usados, sigla
       if (colNome === "repasse") indexarFones(FS, db, tx, ref.id, doc);
     });
     existentes.push({ id: ref.id, ...doc });
+    if (colNome !== "alugueis") (await import("./juntar-colegio.js")).somarNaLista(C, colNome, doc.escola, doc.ano);
   }
   // 📂 fotos numa pasta só: guarda a pasta a criar do aluno (com as fotos dele)
   if (f.fotos && f.fotos.length) {

@@ -31,7 +31,6 @@ export function modulosDe(C) {
   return out;
 }
 export const podeCadastrar = C => modulosDe(C).length > 0;
-
 async function colegios(C) {
   const { FS, db } = C;
   const limpa = l =>
@@ -781,6 +780,7 @@ async function criarPR(C, colecao, d, kit) {
     if (colecao === "repasse") return await repetido(existente);
     throw Object.assign(new Error(`${title(d.nome)} já está na Formatura.`), { aviso: true });
   }
+  (await import("./juntar-colegio.js")).somarNaLista(C, colecao, doc.escola, doc.ano);
   return colecao === "repasse" ? NOMES_MODULO[kit === "paspatur" ? "paspatur" : "pr"] : NOMES_MODULO.formatura;
 }
 // o número digitado conta para a numeração automática do colégio (ids/26CENBJ), para nunca repetir
