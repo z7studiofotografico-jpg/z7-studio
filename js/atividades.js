@@ -4,6 +4,7 @@
 import { el, sheet } from "./ui.js";
 import * as U from "./util.js";
 
+const COR_TIPO = { caido: "ativ-caido", venda: "ativ-venda", interessado: "ativ-provavel" };
 export const NOMES_LISTA = { pr: "PR", paspatur: "Paspatur", formatura: "Formatura", inst: "Instituições" };
 const RESUMO = [
   ["hoje", "para hoje", "para hoje"],
@@ -174,7 +175,14 @@ export function painelAtividades(C, btn) {
         novas.slice(0, 150).forEach(a => {
           const hora = new Date(a.em);
           const hh = (a.dia === U.todayStr() ? "" : U.fmtDate(a.dia) + " ") + (isNaN(hora) ? "" : hora.toTimeString().slice(0, 5));
-          ul.append(el("li", null, `${hh} · ${U.first(a.por)} ${a.texto}${a.lista ? ` (${NOMES_LISTA[a.lista] || a.lista})` : ""}`));
+          // (26/11/2026) cores para bater o olho: caído vermelho, venda verde, provável venda azul
+          ul.append(
+            el(
+              "li",
+              COR_TIPO[a.tipo] || null,
+              `${hh} · ${U.first(a.por)} ${a.texto}${a.lista ? ` (${NOMES_LISTA[a.lista] || a.lista})` : ""}`
+            )
+          );
         });
         if (novas.length) p.append(ul);
         const ok = U.mkBtn("✓ Marcar como visto", "btn-primary", () => {

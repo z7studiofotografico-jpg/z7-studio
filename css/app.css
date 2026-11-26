@@ -619,3 +619,6 @@ body:not(.ver-valores) .vlr{filter:blur(6px);user-select:none;-webkit-user-selec
 .cad-op[aria-pressed="true"]{border-color:var(--accent);background:var(--accent-soft)}button.cad-op{text-align:left;font:inherit;color:inherit}
 .lc-dia{margin:12px 0 4px;font-size:13px;color:var(--muted,#888);font-weight:600}
 .ja-wa .chips{flex-wrap:wrap;overflow-x:visible}
+.ativ-lista li.ativ-caido{color:#c62828;font-weight:600}
+.ativ-lista li.ativ-venda{color:#2e7d32;font-weight:600}
+.ativ-lista li.ativ-provavel{color:#1565c0;font-weight:600}
