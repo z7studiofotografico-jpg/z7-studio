@@ -748,6 +748,11 @@ onAuthStateChanged(auth, u => {
     renderPushBanner();
     refreshPushToken();
     route();
+    // (26/11/2026) chegou uma conversa pelo "Compartilhar → Z7 Studio" do WhatsApp
+    if (/[?&]conversa=1/.test(location.search)) {
+      history.replaceState(history.state, "", location.pathname + location.hash);
+      import("./conversas-wa.js").then(m => m.avisoConversaRecebida()).catch(e => console.warn("[Z7] conversa recebida", e));
+    }
   } else {
     usersLoaded = false;
     unsub.forEach(f => f());

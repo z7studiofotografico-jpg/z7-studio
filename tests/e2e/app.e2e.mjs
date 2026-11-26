@@ -4074,6 +4074,17 @@ await cenario("Lista compacta do PR e janela do aluno (abas, conversa e Claude)"
   ok(doc && doc.conversa.slice(-1)[0].de === "cliente", "a resposta do cliente fica guardada na conversa do aluno");
   await pg.waitForFunction(() => document.querySelectorAll(".ja-msg.cli").length === 1, null, { timeout: 4000 });
   ok(true, "a conversa aparece na janela");
+  // (26/11/2026) dúvidas e objeções (um toque) e a conversa do WhatsApp exportada
+  await j.getByRole("button", { name: "Achou caro" }).click();
+  await calmo(pg);
+  const st2 = await store();
+  ok(Object.values(st2).some(x => x && Array.isArray(x.objecoes) && x.objecoes.includes("Achou caro")), "a dúvida do cliente fica guardada (um toque)");
+  ok((await j.getByRole("button", { name: "📎 Anexar conversa" }).count()) === 1, "botão para anexar a conversa exportada do WhatsApp");
+  if (process.env.FOTOS) {
+    await j.getByRole("button", { name: "📎 Anexar conversa" }).scrollIntoViewIfNeeded();
+    await pg.waitForTimeout(400);
+    await pg.screenshot({ path: process.env.FOTOS + "/conversa-aba.png" });
+  }
   await j.getByLabel("Resposta do cliente").fill("E no Pix? Meu número é 21 99999-8888");
   await j.getByRole("button", { name: "✨ Pedir ao Claude" }).click();
   await pg.waitForFunction(() => /claude\.ai/.test(window.__aberto || ""), null, { timeout: 4000 });

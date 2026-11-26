@@ -120,6 +120,7 @@ const SHELL = [
   "./js/vendas-mes.js",
   "./js/link-pagamento.js",
   "./js/sinal-link.js",
+  "./js/conversas-wa.js",
   "./js/vercomo.js",
   "./js/notificacoes.js",
   "./js/ajustes.js",
@@ -205,7 +206,7 @@ self.addEventListener("activate", e => {
   e.waitUntil(
     caches
       .keys()
-      .then(keys => Promise.all(keys.filter(k => k !== CACHE && k !== CDN).map(k => caches.delete(k))))
+      .then(keys => Promise.all(keys.filter(k => k !== CACHE && k !== CDN && k !== "z7-compartilhado").map(k => caches.delete(k))))
       .then(() => self.clients.claim())
   );
 });
@@ -219,6 +220,27 @@ const ehCDN = u => /^(www\.gstatic\.com|cdn\.jsdelivr\.net|unpkg\.com)$/.test(u.
 const ESPERA_MS = 2500;
 self.addEventListener("fetch", e => {
   const url = new URL(e.request.url);
+  // (26/11/2026) "Compartilhar → Z7 Studio" no WhatsApp (Exportar conversa): guarda o arquivo até o vendedor abrir o
+  // aluno e tocar em "📥 Guardar a conversa recebida" (aba Conversa)
+  if (e.request.method === "POST" && url.origin === self.location.origin && /\/compartilhar\/?$/.test(url.pathname)) {
+    e.respondWith(
+      (async () => {
+        try {
+          const f = await e.request.formData();
+          const arq = f.getAll("arquivo").find(x => x && typeof x !== "string");
+          if (arq)
+            await (await caches.open("z7-compartilhado")).put(
+              "./__conversa-recebida__",
+              new Response(arq, { headers: { "Content-Type": arq.type || "application/octet-stream", "X-Nome": encodeURIComponent(arq.name || "conversa.txt") } })
+            );
+        } catch (_) {
+          // sem o arquivo: o app abre mesmo assim
+        }
+        return Response.redirect("./?conversa=1#pr", 303);
+      })()
+    );
+    return;
+  }
   if (e.request.method !== "GET") return;
   if (ehCDN(url)) {
     e.respondWith(

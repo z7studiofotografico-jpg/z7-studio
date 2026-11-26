@@ -263,6 +263,10 @@ function conversa(box, it) {
     });
     box.append(el("h3", null, "Conversa guardada"), h);
   }
+  // (26/11/2026) dúvidas e objeções do cliente e a conversa do WhatsApp exportada (para o Claude analisar)
+  import("./conversas-wa.js")
+    .then(m => box.append(m.blocoConversasWa(it, { C, col: colNome(), salvar: (patch, msg) => save(it, patch, msg) })))
+    .catch(e => console.warn("[Z7] conversas", e));
 }
 
 // Venda e entrega

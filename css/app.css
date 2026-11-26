@@ -618,3 +618,4 @@ body:not(.ver-valores) .vlr{filter:blur(6px);user-select:none;-webkit-user-selec
 .ct-turmas{display:grid;gap:6px}.ct-turma{display:grid;grid-template-columns:160px 1fr;gap:8px;align-items:center}@media(max-width:520px){.ct-turma{grid-template-columns:1fr}}
 .cad-op[aria-pressed="true"]{border-color:var(--accent);background:var(--accent-soft)}button.cad-op{text-align:left;font:inherit;color:inherit}
 .lc-dia{margin:12px 0 4px;font-size:13px;color:var(--muted,#888);font-weight:600}
+.ja-wa .chips{flex-wrap:wrap;overflow-x:visible}
