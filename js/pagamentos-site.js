@@ -25,7 +25,10 @@ export function patchPago(p, hoje = U.todayStr()) {
     formaPag: p.forma === "pix" ? "Pix" : "Link",
     comprovante: p.recibo || "InfinitePay " + String(p.transaction_nsu || "").slice(0, 40),
     valorForaTabela: false,
-    conferido: true,
+    // (26/11/2026) pagou no cartão pelo link do botão do Pix (valor do Pix): fica a conferir, com o aviso
+    ...(/-px/.test(String(p.order_nsu || "")) && p.forma !== "pix"
+      ? { conferido: false, avisoPagamento: "Pagou no cartão pelo link do Pix (valor do Pix)" }
+      : { conferido: true }),
     conferidoPor: "InfinitePay (pago pelo site)",
     conferidoEm: hoje,
     pagoEm: hoje,

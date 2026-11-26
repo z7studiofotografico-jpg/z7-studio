@@ -15,7 +15,9 @@ if ($pix < 100) z7_resposta(409, ['erro' => 'O valor deste kit ainda não foi in
 
 $kit = ($d['kit'] ?? '') === 'paspatur' ? 'Kit Paspatur' : 'Kit Quadro';
 $desc = mb_substr($kit . ' · ' . ($d['nome'] ?? '') . ' · ' . ($d['escola'] ?? ''), 0, 120);
-$nsu = $codigo . '-' . base_convert((string) time(), 10, 36);
+// (26/11/2026) o link do botão do Pix leva "px" no número do pedido: se alguém pagar no cartão por ele (a tela da
+// InfinitePay não deixa desligar o cartão), o app marca a venda "a conferir" para o Adriano ver
+$nsu = $codigo . '-' . ($forma === 'pix' ? 'px' : '') . base_convert((string) time(), 10, 36);
 $volta = 'https://z7studio.com.br/previa/?c=' . $codigo . '&pago=1';
 // o aviso da InfinitePay já leva o código da prévia no endereço: mesmo se a família fechar a tela antes de voltar
 // para a página, o site sabe de qual aluno é o pagamento
@@ -30,6 +32,11 @@ $r = null;
 if (defined('Z7_INFINITE_KEY')) {
   // sem o passo "Entrega" (o kit é retirado ou combinado pelo WhatsApp): a família só põe o contato e paga
   $opcoes = ['assured_installments' => $semJuros, 'require_delivery_address' => false];
+  // um pagamento só por link, que vale até o fim do dia seguinte (cada toque em Pagar cria um link novo)
+  $opcoes['single_payment'] = true;
+  $opcoes['valid_until'] = date('Y-m-d\\T23:59:59-03:00', time() + 86400);
+  // o link do Pix: o Pix é a única forma que dá para ligar/desligar; o cartão continua na tela (ver o "px" acima)
+  if ($forma === 'pix') $opcoes['payment_methods_enabled'] = ['pix'];
   // (26/11/2026) a família tocou em "Pagar no Pix": o link já sai no valor do Pix (antes saía no valor do cartão,
   // com o desconto só dentro da tela da InfinitePay, e a família via R$ 377 em vez de R$ 350)
   [$st, $r] = z7_json_post(Z7_API_INFINITE . '/links', $base + [

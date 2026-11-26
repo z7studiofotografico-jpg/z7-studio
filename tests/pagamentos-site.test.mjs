@@ -20,3 +20,14 @@ test("pagamento pelo site: aluno vira Pago, já conferido, com forma e parcelas"
   assert.equal(x.pagoPeloSite.parcelas, 1);
   assert.match(x.comprovante, /InfinitePay t9/);
 });
+
+test("pagou no cartão pelo link do botão do Pix: fica a conferir, com o aviso", async () => {
+  const { patchPago } = await import("../js/pagamentos-site.js");
+  const a = patchPago({ valor: 35000, forma: "cartao", order_nsu: "abcdefghjk-pxtbc12" }, "2026-11-26");
+  assert.equal(a.conferido, false);
+  assert.match(a.avisoPagamento, /link do Pix/);
+  const b = patchPago({ valor: 35000, forma: "pix", order_nsu: "abcdefghjk-pxtbc12" }, "2026-11-26");
+  assert.equal(b.conferido, true);
+  const c = patchPago({ valor: 37700, forma: "cartao", order_nsu: "abcdefghjk-tbc12" }, "2026-11-26");
+  assert.equal(c.conferido, true);
+});

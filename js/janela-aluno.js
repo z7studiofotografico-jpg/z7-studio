@@ -335,6 +335,7 @@ function historico(box, it) {
   const hp = historicoPlanilha(it);
   if (hp) box.append(el("p", "notes", "📋 Histórico da planilha: " + hp));
   if (it.notas) box.append(el("p", "notes", "📝 " + it.notas));
+  if (it.avisoPagamento) box.append(el("p", "notes", "⚠️ " + it.avisoPagamento));
   if (C.isAdmin && (it.alteracoes || []).length)
     import("./alteracoes.js").then(m => {
       const d = el("details", "notes");
