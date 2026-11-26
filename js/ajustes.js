@@ -38,7 +38,6 @@ export function ligarAjustes(ctx, o) {
     ["pRepNum", "repNumero", "texto"],
     ["pEntrega", "entrega", "texto"],
     ["pPix", "pix", "texto"],
-    ["pPixSinal", "pixSinal", "texto"],
     ["pAval", "linkAvaliacao", "texto"],
     ["pFeriados", "feriadosExtras", "texto"],
     ["pDrive", "drivePrevias", "texto"],

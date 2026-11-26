@@ -34,7 +34,7 @@ export function nextStep(C, l) {
         };
       return {
         title: "Enviar o valor em texto (sem PDF)",
-        msg: `${n}, o ensaio de formatura no estúdio fica ${valor}, com cerca de ${C.P.fotos || 30} fotos tratadas entregues em até ${C.P.prazo || 15} dias.\nJá estão inclusos: beca, cadeira, 2 fundos, acessórios, fotos com família (até 4 pessoas) e pet.\nPara reservar a data, o sinal é de ${pv(C.P.sinal)} via Pix. Qual dia fica melhor para você?`,
+        msg: `${n}, o ensaio de formatura no estúdio fica ${valor}, com cerca de ${C.P.fotos || 30} fotos tratadas entregues em até ${C.P.prazo || 15} dias.\nJá estão inclusos: beca, cadeira, 2 fundos, acessórios, fotos com família (até 4 pessoas) e pet.\nPara reservar a data, o sinal é de ${pv(C.P.sinal)}, no Pix ou no cartão, por um link seguro que eu te mando. Qual dia fica melhor para você?`,
         then: { etapa: "PROPOSTA ENVIADA", days: 1 }
       };
     case "PROPOSTA ENVIADA":

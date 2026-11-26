@@ -348,22 +348,21 @@ function card(l) {
           }
         })
       );
-      if (C.P.pixSinal && d && ["QUALIFICADO", "PROPOSTA ENVIADA", "FOLLOW-UP"].includes(l.etapa)) {
-        const pm = `Para reservar a data, o sinal${C.P.sinal ? ` é de ${money(C.P.sinal)}` : ""} no Pix: abra o app do seu banco, escolha *Pix Copia e Cola* e cole o código que vou mandar na próxima mensagem 👇 Depois me manda o comprovante por aqui 😊`;
-        const a4 = document.createElement("a");
-        a4.className = "btn btn-sm";
-        a4.textContent = "💠 Pix do sinal";
-        a4.href = "https://wa.me/" + d + "?text=" + encodeURIComponent(pm);
-        a4.target = "_blank";
-        a4.rel = "noopener";
-        row.appendChild(a4);
-        const a5 = document.createElement("a");
-        a5.className = "btn btn-sm";
-        a5.textContent = "📋 Código Pix";
-        a5.href = "https://wa.me/" + d + "?text=" + encodeURIComponent(C.P.pixSinal);
-        a5.target = "_blank";
-        a5.rel = "noopener";
-        row.appendChild(a5);
+      // (25/11/2026) o sinal é pelo link deste cliente (Pix ou cartão): quando ele paga, o lead fecha sozinho
+      if (C.P.sinal && d && ["QUALIFICADO", "PROPOSTA ENVIADA", "FOLLOW-UP"].includes(l.etapa)) {
+        const b = mkBtn(`💳 Link do sinal (${money(C.P.sinal)})`, "", async () => {
+          b.disabled = true;
+          try {
+            const { mandarLinkSinal } = await import("./sinal-link.js");
+            await mandarLinkSinal(C, l, { tel: d, valor: C.P.sinal, salvar: (patch, msg) => save(l.id, patch, msg) });
+          } catch (e) {
+            handleErr(e);
+          } finally {
+            b.disabled = false;
+          }
+        });
+        b.title = "Cria o link deste cliente: quando ele pagar, o lead vira Fechado sozinho";
+        row.appendChild(b);
       }
       if (ns.then)
         row.appendChild(
@@ -391,7 +390,8 @@ function card(l) {
   act.className = "actions";
   if (OPEN.includes(l.etapa) && !li) act.appendChild(mkBtn("✋ Estou respondendo", "", () => claim(l)));
   if (OPEN.includes(l.etapa)) {
-    act.appendChild(mkBtn("Fechou", "btn-ok", () => openForm(l, { etapa: "FECHADO" })));
+    // (25/11/2026) venda registrada à mão só pelo Adriano e pela Luciana (dinheiro no estúdio); o resto fecha sozinho
+    if (C.isAdmin) act.appendChild(mkBtn("Fechou", "btn-ok", () => openForm(l, { etapa: "FECHADO" })));
     act.appendChild(mkBtn("Remarcar +1d", "", () => save(l.id, { followup: addDays(1) }, "Remarcado para " + fmtDate(addDays(1)))));
     act.appendChild(mkBtn("Perdido", "", () => save(l.id, { etapa: "PERDIDO", followup: "", atendendo: null }, "Lead encerrado")));
   } else if (l.etapa === "PERDIDO") {
@@ -548,7 +548,7 @@ function openForm(l, preset) {
   });
   // lead novo da equipe não nasce como venda: primeiro salva, depois "Fechou"
   [...$("fEtapa").options].forEach(o => {
-    if (o.value === "FECHADO") o.disabled = !C.isAdmin && !l;
+    if (o.value === "FECHADO") o.disabled = !C.isAdmin;
   });
   $("btnDel").hidden = !l || !C.isAdmin;
   $("confirmDel").hidden = true;

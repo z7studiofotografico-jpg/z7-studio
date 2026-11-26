@@ -290,7 +290,7 @@ function venda(box, it) {
   const pz = prazoEntrega(it, U.todayStr());
   if (pz) box.append(el("p", "prazo " + pz.cor, pz.texto));
   const ac = el("div", "actions");
-  if (ABERTAS.includes(it.etapa)) ac.append(U.mkBtn("Pagou 💰", "btn-ok", () => openPago(it)));
+  if (C.isAdmin && ABERTAS.includes(it.etapa)) ac.append(U.mkBtn("Pagou 💰", "btn-ok", () => openPago(it)));
   if (it.etapa === "PAGO") ac.append(U.mkBtn("📍 Endereço e data", "", () => openEntrega(it)));
   if (vendido)
     ac.append(

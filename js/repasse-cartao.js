@@ -377,7 +377,8 @@ function acoesDoCartao(it, li, e) {
       )
     );
   if (ABERTAS.includes(it.etapa)) {
-    act.append(U.mkBtn("Pagou 💰", "btn-ok", () => openPago(it)));
+    // (25/11/2026) venda registrada à mão só pelo Adriano e pela Luciana (dinheiro no estúdio); o resto dá baixa sozinho
+    if (C.isAdmin) act.append(U.mkBtn("Pagou 💰", "btn-ok", () => openPago(it)));
     act.append(
       U.mkBtn("🆘 Ajuda de vendas", "", () =>
         import("./ajuda-vendas.js")

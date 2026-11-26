@@ -38,10 +38,25 @@ export function patchPago(p, hoje = U.todayStr()) {
   };
 }
 
+// (25/11/2026) o sinal do ensaio (Funil) também paga pelo site: o lead guarda o código em "linkSinal"
+export const ONDE = [...LISTAS.map(col => [col, "linkPrevia"]), ["leads", "linkSinal"]];
+export function patchSinal(p, hoje = U.todayStr(), lead = {}) {
+  const sinal = {
+    valor: Math.round(Number(p.valor) || 0) / 100,
+    forma: p.forma === "pix" ? "Pix" : "Cartão",
+    transacao: String(p.transaction_nsu || ""),
+    recibo: p.recibo || "",
+    em: hoje
+  };
+  // o sinal pago fecha a venda (já conferida: o dinheiro entrou na InfinitePay); o valor do ensaio não muda
+  return lead.etapa === "FECHADO"
+    ? { sinalPago: sinal }
+    : { etapa: "FECHADO", fechadoEm: hoje, conferido: true, sinalPago: sinal, followup: "", atendendo: null };
+}
 async function alunoDoLink(C, codigo) {
   const { FS, db } = C;
-  for (const col of LISTAS) {
-    const s = await FS.getDocs(FS.query(FS.collection(db, col), FS.where("linkPrevia", "==", codigo)));
+  for (const [col, campo] of ONDE) {
+    const s = await FS.getDocs(FS.query(FS.collection(db, col), FS.where(campo, "==", codigo)));
     if (!s.empty) return { col, id: s.docs[0].id, it: s.docs[0].data() };
   }
   return null;
@@ -58,7 +73,16 @@ export async function registrarPagamentos(C) {
         console.warn("[Z7] pagamento do site sem aluno com o link", p.codigo);
         continue; // fica na lista do site até o link aparecer em um aluno
       }
-      if (!COMPROU.includes(a.it.etapa)) {
+      if (a.col === "leads") {
+        if (!a.it.sinalPago) {
+          await C.FS.updateDoc(
+            C.FS.doc(C.db, "leads", a.id),
+            Object.assign(patchSinal(p, U.todayStr(), a.it), { atualizadoEm: new Date().toISOString() })
+          );
+          U.toast(`💳 ${U.first(a.it.nome || "")} pagou o sinal do ensaio (${p.forma === "pix" ? "Pix" : "cartão"}) ✅`);
+          n++;
+        }
+      } else if (!COMPROU.includes(a.it.etapa)) {
         await C.FS.updateDoc(C.FS.doc(C.db, a.col, a.id), patchPago(p));
         U.toast(`💳 ${U.first(a.it.nome || "")} pagou o kit pelo site (${p.forma === "pix" ? "Pix" : "cartão"}) ✅`);
         n++;

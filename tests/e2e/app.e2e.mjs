@@ -522,7 +522,7 @@ async function cenario(nome, fn) {
     await fn();
   } catch (e) {
     falhas++;
-    console.log("  ✗ parou com erro: " + String((e && e.message) || e).split("\n")[0]);
+    console.log("  ✗ parou com erro: " + String((e && e.message) || e).split("\n").slice(0, 4).join(" / "));
   } finally {
     // (19/11/2026) consultas que o Firebase recusaria para a equipe (só os próprios alunos), mesmo as silenciosas
     for (const ctx of abertos) {
@@ -2676,7 +2676,7 @@ await cenario("ID do ensaio fechado e WhatsApp certo no celular", async () => {
     ok(erros.length === 0, "sem erros no console" + (erros.length ? ": " + erros.slice(0, 3).join(" | ") : ""));
   }
   {
-    // equipe fecha a venda dela: ID na sequência do tipo (corporativo), venda a conferir
+    // equipe: não fecha a venda à mão; manda o link do sinal
     const d = migrar(base);
     d["ids/ensaio_" + aa + "COP"] = { ultimo: 7 };
     d["leads/la"] = {
@@ -2692,13 +2692,22 @@ await cenario("ID do ensaio fechado e WhatsApp certo no celular", async () => {
       atualizadoEm: new Date().toISOString()
     };
     const { pg, store, erros } = await abrir(ANA, d);
+    // (25/11/2026) a equipe não registra venda à mão: o sinal vai pelo link do cliente, que fecha o lead sozinho
+    await pg.route("**/previas-api/cobrar.php", r =>
+      r.fulfill({ status: 200, contentType: "application/json", headers: { "Access-Control-Allow-Origin": "*" }, body: '{"url":"https://checkout.infinitepay.io/z7/teste"}' })
+    );
     await ir(pg, "#funil");
-    await pg.locator("#list .card").filter({ hasText: "Empresa Da Ana" }).getByRole("button", { name: "Fechou" }).click();
-    await pg.fill("#fValor", "900");
-    await pg.click("#btnSave");
-    await calmo(pg);
-    const la = (await store())["leads/la"];
-    ok(la.codigoEnsaio === aa + "COP-00008" && la.conferido === false, "equipe: corporativo ganha " + aa + "COP-00008 e fica a conferir");
+    const cardAna = pg.locator("#list .card").filter({ hasText: "Empresa Da Ana" });
+    ok((await cardAna.getByRole("button", { name: "Fechou" }).count()) === 0, "equipe: sem o Fechou (venda à mão só o Adriano e a Luciana)");
+    const bSinal = cardAna.getByRole("button", { name: /Link do sinal/ });
+    if (await bSinal.count()) {
+      await bSinal.click();
+      await calmo(pg);
+      await pg.waitForTimeout(800);
+      const toastTxt = await pg.evaluate(() => [...document.querySelectorAll(".toast,#toast")].map(x => x.textContent).join(" | "));
+      const la = (await store())["leads/la"];
+      ok(/^[a-z0-9]{10}$/.test(la.linkSinal || "") && la.etapa === "FOLLOW-UP", "equipe: o link do sinal fica guardado no lead (para a baixa automática) " + JSON.stringify([la.linkSinal, la.etapa, erros.slice(-2), toastTxt]));
+    } else ok(false, "equipe: botão 💳 Link do sinal no card");
     ok(erros.length === 0, "sem erros no console" + (erros.length ? ": " + erros.slice(0, 3).join(" | ") : ""));
   }
   {
@@ -5357,7 +5366,23 @@ await cenario("Registrar venda: endereço completo obrigatório e CEP preenche a
     },
     "config/precosColegio": { colegios: { [chavePreco("COLEGIO ALFA", Y - 1)]: { pr: { kitPromo: 297, kitPreco: 350 } } } }
   });
-  const { pg, erros, store, ctx } = await abrir(ANA, migrar(d));
+  {
+    // (25/11/2026) a equipe não registra venda à mão (só o Adriano e a Luciana): o pagamento dá baixa sozinho
+    const { pg } = await abrir(ANA, migrar(d));
+    await ir(pg, "#pr");
+    await calmo(pg);
+    await pg.locator("#rChips").getByText("Provável venda").click();
+    await calmo(pg);
+    const art = pg.locator("article", { hasText: "Luana" }).first();
+    ok(
+      (await art.getByRole("button", { name: "Pagou 💰" }).count()) === 0 && (await art.getByRole("button", { name: /Mandar link de pagamento/ }).count()) === 1,
+      "equipe: sem o Pagou 💰, só o link de pagamento do aluno"
+    );
+  }
+  // (o Adriano vê o ano atual na lista)
+  Object.assign(d["repasse/v1"], { resp: "Adriano", respEmail: ADRIANO, ano: Y });
+  d["config/precosColegio"] = { colegios: { [chavePreco("COLEGIO ALFA", Y)]: { pr: { lfPix: 297, lfCartao: 330, kitPromo: 297, kitPreco: 350 } } } };
+  const { pg, erros, store, ctx } = await abrir(ADRIANO, migrar(d));
   await ctx.route(/viacep\.com\.br\/ws\/26540000\/json/, rt =>
     rt.fulfill({
       contentType: "application/json",
@@ -5393,12 +5418,11 @@ await cenario("Registrar venda: endereço completo obrigatório e CEP preenche a
   const v = (await store())["repasse/v1"];
   ok(
     v.etapa === "PAGO" &&
-      v.conferido === false &&
       v.endereco &&
       v.endereco.cep === "26540000" &&
       v.endereco.rua === "Rua Doutor Rufino" &&
       v.endereco.numero === "290",
-    "venda salva com o endereço completo (e a conferir)"
+    "venda salva com o endereço completo"
   );
   ok(!erros.length, "sem erros no console: " + erros.join(" | "));
 });
