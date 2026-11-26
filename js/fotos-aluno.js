@@ -17,6 +17,18 @@ async function fotosDoAlunoTudo(C, D, raiz, it) {
   return D.fotosDoAluno(raiz, it);
 }
 
+// (26/11/2026) as fotos que vão no link de pagamento: as mesmas que a janela do aluno mostra (site ou Drive)
+export async function fotosParaLink(C, it) {
+  const raiz = idDaPasta(C.P.drivePrevias);
+  try {
+    const r = raiz ? await fotosDoAlunoTudo(C, abrirDrive(C), raiz, it) : await fotosDoAlunoNoSite(C, it);
+    return r && !r.erro ? r : null;
+  } catch (e) {
+    console.warn("[Z7] fotos para o link", e);
+    return null;
+  }
+}
+
 let drive = null,
   chaveUsada = "";
 // Pasta fechada: cada pessoa entra com a conta Google dela (Google Identity Services); o token vale ~1 hora.

@@ -4,7 +4,7 @@
 // botão Pagar. O aviso da InfinitePay chega com o código do aluno e ele vira Pago sozinho.
 import * as U from "./util.js";
 import { mandarLinkPrevia } from "./link-previa.js";
-import { fotosDoAlunoNoSite } from "./site-previas.js";
+import { fotosParaLink } from "./fotos-aluno.js";
 
 export function mensagemPagamento(it, codigo, o = {}) {
   const valores = [o.pixVal ? U.money(o.pixVal) + " no Pix" : "", o.valCartao ? U.money(o.valCartao) + " no cartão, " + o.parc : ""]
@@ -20,6 +20,7 @@ export function mensagemPagamento(it, codigo, o = {}) {
 // o = { tel, precoTxt, cartaoTxt, pixVal, valCartao, parc, salvar(patch, msg) }
 export async function mandarLinkPagamento(C, it, o) {
   if (!o.precoTxt || /\[/.test(o.precoTxt)) return U.toast("Cadastre o preço do colégio antes de mandar o link de pagamento.");
-  const r = (await fotosDoAlunoNoSite(C, it)) || { folhas: [], fotos: [] };
+  // as fotos da prévia do aluno (as mesmas da janela dele: site ou Drive); sem prévia, a página vai só com o Pagar
+  const r = (await fotosParaLink(C, it)) || { folhas: [], fotos: [] };
   return mandarLinkPrevia(C, it, r, Object.assign({}, o, { semFotos: true, mensagem: codigo => mensagemPagamento(it, codigo, o) }));
 }
