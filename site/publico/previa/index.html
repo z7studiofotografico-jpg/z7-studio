@@ -77,7 +77,7 @@
         margin: 6px 0 0;
         color: var(--suave);
       }
-      /* (26/11/2026) uma fileira de 5 fotos pequenas; tocar amplia */
+      /* (26/11/2026) uma fileira de 5 fotos pequenas */
       .grade {
         display: grid;
         grid-template-columns: repeat(5, 1fr);
@@ -92,7 +92,8 @@
         border-radius: 6px;
         overflow: hidden;
         aspect-ratio: 2 / 3;
-        cursor: zoom-in;
+        cursor: default;
+        pointer-events: none; /* (26/11/2026) só as amostras pequenas: tocar não amplia */
         position: relative;
       }
       .grade img {
