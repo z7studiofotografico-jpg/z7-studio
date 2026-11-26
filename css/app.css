@@ -266,7 +266,7 @@ details.tamtipo{border:1px solid var(--line,#ddd);border-radius:10px;padding:6px
 @media (max-width:600px){.rel-folha{padding:16px}.rel-tab{font-size:.78rem}.rel-tab th,.rel-tab td{padding:4px 5px}}
 .rel-paisagem .rel-folha{max-width:1180px}
 @media print{
-  @page{margin:9mm}
+  @page{margin:9mm;@bottom-right{content:counter(page) " / " counter(pages);font-size:8pt;color:#888}}
   /* 17/11/2026: sem buracos em branco: a seção continua na mesma folha (só o título não fica sozinho no fim) */
   .rel-secao{break-inside:auto;margin-bottom:10px}
   .rel-secao h2,.rel-nota{break-after:avoid}

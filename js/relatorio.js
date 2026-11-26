@@ -153,7 +153,9 @@ function folhaDeitada(r, pais) {
     st.id = "relPagina";
     document.head.append(st);
   }
-  st.textContent = `@media print{@page{size:A4 ${pais ? "landscape" : "portrait"};margin:9mm}}`;
+  // (26/11/2026) com uma caixa de margem própria (o número da página), o Chrome não imprime o rodapé e o cabeçalho dele
+  // (data, título da aba e o endereço do app)
+  st.textContent = `@media print{@page{size:A4 ${pais ? "landscape" : "portrait"};margin:9mm;@bottom-right{content:counter(page) " / " counter(pages);font-size:8pt;color:#888}}}`;
 }
 export function fecharRelatorio() {
   const s = document.getElementById("relPagina");
