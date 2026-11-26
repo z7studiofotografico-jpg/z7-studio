@@ -9,7 +9,7 @@ test("pagamento pelo site: aluno vira Pago, já conferido, com forma e parcelas"
   );
   assert.equal(p.etapa, "PAGO");
   assert.equal(p.valor, 377);
-  assert.equal(p.formaPag, "Cartão");
+  assert.equal(p.formaPag, "Link");
   assert.equal(p.comprovante, "https://recibo/x");
   assert.equal(p.conferido, true);
   assert.equal(p.pagoEm, "2026-11-17");

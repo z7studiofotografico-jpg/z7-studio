@@ -21,7 +21,8 @@ export function patchPago(p, hoje = U.todayStr()) {
   return {
     etapa: "PAGO",
     valor: Math.round(Number(p.valor) || 0) / 100,
-    formaPag: p.forma === "pix" ? "Pix" : "Cartão",
+    // (26/11/2026) cartão pelo link do aluno = "Link" (a comissão do link é menor: a taxa da InfinitePay é maior)
+    formaPag: p.forma === "pix" ? "Pix" : "Link",
     comprovante: p.recibo || "InfinitePay " + String(p.transaction_nsu || "").slice(0, 40),
     valorForaTabela: false,
     conferido: true,
