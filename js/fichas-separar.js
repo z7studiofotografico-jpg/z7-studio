@@ -93,7 +93,7 @@ async function guardarPasta(chave, h) {
     db.transaction("h", "readwrite").objectStore("h").put(h, chave);
   } catch (_) {}
 }
-async function lerPasta(chave) {
+export async function lerPasta(chave) {
   try {
     const db = await banco();
     return await new Promise(ok => {
@@ -105,8 +105,8 @@ async function lerPasta(chave) {
     return null;
   }
 }
-const chavePasta = (escola, ano, origem) => `${U.chave(escola)}|${ano}|${origem}`;
-async function liberar(h) {
+export const chavePasta = (escola, ano, origem) => `${U.chave(escola)}|${ano}|${origem}`;
+export async function liberar(h) {
   const o = { mode: "readwrite" };
   if (h.queryPermission && (await h.queryPermission(o)) === "granted") return true;
   return !h.requestPermission || (await h.requestPermission(o)) === "granted";
@@ -130,7 +130,7 @@ async function temPapel(file) {
   bmp.close && bmp.close();
   return !!acharPapel(x.getImageData(0, 0, W, H).data, W, H);
 }
-async function miniatura(file) {
+export async function miniatura(file) {
   try {
     const bmp = await createImageBitmap(file);
     const W = 90,

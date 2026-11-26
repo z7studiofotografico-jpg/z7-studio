@@ -622,3 +622,8 @@ body:not(.ver-valores) .vlr{filter:blur(6px);user-select:none;-webkit-user-selec
 .ativ-lista li.ativ-caido{color:#c62828;font-weight:600}
 .ativ-lista li.ativ-venda{color:#2e7d32;font-weight:600}
 .ativ-lista li.ativ-provavel{color:#1565c0;font-weight:600}
+.faltou-grade{display:grid;grid-template-columns:repeat(auto-fill,minmax(96px,1fr));gap:6px;margin:8px 0;max-height:50vh;overflow:auto}
+.faltou-foto{display:flex;flex-direction:column;align-items:center;gap:3px;padding:4px;border:2px solid var(--borda,#ddd);border-radius:6px;background:transparent;cursor:pointer}
+.faltou-foto img{width:100%;border-radius:4px}
+.faltou-foto small{font-size:10px;word-break:break-all}
+.faltou-foto[aria-pressed=true]{border-color:#c62828;background:rgba(198,40,40,.08)}

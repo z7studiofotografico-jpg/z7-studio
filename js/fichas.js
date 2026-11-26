@@ -330,8 +330,12 @@ export function abrirCadastroAutomatico(C, colNome = "") {
             bPastas.textContent = `📁 Criar as pastas dos alunos (${l.length})`;
           })
           .catch(() => {});
+      // ➕ (26/11/2026) o aluno cuja ficha o app não achou (as fotos dele foram para a pasta do anterior)
+      const bFaltou = U.mkBtn("➕ Incluir o aluno que faltou", "btn-sm", () =>
+        import("./aluno-que-faltou.js").then(m => m.abrirAlunoQueFaltou(C, montar)).catch(e => C.handleErr(e))
+      );
       const acoes = el("div", "eb-bts");
-      acoes.append(bSep, bAlu);
+      acoes.append(bSep, bAlu, bFaltou);
       p.append(acoes, bPastas, lista, U.mkBtn("Fechar", "", close));
       const { FS, db } = C;
       async function montar() {

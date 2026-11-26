@@ -5971,6 +5971,8 @@ await cenario("📂 Fotos numa pasta só: separa pela ficha e cria as pastas dos
   await sp.getByText(/5 fotos · 2 alunos/).waitFor({ timeout: 5000 });
   ok(true, "Não é ficha: junta de volta");
   if (process.env.FOTOS) await sp.locator(".panel").screenshot({ path: process.env.FOTOS + "/separar-ficha.png" });
+  // para onde vão os alunos (obrigatório): PR
+  await sp.locator(".cad-op").nth(2).click();
   await sp.getByRole("button", { name: "Guardar as fichas" }).click();
   await sp.waitFor({ state: "detached", timeout: 15000 });
   await calmo(pg);
@@ -6005,6 +6007,25 @@ await cenario("📂 Fotos numa pasta só: separa pela ficha e cria as pastas dos
   );
   await ca.getByRole("button", { name: "Fechar" }).click();
   await pg.locator(".sheet .cad-fotos").getByRole("button", { name: "🤖 Cadastro automático" }).click();
+  // (26/11/2026) ➕ o aluno que faltou: a última foto vai para um aluno novo ("✍️ Preencher à mão")
+  {
+    await ca.getByRole("button", { name: "➕ Incluir o aluno que faltou" }).click();
+    const fa = pg.locator(".sheet").filter({ hasText: "Incluir o aluno que faltou" });
+    await fa.locator(".faltou-foto", { hasText: "_MG_0912.JPG" }).click();
+    await fa.getByRole("button", { name: "➕ Criar o aluno com essas fotos" }).click();
+    await calmo(pg);
+    const st = await store();
+    const nova = Object.entries(st).find(([k, v]) => k.startsWith("fichas/") && v.status === "nova" && /que faltou/.test(v.pasta || ""));
+    const pf = Object.entries(st).find(([k]) => k.startsWith("pastasFotos/"));
+    ok(nova && nova[1].fotos.join() === "_MG_0912.JPG" && pf && pf[1].fotos.length === 2, "➕ aluno que faltou: ficha nova com a foto marcada; sai da pasta do outro");
+    // desfaz, para o resto do teste seguir igual
+    await pg.evaluate(([k, kp]) => {
+      window.__store.delete(k);
+      const v = window.__store.get(kp);
+      v.fotos = ["_MG_0910.JPG", "_MG_0911.JPG", "_MG_0912.JPG"];
+      window.__store.set(kp, v);
+    }, [nova[0], pf[0]]);
+  }
   await ca.getByRole("button", { name: /Criar as pastas dos alunos \(1\)/ }).click();
   await calmo(pg);
   await pg.waitForTimeout(500);
