@@ -6,7 +6,7 @@ import { initializeApp, cert } from "firebase-admin/app";
 import { getFirestore } from "firebase-admin/firestore";
 import { getMessaging } from "firebase-admin/messaging";
 import { DONOS } from "./config.mjs";
-import { patchPago, patchSinal, ONDE } from "../js/pagamentos-site.js";
+import { patchPago, patchSinal, ONDE, atividadeDoPagamento } from "../js/pagamentos-site.js";
 
 const API = "https://z7studio.com.br/previas-api/pagamentos.php";
 const COMPROU = ["PAGO", "ENTREGUE"];
@@ -66,6 +66,7 @@ for (const p of pagamentos) {
     } else if (!COMPROU.includes(achou.it.etapa)) {
       const patch = Object.assign(patchPago(p, hoje), { atualizadoEm: new Date().toISOString() });
       await achou.ref.update(patch);
+      await db.collection("atividades").add(atividadeDoPagamento(achou.it, achou.col, p, hoje));
       avisos.push({
         para: [...DONOS, String(achou.it.respEmail || "").toLowerCase()].filter(Boolean),
         title: `💳 ${primeiro(achou.it.nome)} pagou o kit (${p.forma === "pix" ? "Pix" : "cartão"} ${brl(patch.valor)})`,

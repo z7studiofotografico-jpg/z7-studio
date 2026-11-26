@@ -234,7 +234,8 @@ service cloud.firestore {
         || soma('vistos', 'vistoEm') || soma('cliques', 'cliqueEm');
     }
     match /atividades/{id} {
-      allow create: if membro() && request.resource.data.email == email()
+      // (26/11/2026) o admin também grava: a venda paga pelo link entra no nome de quem atende o aluno
+      allow create: if (admin() || (membro() && request.resource.data.email == email()))
         && request.resource.data.keys().hasOnly(['tipo', 'texto', 'n', 'lista', 'por', 'email', 'dia', 'em'])
         && request.resource.data.texto is string && request.resource.data.texto.size() <= 200
         && request.resource.data.tipo is string && request.resource.data.tipo.size() <= 20

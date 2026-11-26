@@ -66,6 +66,26 @@ async function alunoDoLink(C, codigo) {
   return null;
 }
 
+// (26/11/2026) a venda paga pelo link aparece em "Atividades da equipe" (em verde), no nome de quem atende o aluno
+export function atividadeDoPagamento(it, col, p, hoje) {
+  const nome = String(it.nome || "um aluno")
+    .toLowerCase()
+    .replace(/(^|\s)\S/g, c => c.toUpperCase());
+  const lista = col === "formaturaAlunos" ? "formatura" : it.vendaComo === "paspatur" ? "paspatur" : "pr";
+  return {
+    tipo: "venda",
+    texto: `vendeu para ${nome}${it.escola ? ` (${it.escola})` : ""} · pago pelo link (${p.forma === "pix" ? "Pix" : "cartão"})`.slice(
+      0,
+      200
+    ),
+    n: 1,
+    lista,
+    por: String(it.resp || "Pelo link").slice(0, 80),
+    email: String(it.respEmail || "").toLowerCase(),
+    dia: hoje,
+    em: new Date().toISOString()
+  };
+}
 export async function registrarPagamentos(C) {
   if (!C.isAdmin) return 0;
   const { pagamentos = [] } = await chamar(C, "/pagamentos.php");
@@ -88,6 +108,9 @@ export async function registrarPagamentos(C) {
         }
       } else if (!COMPROU.includes(a.it.etapa)) {
         await C.FS.updateDoc(C.FS.doc(C.db, a.col, a.id), patchPago(p));
+        await C.FS.addDoc(C.FS.collection(C.db, "atividades"), atividadeDoPagamento(a.it, a.col, p, U.todayStr())).catch(e =>
+          console.warn("[Z7] atividade do pagamento", e)
+        );
         U.toast(`💳 ${U.first(a.it.nome || "")} pagou o kit pelo site (${p.forma === "pix" ? "Pix" : "cartão"}) ✅`);
         n++;
       }
