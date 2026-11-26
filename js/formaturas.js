@@ -680,6 +680,12 @@ function openKits() {
   });
 }
 
+const becaDe = f => String(f.beca || "").trim().toUpperCase();
+const ORDEM_BECA = ["PP", "P", "M", "G", "GG", "XG", "XGG", "EXG", "EXGG"];
+const ordemBeca = t => {
+  const i = ORDEM_BECA.indexOf(String(t).replace(/\d+$/, ""));
+  return i < 0 ? 99 : i;
+};
 // Relatório para reunião: números das turmas do bloco escolhido e as cobranças em atraso
 async function relatorioFormaturas() {
   await carregarTudo();
@@ -738,14 +744,30 @@ async function relatorioFormaturas() {
         },
         vazio: "Nenhum kit vendido."
       },
+      // (26/11/2026) o tamanho da beca de cada aluno (na frente do ID): para separar e vestir no dia
+      {
+        titulo: "Becas por tamanho",
+        tabela: {
+          cols: ["Tamanho", "Alunos"],
+          linhas: Object.entries(
+            fs.reduce((m, f) => {
+              const t = becaDe(f) || "Sem tamanho";
+              m[t] = (m[t] || 0) + 1;
+              return m;
+            }, {})
+          ).sort((a, b) => ordemBeca(a[0]) - ordemBeca(b[0]) || a[0].localeCompare(b[0]))
+        },
+        vazio: "Nenhum aluno."
+      },
       {
         titulo: "Todos os alunos",
         tabela: {
-          cols: ["ID", "Aluno", "Colégio", "Turma", "WhatsApp", "Kit", "Valor", "Pago", "Em aberto", "Parcelas", "Situação"],
+          cols: ["Beca", "ID", "Aluno", "Colégio", "Turma", "WhatsApp", "Kit", "Valor", "Pago", "Em aberto", "Parcelas", "Situação"],
           linhas: fs
             .slice()
             .sort((a, b) => String(a.codigo || "~").localeCompare(String(b.codigo || "~"), "pt-BR", { numeric: true }))
             .map(f => [
+              becaDe(f),
               f.codigo || "",
               title(f.nome),
               title(f.instNome),
@@ -765,11 +787,12 @@ async function relatorioFormaturas() {
       {
         titulo: "Alunos em dia",
         tabela: {
-          cols: ["ID", "Aluno", "Colégio", "Turma", "WhatsApp", "Kit", "Pago", "Parcelas", "Situação"],
+          cols: ["Beca", "ID", "Aluno", "Colégio", "Turma", "WhatsApp", "Kit", "Pago", "Parcelas", "Situação"],
           linhas: fs
             .filter(f => !atrasado(f))
             .sort((a, b) => String(a.codigo || "~").localeCompare(String(b.codigo || "~"), "pt-BR", { numeric: true }))
             .map(f => [
+              becaDe(f),
               f.codigo || "",
               title(f.nome),
               title(f.instNome),
@@ -786,8 +809,9 @@ async function relatorioFormaturas() {
       {
         titulo: "Cobranças em atraso",
         tabela: {
-          cols: ["ID", "Aluno", "Colégio", "WhatsApp", "Kit", "Parcela", "Valor", "Venceu"],
+          cols: ["Beca", "ID", "Aluno", "Colégio", "WhatsApp", "Kit", "Parcela", "Valor", "Venceu"],
           linhas: atr.map(({ f, venc }) => [
+            becaDe(f),
             f.codigo || "",
             title(f.nome),
             title(f.instNome),
