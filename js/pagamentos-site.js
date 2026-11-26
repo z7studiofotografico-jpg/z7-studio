@@ -5,7 +5,7 @@
 import * as U from "./util.js";
 import { API_SITE } from "./site-previas.js";
 
-const LISTAS = ["repasse", "paspatur"];
+const LISTAS = ["repasse", "paspatur", "formaturaAlunos"];
 const COMPROU = ["PAGO", "ENTREGUE"];
 
 async function chamar(C, caminho, o = {}) {

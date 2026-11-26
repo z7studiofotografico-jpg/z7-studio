@@ -271,6 +271,7 @@ export function desenharProximo(box, it, escolhido, blocked, li) {
         const { mandarLinkPagamento } = await import("./link-pagamento.js");
         await mandarLinkPagamento(C, it, {
           tel: (contatoAtual(it) || {}).tel,
+          kit: ehFormatura() ? "formatura" : undefined,
           // na última oferta, a página mostra o valor da última oferta
           precoTxt: ultima ? U.money(P.kitFinal) : precoTxt(it),
           cartaoTxt: ultima ? `${U.money(P.kitFinal)} no cartão · ${parcTxt(pc)}` : cartaoTxt(it),

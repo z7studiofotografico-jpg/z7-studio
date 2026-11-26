@@ -169,6 +169,7 @@ function previa(box, it) {
   const o = {
     precoTxt: precoTxt(it),
     cartaoTxt: cartaoTxt(it),
+    kit: ehFormatura() ? "formatura" : undefined,
     tel: (contatoAtual(it) || {}).tel,
     salvar: (patch, msg) => save(it, patch, msg)
   };

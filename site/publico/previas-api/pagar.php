@@ -13,7 +13,7 @@ $pix = z7_centavos($d['preco'] ?? '');
 $cartao = z7_centavos($d['cartao'] ?? '') ?: $pix;
 if ($pix < 100) z7_resposta(409, ['erro' => 'O valor deste kit ainda não foi informado. Chame a gente no WhatsApp.']);
 
-$kit = ($d['kit'] ?? '') === 'paspatur' ? 'Kit Paspatur' : 'Kit Quadro';
+$kit = ['paspatur' => 'Kit Paspatur', 'formatura' => 'Pacote de fotos da formatura'][$d['kit'] ?? ''] ?? 'Kit Quadro';
 $desc = mb_substr($kit . ' · ' . ($d['nome'] ?? '') . ' · ' . ($d['escola'] ?? ''), 0, 120);
 $nsu = $codigo . '-' . base_convert((string) time(), 10, 36);
 $volta = 'https://z7studio.com.br/previa/?c=' . $codigo . '&pago=1';

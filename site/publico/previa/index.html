@@ -403,6 +403,12 @@
             arq: "quadro",
             itens: ["Quadro 30x40 com a foto que você escolher", "2 porta-retratos 15x10", "As fotos digitais"]
           },
+          // (26/11/2026) as fotos da Formatura (Linha de Frente e Repasse): pagamento pelo link, com baixa automática
+          formatura: {
+            nome: "Pacote de fotos da formatura",
+            arq: "",
+            itens: ["As fotos da formatura, tratadas e sem marca d’água"]
+          },
           paspatur: {
             nome: "Kit Paspatur",
             arq: "paspatur",
@@ -577,7 +583,7 @@
               "</span></button>";
           });
           h += "</div>";
-          h += '<p class="nota">Estas são prévias com marca d’água. As fotos do kit saem sem a marca e em alta qualidade.</p>';
+          if (fotos.length) h += '<p class="nota">Estas são prévias com marca d’água. As fotos do kit saem sem a marca e em alta qualidade.</p>';
           h += '<section class="cartao"><h2>' + esc(kit.nome) + "</h2><ul>";
           kit.itens.forEach(function (x) {
             h += "<li>" + esc(x) + "</li>";
@@ -645,10 +651,13 @@
             '">💬 ' +
             (pix ? "Tirar dúvidas no WhatsApp" : "Quero o " + esc(kit.nome)) +
             "</a></section>";
-          h += '<section class="cartao"><h2>Veja como fica</h2>';
-          h +=
-            '<div class="abas"><button type="button" data-idade="infantil">Infantil</button><button type="button" data-idade="adulto">Ensino médio e adulto</button></div>';
-          h += '<video id="video" controls muted playsinline loop preload="metadata"></video></section>';
+          // o vídeo de amostra é do kit impresso (a Formatura não tem)
+          if (kit.arq) {
+            h += '<section class="cartao"><h2>Veja como fica</h2>';
+            h +=
+              '<div class="abas"><button type="button" data-idade="infantil">Infantil</button><button type="button" data-idade="adulto">Ensino médio e adulto</button></div>';
+            h += '<video id="video" controls muted playsinline loop preload="metadata"></video></section>';
+          }
           main.innerHTML = h;
           // a barra de baixo: com valor, leva até o pagamento; sem valor, o WhatsApp
           document.getElementById("barra").innerHTML = pix
@@ -711,6 +720,7 @@
           // vídeo de amostra
           var video = document.getElementById("video");
           function amostra(idade) {
+            if (!video) return;
             document.querySelectorAll("[data-idade]").forEach(function (b) {
               b.classList.toggle("on", b.dataset.idade === idade);
             });

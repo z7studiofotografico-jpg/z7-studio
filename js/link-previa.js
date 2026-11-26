@@ -63,6 +63,8 @@ export const mensagemLink = (it, codigo) =>
 export async function mandarLinkPrevia(C, it, r, o = {}) {
   const FS = C.FS;
   const d = dadosLink(it, r, o.precoTxt, C.me, new Date(), o.cartaoTxt);
+  // (26/11/2026) a Formatura também paga pela página (kit "formatura": as fotos da formatura)
+  if (o.kit) d.kit = o.kit;
   // (25/11/2026) o link de pagamento usa a mesma página, mesmo sem prévia (o.semFotos): é ela que avisa quem pagou
   if (!d.fotos.length && !o.semFotos) return U.toast("Este aluno ainda não tem prévia.");
   // ⏳ o prazo do atendimento (3 dias; o representante pode aumentar): vai para a página da prévia
