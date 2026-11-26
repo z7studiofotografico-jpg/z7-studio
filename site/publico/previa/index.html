@@ -577,7 +577,7 @@
               "</span></button>";
           });
           h += "</div>";
-          h += '<p class="nota">Estas são prévias com marca d’água. As fotos do kit saem sem a marca e em alta qualidade.</p>';
+          if (fotos.length) h += '<p class="nota">Estas são prévias com marca d’água. As fotos do kit saem sem a marca e em alta qualidade.</p>';
           h += '<section class="cartao"><h2>' + esc(kit.nome) + "</h2><ul>";
           kit.itens.forEach(function (x) {
             h += "<li>" + esc(x) + "</li>";
