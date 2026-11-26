@@ -17,10 +17,45 @@ export function mensagemPagamento(it, codigo, o = {}) {
   );
 }
 
+// (26/11/2026) a foto com a ficha nunca vai para o cliente. Nas prévias geradas com a ficha (a 1ª foto de cada aluno),
+// tira a 1ª; nas geradas depois que a ficha passou a sair sozinha (o colégio tem fichas guardadas), não há o que tirar.
+// E, por garantia, o app procura o papel branco da ficha nas 3 primeiras fotos que sobraram.
+async function semFichaAsync(C, it, r) {
+  const fotos = (r.fotos || []).slice();
+  if (fotos.length < 2) return r;
+  let fichaSaiu = false;
+  try {
+    const s = await C.FS.getDocs(
+      C.FS.query(
+        C.FS.collection(C.db, "fichas"),
+        C.FS.where("escola", "==", it.escola || ""),
+        C.FS.where("ano", "==", Number(it.ano) || null),
+        C.FS.limit(1)
+      )
+    );
+    fichaSaiu = !s.empty;
+  } catch (e) {
+    console.warn("[Z7] fichas do colégio", e);
+  }
+  if (!fichaSaiu) fotos.shift();
+  try {
+    const { fotoDaFicha } = await import("./fichas.js");
+    for (let i = 0; i < Math.min(3, fotos.length); i++) {
+      const u = /^https:/.test(fotos[i].id) ? fotos[i].id : "https://z7studio.com.br/previas/" + fotos[i].id + ".jpg";
+      const b = await fetch(u).then(x => (x.ok ? x.blob() : null));
+      if (b && (await fotoDaFicha(b)).achou) fotos.splice(i--, 1);
+    }
+  } catch (e) {
+    console.warn("[Z7] procurar a ficha nas fotos", e);
+  }
+  return Object.assign({}, r, { fotos });
+}
+const semFicha = semFichaAsync;
+
 // o = { tel, precoTxt, cartaoTxt, pixVal, valCartao, parc, salvar(patch, msg) }
 export async function mandarLinkPagamento(C, it, o) {
   if (!o.precoTxt || /\[/.test(o.precoTxt)) return U.toast("Cadastre o preço do colégio antes de mandar o link de pagamento.");
   // as fotos da prévia do aluno (as mesmas da janela dele: site ou Drive); sem prévia, a página vai só com o Pagar
-  const r = (await fotosParaLink(C, it)) || { folhas: [], fotos: [] };
+  const r = await semFicha(C, it, (await fotosParaLink(C, it)) || { folhas: [], fotos: [] });
   return mandarLinkPrevia(C, it, r, Object.assign({}, o, { semFotos: true, mensagem: codigo => mensagemPagamento(it, codigo, o) }));
 }

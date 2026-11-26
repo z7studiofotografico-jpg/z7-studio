@@ -293,10 +293,12 @@ export function abrirPreviasLote(C, o = {}) {
     const ficha = el("input");
     ficha.type = "checkbox";
     ficha.checked = !livre;
+    // (26/11/2026) sempre: foto com a ficha nunca vai para a prévia do cliente
+    ficha.disabled = !livre;
     const lFicha = el("label", "chk");
     lFicha.append(
       ficha,
-      document.createTextNode(" A 1ª foto de cada aluno é a ficha (guardar para o 🤖 Cadastro automático e tirar da prévia)")
+      document.createTextNode(" A 1ª foto de cada aluno é a ficha: sempre sai da prévia (e fica guardada para o 🤖 Cadastro automático)")
     );
     // só as fichas (sem gerar as prévias de novo): para guardar as fichas de um colégio que já tem as prévias prontas
     const soFichas = el("input");
