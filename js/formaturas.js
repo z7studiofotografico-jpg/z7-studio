@@ -46,7 +46,7 @@ let C,
   forms = [],
   cobr = [],
   insts = [],
-  aba = "cobrancas",
+  aba = "todos",
   tudoCarregado = false,
   carregando = false,
   ofertas = [], // formandos só das turmas com fotos prontas (para o aviso), sem ler a coleção inteira
@@ -207,7 +207,8 @@ function mostrarVA(v) {
   cobr = [];
   insts = [];
   tudoCarregado = false;
-  aba = "cobrancas";
+  // (26/11/2026) abre em "Todos" (antes abria em Cobranças)
+  aba = "todos";
   const erro = e => {
     avisoErro(e, "carregar as formaturas");
     if (e.code === "permission-denied") {
@@ -258,6 +259,7 @@ function mostrarVA(v) {
     )
   );
   erroFn = erro;
+  carregarTudo();
 }
 // Formandos das turmas com fotos prontas (Linha de Frente), em grupos de 30 turmas por consulta
 async function carregarOfertas() {

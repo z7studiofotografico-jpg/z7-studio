@@ -846,8 +846,9 @@ await cenario("Adriano (admin), com os dados já atualizados no servidor", async
     await calmo(pg);
     const leit = await pg.evaluate(() => window.__leituras.filter(l => l.col === "formandos"));
     ok(
-      /Pode oferecer os kits para 1 aluno/i.test(await pg.textContent("#fmCorpo")) && !leit.some(l => l.filtros === 0),
-      "aviso de oferta sem ler a coleção inteira de formandos: " + JSON.stringify(leit)
+      // (26/11/2026) a Venda Antecipada abre em "Todos": lê todos os formandos de uma vez (uma leitura só)
+      /Pode oferecer os kits para 1 aluno/i.test(await pg.textContent("#fmCorpo")) && leit.filter(l => l.filtros === 0).length <= 1,
+      "aviso de oferta, com uma leitura só de todos os formandos: " + JSON.stringify(leit)
     );
     await pg.locator("#fmChips").getByText("📸 Depois das fotos").click();
     await calmo(pg);
@@ -3177,11 +3178,8 @@ await cenario("Prévias do colégio inteiro direto no site (janela do colégio)"
   await esc.getByLabel("Colégio e ano").waitFor();
   ok(/2026 · C\.E\. TESTE · PR/i.test(await esc.getByLabel("Colégio e ano").textContent()), "o topo do cartão lista o colégio e o ano");
   await esc.getByRole("button", { name: "Continuar" }).click();
-  await pg
-    .locator(".sheet:visible")
-    .last()
-    .getByLabel(/A 1ª foto de cada aluno é a ficha/)
-    .uncheck();
+  // (26/11/2026) a ficha sempre sai da prévia: a opção fica marcada e travada
+  ok(await pg.locator(".sheet:visible").last().getByLabel(/A 1ª foto de cada aluno é a ficha/).isDisabled(), "a ficha sempre sai da prévia (opção travada)");
   await pg.locator(".sheet:visible").getByRole("button", { name: "Escolher a pasta do colégio" }).click();
   await pg.waitForFunction(() => /Pronto!/.test(document.querySelector(".sheet:last-of-type")?.textContent || ""), null, {
     timeout: 15000
@@ -4482,6 +4480,9 @@ await cenario("Formaturas · abas Linha de Frente / Repasse / Venda Antecipada, 
   );
   // Venda Antecipada: parcela paga por Pix, com a data
   await pg.locator("#viewFormaturas .seg", { hasText: "Venda Antecipada" }).click();
+  await calmo(pg);
+  // (26/11/2026) a Venda Antecipada abre em "Todos": vai para Cobranças
+  await pg.locator("#fmChips button", { hasText: "Cobranças" }).click();
   await calmo(pg);
   await pg
     .locator("#fmCorpo")
