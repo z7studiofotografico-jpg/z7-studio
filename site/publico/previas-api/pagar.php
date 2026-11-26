@@ -30,9 +30,10 @@ $r = null;
 if (defined('Z7_INFINITE_KEY')) {
   // sem o passo "Entrega" (o kit é retirado ou combinado pelo WhatsApp): a família só põe o contato e paga
   $opcoes = ['assured_installments' => $semJuros, 'require_delivery_address' => false];
-  if ($cartao > $pix) $opcoes['discounts'] = ['pix' => round((1 - $pix / $cartao) * 100, 2)];
+  // (26/11/2026) a família tocou em "Pagar no Pix": o link já sai no valor do Pix (antes saía no valor do cartão,
+  // com o desconto só dentro da tela da InfinitePay, e a família via R$ 377 em vez de R$ 350)
   [$st, $r] = z7_json_post(Z7_API_INFINITE . '/links', $base + [
-    'items' => [['quantity' => 1, 'price' => $cartao, 'description' => $desc]],
+    'items' => [['quantity' => 1, 'price' => $forma === 'pix' ? $pix : $cartao, 'description' => $desc]],
     'options' => $opcoes,
   ], true);
   if ($st >= 300 || empty($r['url'])) $r = null; // se recusar, faz o link simples abaixo
