@@ -9,7 +9,7 @@ import { kitsDe } from "./contrato.js";
 import { brl, proxVenc } from "./regras.js";
 import { el, sel, field, sheet, botoes, title, carregarLib } from "./ui.js";
 import * as U from "./util.js";
-import { codigoBusca } from "./aluno-id.js";
+import { codigoBusca, siglaDe } from "./aluno-id.js";
 
 export async function abrirImportarVA(C, aoTerminar = () => {}) {
   const { FS, db } = C;
@@ -69,7 +69,7 @@ export async function abrirImportarVA(C, aoTerminar = () => {}) {
         lido = null;
         if (!cab.length) return;
         const i = inst();
-        lido = lerPlanilhaVA(cab, linhas, { kits: kitsDe(C.P, i || {}), ano: Number(ano.value), hoje: U.todayStr() });
+        lido = lerPlanilhaVA(cab, linhas, { kits: kitsDe(C.P, i || {}), ano: Number(ano.value), hoje: U.todayStr(), sigla: i ? i.sigla || siglaDe(i.nome, []) : "" });
         if (!i && lido.escola) {
           const k = U.chave(lido.escola).replace(/[^A-Z0-9]/g, "");
           const ach = insts.find(x => {

@@ -9,7 +9,7 @@
 // - Quem não tem kit de fotos (só o Kit 01, ou nada) vai também para a Linha de Frente (venda depois das fotos).
 import { centavos, reais, somar } from "./regras.js";
 import { chave } from "./util.js";
-import { comAno } from "./aluno-id.js";
+import { comAno, fmtCodigo } from "./aluno-id.js";
 
 const MESES = ["JANEIRO", "FEVEREIRO", "MARCO", "ABRIL", "MAIO", "JUNHO", "JULHO", "AGOSTO", "SETEMBRO", "OUTUBRO", "NOVEMBRO", "DEZEMBRO"];
 const p2 = n => String(n).padStart(2, "0");
@@ -79,7 +79,7 @@ export function situacaoDaObs(obs) {
 // Lê a planilha inteira: cab = 1ª linha (nomes das colunas), linhas = as outras (listas de células).
 // Devolve { alunos: [...], ignorados: [...] }; cada aluno = { doc (formando da Venda Antecipada ou null),
 // lf (true = também na Linha de Frente), avisos: [], resumo }.
-export function lerPlanilhaVA(cab, linhas, { kits, ano, hoje }) {
+export function lerPlanilhaVA(cab, linhas, { kits, ano, hoje, sigla }) {
   const c = {
     beca: coluna(cab, "BECA"),
     turma: coluna(cab, "TURMA"),
@@ -166,7 +166,13 @@ export function lerPlanilhaVA(cab, linhas, { kits, ano, hoje }) {
     const tel = (contatos.find(x => x.tipo === "Formando") || contatos[0] || {}).tel || "";
     if (!tel) avisos.push("sem telefone");
     const idTxt = txt(v(r, "id"));
-    const codigo = idTxt && /\d/.test(idTxt) ? comAno(idTxt.toUpperCase(), ano) : "";
+    // (26/11/2026) só o número na planilha ("25"): vira o ID completo do colégio (26CIEP156-25), como no PR
+    const codigo =
+      /^\d{1,4}$/.test(idTxt) && sigla
+        ? fmtCodigo(ano, sigla, Number(idTxt))
+        : idTxt && /\d/.test(idTxt)
+          ? comAno(idTxt.toUpperCase(), ano)
+          : "";
     const turma = txt(v(r, "turma")).replace(/\.0+$/, "");
     const semFotos = !kit || kit.id === "k01" || kit.id === "k01s";
     const comum = {
