@@ -256,14 +256,13 @@ export function desenharProximo(box, it, escolhido, blocked, li) {
   // Depois que a última oferta foi enviada (Repasse), o link do cartão passa a ser o da última oferta.
   const P = precos(it);
   const ultimaOferta = segDe(it) === "rep" && P.kitFinal && (it.tentInteresse || 0) >= 2;
-  const ultima = ultimaOferta && P.linkCartaoFinal;
+  const ultima = ultimaOferta;
   // Pix Copia e Cola com o valor certo para o momento da conversa
   const pixCod = segDe(it) === "lf" ? P.pixLF : ultimaOferta ? P.pixFinal : P.pixRep;
   const pixVal = segDe(it) === "lf" ? P.lfPix || P.kitPreco : ultimaOferta ? P.kitFinal : P.kitPromo || P.kitPreco;
-  const link = ultima ? P.linkCartaoFinal : segDe(it) === "lf" ? P.linkCartaoLF || P.linkCartao : P.linkCartao;
   const valCartao = ultima ? P.kitFinal : segDe(it) === "lf" ? P.lfCartao : P.kitCartao;
   // 17/11/2026: com o link da prévia, o pagamento é pela página do site (Pix ou cartão na InfinitePay): a visita
-  // conta para o site e o aluno vira Pago sozinho. Sem o link da prévia, continua o link fixo da InfinitePay.
+  // conta para o site e o aluno vira Pago sozinho.
   if (it.etapa === "INTERESSADO" && it.linkPrevia && d) {
     const pc = parcDe(it);
     const lm =
@@ -278,14 +277,32 @@ export function desenharProximo(box, it, escolhido, blocked, li) {
     a2.target = "_blank";
     a2.rel = "noopener";
     row.append(a2);
-  } else if (it.etapa === "INTERESSADO" && link && d) {
+  } else if (it.etapa === "INTERESSADO" && d) {
+    // (25/11/2026) sem o link da prévia, o botão cria o link deste aluno (a mesma página, com o botão Pagar):
+    // o link fixo da InfinitePay não diz quem pagou, e o aluno não virava Pago sozinho
     const pc = parcDe(it);
-    const lm = `Para pagar no cartão${valCartao ? ` (${U.money(valCartao)}, ${parcTxt(pc)})` : ` (${parcTxt(pc)})`}, é só usar este link seguro da InfinitePay:\n${link}\nDepois me manda o comprovante por aqui 😊${pixCod ? " Se preferir Pix, é só me avisar que te mando o código." : C.P.pix ? ` No Pix${pixVal ? ` (${U.money(pixVal)})` : ""}, a chave é ${C.P.pix}.` : ""}`;
-    const a2 = el("a", "btn btn-sm", ultima ? "💳 Link da última oferta" : "💳 Mandar link de pagamento");
-    a2.href = "https://wa.me/" + d + "?text=" + encodeURIComponent(lm);
-    a2.target = "_blank";
-    a2.rel = "noopener";
-    row.append(a2);
+    const b = U.mkBtn(ultima ? "💳 Link da última oferta" : "💳 Mandar link de pagamento", "btn-sm", async () => {
+      b.disabled = true;
+      try {
+        const { mandarLinkPagamento } = await import("./link-pagamento.js");
+        await mandarLinkPagamento(C, it, {
+          tel: (contatoAtual(it) || {}).tel,
+          // na última oferta, a página mostra o valor da última oferta
+          precoTxt: ultima ? U.money(P.kitFinal) : precoTxt(it),
+          cartaoTxt: ultima ? `${U.money(P.kitFinal)} no cartão · ${parcTxt(pc)}` : cartaoTxt(it),
+          pixVal,
+          valCartao,
+          parc: parcTxt(pc),
+          salvar: (patch, msg) => save(it, patch, msg)
+        });
+      } catch (e) {
+        C.handleErr(e);
+      } finally {
+        b.disabled = false;
+      }
+    });
+    b.title = "Cria o link deste aluno: quando a família pagar, ele vira Pago sozinho";
+    row.append(b);
   }
   if (it.etapa === "INTERESSADO" && pixCod && d) {
     const pm =

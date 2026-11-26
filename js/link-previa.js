@@ -63,7 +63,8 @@ export const mensagemLink = (it, codigo) =>
 export async function mandarLinkPrevia(C, it, r, o = {}) {
   const FS = C.FS;
   const d = dadosLink(it, r, o.precoTxt, C.me, new Date(), o.cartaoTxt);
-  if (!d.fotos.length) return U.toast("Este aluno ainda não tem prévia.");
+  // (25/11/2026) o link de pagamento usa a mesma página, mesmo sem prévia (o.semFotos): é ela que avisa quem pagou
+  if (!d.fotos.length && !o.semFotos) return U.toast("Este aluno ainda não tem prévia.");
   // ⏳ o prazo do atendimento (3 dias; o representante pode aumentar): vai para a página da prévia
   const { prazo, patch: patchPrazo } = prazoParaMandar(it);
   let codigo = it.linkPrevia;
@@ -78,7 +79,7 @@ export async function mandarLinkPrevia(C, it, r, o = {}) {
     if (o.salvar) await o.salvar(Object.assign({ linkPrevia: codigo }, patchPrazo || {}), "Link da prévia criado");
   }
   if (it.linkPrevia && patchPrazo && o.salvar) await o.salvar(patchPrazo, "Atendimento até " + prazoCurto(prazo));
-  const texto = mensagemLink(it, codigo);
+  const texto = o.mensagem ? o.mensagem(codigo) : mensagemLink(it, codigo);
   const tel = U.digits(o.tel || ""); // já com o 55
   try {
     await navigator.clipboard.writeText(texto);
@@ -87,7 +88,9 @@ export async function mandarLinkPrevia(C, it, r, o = {}) {
   }
   if (noComputador()) abrirWhatsAppWeb(tel, texto);
   else window.open(`https://wa.me/${tel}?text=${encodeURIComponent(texto)}`, "_blank", "noopener");
-  U.toast("Link da prévia na mensagem do WhatsApp (e copiado) ✅");
+  U.toast(
+    o.mensagem ? "Link de pagamento na mensagem do WhatsApp (e copiado) ✅" : "Link da prévia na mensagem do WhatsApp (e copiado) ✅"
+  );
   return codigo;
 }
 
