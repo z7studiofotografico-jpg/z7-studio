@@ -415,6 +415,8 @@ function render() {
   [
     // (23/11/2026) todos os alunos do colégio, numa lista só, em primeiro
     ["todos", "👥 Todos", tudoCarregado ? fs.length : ""],
+    // (26/11/2026) Todos → Em dia → Cobranças (os em atraso)
+    ["emdia", "✅ Em dia", tudoCarregado ? fs.filter(f => !atrasado(f)).length : ""],
     ["cobrancas", "Cobranças", cob.length],
     ["adesao", "🎓 Adesão (Kit 01)", tudoCarregado ? col.length : ""],
     ["album", "📘 Kits 02 a 05", tudoCarregado ? alb.length : ""],
@@ -472,12 +474,15 @@ function resumoInst(i, lst) {
 // Adesão (Kit 01) e Kits 02 a 05: uma linha por aluno, com busca e colégio (o mesmo desenho das Cobranças)
 function renderContrato(corpo, tipo) {
   const adesao = tipo === "adesao",
-    todos = tipo === "todos";
+    emdia = tipo === "emdia",
+    todos = tipo === "todos" || emdia;
   corpo.append(
     el(
       "p",
       "hint",
-      todos
+      emdia
+        ? "Alunos em dia: sem parcela atrasada (inclui quem já quitou). Os atrasados estão em Cobranças."
+        : todos
         ? "Todos os alunos dos colégios, com o kit (adesão ou kits 02 a 05) e as parcelas de cada um."
         : adesao
           ? "Kit 01 (beca + canudo) é a adesão da formatura. A comissão é sobre cada parcela paga (taxa em Ajustes)."
@@ -485,7 +490,7 @@ function renderContrato(corpo, tipo) {
     )
   );
   const ids = new Set(minhasInsts().map(i => i.id));
-  const fs = meusForms().filter(f => ids.has(f.instId) && ativo(f) && (todos || (adesao ? ehKit01(f) : !ehKit01(f))));
+  const fs = meusForms().filter(f => ids.has(f.instId) && ativo(f) && (!emdia || !atrasado(f)) && (todos || (adesao ? ehKit01(f) : !ehKit01(f))));
   renderAlunosVA(corpo, fs, { C, insts, abrirTurma, ajuda }, tipo);
 }
 function renderTurmas(corpo) {
@@ -755,6 +760,28 @@ async function relatorioFormaturas() {
             ])
         },
         vazio: "Nenhum aluno."
+      },
+      // (26/11/2026) a mesma sequência das abas: Todos → Em dia → Cobranças em atraso
+      {
+        titulo: "Alunos em dia",
+        tabela: {
+          cols: ["ID", "Aluno", "Colégio", "Turma", "WhatsApp", "Kit", "Pago", "Parcelas", "Situação"],
+          linhas: fs
+            .filter(f => !atrasado(f))
+            .sort((a, b) => String(a.codigo || "~").localeCompare(String(b.codigo || "~"), "pt-BR", { numeric: true }))
+            .map(f => [
+              f.codigo || "",
+              title(f.nome),
+              title(f.instNome),
+              f.turma || [f.serie, f.sala].filter(Boolean).join(" "),
+              contatoRel(f.tel, f.email),
+              String(f.kit || (ehKit01(f) ? "Kit 01" : "Kit")).split(" · ")[0],
+              moeda(recebidoDe(f)),
+              `${pagasDe(f)}/${nParcelas(f)}`,
+              situacaoRel(f)
+            ])
+        },
+        vazio: "Nenhum aluno em dia."
       },
       {
         titulo: "Cobranças em atraso",
