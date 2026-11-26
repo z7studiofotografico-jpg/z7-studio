@@ -20,3 +20,14 @@ test("sinal do ensaio pago pelo link: fecha o lead conferido, sem mexer no valor
   assert.deepEqual(Object.keys(patchSinal({ valor: 100 }, "2026-11-25", { etapa: "FECHADO" })), ["sinalPago"]);
   assert.ok(ONDE.some(([c, k]) => c === "leads" && k === "linkSinal"));
 });
+
+test("dúvidas e objeções: conta por dúvida e quantos compraram mesmo assim", async () => {
+  const { contarObjecoes } = await import("../js/conversas-analise.js");
+  const r = contarObjecoes([
+    { etapa: "PAGO", objecoes: ["Achou caro", "Vai pensar"] },
+    { etapa: "CAÍDO", objecoes: ["Achou caro"] },
+    { etapa: "INTERESSADO", objecoes: [] }
+  ]);
+  assert.deepEqual(r[0], ["Achou caro", { n: 2, vendeu: 1 }]);
+  assert.deepEqual(r[1], ["Vai pensar", { n: 1, vendeu: 1 }]);
+});

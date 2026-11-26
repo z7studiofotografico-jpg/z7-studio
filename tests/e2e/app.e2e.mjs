@@ -4080,6 +4080,16 @@ await cenario("Lista compacta do PR e janela do aluno (abas, conversa e Claude)"
   const st2 = await store();
   ok(Object.values(st2).some(x => x && Array.isArray(x.objecoes) && x.objecoes.includes("Achou caro")), "a dúvida do cliente fica guardada (um toque)");
   ok((await j.getByRole("button", { name: "📎 Anexar conversa" }).count()) === 1, "botão para anexar a conversa exportada do WhatsApp");
+  // (26/11/2026) o Adriano vê as dúvidas contadas e as conversas para baixar
+  await pg.route("**/previas-api/conversas.php**", r =>
+    r.fulfill({ status: 200, contentType: "application/json", headers: { "Access-Control-Allow-Origin": "*" }, body: JSON.stringify({ conversas: [{ id: "202611-abc", col: "repasse", aluno: "x", codigo: "26COL-01", nome: "ALUNO TESTE", em: "2026-11-26T12:00:00Z", tam: 2048, ext: "zip" }] }) })
+  );
+  await pg.evaluate(() => document.getElementById("rConv").click());
+  const an = pg.locator(".sheet").filter({ hasText: "Conversas e dúvidas dos clientes" });
+  await an.getByText("Achou caro").waitFor({ timeout: 8000 });
+  ok(/Baixar todas \(1\)/.test(await an.textContent()), "💬 Conversas e dúvidas: dúvidas contadas e as conversas para baixar");
+  if (process.env.FOTOS) await an.locator(".panel").screenshot({ path: process.env.FOTOS + "/conversas-analise.png" });
+  await an.getByRole("button", { name: "Fechar" }).click();
   if (process.env.FOTOS) {
     await j.getByRole("button", { name: "📎 Anexar conversa" }).scrollIntoViewIfNeeded();
     await pg.waitForTimeout(400);

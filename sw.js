@@ -121,6 +121,7 @@ const SHELL = [
   "./js/link-pagamento.js",
   "./js/sinal-link.js",
   "./js/conversas-wa.js",
+  "./js/conversas-analise.js",
   "./js/vercomo.js",
   "./js/notificacoes.js",
   "./js/ajustes.js",

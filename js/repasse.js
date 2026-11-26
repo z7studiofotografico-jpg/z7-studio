@@ -292,6 +292,7 @@ function mount() {
       <button class="btn btn-sm" id="rVerAlunos" type="button">👥 Ver / excluir alunos</button>
       <button class="btn btn-sm btn-danger" id="rExcluirCol" type="button">🗑️ Excluir colégio inteiro</button>
       <button class="btn btn-sm" id="rAcertar" type="button">🔄 Acertar a lista</button>
+      <button class="btn btn-sm" id="rConv" type="button">💬 Conversas e dúvidas</button>
     </div></div>`;
   v.append(lote);
 
@@ -365,6 +366,7 @@ function mount() {
     $("rEscola").value = v;
     buscar();
   };
+  $("rConv").onclick = () => import("./conversas-analise.js").then(m => m.abrirAnalise(C)).catch(e => C.handleErr(e));
   // a lista com números errados ou colégio sem ninguém: conta de novo, colégio por colégio
   $("rAcertar").onclick = () =>
     import("./juntar-colegio.js")
