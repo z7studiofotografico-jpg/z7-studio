@@ -4052,6 +4052,8 @@ await cenario("Lista compacta do PR e janela do aluno (abas, conversa e Claude)"
   ok(new RegExp(nome, "i").test(await j.locator(".ja-topo").textContent()), "tocar no aluno abre a janela dele");
   ok((await j.locator(".ja-abas [role=tab]").count()) === 5, "janela com as 5 abas");
   ok((await j.locator(".ja-corpo .card .actions").count()) === 1, "Resumo: o cartão completo com todos os botões");
+  ok(!/Código Pix|💠 Pix/.test(await j.textContent()), "sem Pix Copia e Cola fixo (o pagamento é só pelo link do aluno)");
+  if (process.env.FOTOS) await j.screenshot({ path: process.env.FOTOS + "/cartao-pagamento.png" });
   await j.getByRole("tab", { name: "Prévia e fotos" }).click();
   ok(/Prévia do kit/.test(await j.textContent()) && /Fotos para escolher/.test(await j.textContent()), "aba Prévia e fotos");
   await j.getByRole("tab", { name: "Conversa" }).click();

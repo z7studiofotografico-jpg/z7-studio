@@ -257,29 +257,13 @@ export function desenharProximo(box, it, escolhido, blocked, li) {
   const P = precos(it);
   const ultimaOferta = segDe(it) === "rep" && P.kitFinal && (it.tentInteresse || 0) >= 2;
   const ultima = ultimaOferta;
-  // Pix Copia e Cola com o valor certo para o momento da conversa
-  const pixCod = segDe(it) === "lf" ? P.pixLF : ultimaOferta ? P.pixFinal : P.pixRep;
   const pixVal = segDe(it) === "lf" ? P.lfPix || P.kitPreco : ultimaOferta ? P.kitFinal : P.kitPromo || P.kitPreco;
   const valCartao = ultima ? P.kitFinal : segDe(it) === "lf" ? P.lfCartao : P.kitCartao;
   // 17/11/2026: com o link da prévia, o pagamento é pela página do site (Pix ou cartão na InfinitePay): a visita
-  // conta para o site e o aluno vira Pago sozinho.
-  if (it.etapa === "INTERESSADO" && it.linkPrevia && d) {
-    const pc = parcDe(it);
-    const lm =
-      `Para pagar, é só abrir a página das fotos e tocar em *Pagar*` +
-      (pixVal || valCartao
-        ? ` (${[pixVal ? U.money(pixVal) + " no Pix" : "", valCartao ? U.money(valCartao) + " no cartão, " + parcTxt(pc) : ""].filter(Boolean).join(" ou ")})`
-        : "") +
-      `:\nhttps://z7studio.com.br/previa/?c=${it.linkPrevia}\nO pagamento é pela InfinitePay, seguro, e a confirmação chega para a gente na hora 😊`;
-    const a2 = el("a", "btn btn-sm", "💳 Mandar link de pagamento");
-    a2.title = "Manda a página das fotos no site, com o botão de pagar";
-    a2.href = "https://wa.me/" + d + "?text=" + encodeURIComponent(lm);
-    a2.target = "_blank";
-    a2.rel = "noopener";
-    row.append(a2);
-  } else if (it.etapa === "INTERESSADO" && d) {
-    // (25/11/2026) sem o link da prévia, o botão cria o link deste aluno (a mesma página, com o botão Pagar):
-    // o link fixo da InfinitePay não diz quem pagou, e o aluno não virava Pago sozinho
+  // conta para o site e o aluno vira Pago sozinho. Sem o link, o botão cria um (link-pagamento.js).
+  if (it.etapa === "INTERESSADO" && d) {
+    // (25/11/2026) o botão cria (ou renova, com o valor do momento) o link deste aluno: a mesma página da prévia, com
+    // o botão Pagar. O link fixo da InfinitePay não dizia quem pagou, e o aluno não virava Pago sozinho
     const pc = parcDe(it);
     const b = U.mkBtn(ultima ? "💳 Link da última oferta" : "💳 Mandar link de pagamento", "btn-sm", async () => {
       b.disabled = true;
@@ -304,25 +288,8 @@ export function desenharProximo(box, it, escolhido, blocked, li) {
     b.title = "Cria o link deste aluno: quando a família pagar, ele vira Pago sozinho";
     row.append(b);
   }
-  if (it.etapa === "INTERESSADO" && pixCod && d) {
-    const pm =
-      `Para pagar no Pix${pixVal ? ` (${U.money(pixVal)})` : ""}: abra o app do seu banco, escolha *Pix Copia e Cola* e cole o código que vou mandar na próxima mensagem 👇 Depois me manda o comprovante por aqui 😊` +
-      // com o link da prévia, também dá para pagar pela página do site (o aluno vira Pago sozinho)
-      (it.linkPrevia
-        ? `\nSe preferir, pague pela página das fotos, no Pix ou no cartão: https://z7studio.com.br/previa/?c=${it.linkPrevia}`
-        : "");
-    const a4 = el("a", "btn btn-sm", `💠 Pix ${pixVal ? U.money(pixVal) : ""}`.trim());
-    a4.href = "https://wa.me/" + d + "?text=" + encodeURIComponent(pm);
-    a4.target = "_blank";
-    a4.rel = "noopener";
-    row.append(a4);
-    const a5 = el("a", "btn btn-sm", "📋 Código Pix");
-    a5.title = "Manda só o código, para o cliente copiar fácil";
-    a5.href = "https://wa.me/" + d + "?text=" + encodeURIComponent(pixCod);
-    a5.target = "_blank";
-    a5.rel = "noopener";
-    row.append(a5);
-  }
+  // (25/11/2026) sem Pix Copia e Cola fixo nem link fixo da InfinitePay: o pagamento é sempre pela página do aluno
+  // (Pix ou cartão), que dá a baixa sozinha. O que não dá baixa sozinho saiu do app.
   if (ns.then)
     row.append(
       U.mkBtn("Enviei ✓", "btn-ok", () => {
