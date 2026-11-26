@@ -1097,6 +1097,13 @@ await cenario("Adriano (admin), com os dados já atualizados no servidor", async
       "Na fila: abre por colégio com Passar o colégio inteiro"
     );
     await fila.getByRole("button", { name: "Fechar" }).click();
+    // "Vendido no mês": tocar abre as vendas do mês (quadro por vendedor e a lista do dia)
+    await pg.locator("#rsMes").click();
+    const vm = pg.locator(".sheet").filter({ hasText: "Vendas de" });
+    await vm.getByText("BRUNO").first().waitFor({ timeout: 8000 });
+    ok(/Vendedor/.test(await vm.textContent()) && /Pix/.test(await vm.textContent()), "Vendido no mês: abre as vendas do mês com vendedor e pagamento");
+    if (process.env.FOTOS) await vm.screenshot({ path: process.env.FOTOS + "/vendas-mes.png" });
+    await vm.getByRole("button", { name: "Fechar" }).click();
     // 🤖 Cadastro automático: conferir a ficha lida e confirmar (sem número na ficha → o menor número livre)
     await ir(pg, "#home");
     await pg.locator("#tileCadastrar").click();

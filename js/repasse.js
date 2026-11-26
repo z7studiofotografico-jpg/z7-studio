@@ -50,6 +50,7 @@ import {
   colNome,
   $,
   textoVendasMes,
+  vendasMes,
   meuOuLivre,
   pessoaAberta,
   mudarPessoaAberta
@@ -386,7 +387,7 @@ function mount() {
   const irPara = (id, fn) => clicavel($(id).closest(".stat"), fn, "Ver a lista");
   irPara("rsHoje", () => openTab("hoje"));
   irPara("rsInt", () => openTab("interessados"));
-  irPara("rsMes", () => openTab("entregas"));
+  irPara("rsMes", () => import("./vendas-mes.js").then(m => m.abrirVendasMes(vendasMes, linha)).catch(e => C.handleErr(e)));
   // a fila: quem são, separados por colégio (com "Passar o colégio inteiro")
   irPara("rsFila", () => import("./fila-colegios.js").then(m => m.abrirFilaPorColegio(depoisDaLista)).catch(e => C.handleErr(e)));
   try {

@@ -68,8 +68,11 @@ export async function refreshStats() {
       docs(h).filter(x => ABERTAS.includes(x.etapa) && x.followup && x.followup <= today && (!C.isAdmin || meuOuLivre(x))).length
     );
     set("rsInt", docs(i).length);
-    const doMes = docs(m).filter(x => (x.pagoEm || "") >= mes);
-    Object.assign(vendasMes, { n: doMes.length, v: doMes.reduce((a, x) => a + (Number(x.valor) || 0), 0), pronto: true });
+    const doMes = m.docs
+      .map(d => Object.assign({ id: d.id }, d.data()))
+      .filter(noSeg)
+      .filter(x => (x.pagoEm || "") >= mes);
+    Object.assign(vendasMes, { n: doMes.length, v: doMes.reduce((a, x) => a + (Number(x.valor) || 0), 0), pronto: true, lista: doMes });
     set("rsMes", U.money(vendasMes.v));
     set("rVendMes", textoVendasMes());
     // Fila: conta por ano (só filtros de igualdade, não precisa de índice extra no Firebase)
