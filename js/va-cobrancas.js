@@ -11,6 +11,8 @@ import * as U from "./util.js";
 
 let busca = "",
   colegio = "";
+// (26/11/2026) o colégio escolhido na lista: o 🖨️ Relatório da Venda Antecipada sai só dele
+export const colegioEscolhido = () => colegio;
 
 // o = { C, soHoje, mudarHoje, insts, abrirTurma, ajuda }
 export function renderCobrancas(corpo, cob, o) {

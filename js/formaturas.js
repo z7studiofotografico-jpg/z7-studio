@@ -34,7 +34,7 @@ const situacaoRel = f =>
   SIT_REL[f.status] || (quitado(f) ? "Quitado" : !pagasDe(f) ? "Não fez o 1º pagamento" : atrasado(f) ? "Atrasado" : "Em dia");
 import { renderFechados } from "./formaturas-fechados.js";
 import { linhaGenerica } from "./lista-compacta.js";
-import { renderCobrancas as renderCobrancasVA, renderAlunosVA } from "./va-cobrancas.js";
+import { renderCobrancas as renderCobrancasVA, renderAlunosVA, colegioEscolhido } from "./va-cobrancas.js";
 // Cobranças: só os lembretes de hoje da régua (3 dias antes, no dia, 3 e 10 dias depois) ou todas
 let soHoje = true;
 // Leitura sob demanda: ao abrir, só as parcelas que vencem até o fim do mês (campo proxVenc);
@@ -678,9 +678,12 @@ function openKits() {
 // Relatório para reunião: números das turmas do bloco escolhido e as cobranças em atraso
 async function relatorioFormaturas() {
   await carregarTudo();
-  const turmas = minhasInsts(),
-    fs = meusForms(),
-    cf = meusForms(cobr);
+  // (26/11/2026) com um colégio escolhido na lista, o relatório sai só dele (para levar ao diretor)
+  const col = colegioEscolhido();
+  const doCol = f => !col || (f.instNome || "?") === col;
+  const fs = meusForms().filter(doCol),
+    cf = meusForms(cobr).filter(doCol);
+  const turmas = minhasInsts().filter(i => !col || i.nome === col || fs.some(f => f.instId === i.id));
   const tot = resumoInst(null, fs);
   const linhas = turmas
     .map(i => [
@@ -694,7 +697,7 @@ async function relatorioFormaturas() {
     .map(([i, r]) => [title(i.nome), r.n, moeda(r.vend), moeda(r.rec), moeda(r.aberto), r.atr || ""]);
   const atr = cobrancas(cf).filter(({ f }) => atrasado(f));
   return {
-    titulo: "Formaturas",
+    titulo: col ? "Formatura · " + title(col) : "Formaturas",
     subtitulo: seg === "rep" ? "Repasse (turmas de anos anteriores)" : "Linha de Frente (turmas deste ano)",
     secoes: [
       {
