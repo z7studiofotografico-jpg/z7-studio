@@ -37,11 +37,43 @@ export function abrirAlunoQueFaltou(C, depois) {
       }
       const s = el("select");
       s.setAttribute("aria-label", "Pasta onde estão as fotos do aluno que faltou");
+      // (26/11/2026) a pasta com fotos demais (bem mais que a maioria) é quase sempre a que tem o aluno que faltou
+      const qts = itens.map(x => x.fotos.length).sort((a, b) => a - b);
+      const mediana = qts[Math.floor(qts.length / 2)] || 0;
+      const demais = x => mediana && x.fotos.length >= Math.max(mediana + 3, Math.ceil(mediana * 1.6));
       itens.forEach((x, i) => {
-        const o = el("option", null, `${x.codigo || ""} · ${title(x.nome || "")} · ${x.fotos.length} fotos`);
+        const o = el("option", null, `${demais(x) ? "⚠️ " : ""}${x.codigo || ""} · ${title(x.nome || "")} · ${x.fotos.length} fotos`);
         o.value = String(i);
         s.append(o);
       });
+      const suspeita = itens.findIndex(demais);
+      if (suspeita >= 0) s.value = String(suspeita);
+      // o número que falta na sequência dos IDs (ex.: 21, 23 → falta o 22)
+      const porSigla = {};
+      itens.forEach(x => {
+        const m = String(x.codigo || "").match(/^(.*-)(\d+)$/);
+        if (m) (porSigla[m[1]] = porSigla[m[1]] || []).push(Number(m[2]));
+      });
+      const faltam = [];
+      Object.entries(porSigla).forEach(([pre, ns]) => {
+        const max = Math.max(...ns);
+        for (let n = 1; n < max; n++) if (!ns.includes(n)) faltam.push(pre + String(n).padStart(2, "0"));
+      });
+      if (suspeita >= 0 || faltam.length)
+        p.append(
+          el(
+            "p",
+            "notice",
+            [
+              faltam.length ? `Faltam na sequência: ${faltam.slice(0, 8).join(", ")}.` : "",
+              suspeita >= 0
+                ? `A pasta ${itens[suspeita].codigo} tem ${itens[suspeita].fotos.length} fotos (a maioria tem ${mediana}): o aluno que faltou deve estar nela.`
+                : ""
+            ]
+              .filter(Boolean)
+              .join(" ")
+          )
+        );
       const grade = el("div", "faltou-grade");
       const msg = el("p", "hint", "");
       let marcadas = new Set(),
