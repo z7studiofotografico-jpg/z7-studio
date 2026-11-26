@@ -77,10 +77,12 @@
         margin: 6px 0 0;
         color: var(--suave);
       }
+      /* (26/11/2026) uma fileira de 5 fotos pequenas; tocar amplia */
       .grade {
         display: grid;
-        grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
-        gap: 8px;
+        grid-template-columns: repeat(5, 1fr);
+        gap: 6px;
+        max-width: 520px;
         margin: 18px 0 8px;
       }
       .grade button {
@@ -102,13 +104,13 @@
       }
       .grade span {
         position: absolute;
-        left: 6px;
-        top: 6px;
+        left: 3px;
+        top: 3px;
         background: rgba(0, 0, 0, 0.55);
         color: #fff;
-        font-size: 12px;
-        padding: 2px 7px;
-        border-radius: 10px;
+        font-size: 10px;
+        padding: 1px 5px;
+        border-radius: 8px;
       }
       .nota {
         font-size: 13px;
