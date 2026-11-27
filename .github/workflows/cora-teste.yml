@@ -21,6 +21,9 @@ jobs:
           ID=$(printf '%s' "$CORA_CLIENT_ID" | grep -o 'int-[A-Za-z0-9]*' | head -1)
           openssl x509 -noout -modulus -in /tmp/c.pem | md5sum | cut -c1-8 | sed 's/^/cert /'
           openssl rsa -noout -modulus -in /tmp/k.key 2>/dev/null | md5sum | cut -c1-8 | sed 's/^/key  /'
+          CN=$(openssl x509 -noout -subject -nameopt multiline -in /tmp/c.pem | sed -n 's/^ *commonName *= *//p')
+          [ "$CN" = "$ID" ] && echo "client-id = CN do certificado: igual" || echo "client-id = CN do certificado: DIFERENTE (${#ID} x ${#CN} letras)"
+          openssl x509 -noout -startdate -enddate -in /tmp/c.pem
           for H in matls-clients.api.stage.cora.com.br matls-clients.api.cora.com.br; do
             printf '%s: ' "$H"
             curl -s -o /tmp/r.json -w "HTTP %{http_code} · " --cert /tmp/c.pem --key /tmp/k.key -H 'Content-Type: application/x-www-form-urlencoded' -X POST https://$H/token -d "grant_type=client_credentials&client_id=$ID" || true
