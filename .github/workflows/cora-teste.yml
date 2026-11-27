@@ -12,7 +12,7 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: 20
-      - name: Diagnóstico com curl (só o código e o tipo de erro, sem mostrar o token)
+      - name: Diagnóstico com curl no teste e na produção (só pede o token; não emite nada, sem mostrar o token)
         working-directory: scripts
         run: |
           umask 077
@@ -21,8 +21,11 @@ jobs:
           ID=$(printf '%s' "$CORA_CLIENT_ID" | grep -o 'int-[A-Za-z0-9]*' | head -1)
           openssl x509 -noout -modulus -in /tmp/c.pem | md5sum | cut -c1-8 | sed 's/^/cert /'
           openssl rsa -noout -modulus -in /tmp/k.key 2>/dev/null | md5sum | cut -c1-8 | sed 's/^/key  /'
-          curl -s -o /tmp/r.json -w "HTTP %{http_code}\n" --cert /tmp/c.pem --key /tmp/k.key -H 'Content-Type: application/x-www-form-urlencoded' -X POST https://matls-clients.api.stage.cora.com.br/token -d "grant_type=client_credentials&client_id=$ID" || true
-          node -e "const j=require('/tmp/r.json'); console.log(j.access_token ? 'curl: token OK' : 'curl: ' + JSON.stringify(j))" || true
+          for H in matls-clients.api.stage.cora.com.br matls-clients.api.cora.com.br; do
+            printf '%s: ' "$H"
+            curl -s -o /tmp/r.json -w "HTTP %{http_code} · " --cert /tmp/c.pem --key /tmp/k.key -H 'Content-Type: application/x-www-form-urlencoded' -X POST https://$H/token -d "grant_type=client_credentials&client_id=$ID" || true
+            node -e "const j=require('/tmp/r.json'); console.log(j.access_token ? 'token OK' : JSON.stringify(j))" || true
+          done
           rm -f /tmp/c.pem /tmp/k.key /tmp/r.json
         env:
           CORA_CLIENT_ID: ${{ secrets.CORA_CLIENT_ID }}
