@@ -39,7 +39,9 @@ export const COLECOES = [
   "fichasPedidos",
   "previasSite",
   "historico",
-  "pastasFotos"
+  "pastasFotos",
+  // (28/11/2026) as medidas que o cliente manda pela página medidas.html
+  "medidasBeca"
 ];
 // subcoleções: os pagamentos de cada contrato do colégio (Aluguel de becas) ficam dentro do contrato
 export const SUBCOLECOES = { contratosColegio: ["pagamentos"] };

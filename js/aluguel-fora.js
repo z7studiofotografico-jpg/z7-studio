@@ -18,7 +18,7 @@ export function abrirBecasFora(doAno, evsAno, cobre, hoje, linha) {
     (p, close) => {
       const n = al.length + evs.reduce((t, e) => t + totEv(e), 0);
       const txt =
-        `${n} beca${n === 1 ? "" : "s"} fora agora` + (nAtr ? ` · ⚠️ ${nAtr} passa${nAtr === 1 ? "ou" : "ram"} da devolução` : "");
+        `${n} beca${n === 1 ? "" : "s"} fora agora` + (nAtr ? ` · ⚠️ ${nAtr} ${nAtr === 1 ? "passou" : "passaram"} da devolução` : "");
       p.append(el("p", "hint", txt));
       if (evs.length) {
         p.append(el("h3", null, "Agendamentos dos colégios"));

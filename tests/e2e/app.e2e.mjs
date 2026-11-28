@@ -2103,7 +2103,7 @@ await cenario("Relatórios para imprimir (um por card)", async () => {
     ["#pr", /PR|Linha de Frente|Repasse/],
     ["#formaturas", /Formaturas/],
     ["#agenda", /Agenda de/],
-    ["#becas", /Aluguel de becas/],
+    ["#becas", /Aluguel de becas|Kits do colégio/], // o título segue os alunos: sem beca, "Kits do colégio"
     ["#inst-particular", /Colégio particular/],
     ["#inst-superior", /Faculdade e curso profissionalizante/],
     ["#vendas", /Dashboard/]
