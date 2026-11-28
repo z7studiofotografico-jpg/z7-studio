@@ -18,8 +18,22 @@ async function fotosDoAlunoTudo(C, D, raiz, it) {
 }
 
 // (26/11/2026) as fotos que vão no link de pagamento: as mesmas que a janela do aluno mostra (site ou Drive)
+// (27/11/2026) a pasta das prévias: a dos Ajustes; se a tela aberta não tiver os Ajustes (aconteceu no celular do
+// representante: o botão Prévia abria sem as fotos), lê direto do banco
+let cfgApp = null;
+async function pastaPrevias(C) {
+  if (C.P && C.P.drivePrevias) return C.P.drivePrevias;
+  if (!cfgApp)
+    try {
+      cfgApp = (await C.FS.getDoc(C.FS.doc(C.db, "config", "app"))).data() || {};
+    } catch (e) {
+      console.warn("[Z7] ajustes para as prévias", e);
+      return "";
+    }
+  return cfgApp.drivePrevias || "";
+}
 export async function fotosParaLink(C, it) {
-  const raiz = idDaPasta(C.P.drivePrevias);
+  const raiz = idDaPasta(await pastaPrevias(C));
   try {
     const r = raiz ? await fotosDoAlunoTudo(C, abrirDrive(C), raiz, it) : await fotosDoAlunoNoSite(C, it);
     return r && !r.erro ? r : null;
@@ -610,4 +624,23 @@ export function trocarFotos(C, it, salvar) {
     p.append(acoes);
     carregar();
   });
+}
+
+// (27/11/2026) "🖼️ Prévia" e "📷 Fotos para escolher" abrem já com as fotos do aluno (do site ou do Drive), sem
+// precisar arrastar. Sem fotos guardadas, abre como antes (com a foto de exemplo, para arrastar).
+export async function abrirPreviaDoAluno(C, it, opcoes) {
+  U.toast("Carregando as fotos de " + U.first(title(it.nome || "")) + "…");
+  let fotos = [];
+  try {
+    const r = await fotosParaLink(C, it);
+    if (r && r.fotos && r.fotos.length) {
+      const D = abrirDrive(C);
+      const lista = r.fotos.slice(0, opcoes.maxFotos || 15);
+      fotos = (await Promise.all(lista.map(f => D.baixar(f.id).catch(() => null)))).filter(Boolean);
+    }
+  } catch (e) {
+    console.warn("[Z7] fotos para a prévia", e);
+  }
+  if (!fotos.length) U.toast("Não achei as fotos deste aluno: arraste as fotos do ensaio na prévia.");
+  openMockup(Object.assign({}, opcoes, { fotos, escolhidas: false }));
 }

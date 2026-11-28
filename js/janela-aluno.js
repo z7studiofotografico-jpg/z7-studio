@@ -5,8 +5,7 @@
 // "conversa") e "Pedir ao Claude", que copia o texto pronto (sem telefone) e abre o Claude para sugerir a resposta.
 import { el, title, sheet } from "./ui.js";
 import * as U from "./util.js";
-import { openMockup } from "./mockup.js";
-import { miniaturasDoAluno, driveLiberado } from "./fotos-aluno.js";
+import { miniaturasDoAluno, driveLiberado, abrirPreviaDoAluno } from "./fotos-aluno.js";
 import { linhaVisitas } from "./link-previa.js";
 import { linhasRetorno } from "./retorno.js";
 import { situacaoTxt, enderecoTxt, historicoPlanilha, prazoEntrega } from "./repasse-dados.js";
@@ -134,7 +133,7 @@ function previa(box, it) {
     "Prévia do kit",
     kit === "paspatur" ? "o livro do Kit Paspatur aberto, com a marca d'água" : "quadro na parede e porta-retratos, com a marca d'água",
     async () =>
-      openMockup({
+      abrirPreviaDoAluno(C, it, {
         tel: (contatoAtual(it) || {}).tel,
         nome: title(it.nome),
         escola: title(it.escola),
@@ -148,7 +147,7 @@ function previa(box, it) {
       })
   );
   bloco("📷", "Fotos para escolher", "folha com as fotos numeradas para a família escolher", () =>
-    openMockup({
+    abrirPreviaDoAluno(C, it, {
       tel: (contatoAtual(it) || {}).tel,
       nome: title(it.nome),
       escola: title(it.escola),

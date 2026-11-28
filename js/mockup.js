@@ -295,6 +295,7 @@ export function openMockup({
   modo = "kit",
   toast = null,
   fotos = [],
+  escolhidas = true, // false: as fotos do aluno vieram todas (o app sugere qual vai em cada lugar)
   maxFotos = 15,
   kit = "pr",
   encarte = "calendario",
@@ -738,7 +739,7 @@ export function openMockup({
   paintSlots();
   setModo(modo);
   // fotos já escolhidas pela família, na ordem dos lugares: ficam onde vieram (sem a sugestão automática)
-  if (fotos.length) st.escolheu = true;
+  if (fotos.length && escolhidas) st.escolheu = true;
   if (fotos.length) addFiles(fotos.map(b => (b instanceof File ? b : new File([b], "foto.jpg", { type: b.type || "image/jpeg" }))));
   // Kit Paspatur: sempre pergunta o encarte antes (a regra costuma ser público = calendário e particular = turma,
   // e a sugestão do colégio vem marcada, mas quem decide é quem está vendendo — pedido da Luciana, 09/11/2026)

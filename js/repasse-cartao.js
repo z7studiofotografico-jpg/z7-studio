@@ -1,6 +1,6 @@
 // PR: o cartão de cada contato (para quem mandar, a mensagem pronta, os botões de cada etapa)
 import { excluir, faixaExclusao, pedirTexto, escolher } from "./confirmar.js";
-import { openMockup, textoEscolha } from "./mockup.js";
+import { textoEscolha } from "./mockup.js";
 import { el, title, sheet as sheetUi } from "./ui.js";
 import * as U from "./util.js";
 import { faltando, situacaoTxt, enderecoTxt, historicoPlanilha, prazoEntrega, MOTIVOS_CAIDO, motivoPreco } from "./repasse-dados.js";
@@ -41,7 +41,7 @@ import { openPago, openEntrega, openNotas } from "./repasse-janelas.js";
 import { openDados } from "./repasse-form.js";
 import { passarAluno } from "./passar-pr.js";
 import { prazoParaMandar, linhaPrazo } from "./prazo-atendimento.js";
-import { abrirFotosDoAluno } from "./fotos-aluno.js";
+import { abrirFotosDoAluno, abrirPreviaDoAluno } from "./fotos-aluno.js";
 
 // aviso dos telefones que com certeza estão errados (DDD que não existe, celular sem o 9...)
 function telAvisos(it) {
@@ -216,7 +216,7 @@ export function desenharProximo(box, it, escolhido, blocked, li) {
   if (!C.P.drivePrevias)
     row.append(
       U.mkBtn("🖼️ Prévia", "", async () =>
-        openMockup({
+        abrirPreviaDoAluno(C, it, {
           tel: (contatoAtual(it) || {}).tel,
           encarte: vendaDe(it) === "paspatur" ? await (await import("./encarte.js")).encarteDoColegio(it.escola) : undefined,
           nome: title(it.nome),
@@ -233,7 +233,7 @@ export function desenharProximo(box, it, escolhido, blocked, li) {
   if (it.etapa === "INTERESSADO")
     row.append(
       U.mkBtn("📷 Fotos para escolher", "", () =>
-        openMockup({
+        abrirPreviaDoAluno(C, it, {
           tel: (contatoAtual(it) || {}).tel,
           nome: title(it.nome),
           escola: title(it.escola),
@@ -433,7 +433,11 @@ function acoesDoCartao(it, li, e) {
           patch =>
             save(
               it,
-              Object.assign(patch, { followup: patch.retorno.data, atendendo: null, etapa: "INTERESSADO" }, !it.resp && !it.respEmail && C.me ? assumir(it) : {}),
+              Object.assign(
+                patch,
+                { followup: patch.retorno.data, atendendo: null, etapa: "INTERESSADO" },
+                !it.resp && !it.respEmail && C.me ? assumir(it) : {}
+              ),
               `Retorno marcado: ${U.fmtDate(patch.retorno.data)} às ${patch.retorno.hora}`,
               { semConfirmar: true }
             ),
