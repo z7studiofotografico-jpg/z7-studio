@@ -522,7 +522,13 @@ async function cenario(nome, fn) {
     await fn();
   } catch (e) {
     falhas++;
-    console.log("  ✗ parou com erro: " + String((e && e.message) || e).split("\n").slice(0, 4).join(" / "));
+    console.log(
+      "  ✗ parou com erro: " +
+        String((e && e.message) || e)
+          .split("\n")
+          .slice(0, 4)
+          .join(" / ")
+    );
   } finally {
     // (19/11/2026) consultas que o Firebase recusaria para a equipe (só os próprios alunos), mesmo as silenciosas
     for (const ctx of abertos) {
@@ -1102,7 +1108,10 @@ await cenario("Adriano (admin), com os dados já atualizados no servidor", async
     await pg.locator("#rsMes").click();
     const vm = pg.locator(".sheet").filter({ hasText: "Vendas de" });
     await vm.getByText("BRUNO").first().waitFor({ timeout: 8000 });
-    ok(/Vendedor/.test(await vm.textContent()) && /Pix/.test(await vm.textContent()), "Vendido no mês: abre as vendas do mês com vendedor e pagamento");
+    ok(
+      /Vendedor/.test(await vm.textContent()) && /Pix/.test(await vm.textContent()),
+      "Vendido no mês: abre as vendas do mês com vendedor e pagamento"
+    );
     if (process.env.FOTOS) await vm.screenshot({ path: process.env.FOTOS + "/vendas-mes.png" });
     await vm.getByRole("button", { name: "Fechar" }).click();
     // 🤖 Cadastro automático: conferir a ficha lida e confirmar (sem número na ficha → o menor número livre)
@@ -1540,8 +1549,15 @@ await cenario("Adriano (admin), com os dados já atualizados no servidor", async
     }
     await lin.click();
     await calmo(pg);
-    ok(/🖨️ Gerar contrato.*📏 Link das medidas/.test(await pg.locator(".sheet").last().textContent()), "avulso: a janela abre com o cartão, o contrato e o link das medidas");
-    if (process.env.FOTOS) await pg.locator(".sheet").last().screenshot({ path: process.env.FOTOS + "/avulsos-janela.png" });
+    ok(
+      /🖨️ Gerar contrato.*📏 Link das medidas/.test(await pg.locator(".sheet").last().textContent()),
+      "avulso: a janela abre com o cartão, o contrato e o link das medidas"
+    );
+    if (process.env.FOTOS)
+      await pg
+        .locator(".sheet")
+        .last()
+        .screenshot({ path: process.env.FOTOS + "/avulsos-janela.png" });
     // (24/11/2026) Retirou sem querer → "Voltar: Reservado" (com Sim / Não)
     await pg.locator(".sheet").last().getByRole("button", { name: "📦 Retirou" }).click();
     await calmo(pg);
@@ -1550,7 +1566,11 @@ await cenario("Adriano (admin), com os dados já atualizados no servidor", async
     await calmo(pg);
     s = await store();
     ok(Object.values(s).find(x => x.cliente === "Igreja Central").status === "reservado", "avulso: Voltar desfaz o Retirou");
-    await pg.locator(".sheet").last().getByRole("button", { name: /Voltar para a lista/ }).click();
+    await pg
+      .locator(".sheet")
+      .last()
+      .getByRole("button", { name: /Voltar para a lista/ })
+      .click();
     await calmo(pg);
     await pg.evaluate(() => (window.__z7CartaoNaLista = true));
     // retirada e devolução no dia do evento (marcado por padrão)
@@ -1559,10 +1579,19 @@ await cenario("Adriano (admin), com os dados já atualizados no servidor", async
     sh = pg.locator(".sheet").last();
     await sh.getByLabel("Data do evento").fill(dia(12));
     await sh.getByLabel("Data do evento").dispatchEvent("change");
-    ok((await sh.getByLabel("Retirada", { exact: true }).inputValue()) === dia(12) && (await sh.getByLabel("Devolução").inputValue()) === dia(12) && !(await sh.getByLabel("Retirada", { exact: true }).isVisible()), "retirada e devolução no dia do evento");
+    ok(
+      (await sh.getByLabel("Retirada", { exact: true }).inputValue()) === dia(12) &&
+        (await sh.getByLabel("Devolução").inputValue()) === dia(12) &&
+        !(await sh.getByLabel("Retirada", { exact: true }).isVisible()),
+      "retirada e devolução no dia do evento"
+    );
     if (process.env.FOTOS) await sh.screenshot({ path: process.env.FOTOS + "/avulso-form.png" });
     await sh.getByText("Retira e devolve no dia do evento").click();
-    ok((await sh.getByLabel("Retirada", { exact: true }).isVisible()) && (await sh.getByLabel("Retirada", { exact: true }).inputValue()) === dia(11), "desmarcado: escolhe as datas (sugere a véspera)");
+    ok(
+      (await sh.getByLabel("Retirada", { exact: true }).isVisible()) &&
+        (await sh.getByLabel("Retirada", { exact: true }).inputValue()) === dia(11),
+      "desmarcado: escolhe as datas (sugere a véspera)"
+    );
     await pg.keyboard.press("Escape");
   });
   ok(erros.length === 0, "sem erros no console" + (erros.length ? ": " + erros.slice(0, 3).join(" | ") : ""));
@@ -2167,7 +2196,10 @@ await cenario("Relatórios para imprimir (um por card)", async () => {
       const nomeCol = (await col.textContent()).trim();
       await col.locator("input").uncheck();
       const ths = await pg.$$eval("#relatorio .rel-tab th", x => x.map(t => t.textContent.trim()));
-      ok(!ths.includes(nomeCol) && !/\(21\) 97777-6666/.test(await pg.textContent("#relatorio .rel-folha")), `coluna “${nomeCol}” desmarcada não sai`);
+      ok(
+        !ths.includes(nomeCol) && !/\(21\) 97777-6666/.test(await pg.textContent("#relatorio .rel-folha")),
+        `coluna “${nomeCol}” desmarcada não sai`
+      );
       if (process.env.FOTOS) await pg.screenshot({ path: process.env.FOTOS + "/rel-colunas.png" });
       await pg.locator("#relatorio .rel-escolha summary").click();
       await pg.locator("#relatorio").getByRole("button", { name: "Fechar" }).click();
@@ -2701,11 +2733,19 @@ await cenario("ID do ensaio fechado e WhatsApp certo no celular", async () => {
     const { pg, store, erros } = await abrir(ANA, d);
     // (25/11/2026) a equipe não registra venda à mão: o sinal vai pelo link do cliente, que fecha o lead sozinho
     await pg.route("**/previas-api/cobrar.php", r =>
-      r.fulfill({ status: 200, contentType: "application/json", headers: { "Access-Control-Allow-Origin": "*" }, body: '{"url":"https://checkout.infinitepay.io/z7/teste"}' })
+      r.fulfill({
+        status: 200,
+        contentType: "application/json",
+        headers: { "Access-Control-Allow-Origin": "*" },
+        body: '{"url":"https://checkout.infinitepay.io/z7/teste"}'
+      })
     );
     await ir(pg, "#funil");
     const cardAna = pg.locator("#list .card").filter({ hasText: "Empresa Da Ana" });
-    ok((await cardAna.getByRole("button", { name: "Fechou" }).count()) === 0, "equipe: sem o Fechou (venda à mão só o Adriano e a Luciana)");
+    ok(
+      (await cardAna.getByRole("button", { name: "Fechou" }).count()) === 0,
+      "equipe: sem o Fechou (venda à mão só o Adriano e a Luciana)"
+    );
     const bSinal = cardAna.getByRole("button", { name: /Link do sinal/ });
     if (await bSinal.count()) {
       await bSinal.click();
@@ -2713,7 +2753,11 @@ await cenario("ID do ensaio fechado e WhatsApp certo no celular", async () => {
       await pg.waitForTimeout(800);
       const toastTxt = await pg.evaluate(() => [...document.querySelectorAll(".toast,#toast")].map(x => x.textContent).join(" | "));
       const la = (await store())["leads/la"];
-      ok(/^[a-z0-9]{10}$/.test(la.linkSinal || "") && la.etapa === "FOLLOW-UP", "equipe: o link do sinal fica guardado no lead (para a baixa automática) " + JSON.stringify([la.linkSinal, la.etapa, erros.slice(-2), toastTxt]));
+      ok(
+        /^[a-z0-9]{10}$/.test(la.linkSinal || "") && la.etapa === "FOLLOW-UP",
+        "equipe: o link do sinal fica guardado no lead (para a baixa automática) " +
+          JSON.stringify([la.linkSinal, la.etapa, erros.slice(-2), toastTxt])
+      );
     } else ok(false, "equipe: botão 💳 Link do sinal no card");
     ok(erros.length === 0, "sem erros no console" + (erros.length ? ": " + erros.slice(0, 3).join(" | ") : ""));
   }
@@ -3185,7 +3229,14 @@ await cenario("Prévias do colégio inteiro direto no site (janela do colégio)"
   ok(/2026 · C\.E\. TESTE · PR/i.test(await esc.getByLabel("Colégio e ano").textContent()), "o topo do cartão lista o colégio e o ano");
   await esc.getByRole("button", { name: "Continuar" }).click();
   // (26/11/2026) a ficha sempre sai da prévia: a opção fica marcada e travada
-  ok(await pg.locator(".sheet:visible").last().getByLabel(/A 1ª foto de cada aluno é a ficha/).isDisabled(), "a ficha sempre sai da prévia (opção travada)");
+  ok(
+    await pg
+      .locator(".sheet:visible")
+      .last()
+      .getByLabel(/A 1ª foto de cada aluno é a ficha/)
+      .isDisabled(),
+    "a ficha sempre sai da prévia (opção travada)"
+  );
   await pg.locator(".sheet:visible").getByRole("button", { name: "Escolher a pasta do colégio" }).click();
   await pg.waitForFunction(() => /Pronto!/.test(document.querySelector(".sheet:last-of-type")?.textContent || ""), null, {
     timeout: 15000
@@ -3428,8 +3479,22 @@ await cenario("Agendamento · Importação: folha da turma (20 por página, nome
 await cenario("Cadastro automático: um toque manda as fichas para o Claude ler (25/11/2026)", async () => {
   const Y = new Date().getFullYear();
   const d = Object.assign({}, migrar(base), {
-    "fichas/fn1": { escola: "COLEGIO BETA", ano: Y, colNome: "repasse", pasta: "26 -CB- 01 - ANA NOVA", img: "data:image/gif;base64,R0lGODlhAQABAAAAACw=", status: "nova" },
-    "fichas/fn2": { escola: "COLEGIO BETA", ano: Y, colNome: "repasse", pasta: "26 -CB- 02 - BIA NOVA", img: "data:image/gif;base64,R0lGODlhAQABAAAAACw=", status: "nova" }
+    "fichas/fn1": {
+      escola: "COLEGIO BETA",
+      ano: Y,
+      colNome: "repasse",
+      pasta: "26 -CB- 01 - ANA NOVA",
+      img: "data:image/gif;base64,R0lGODlhAQABAAAAACw=",
+      status: "nova"
+    },
+    "fichas/fn2": {
+      escola: "COLEGIO BETA",
+      ano: Y,
+      colNome: "repasse",
+      pasta: "26 -CB- 02 - BIA NOVA",
+      img: "data:image/gif;base64,R0lGODlhAQABAAAAACw=",
+      status: "nova"
+    }
   });
   const { pg, erros, store } = await abrir(ADRIANO, d);
   await ir(pg, "#home");
@@ -3440,12 +3505,18 @@ await cenario("Cadastro automático: um toque manda as fichas para o Claude ler 
   await ca.getByRole("button", { name: "🤖 Pedir a leitura" }).click();
   await calmo(pg);
   const st = await store();
-  ok(Object.keys(st).some(k => /^fichasPedidos\//.test(k) && st[k].status === "na fila"), "o pedido entra na fila");
+  ok(
+    Object.keys(st).some(k => /^fichasPedidos\//.test(k) && st[k].status === "na fila"),
+    "o pedido entra na fila"
+  );
   await ca.getByRole("button", { name: "🤖 Mandar para o Claude ler" }).waitFor({ timeout: 8000 });
   ok(/toque em “🤖 Mandar para o Claude ler” e aperte Enter/.test(await ca.textContent()), "o aviso diz o que fazer");
   await pg.evaluate(() => [...document.querySelectorAll("button")].find(b => /Claude no site/.test(b.textContent)).click());
   await pg.waitForTimeout(300);
-  ok((await pg.evaluate(() => window.__aberto)) === "https://claude.ai/new?q=l%C3%AA%20as%20fichas", "o site do Claude abre com “lê as fichas”");
+  ok(
+    (await pg.evaluate(() => window.__aberto)) === "https://claude.ai/new?q=l%C3%AA%20as%20fichas",
+    "o site do Claude abre com “lê as fichas”"
+  );
   if (process.env.FOTOS) await ca.locator(".panel").screenshot({ path: process.env.FOTOS + "/fichas-claude.png" });
   ok(!erros.length, "sem erros" + (erros.length ? ": " + erros.join(" | ") : ""));
 });
@@ -3498,10 +3569,16 @@ await cenario("Tabela de preço dos colégios no PR (o Juntar colégio saiu)", a
     await sh.locator(".panel").screenshot({ path: process.env.FOTOS + "/tabela-preco.png" });
   }
   // (25/11/2026) tocar no "sem preço" abre o preço certo (Paspatur do Colégio Alfa); salvo, a tabela volta atualizada
-  await sh.getByText(/Paspatur: sem preço/).first().click();
+  await sh
+    .getByText(/Paspatur: sem preço/)
+    .first()
+    .click();
   await calmo(pg);
   const jp = pg.locator(".sheet").last();
-  ok(/Preço · Paspatur · Linha de Frente/.test(await jp.textContent()) && /Colegio Alfa/i.test(await jp.textContent()), "abre o preço do Paspatur do colégio");
+  ok(
+    /Preço · Paspatur · Linha de Frente/.test(await jp.textContent()) && /Colegio Alfa/i.test(await jp.textContent()),
+    "abre o preço do Paspatur do colégio"
+  );
   if (process.env.FOTOS) await jp.locator(".panel").screenshot({ path: process.env.FOTOS + "/tabela-preco-cadastrar.png" });
   await jp.locator("input").first().fill("160");
   await jp.getByRole("button", { name: "Salvar preço" }).click();
@@ -3997,7 +4074,12 @@ await cenario("Aluguel de becas · alunos dos colégios (status, estoque e produ
   await pg.locator("#alKpis .kpi", { hasText: "Becas fora" }).click();
   const jf = pg.locator(".sheet").last();
   await jf.waitFor({ timeout: 5000 });
-  ok(/Becas fora/.test(await jf.textContent()) && /Caio Atrasado/.test(await jf.textContent()) && /passou da devolução/.test(await jf.textContent()), "janela Becas fora: quem está com a beca e o atraso");
+  ok(
+    /Becas fora/.test(await jf.textContent()) &&
+      /Caio Atrasado/.test(await jf.textContent()) &&
+      /passou da devolução/.test(await jf.textContent()),
+    "janela Becas fora: quem está com a beca e o atraso"
+  );
   if (process.env.FOTOS) await jf.screenshot({ path: process.env.FOTOS + "/becas-fora.png" });
   await jf.getByRole("button", { name: "Fechar" }).click();
   await pg.locator("#alChips .chip", { hasText: "Tudo" }).click();
@@ -4098,11 +4180,32 @@ await cenario("Lista compacta do PR e janela do aluno (abas, conversa e Claude)"
   await j.getByRole("button", { name: "Achou caro" }).click();
   await calmo(pg);
   const st2 = await store();
-  ok(Object.values(st2).some(x => x && Array.isArray(x.objecoes) && x.objecoes.includes("Achou caro")), "a dúvida do cliente fica guardada (um toque)");
+  ok(
+    Object.values(st2).some(x => x && Array.isArray(x.objecoes) && x.objecoes.includes("Achou caro")),
+    "a dúvida do cliente fica guardada (um toque)"
+  );
   ok((await j.getByRole("button", { name: "📎 Anexar conversa" }).count()) === 1, "botão para anexar a conversa exportada do WhatsApp");
   // (26/11/2026) o Adriano vê as dúvidas contadas e as conversas para baixar
   await pg.route("**/previas-api/conversas.php**", r =>
-    r.fulfill({ status: 200, contentType: "application/json", headers: { "Access-Control-Allow-Origin": "*" }, body: JSON.stringify({ conversas: [{ id: "202611-abc", col: "repasse", aluno: "x", codigo: "26COL-01", nome: "ALUNO TESTE", em: "2026-11-26T12:00:00Z", tam: 2048, ext: "zip" }] }) })
+    r.fulfill({
+      status: 200,
+      contentType: "application/json",
+      headers: { "Access-Control-Allow-Origin": "*" },
+      body: JSON.stringify({
+        conversas: [
+          {
+            id: "202611-abc",
+            col: "repasse",
+            aluno: "x",
+            codigo: "26COL-01",
+            nome: "ALUNO TESTE",
+            em: "2026-11-26T12:00:00Z",
+            tam: 2048,
+            ext: "zip"
+          }
+        ]
+      })
+    })
   );
   await pg.evaluate(() => document.getElementById("rConv").click());
   const an = pg.locator(".sheet").filter({ hasText: "Conversas e dúvidas dos clientes" });
@@ -4284,7 +4387,19 @@ await cenario("Aluguel de becas: entrada / antecipação do colégio, Recebido e
   const Y = new Date().getFullYear();
   const al = (nome, extra) =>
     Object.assign(
-      { instId: "i1", instNome: "COLEGIO ALFA", ano: Y, nome, serie: "5º ano", status: "Cadastrado", produtos: [], historico: [], pacote: ["paspatur"], valor: 80, respEmail: ANA },
+      {
+        instId: "i1",
+        instNome: "COLEGIO ALFA",
+        ano: Y,
+        nome,
+        serie: "5º ano",
+        status: "Cadastrado",
+        produtos: [],
+        historico: [],
+        pacote: ["paspatur"],
+        valor: 80,
+        respEmail: ANA
+      },
       extra
     );
   const d = Object.assign({}, migrar(base), {
@@ -4292,8 +4407,18 @@ await cenario("Aluguel de becas: entrada / antecipação do colégio, Recebido e
     "alugueis/c2": al("Miguel Augusto"),
     "alugueis/c3": al("Pedro Henrique"),
     [`contratosColegio/i1_${Y}`]: {
-      instId: "i1", instNome: "COLEGIO ALFA", ano: Y, respEmail: ANA, respNome: "Ana Vendedora",
-      quemPaga: "alunos", recebePadrao: "estudio", valor: 80, parcelas: 1, precos: { paspatur: 80 }, pacotePadrao: ["paspatur"], comissaoPct: 10
+      instId: "i1",
+      instNome: "COLEGIO ALFA",
+      ano: Y,
+      respEmail: ANA,
+      respNome: "Ana Vendedora",
+      quemPaga: "alunos",
+      recebePadrao: "estudio",
+      valor: 80,
+      parcelas: 1,
+      precos: { paspatur: 80 },
+      pacotePadrao: ["paspatur"],
+      comissaoPct: 10
     }
   });
   const { pg, erros, store } = await abrir(ADRIANO, d);
@@ -4316,11 +4441,18 @@ await cenario("Aluguel de becas: entrada / antecipação do colégio, Recebido e
   await calmo(pg);
   ok(/comissão R\$\s*7,20 a pagar/.test(await pg.locator(".sheet").last().textContent()), "conferido: comissão de 10% a pagar");
   await pg.locator(".sheet").last().getByRole("button", { name: "Paguei a comissão" }).click();
-  await pg.getByRole("button", { name: /Confirmar|Sim/ }).last().click();
+  await pg
+    .getByRole("button", { name: /Confirmar|Sim/ })
+    .last()
+    .click();
   await calmo(pg);
   st = await store();
   ok(!!st[pk].comissaoPagaEm, "Paguei a comissão grava a data");
-  if (process.env.FOTOS) await pg.locator(".sheet").last().screenshot({ path: process.env.FOTOS + "/contrato-entrada.png" });
+  if (process.env.FOTOS)
+    await pg
+      .locator(".sheet")
+      .last()
+      .screenshot({ path: process.env.FOTOS + "/contrato-entrada.png" });
   await pg.locator(".sheet").last().getByRole("button", { name: "Fechar" }).click();
   await calmo(pg);
   await pg.waitForTimeout(800);
@@ -4336,18 +4468,45 @@ await cenario("Aluguel de becas: entrada / antecipação do colégio, Recebido e
   await pg.getByRole("button", { name: "🖨️ Gerar contrato" }).click();
   await pg.waitForFunction(() => window.__aba && /CONTRATO DE LOCAÇÃO DE BECAS/.test(window.__aba.html), null, { timeout: 8000 });
   const txt = await pg.evaluate(() => window.__aba.html);
-  ok(/COLEGIO ALFA/.test(txt) && /Entrada já paga em 01\/05/.test(txt) && /3 alunos/.test(txt), "contrato do colégio sai com os alunos e a entrada");
+  ok(
+    /COLEGIO ALFA/.test(txt) && /Entrada já paga em 01\/05/.test(txt) && /3 alunos/.test(txt),
+    "contrato do colégio sai com os alunos e a entrada"
+  );
   ok(/Recebido\s*R\$\s*72/.test(topo) && /A receber\s*R\$\s*168/.test(topo), "topo: Recebido R$ 72 e A receber R$ 168");
   if (process.env.FOTOS) await pg.locator("#viewBecas").screenshot({ path: process.env.FOTOS + "/becas-topo.png" });
   ok(!erros.length, "sem erros" + (erros.length ? ": " + erros.join(" | ") : ""));
 });
 await cenario("Contrato do colégio: recepcionista que coloca as becas (soma no total, aparece na faixa)", async () => {
   const Y = new Date().getFullYear();
-  const al = nome => ({ instId: "i1", instNome: "COLEGIO ALFA", ano: Y, nome, serie: "5º ano", status: "Cadastrado", produtos: [], historico: [], pacote: ["beca"], valor: 100, respEmail: ADRIANO });
+  const al = nome => ({
+    instId: "i1",
+    instNome: "COLEGIO ALFA",
+    ano: Y,
+    nome,
+    serie: "5º ano",
+    status: "Cadastrado",
+    produtos: [],
+    historico: [],
+    pacote: ["beca"],
+    valor: 100,
+    respEmail: ADRIANO
+  });
   const d = Object.assign({}, migrar(base), {
     "alugueis/c1": al("Joao Lucas"),
     "alugueis/c2": al("Miguel Augusto"),
-    [`contratosColegio/i1_${Y}`]: { instId: "i1", instNome: "COLEGIO ALFA", ano: Y, respEmail: ADRIANO, respNome: "Adriano", quemPaga: "alunos", recebePadrao: "estudio", valor: 100, parcelas: 1, precos: { beca: 100 }, pacotePadrao: ["beca"] }
+    [`contratosColegio/i1_${Y}`]: {
+      instId: "i1",
+      instNome: "COLEGIO ALFA",
+      ano: Y,
+      respEmail: ADRIANO,
+      respNome: "Adriano",
+      quemPaga: "alunos",
+      recebePadrao: "estudio",
+      valor: 100,
+      parcelas: 1,
+      precos: { beca: 100 },
+      pacotePadrao: ["beca"]
+    }
   });
   const { pg, erros, store } = await abrir(ADRIANO, d);
   await ir(pg, "#becas");
@@ -4365,9 +4524,15 @@ await cenario("Contrato do colégio: recepcionista que coloca as becas (soma no 
   await calmo(pg);
   const st = await store();
   const c = st[`contratosColegio/i1_${Y}`];
-  ok(c.recepcionista && c.recepcionista.tem && c.recepcionista.nome === "Carla Souza" && c.recepcionista.valor === 200, "recepcionista gravada no contrato");
+  ok(
+    c.recepcionista && c.recepcionista.tem && c.recepcionista.nome === "Carla Souza" && c.recepcionista.valor === 200,
+    "recepcionista gravada no contrato"
+  );
   const painel = pg.locator(".sheet").last();
-  ok(/Recepcionista\s*Carla Souza/.test(await painel.textContent()) && /Falta receber\s*R\$\s*400/.test(await painel.textContent()), "aparece no contrato e soma no Falta receber (200 + 200)");
+  ok(
+    /Recepcionista\s*Carla Souza/.test(await painel.textContent()) && /Falta receber\s*R\$\s*400/.test(await painel.textContent()),
+    "aparece no contrato e soma no Falta receber (200 + 200)"
+  );
   await painel.getByRole("button", { name: "Fechar" }).click();
   await calmo(pg);
   await pg.waitForTimeout(800);
@@ -4378,13 +4543,37 @@ await cenario("Contrato do colégio: recepcionista que coloca as becas (soma no 
 });
 await cenario("Aluguel de becas: o estoque é o limite e o sistema sugere a troca de tamanho", async () => {
   const Y = new Date().getFullYear();
-  const al = (nome, t) => ({ instId: "i1", instNome: "COLEGIO ALFA", ano: Y, nome, serie: "5º ano", status: "Cadastrado", produtos: [], historico: [], becaTipo: "tradPreta", tamanho: t, contratoZerado: true });
+  const al = (nome, t) => ({
+    instId: "i1",
+    instNome: "COLEGIO ALFA",
+    ano: Y,
+    nome,
+    serie: "5º ano",
+    status: "Cadastrado",
+    produtos: [],
+    historico: [],
+    becaTipo: "tradPreta",
+    tamanho: t,
+    contratoZerado: true
+  });
   const d = Object.assign({}, migrar(base), {
     "config/app": Object.assign({}, base["config/app"], { estoque: { becas: { tradPreta: 6 }, tamanhos: { tradPreta: { P: 1, M: 5 } } } }),
     "alugueis/a1": al("Ana Primeira", "P"),
     "alugueis/a2": al("Bia Segunda", "P"),
     "alugueis/a3": Object.assign(al("Caio Espera", ""), { esperaBeca: "PP azul" }),
-    "becasUso/evento_i1_diaBecas": { tipo: "evento", status: "reservado", instId: "i1", instNome: "COLEGIO ALFA", campo: "diaBecas", retirada: `${Y}-12-07`, devolucao: `${Y}-12-07`, becasQtd: {}, tamanhosQtd: {}, faixasQtd: {}, capelosQtd: {} }
+    "becasUso/evento_i1_diaBecas": {
+      tipo: "evento",
+      status: "reservado",
+      instId: "i1",
+      instNome: "COLEGIO ALFA",
+      campo: "diaBecas",
+      retirada: `${Y}-12-07`,
+      devolucao: `${Y}-12-07`,
+      becasQtd: {},
+      tamanhosQtd: {},
+      faixasQtd: {},
+      capelosQtd: {}
+    }
   });
   const { pg, erros, store } = await abrir(ADRIANO, d);
   await ir(pg, "#becas");
@@ -4392,7 +4581,10 @@ await cenario("Aluguel de becas: o estoque é o limite e o sistema sugere a troc
   await pg.locator("#alFiltros select").nth(2).selectOption("i1");
   await calmo(pg);
   const esp = pg.locator("#alLista .lc-item", { hasText: "Caio Espera" }).locator(".lc-passo");
-  ok(/Esperando a beca ideal \(PP azul\)/.test(await esp.textContent()) && /late/.test(await esp.getAttribute("class")), "aviso vermelho: esperando a beca ideal");
+  ok(
+    /Esperando a beca ideal \(PP azul\)/.test(await esp.textContent()) && /late/.test(await esp.getAttribute("class")),
+    "aviso vermelho: esperando a beca ideal"
+  );
   if (process.env.FOTOS) await pg.locator("#alLista").screenshot({ path: process.env.FOTOS + "/esperando-beca.png" });
   await pg.getByRole("button", { name: "⏩ Avançar o colégio inteiro" }).click();
   const sh = pg.locator(".sheet").filter({ hasText: "Avançar o colégio inteiro" });
@@ -4400,13 +4592,21 @@ await cenario("Aluguel de becas: o estoque é o limite e o sistema sugere a troc
   await pg.locator(".sheet").last().getByRole("button", { name: "Sim, passar todos" }).click();
   await sh.getByText(/1 aluno em/).waitFor({ timeout: 8000 });
   let st = await store();
-  ok(st["alugueis/a1"].status === "Beca medida" && st["alugueis/a2"].status === "Cadastrado", "só 1 P no estoque: o segundo não passa do limite");
+  ok(
+    st["alugueis/a1"].status === "Beca medida" && st["alugueis/a2"].status === "Cadastrado",
+    "só 1 P no estoque: o segundo não passa do limite"
+  );
   ok(/Bia Segunda: P → M/.test(await sh.textContent()), "sugere a troca para o tamanho mais perto com beca livre");
   if (process.env.FOTOS) await sh.screenshot({ path: process.env.FOTOS + "/troca-tamanho.png" });
   await sh.getByRole("button", { name: /Trocar o tamanho de 1 e avançar/ }).click();
   await sh.getByText(/1 trocado de tamanho/).waitFor({ timeout: 8000 });
   st = await store();
-  ok(st["alugueis/a2"].tamanho === "M" && st["alugueis/a2"].status === "Beca medida" && /P → M/.test(JSON.stringify(st["alugueis/a2"].historico)), "trocou para M, reservou e anotou no histórico");
+  ok(
+    st["alugueis/a2"].tamanho === "M" &&
+      st["alugueis/a2"].status === "Beca medida" &&
+      /P → M/.test(JSON.stringify(st["alugueis/a2"].historico)),
+    "trocou para M, reservou e anotou no histórico"
+  );
   ok(!erros.length, "sem erros" + (erros.length ? ": " + erros.join(" | ") : ""));
 });
 await cenario("Formaturas · abas Linha de Frente / Repasse / Venda Antecipada, virada e Pix", async () => {
@@ -5265,9 +5465,38 @@ await cenario("Aluguel de becas: avançar o colégio inteiro (Cadastrado → Bec
 });
 await cenario("Aluguel avulso: medidas recebidas pelo link entram no aluguel (24/11/2026)", async () => {
   const d = Object.assign({}, migrar(base), {
-    "becas/b1": { cliente: "Paula Teste", status: "reservado", tipoEvento: "outro", becasQtd: { infAzul: 2 }, qtd: 2, retirada: dia(5), devolucao: dia(5), dataEvento: dia(5), valor: 100, pago: 0 },
-    "medidasBeca/m1": { aluguelId: "b1", nome: "Ana Clara", tipo: "infantil", manga: 45, comp: 104, larg: 0, tamanho: "P", em: new Date().toISOString() },
-    "medidasBeca/m2": { aluguelId: "b1", nome: "Joao", tipo: "infantil", manga: 47, comp: 109, larg: 0, tamanho: "M", em: new Date().toISOString() }
+    "becas/b1": {
+      cliente: "Paula Teste",
+      status: "reservado",
+      tipoEvento: "outro",
+      becasQtd: { infAzul: 2 },
+      qtd: 2,
+      retirada: dia(5),
+      devolucao: dia(5),
+      dataEvento: dia(5),
+      valor: 100,
+      pago: 0
+    },
+    "medidasBeca/m1": {
+      aluguelId: "b1",
+      nome: "Ana Clara",
+      tipo: "infantil",
+      manga: 45,
+      comp: 104,
+      larg: 0,
+      tamanho: "P",
+      em: new Date().toISOString()
+    },
+    "medidasBeca/m2": {
+      aluguelId: "b1",
+      nome: "Joao",
+      tipo: "infantil",
+      manga: 47,
+      comp: 109,
+      larg: 0,
+      tamanho: "M",
+      em: new Date().toISOString()
+    }
   });
   const { pg, store } = await abrir(ADRIANO, d);
   await ir(pg, "#becas");
@@ -5280,7 +5509,12 @@ await cenario("Aluguel avulso: medidas recebidas pelo link entram no aluguel (24
   await pg.getByRole("button", { name: /Usar os tamanhos recebidos/ }).click();
   await calmo(pg);
   const st = await store();
-  ok(st["becas/b1"].tamanhosQtd.infAzul.P === 1 && st["becas/b1"].tamanhosQtd.infAzul.M === 1 && /infantil azul: 1 P, 1 M/.test(st["becas/b1"].tamanhos), "os tamanhos entram no aluguel");
+  ok(
+    st["becas/b1"].tamanhosQtd.infAzul.P === 1 &&
+      st["becas/b1"].tamanhosQtd.infAzul.M === 1 &&
+      /infantil azul: 1 P, 1 M/.test(st["becas/b1"].tamanhos),
+    "os tamanhos entram no aluguel"
+  );
 });
 
 await cenario("Provável venda: data e hora do retorno, com quem falar", async () => {
@@ -5334,20 +5568,33 @@ await cenario("Provável venda: data e hora do retorno, com quem falar", async (
   await calmo(pg);
   const x = (await store())["repasse/rv1"];
   ok(
-    x.etapa === "INTERESSADO" && x.retorno.hora === "15:30" && x.retornoAvisar === dia(1) + "T15:30" && /mãe de Rayane \(Rosa\)/.test(x.retorno.com) && x.followup === dia(1),
+    x.etapa === "INTERESSADO" &&
+      x.retorno.hora === "15:30" &&
+      x.retornoAvisar === dia(1) + "T15:30" &&
+      /mãe de Rayane \(Rosa\)/.test(x.retorno.com) &&
+      x.followup === dia(1),
     "retorno gravado: provável venda, dia, hora, com quem falar e o aviso"
   );
   await pg.locator("#rChips").getByText("Provável venda").click();
   await calmo(pg);
   const txt = await pg.locator("#rList").textContent();
-  ok(/PROVÁVEL VENDA/.test(txt) && /às 15:30 – entrar em contato com mãe de Rayane \(Rosa\)/.test(txt), "aparece embaixo do nome: dia, hora e com quem falar");
+  ok(
+    /PROVÁVEL VENDA/.test(txt) && /às 15:30 – entrar em contato com mãe de Rayane \(Rosa\)/.test(txt),
+    "aparece embaixo do nome: dia, hora e com quem falar"
+  );
   ok(new RegExp("📅 " + dia(1).slice(8, 10) + "/" + dia(1).slice(5, 7)).test(txt), "a aba fica separada pelo dia do retorno");
-  ok(/Sem data de retorno/.test(txt) && txt.indexOf("Flavia") < txt.indexOf("Rayane"), "quem não tem retorno marcado fica no topo, para marcar");
+  ok(
+    /Sem data de retorno/.test(txt) && txt.indexOf("Flavia") < txt.indexOf("Rayane"),
+    "quem não tem retorno marcado fica no topo, para marcar"
+  );
   if (process.env.FOTOS) {
     await pg.waitForTimeout(3500);
     await pg.locator("#rList").screenshot({ path: process.env.FOTOS + "/provavel-venda.png" });
   }
-  ok((await pg.locator("article", { hasText: "Rayane" }).first().getByRole("button", { name: "📅 Remarcar retorno" }).count()) === 1, "o botão vira Remarcar retorno");
+  ok(
+    (await pg.locator("article", { hasText: "Rayane" }).first().getByRole("button", { name: "📅 Remarcar retorno" }).count()) === 1,
+    "o botão vira Remarcar retorno"
+  );
   ok(!erros.length, "sem erros" + (erros.length ? ": " + erros.join(" | ") : ""));
 });
 await cenario("Colégio sem preço: aviso vermelho e venda bloqueada", async () => {
@@ -5421,13 +5668,16 @@ await cenario("Registrar venda: endereço completo obrigatório e CEP preenche a
     await calmo(pg);
     const art = pg.locator("article", { hasText: "Luana" }).first();
     ok(
-      (await art.getByRole("button", { name: "Pagou 💰" }).count()) === 0 && (await art.getByRole("button", { name: /Mandar link de pagamento/ }).count()) === 1,
+      (await art.getByRole("button", { name: "Pagou 💰" }).count()) === 0 &&
+        (await art.getByRole("button", { name: /Mandar link de pagamento/ }).count()) === 1,
       "equipe: sem o Pagou 💰, só o link de pagamento do aluno"
     );
   }
   // (o Adriano vê o ano atual na lista)
   Object.assign(d["repasse/v1"], { resp: "Adriano", respEmail: ADRIANO, ano: Y });
-  d["config/precosColegio"] = { colegios: { [chavePreco("COLEGIO ALFA", Y)]: { pr: { lfPix: 297, lfCartao: 330, kitPromo: 297, kitPreco: 350 } } } };
+  d["config/precosColegio"] = {
+    colegios: { [chavePreco("COLEGIO ALFA", Y)]: { pr: { lfPix: 297, lfCartao: 330, kitPromo: 297, kitPreco: 350 } } }
+  };
   const { pg, erros, store, ctx } = await abrir(ADRIANO, migrar(d));
   await ctx.route(/viacep\.com\.br\/ws\/26540000\/json/, rt =>
     rt.fulfill({
@@ -6042,14 +6292,20 @@ await cenario("📂 Fotos numa pasta só: separa pela ficha e cria as pastas dos
     const st = await store();
     const nova = Object.entries(st).find(([k, v]) => k.startsWith("fichas/") && v.status === "nova" && /que faltou/.test(v.pasta || ""));
     const pf = Object.entries(st).find(([k]) => k.startsWith("pastasFotos/"));
-    ok(nova && nova[1].fotos.join() === "_MG_0912.JPG" && pf && pf[1].fotos.length === 2, "➕ aluno que faltou: ficha nova com a foto marcada; sai da pasta do outro");
+    ok(
+      nova && nova[1].fotos.join() === "_MG_0912.JPG" && pf && pf[1].fotos.length === 2,
+      "➕ aluno que faltou: ficha nova com a foto marcada; sai da pasta do outro"
+    );
     // desfaz, para o resto do teste seguir igual
-    await pg.evaluate(([k, kp]) => {
-      window.__store.delete(k);
-      const v = window.__store.get(kp);
-      v.fotos = ["_MG_0910.JPG", "_MG_0911.JPG", "_MG_0912.JPG"];
-      window.__store.set(kp, v);
-    }, [nova[0], pf[0]]);
+    await pg.evaluate(
+      ([k, kp]) => {
+        window.__store.delete(k);
+        const v = window.__store.get(kp);
+        v.fotos = ["_MG_0910.JPG", "_MG_0911.JPG", "_MG_0912.JPG"];
+        window.__store.set(kp, v);
+      },
+      [nova[0], pf[0]]
+    );
   }
   await ca.getByRole("button", { name: /Criar as pastas dos alunos \(1\)/ }).click();
   await calmo(pg);
