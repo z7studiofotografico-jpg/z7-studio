@@ -4,14 +4,13 @@
 // (quem recebeu cada um), alunos e pacotes (um por um ou vários de uma vez) e o relatório de produção.
 // Quem mexe: o admin e o representante que fechou. Cada mudança guarda quem fez e quando. Regras em contrato-colegio-regras.js.
 import { textoRecepcionista } from "./recepcionista.js";
-import { el, title, field, inp, inpReais, sel, sheet, botoes, bloco, blocosDesde } from "./ui.js";
+import { el, title, field, inp, inpReais, sel, sheet, botoes, blocosDesde } from "./ui.js";
 import * as U from "./util.js";
 import { lerReais, brl } from "./regras.js";
 import { confirmar } from "./confirmar.js";
 import { abrirRelatorio } from "./relatorio.js";
 import { contatoRel, ordemCodigo } from "./aluno-id.js";
 import * as R from "./contrato-colegio-regras.js";
-import { chipItem, lerQtd } from "./itens-qtd.js";
 
 let C, FS, db;
 let stAtual = null; // o contrato aberto (os preços para o valor do pacote)
@@ -428,17 +427,29 @@ function linhaPagamento(pg, st, ref, pode) {
   // (24/11/2026) comissão de cada pagamento conferido: a pagar → "Paguei a comissão" (só o admin)
   const com = !R.semComissao(c, C.isDono) && onde === "caixa" && pg.conferido ? R.comissaoPagamento(pg, C.P, c) / 100 : 0;
   if (com > 0) {
-    l.append(el("span", "tag " + (pg.comissaoPagaEm ? "ok" : "warn"), `comissão ${brl(com)} ${pg.comissaoPagaEm ? "paga " + dataBR(pg.comissaoPagaEm) : "a pagar"}`));
+    l.append(
+      el(
+        "span",
+        "tag " + (pg.comissaoPagaEm ? "ok" : "warn"),
+        `comissão ${brl(com)} ${pg.comissaoPagaEm ? "paga " + dataBR(pg.comissaoPagaEm) : "a pagar"}`
+      )
+    );
     if (C.isAdmin)
       ac.append(
-        U.mkBtn(pg.comissaoPagaEm ? "Desfazer comissão paga" : "Paguei a comissão", "btn-sm" + (pg.comissaoPagaEm ? "" : " btn-ok"), async () => {
-          if (!pg.comissaoPagaEm && !(await confirmar("Pagou a comissão?", `Marcar a comissão de ${brl(com)} como paga hoje?`))) return;
-          muda(
-            pg.comissaoPagaEm ? { comissaoPagaEm: "", comissaoPagaPor: "" } : { comissaoPagaEm: U.todayStr(), comissaoPagaPor: C.me || "" },
-            pg.comissaoPagaEm ? "desfez a comissão paga" : `pagou a comissão (${brl(com)})`,
-            pg.comissaoPagaEm ? "Comissão voltou para a pagar" : "Comissão marcada como paga ✅"
-          );
-        })
+        U.mkBtn(
+          pg.comissaoPagaEm ? "Desfazer comissão paga" : "Paguei a comissão",
+          "btn-sm" + (pg.comissaoPagaEm ? "" : " btn-ok"),
+          async () => {
+            if (!pg.comissaoPagaEm && !(await confirmar("Pagou a comissão?", `Marcar a comissão de ${brl(com)} como paga hoje?`))) return;
+            muda(
+              pg.comissaoPagaEm
+                ? { comissaoPagaEm: "", comissaoPagaPor: "" }
+                : { comissaoPagaEm: U.todayStr(), comissaoPagaPor: C.me || "" },
+              pg.comissaoPagaEm ? "desfez a comissão paga" : `pagou a comissão (${brl(com)})`,
+              pg.comissaoPagaEm ? "Comissão voltou para a pagar" : "Comissão marcada como paga ✅"
+            );
+          }
+        )
       );
   }
   if (pode && (C.isAdmin || R.repPodeMexer(pg))) ac.append(U.mkBtn("Editar", "btn-sm", () => formPagamento(pg, st, ref)));

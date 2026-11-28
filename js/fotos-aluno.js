@@ -628,6 +628,34 @@ export function trocarFotos(C, it, salvar) {
 
 // (27/11/2026) "🖼️ Prévia" e "📷 Fotos para escolher" abrem já com as fotos do aluno (do site ou do Drive), sem
 // precisar arrastar. Sem fotos guardadas, abre como antes (com a foto de exemplo, para arrastar).
+// (28/11/2026) a foto com a ficha (o aluno segurando o papel) nunca entra na prévia: no vídeo do Adriano, o quadro
+// 30x40 saiu com ela. Mesma regra do link de pagamento: colégio sem fichas guardadas = a 1ª foto é a da ficha;
+// e, por garantia, procura o papel branco nas 3 primeiras que sobraram.
+async function semFotoDaFicha(C, it, fotos) {
+  if (fotos.length < 2) return fotos;
+  let fichaSaiu = false;
+  try {
+    const s = await C.FS.getDocs(
+      C.FS.query(
+        C.FS.collection(C.db, "fichas"),
+        C.FS.where("escola", "==", it.escola || ""),
+        C.FS.where("ano", "==", Number(it.ano) || null),
+        C.FS.limit(1)
+      )
+    );
+    fichaSaiu = !s.empty;
+  } catch (e) {
+    console.warn("[Z7] fichas do colégio", e);
+  }
+  const r = fichaSaiu ? fotos.slice() : fotos.slice(1);
+  try {
+    const { fotoDaFicha } = await import("./fichas.js");
+    for (let i = 0; i < Math.min(3, r.length); i++) if ((await fotoDaFicha(r[i])).achou) r.splice(i--, 1);
+  } catch (e) {
+    console.warn("[Z7] procurar a ficha nas fotos", e);
+  }
+  return r.length ? r : fotos.slice(fichaSaiu ? 0 : 1);
+}
 export async function abrirPreviaDoAluno(C, it, opcoes) {
   U.toast("Carregando as fotos de " + U.first(title(it.nome || "")) + "…");
   let fotos = [];
@@ -635,8 +663,9 @@ export async function abrirPreviaDoAluno(C, it, opcoes) {
     const r = await fotosParaLink(C, it);
     if (r && r.fotos && r.fotos.length) {
       const D = abrirDrive(C);
-      const lista = r.fotos.slice(0, opcoes.maxFotos || 15);
+      const lista = r.fotos.slice(0, (opcoes.maxFotos || 15) + 1);
       fotos = (await Promise.all(lista.map(f => D.baixar(f.id).catch(() => null)))).filter(Boolean);
+      fotos = (await semFotoDaFicha(C, it, fotos)).slice(0, opcoes.maxFotos || 15);
     }
   } catch (e) {
     console.warn("[Z7] fotos para a prévia", e);

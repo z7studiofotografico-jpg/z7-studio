@@ -155,7 +155,13 @@ async function sugerirTrocas(C, travados, para, mudarStatus, msg) {
       if (r === "ok") ok++;
       else nao.push(`${title(a.nome)}: ${r}`);
     }
-    msg.append(el("p", "notice", `✅ ${ok} trocado${ok === 1 ? "" : "s"} de tamanho e em “${para}”.` + (nao.length ? ` Ficaram: ${nao.join("; ")}` : "")));
+    msg.append(
+      el(
+        "p",
+        "notice",
+        `✅ ${ok} trocado${ok === 1 ? "" : "s"} de tamanho e em “${para}”.` + (nao.length ? ` Ficaram: ${nao.join("; ")}` : "")
+      )
+    );
   });
   msg.append(el("p", "notice", "💡 O estoque é o limite. Sugestão de troca de tamanho (o mais perto com beca livre):"), ul, btn);
 }

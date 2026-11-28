@@ -149,11 +149,11 @@
         margin: 14px 0 2px;
         line-height: 1.05;
       }
+      /* 28/11/2026: o "5x" do mesmo tamanho da parcela, na mesma linha */
       .parcela span {
-        display: block;
-        font-size: 16px;
-        color: var(--suave);
-        font-weight: 600;
+        font-size: 44px;
+        color: #b3202a;
+        font-weight: 700;
       }
       .parcela b {
         font-size: 44px;
@@ -170,22 +170,26 @@
         font-weight: 700;
         margin: 6px 0 0;
       }
-      /* o prazo do atendimento: grafite (como o topo), com o filete vermelho do Z7 e a data grande */
+      /* o prazo do atendimento: grafite com o filete vermelho; "TERMINA" em vermelho e a data grande (28/11/2026) */
       .prazo {
         display: block;
         margin: 14px 0 0;
         background: var(--grafite);
         color: #fff;
-        border-left: 6px solid var(--vermelho);
+        border-left: 7px solid var(--vermelho);
         border-radius: 14px;
-        padding: 12px 16px;
-        font-weight: 600;
-        font-size: 15px;
+        padding: 14px 18px;
+        font-weight: 800;
+        font-size: 17px;
         line-height: 1.2;
+      }
+      .prazo i {
+        font-style: normal;
+        color: #ff5a63;
       }
       .prazo b {
         display: block;
-        font-size: 32px;
+        font-size: 38px;
         letter-spacing: 0.5px;
         text-transform: uppercase;
         margin-top: 2px;
@@ -596,7 +600,7 @@
             h +=
               '<p class="parcela"><span>' +
               vz +
-              "x de</span><b>" +
+              "x </span><b>" +
               esc(dinheiro(parc)) +
               "</b><small>sem juros no cartão · o kit completo</small></p>";
             h += '<p class="avista">ou ' + esc(dinheiro(pix)) + " à vista no Pix</p>";
@@ -613,7 +617,7 @@
               dd = Math.floor(faltam / 864e5),
               hh = Math.floor((faltam % 864e5) / 36e5);
             h +=
-              '<p class="prazo">⏳ Seu atendimento vai até<b>' +
+              '<p class="prazo">⏳ SEU ATENDIMENTO <i>TERMINA</i><b>' +
               ["dom", "seg", "ter", "qua", "qui", "sex", "sáb"][prazo.getDay()] +
               ", " +
               String(prazo.getDate()).padStart(2, "0") +

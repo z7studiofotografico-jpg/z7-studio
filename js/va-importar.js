@@ -69,7 +69,12 @@ export async function abrirImportarVA(C, aoTerminar = () => {}) {
         lido = null;
         if (!cab.length) return;
         const i = inst();
-        lido = lerPlanilhaVA(cab, linhas, { kits: kitsDe(C.P, i || {}), ano: Number(ano.value), hoje: U.todayStr(), sigla: i ? i.sigla || siglaDe(i.nome, []) : "" });
+        lido = lerPlanilhaVA(cab, linhas, {
+          kits: kitsDe(C.P, i || {}),
+          ano: Number(ano.value),
+          hoje: U.todayStr(),
+          sigla: i ? i.sigla || siglaDe(i.nome, []) : ""
+        });
         if (!i && lido.escola) {
           const k = U.chave(lido.escola).replace(/[^A-Z0-9]/g, "");
           const ach = insts.find(x => {

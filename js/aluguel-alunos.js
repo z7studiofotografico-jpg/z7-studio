@@ -8,7 +8,7 @@
 // "Atrasado na devolução": retirou e passou da data de devolução (destaque para o Adriano).
 import { problemaCadastro } from "./aluguel-troca.js";
 import { botoesContratoColegio } from "./contrato-imprimir.js";
-import { ordemCodigo, telRelatorio } from "./aluno-id.js";
+import { ordemCodigo } from "./aluno-id.js";
 import { kpisValores, limparCacheValores, etiquetaRecep, TIPOS_FILTRO, tipoDoAluno, botaoNovaInstituicao } from "./aluguel-resumo.js";
 import { cartaoDoTipo } from "./instituicoes-dados.js";
 import { bloco, el, title, field, inp, inpReais, sel, sheet, botoes, wa, clicavel } from "./ui.js";
@@ -33,6 +33,7 @@ import { reservar, baixar, estornar } from "./estoque.js";
 import { ESTUDIO, ENDERECO } from "./mensagens.js";
 import { botaoRelatorio } from "./relatorio.js";
 import { relatorioAluguel, atrasadoAluguel } from "./aluguel-relatorio.js";
+import { corAluguel, infoAluguel } from "./aluguel-info.js";
 import { ITENS_PACOTE, nomeItem, lerPacote, valorDoPacote } from "./contrato-colegio-regras.js";
 import { linhaGenerica } from "./lista-compacta.js";
 import { chipItem, lerQtd } from "./itens-qtd.js";
@@ -41,7 +42,7 @@ import { ouvirUso, espelhar, donoDoAluguel, equipePode, AVISO_RESERVA, faltaDoAl
 import { abrirJanela } from "./janela.js";
 import { abaColegio, abaHistorico } from "./aluguel-janela.js";
 export { STATUS_ALUGUEL, temProducao, semBeca, etapasDe, proximoStatus, anteriorStatus, nomeEtapa } from "./aluguel-etapas.js";
-import { STATUS_ALUGUEL, temProducao, semBeca, etapasDe, proximoStatus, anteriorStatus, nomeEtapa, rotuloEtapa } from "./aluguel-etapas.js";
+import { STATUS_ALUGUEL, semBeca, proximoStatus, anteriorStatus, nomeEtapa, rotuloEtapa } from "./aluguel-etapas.js";
 const anoSerie = a => [a.ano, a.serie, a.turma && "turma " + a.turma].filter(Boolean).join(" · ");
 const SERIES = ["Pré", "5º ano", "9º ano", "Ensino médio", "Faculdade", "Curso", "Outra"];
 const ANO = () => new Date().getFullYear();
@@ -222,7 +223,10 @@ function render() {
   const cont = {};
   doAno.forEach(a => (cont[a.instId] = (cont[a.instId] || 0) + 1));
   // (23/11/2026) todos os colégios cadastrados aparecem (mesmo sem aluno ainda), não só os que já têm aluno
-  const ids = new Set([...Object.keys(cont), ...insts.filter(i => !filtro.tipo || cartaoDoTipo(i.tipo || "") === filtro.tipo).map(i => i.id)]);
+  const ids = new Set([
+    ...Object.keys(cont),
+    ...insts.filter(i => !filtro.tipo || cartaoDoTipo(i.tipo || "") === filtro.tipo).map(i => i.id)
+  ]);
   const nomeDe = id => (insts.find(i => i.id === id) || {}).nome || (lista.find(a => a.instId === id) || {}).instNome || "?";
   const opcoes = [...ids].map(id => [id, `${title(nomeDe(id))}${cont[id] ? ` (${cont[id]})` : ""}`]);
   const sInst = sel(
@@ -267,7 +271,13 @@ function render() {
     import("./aluguel-do-pr.js")
       .then(m => {
         const i0 = Object.assign({ id: filtro.inst }, inst);
-        m.botaoEnviarParaPR(C, i0, Number(filtro.ano || ANO()), doCol.filter(a => !a.naoParticipa), r);
+        m.botaoEnviarParaPR(
+          C,
+          i0,
+          Number(filtro.ano || ANO()),
+          doCol.filter(a => !a.naoParticipa),
+          r
+        );
         return m.botaoTrazerDoPR(C, i0, Number(filtro.ano || ANO()), doCol, r);
       })
       .catch(e => console.warn("[Z7] trazer do PR", e));
@@ -341,16 +351,7 @@ function render() {
   arr.slice(0, 400).forEach(a => corpo.append(linha(a)));
   if (arr.length > 400) corpo.append(el("p", "hint", `Mostrando 400 de ${arr.length}. Escolha um colégio para ver os outros.`));
 }
-// Lista compacta (o mesmo formato do PR, Formatura e Instituições): uma linha por aluno; tocar abre a janela
-// Cores: vermelho atrasado na devolução · amarelo pronto para retirada · azul com a beca · verde devolvida · cinza o resto
-export function corAluguel(a, hoje = U.todayStr()) {
-  if (atrasadoAluguel(a, hoje)) return "vermelho";
-  const st = a.status || "Cadastrado";
-  if (st === "Devolvida") return "verde";
-  if (st === "Retirou a beca") return "azul";
-  if (st === "Pronto para retirada") return "amarelo";
-  return "cinza";
-}
+export { corAluguel } from "./aluguel-info.js";
 const becaTxt = a => (a.becaTipo ? `👘 Beca ${tamanhoBeca(a).replace(/^\w/, c => c.toLowerCase())} · ${modeloBeca(a.becaTipo)}` : "");
 function passoAluguel(a, hoje) {
   if (atrasadoAluguel(a, hoje)) return "⚠️ Devolução atrasada desde " + U.fmtDate(a.devolucao);
@@ -372,7 +373,13 @@ function linha(a) {
     sub: [
       title(a.instNome || ""),
       anoSerie(a),
-      a.naoParticipa ? "🚫 Não vai participar" : a.soPaspatur ? "📒 Só o Paspatur" : a.semBeca ? "📦 " + (a.pacote || []).map(nomeItem).join(" + ") : becaTxt(a)
+      a.naoParticipa
+        ? "🚫 Não vai participar"
+        : a.soPaspatur
+          ? "📒 Só o Paspatur"
+          : a.semBeca
+            ? "📦 " + (a.pacote || []).map(nomeItem).join(" + ")
+            : becaTxt(a)
     ]
       .filter(Boolean)
       .join(" · "),
@@ -382,20 +389,6 @@ function linha(a) {
     card: () => card(a),
     abrir: () => janela(a)
   });
-}
-// a linha completa do aluno na janela: beca, kit e contato
-function infoAluguel(a) {
-  const kit = (a.pacote || []).map(nomeItem).join(" + ");
-  const beca = a.becaTipo ? "👘 Beca " + tamanhoBeca(a).toLowerCase() : "";
-  const p = a.naoParticipa ? "🚫 Não vai participar da formatura" : a.soPaspatur ? "📒 Só o Paspatur" : a.semBeca ? "📦 Sem beca" : beca;
-  return [
-    p,
-    kit ? "Kit: " + kit : "",
-    a.responsavel ? "Responsável: " + title(a.responsavel) : "",
-    a.tel ? "📱 " + telRelatorio(a.tel) : ""
-  ]
-    .filter(Boolean)
-    .join(" · ");
 }
 // abre o Contrato do colégio; ao fechar, os quadros de valor do topo leem os pagamentos de novo
 function abrirContratoCol(inst, doCol, o = {}) {

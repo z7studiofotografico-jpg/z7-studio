@@ -23,7 +23,9 @@ export function textoRecepcionista(c, comValor = true) {
   return (
     "Recepcionista: " +
     [r.nome || "a confirmar", fone(r.tel)].filter(Boolean).join(" ") +
-    (comValor && Number(r.valor) ? ` · ${brl(r.valor)}${r.quemPaga === "alunos" ? " (dividido entre os alunos)" : " (o colégio paga)"}` : "")
+    (comValor && Number(r.valor)
+      ? ` · ${brl(r.valor)}${r.quemPaga === "alunos" ? " (dividido entre os alunos)" : " (o colégio paga)"}`
+      : "")
   );
 }
 

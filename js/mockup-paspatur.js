@@ -8,7 +8,7 @@
 // 4 = a foto do calendário ou a foto da turma (A4 deitada, já pronta). st.anoCal = ano do calendário.
 export const ehTurma = st => st.encarte === "turma";
 import { cover, marca, prep, logoAtual, loadImg, exemplo, blocoPreco } from "./mockup.js";
-import { parcelaDoCartao, seloPrazo } from "./mockup-preco.js";
+import { parcelaDoCartao, seloPrazo, parcelaGrande } from "./mockup-preco.js";
 
 export const W = 1080,
   H = 1350;
@@ -359,13 +359,7 @@ function precoNaMesa(ctx, st, y) {
   ctx.textBaseline = "alphabetic";
   ctx.fillStyle = "rgba(255,255,255,.12)";
   ctx.fillRect(60, y, W - 120, 2);
-  ctx.fillStyle = "#a39fa6";
-  ctx.font = "600 24px 'Source Sans 3', sans-serif";
-  ctx.fillText(p.vezes + "x de", 60, y + 62);
-  const l = ctx.measureText(p.vezes + "x de ").width;
-  ctx.fillStyle = "#e0525b";
-  ctx.font = "700 64px 'Barlow Condensed', sans-serif";
-  ctx.fillText("R$ " + p.parcela.toFixed(2).replace(".", ","), 60 + l, y + 64);
+  parcelaGrande(ctx, p, 60, y + 64, W / 2 - 80, "#e0525b", 64);
   ctx.fillStyle = "#a39fa6";
   ctx.font = "600 21px 'Source Sans 3', sans-serif";
   ctx.fillText("sem juros no cartão", 60, y + 96);

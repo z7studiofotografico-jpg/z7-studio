@@ -79,12 +79,30 @@ export const escolherQueFica = grupo =>
   [...grupo].sort((a, b) => peso(b) - peso(a) || String(a.criadoEm || "9").localeCompare(String(b.criadoEm || "9")))[0];
 
 const vazio = v =>
-  v == null || v === "" || (Array.isArray(v) && !v.length) || (typeof v === "object" && !Array.isArray(v) && !Object.values(v).some(x => !vazio(x)));
-const SEM_COPIAR = new Set(["id", "nome", "nomeBusca", "criadoEm", "atualizadoEm", "arquivado", "juntadoCom", "juntadoEm", "resp", "respEmail"]);
+  v == null ||
+  v === "" ||
+  (Array.isArray(v) && !v.length) ||
+  (typeof v === "object" && !Array.isArray(v) && !Object.values(v).some(x => !vazio(x)));
+const SEM_COPIAR = new Set([
+  "id",
+  "nome",
+  "nomeBusca",
+  "criadoEm",
+  "atualizadoEm",
+  "arquivado",
+  "juntadoCom",
+  "juntadoEm",
+  "resp",
+  "respEmail"
+]);
 // o que o colégio que fica ganha dos outros: campos vazios nele são completados; contatos e visitas se somam
 export function juntarCampos(fica, outros) {
   const patch = {};
-  const tel = c => String((c && c.tel) || "").replace(/\D/g, "").replace(/^0+/, "").replace(/^55(?=\d{10,11}$)/, "");
+  const tel = c =>
+    String((c && c.tel) || "")
+      .replace(/\D/g, "")
+      .replace(/^0+/, "")
+      .replace(/^55(?=\d{10,11}$)/, "");
   let contatos = [...(fica.contatos || [])];
   let visitas = [...(fica.visitas || [])];
   outros.forEach(o => {
@@ -98,13 +116,18 @@ export function juntarCampos(fica, outros) {
     visitas = [...visitas, ...(o.visitas || [])];
   });
   if (contatos.length !== (fica.contatos || []).length) patch.contatos = contatos;
-  if (visitas.length !== (fica.visitas || []).length) patch.visitas = visitas.sort((a, b) => String(b.data || "").localeCompare(String(a.data || "")));
+  if (visitas.length !== (fica.visitas || []).length)
+    patch.visitas = visitas.sort((a, b) => String(b.data || "").localeCompare(String(a.data || "")));
   return patch;
 }
 
 // ---------- com tela ----------
-const tit = s => String(s || "").replace(/\S+/g, w => (/\./.test(w) ? w.toUpperCase() : w.length > 2 ? w[0].toUpperCase() + w.slice(1).toLowerCase() : w));
-const quem = i => [i.resp && "cadastrado por " + i.resp, i.criadoEm && "em " + String(i.criadoEm).slice(8, 10) + "/" + String(i.criadoEm).slice(5, 7)].filter(Boolean).join(" ");
+const tit = s =>
+  String(s || "").replace(/\S+/g, w => (/\./.test(w) ? w.toUpperCase() : w.length > 2 ? w[0].toUpperCase() + w.slice(1).toLowerCase() : w));
+const quem = i =>
+  [i.resp && "cadastrado por " + i.resp, i.criadoEm && "em " + String(i.criadoEm).slice(8, 10) + "/" + String(i.criadoEm).slice(5, 7)]
+    .filter(Boolean)
+    .join(" ");
 
 // Antes de cadastrar um colégio novo: { usar: inst } (é o mesmo), { novo: true } (é outro) ou null (não achou parecido)
 export async function perguntarSeRepetido(C, nome, insts) {
@@ -161,17 +184,32 @@ export async function juntarColegios(C, fica, outros, aviso = () => {}) {
     // agendamentos de becas copiados no estoque: o da Agenda grava de novo ao abrir
     try {
       const s = await FS.getDocs(FS.collection(db, "becasUso"));
-      s.docs.filter(d => d.id.startsWith(`evento_${o.id}_`)).forEach(d => {
-        const u = d.data();
-        ops.push(b => b.set(FS.doc(db, "becasUso", d.id.replace(`evento_${o.id}_`, `evento_${fica.id}_`)), Object.assign({}, u, { instId: fica.id, instNome: fica.nome })));
-        ops.push(b => b.delete(d.ref));
-      });
-      s.docs.filter(d => d.data().instId === o.id && d.id.startsWith("aluno_")).forEach(d => ops.push(b => b.update(d.ref, { instId: fica.id })));
+      s.docs
+        .filter(d => d.id.startsWith(`evento_${o.id}_`))
+        .forEach(d => {
+          const u = d.data();
+          ops.push(b =>
+            b.set(
+              FS.doc(db, "becasUso", d.id.replace(`evento_${o.id}_`, `evento_${fica.id}_`)),
+              Object.assign({}, u, { instId: fica.id, instNome: fica.nome })
+            )
+          );
+          ops.push(b => b.delete(d.ref));
+        });
+      s.docs
+        .filter(d => d.data().instId === o.id && d.id.startsWith("aluno_"))
+        .forEach(d => ops.push(b => b.update(d.ref, { instId: fica.id })));
     } catch (e) {
       console.warn("[Z7] juntar estoque", e);
     }
     ops.push(b =>
-      b.update(FS.doc(db, "instituicoes", o.id), { arquivado: true, juntadoCom: fica.id, juntadoEm: agora, juntadoPor: C.me || "", atualizadoEm: agora })
+      b.update(FS.doc(db, "instituicoes", o.id), {
+        arquivado: true,
+        juntadoCom: fica.id,
+        juntadoEm: agora,
+        juntadoPor: C.me || "",
+        atualizadoEm: agora
+      })
     );
   }
   const patch = juntarCampos(fica, outros);
@@ -215,7 +253,12 @@ export async function abrirRepetidos(C, insts) {
         r.name = nome;
         r.value = i.id;
         r.checked = i.id === fica0.id;
-        l.append(r, " ", el("b", null, tit(i.nome)), el("small", null, " " + [quem(i), (i.contatos || []).length + " contato(s)"].filter(Boolean).join(" · ")));
+        l.append(
+          r,
+          " ",
+          el("b", null, tit(i.nome)),
+          el("small", null, " " + [quem(i), (i.contatos || []).length + " contato(s)"].filter(Boolean).join(" · "))
+        );
         box.append(l);
       });
       const msg = el("p", "hint");

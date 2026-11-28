@@ -111,7 +111,9 @@ function escolherPartes(conteudo, mudou) {
     semCol = new Set(JSON.parse(localStorage.getItem(chave) || "[]"));
   } catch (_) {}
   const colunas = [];
-  (conteudo.secoes || []).forEach(s => ((s.tabela || {}).cols || []).forEach(c => colunas.includes(String(c).trim()) || colunas.push(String(c).trim())));
+  (conteudo.secoes || []).forEach(s =>
+    ((s.tabela || {}).cols || []).forEach(c => colunas.includes(String(c).trim()) || colunas.push(String(c).trim()))
+  );
   if (colunas.length) {
     box.append(el("b", "rel-escolha-tit", "Colunas"));
     colunas.forEach(c => {

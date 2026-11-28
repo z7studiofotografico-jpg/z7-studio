@@ -124,7 +124,13 @@ export function formContrato(c, inst, ano, ref) {
     r2.append(fRecebe, fValor);
     // (23/11/2026) contrato novo: o contato vem do cadastro do colégio (quem a pessoa já colocou no agendamento)
     const cInst = (inst.contatos || []).find(k => k && k.tel) || (inst.contatos || [])[0] || {};
-    const cargoDe = t => R.CARGOS.find(g => String(t || "").slice(0, 5).toLowerCase() === g.slice(0, 5).toLowerCase()) || "";
+    const cargoDe = t =>
+      R.CARGOS.find(
+        g =>
+          String(t || "")
+            .slice(0, 5)
+            .toLowerCase() === g.slice(0, 5).toLowerCase()
+      ) || "";
     const ct = x.contato || (c ? {} : { nome: cInst.nome || "", cargo: cargoDe(cInst.cargo) || "Diretor(a)", tel: cInst.tel || "" });
     const cNome = inp(ct.nome || "", "nome");
     const cCargo = sel(R.CARGOS, ct.cargo || "Diretor(a)");
@@ -279,4 +285,3 @@ export function formContrato(c, inst, ano, ref) {
     });
   });
 }
-

@@ -31,7 +31,11 @@ export function aluguelDoPR(x, inst, ano, contrato, R) {
     nome: x.nome || "",
     nomeBusca: U.chave(x.nome || ""),
     codigo: x.codigo || "",
-    codigoBusca: x.codigoBusca || String(x.codigo || "").replace(/\W/g, "").toUpperCase(),
+    codigoBusca:
+      x.codigoBusca ||
+      String(x.codigo || "")
+        .replace(/\W/g, "")
+        .toUpperCase(),
     tel: tels[0] || "",
     contatos: x.contatos || [],
     responsavel: ((x.contatos || []).find(c => c && c.tipo && c.tipo !== "Formando" && c.nome) || {}).nome || "",
@@ -151,7 +155,11 @@ export function prDoAluguel(a, inst, vendaComo) {
     escola: inst.nome || a.instNome || "",
     ano: Number(a.ano),
     codigo: a.codigo || "",
-    codigoBusca: a.codigoBusca || String(a.codigo || "").replace(/\W/g, "").toUpperCase(),
+    codigoBusca:
+      a.codigoBusca ||
+      String(a.codigo || "")
+        .replace(/\W/g, "")
+        .toUpperCase(),
     turma: a.turma || a.serie || "",
     nascimento: a.nascimento || "",
     email: a.email || "",
@@ -176,7 +184,13 @@ export async function botaoEnviarParaPR(C, inst, ano, alunos, box) {
   if (!C.isAdmin || !(alunos || []).length) return;
   const f = formaturaPassou(inst);
   if (f.tem && !f.passou) {
-    box.append(" ", Object.assign(document.createElement("small"), { className: "hint", textContent: `Depois da formatura (${f.dia.slice(8, 10)}/${f.dia.slice(5, 7)}), aparece o botão de mandar os alunos para o PR ou o Paspatur.` }));
+    box.append(
+      " ",
+      Object.assign(document.createElement("small"), {
+        className: "hint",
+        textContent: `Depois da formatura (${f.dia.slice(8, 10)}/${f.dia.slice(5, 7)}), aparece o botão de mandar os alunos para o PR ou o Paspatur.`
+      })
+    );
     return;
   }
   const b = U.mkBtn("📤 Mandar para o PR ou Paspatur", "btn-sm", async () => {
@@ -222,7 +236,10 @@ export async function botaoEnviarParaPR(C, inst, ano, alunos, box) {
       };
       const acoes = el("div", "panel-actions");
       if (vai.length)
-        acoes.append(U.mkBtn("🖼️ Mandar para o PR", "btn-primary", enviar("pr")), U.mkBtn("📒 Mandar para o Paspatur", "btn-primary", enviar("paspatur")));
+        acoes.append(
+          U.mkBtn("🖼️ Mandar para o PR", "btn-primary", enviar("pr")),
+          U.mkBtn("📒 Mandar para o Paspatur", "btn-primary", enviar("paspatur"))
+        );
       acoes.append(U.mkBtn("Fechar", "", close));
       p.append(msg, acoes);
     });

@@ -485,14 +485,16 @@ function renderContrato(corpo, tipo) {
       emdia
         ? "Alunos em dia: sem parcela atrasada (inclui quem já quitou). Os atrasados estão em Cobranças."
         : todos
-        ? "Todos os alunos dos colégios, com o kit (adesão ou kits 02 a 05) e as parcelas de cada um."
-        : adesao
-          ? "Kit 01 (beca + canudo) é a adesão da formatura. A comissão é sobre cada parcela paga (taxa em Ajustes)."
-          : "Kits 02 a 05 do contrato (e outros kits). Preços em “📋 Kits e preços”."
+          ? "Todos os alunos dos colégios, com o kit (adesão ou kits 02 a 05) e as parcelas de cada um."
+          : adesao
+            ? "Kit 01 (beca + canudo) é a adesão da formatura. A comissão é sobre cada parcela paga (taxa em Ajustes)."
+            : "Kits 02 a 05 do contrato (e outros kits). Preços em “📋 Kits e preços”."
     )
   );
   const ids = new Set(minhasInsts().map(i => i.id));
-  const fs = meusForms().filter(f => ids.has(f.instId) && ativo(f) && (!emdia || !atrasado(f)) && (todos || (adesao ? ehKit01(f) : !ehKit01(f))));
+  const fs = meusForms().filter(
+    f => ids.has(f.instId) && ativo(f) && (!emdia || !atrasado(f)) && (todos || (adesao ? ehKit01(f) : !ehKit01(f)))
+  );
   renderAlunosVA(corpo, fs, { C, insts, abrirTurma, ajuda }, tipo);
 }
 function renderTurmas(corpo) {
@@ -682,7 +684,10 @@ function openKits() {
   });
 }
 
-const becaDe = f => String(f.beca || "").trim().toUpperCase();
+const becaDe = f =>
+  String(f.beca || "")
+    .trim()
+    .toUpperCase();
 const ORDEM_BECA = ["PP", "P", "M", "G", "GG", "XG", "XGG", "EXG", "EXGG"];
 const ordemBeca = t => {
   const i = ORDEM_BECA.indexOf(String(t).replace(/\d+$/, ""));
@@ -742,7 +747,13 @@ async function relatorioFormaturas() {
             }, {})
           )
             .sort((a, b) => a[0].localeCompare(b[0], "pt-BR", { numeric: true }))
-            .map(([k, l]) => [k, l.length, moeda(somar(l.map(f => f.valor))), moeda(somar(l.map(recebidoDe))), moeda(somar(l.map(emAberto)))])
+            .map(([k, l]) => [
+              k,
+              l.length,
+              moeda(somar(l.map(f => f.valor))),
+              moeda(somar(l.map(recebidoDe))),
+              moeda(somar(l.map(emAberto)))
+            ])
         },
         vazio: "Nenhum kit vendido."
       },

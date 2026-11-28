@@ -18,7 +18,10 @@ export const quemTxt = (it, c) => {
 };
 export const frasRetorno = r =>
   `📅 ${dataBR(r.data)} às ${r.hora} – entrar em contato com ${r.com || "o cliente"}${r.tel ? " · " + r.tel : ""} para confirmar a venda`;
-const agoraBR = () => new Intl.DateTimeFormat("sv-SE", { timeZone: "America/Sao_Paulo", dateStyle: "short", timeStyle: "short" }).format(new Date()).replace(" ", "T");
+const agoraBR = () =>
+  new Intl.DateTimeFormat("sv-SE", { timeZone: "America/Sao_Paulo", dateStyle: "short", timeStyle: "short" })
+    .format(new Date())
+    .replace(" ", "T");
 export const retornoVenceu = r => !!(r && r.data && r.hora && `${r.data}T${r.hora}` <= agoraBR());
 // já passou da data (ou é hoje): é para retornar
 export const retornarHoje = it => !!(it && it.retorno && it.retorno.data && it.retorno.data <= U.todayStr());
@@ -29,7 +32,8 @@ export function linhasRetorno(it) {
   if (it.naoContatar) out.push(el("p", "wait", "🚫 Não entrar em contato" + (it.naoContatarMotivo ? ": " + it.naoContatarMotivo : "")));
   const r = it.retorno;
   // a frase do retorno já vem na linha de cima (situação); aqui só o número do WhatsApp e a observação
-  if (r && r.data && r.hora) out.push(el("p", "notes", [r.tel ? "📱 " + r.tel : "", r.motivo ? "📝 " + r.motivo : ""].filter(Boolean).join(" · ")));
+  if (r && r.data && r.hora)
+    out.push(el("p", "notes", [r.tel ? "📱 " + r.tel : "", r.motivo ? "📝 " + r.motivo : ""].filter(Boolean).join(" · ")));
   else if (r && r.data) {
     const hoje = retornarHoje(it);
     out.push(
@@ -130,7 +134,12 @@ export function abrirRetorno(C, it, salvar, o = {}) {
         const ant = it.retorno && it.retorno.hora ? ` (antes ${dataBR(it.retorno.data)} às ${it.retorno.hora})` : "";
         patch.motivos = [
           ...(it.motivos || []),
-          { em: agora, por: C.me || "", texto: `Retorno marcado para ${dataBR(data.value)} às ${hora.value} com ${ret.com}${ant}${texto ? ": " + texto : ""}`, data: data.value }
+          {
+            em: agora,
+            por: C.me || "",
+            texto: `Retorno marcado para ${dataBR(data.value)} às ${hora.value} com ${ret.com}${ant}${texto ? ": " + texto : ""}`,
+            data: data.value
+          }
         ];
       } else patch.motivos = [...(it.motivos || []), { em: agora, por: C.me || "", texto, data: data.value }];
       try {

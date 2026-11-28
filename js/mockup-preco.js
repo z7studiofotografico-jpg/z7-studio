@@ -39,6 +39,16 @@ const reais = v =>
     .toFixed(2)
     .replace(".", ",")
     .replace(/\B(?=(\d{3})+(?!\d))/g, ".");
+// "5x R$ 75,40" numa linha só, tudo no tamanho da parcela (diminui a letra se não couber na largura)
+export function parcelaGrande(ctx, p, x, y, maxW, cor, tam) {
+  const txt = p.vezes + "x " + reais(p.parcela);
+  let t = tam;
+  ctx.font = `700 ${t}px 'Barlow Condensed', sans-serif`;
+  while (t > 36 && ctx.measureText(txt).width > maxW) ctx.font = `700 ${(t -= 4)}px 'Barlow Condensed', sans-serif`;
+  ctx.fillStyle = cor;
+  ctx.fillText(txt, x, y);
+  return y;
+}
 export function blocoPreco(ctx, st, x, y, maxW, cores = {}) {
   const c = Object.assign(
     { forte: "#b3202a", texto: "#1c1b1d", fraco: "#6b6670", linha: "rgba(28,27,29,.15)", selo: "#1c1b1d", seloTxt: "#fff" },
@@ -51,18 +61,15 @@ export function blocoPreco(ctx, st, x, y, maxW, cores = {}) {
   const p = parcelaDoCartao(st.cartao);
   let fim;
   if (p) {
-    ctx.fillStyle = c.fraco;
-    ctx.font = "600 24px 'Source Sans 3', sans-serif";
-    ctx.fillText(p.vezes + "x de", x, y + 42);
-    ctx.fillStyle = c.forte;
-    ctx.font = "700 72px 'Barlow Condensed', sans-serif";
-    ctx.fillText(reais(p.parcela), x, y + 108);
+    // (28/11/2026) o "5x" do mesmo tamanho da parcela, na mesma linha ("5x R$ 75,40"): o Adriano achou que só o
+    // valor aparecia e o cliente não via que era parcela
+    fim = parcelaGrande(ctx, p, x, y + 82, maxW, c.forte, 72);
     ctx.fillStyle = c.fraco;
     ctx.font = "600 22px 'Source Sans 3', sans-serif";
-    ctx.fillText("sem juros no cartão", x, y + 140);
+    ctx.fillText("sem juros no cartão", x, fim + 36);
     ctx.fillStyle = c.texto;
     ctx.font = "700 27px 'Source Sans 3', sans-serif";
-    fim = wrap(ctx, "ou " + st.preco + " à vista no Pix", x, y + 184, maxW, 32);
+    fim = wrap(ctx, "ou " + st.preco + " à vista no Pix", x, fim + 80, maxW, 32);
   } else {
     ctx.fillStyle = c.forte;
     ctx.font = "700 66px 'Barlow Condensed', sans-serif";
@@ -78,7 +85,7 @@ export function blocoPreco(ctx, st, x, y, maxW, cores = {}) {
       fim = wrap(ctx, "ou " + String(st.cartao).split(" · ")[0], x, y + 112, maxW, 30);
     }
   }
-  // o prazo, num selo grande grafite (bem visível): "⏳ Seu atendimento vai até" / "SEX, 20/11"
+  // o prazo, num selo grande grafite (bem visível): "⏳ SEU ATENDIMENTO TERMINA" / "SEX, 20/11"
   // (o preço não muda depois: o selo fala só do atendimento, prazo-atendimento.js)
   if (st.prazo) fim = seloPrazo(ctx, st.prazo, x, fim + 24, Math.min(maxW, 380), c);
   return fim;
@@ -86,24 +93,33 @@ export function blocoPreco(ctx, st, x, y, maxW, cores = {}) {
 
 // o selo do prazo: caixa cheia, duas linhas, a data grande
 export function seloPrazo(ctx, prazo, x, y, w, c = {}) {
+  // (28/11/2026) mais destaque sem mudar o estilo clássico (grafite com o filete vermelho do Z7), a pedido do
+  // Adriano ("quem não presta atenção não vê"): a palavra "TERMINA" em vermelho e a data maior
+  const H = 108;
   const fundo = c.seloFundo || "#2b2d31";
   ctx.fillStyle = fundo;
   ctx.beginPath();
-  ctx.roundRect ? ctx.roundRect(x, y, w, 92, 18) : ctx.rect(x, y, w, 92);
+  ctx.roundRect ? ctx.roundRect(x, y, w, H, 18) : ctx.rect(x, y, w, H);
   ctx.fill();
-  // o filete vermelho do Z7 à esquerda (como na página da prévia)
   if (!c.seloFundo) {
     ctx.save();
     ctx.clip();
     ctx.fillStyle = "#d0202b";
-    ctx.fillRect(x, y, 8, 92);
+    ctx.fillRect(x, y, 10, H);
     ctx.restore();
   }
   ctx.textAlign = "left";
+  const a1 = "⏳ SEU ATENDIMENTO ",
+    a2 = "TERMINA";
+  let t = 25;
+  ctx.font = `800 ${t}px 'Source Sans 3', sans-serif`;
+  while (t > 16 && ctx.measureText(a1 + a2).width > w - 44) ctx.font = `800 ${(t -= 1)}px 'Source Sans 3', sans-serif`;
   ctx.fillStyle = "#fff";
-  ctx.font = "700 22px 'Source Sans 3', sans-serif";
-  ctx.fillText("⏳ Seu atendimento vai até", x + 24, y + 34);
-  ctx.font = "700 44px 'Barlow Condensed', sans-serif";
-  ctx.fillText(String(prazo).toUpperCase(), x + 24, y + 78);
-  return y + 92;
+  ctx.fillText(a1, x + 26, y + 38);
+  ctx.fillStyle = c.seloFundo ? "#fff" : "#ff5a63";
+  ctx.fillText(a2, x + 26 + ctx.measureText(a1).width, y + 38);
+  ctx.fillStyle = "#fff";
+  ctx.font = "700 54px 'Barlow Condensed', sans-serif";
+  ctx.fillText(String(prazo).toUpperCase(), x + 26, y + 92);
+  return y + H;
 }

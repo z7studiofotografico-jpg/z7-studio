@@ -43,6 +43,7 @@ const SHELL = [
   "./js/importador.js",
   "./js/aluguel-importar.js",
   "./js/aluguel-alunos.js",
+  "./js/aluguel-info.js",
   "./js/aluguel-do-pr.js",
   "./js/aluguel-fora.js",
   "./js/aluguel-troca.js",
@@ -231,9 +232,16 @@ self.addEventListener("fetch", e => {
           const f = await e.request.formData();
           const arq = f.getAll("arquivo").find(x => x && typeof x !== "string");
           if (arq)
-            await (await caches.open("z7-compartilhado")).put(
+            await (
+              await caches.open("z7-compartilhado")
+            ).put(
               "./__conversa-recebida__",
-              new Response(arq, { headers: { "Content-Type": arq.type || "application/octet-stream", "X-Nome": encodeURIComponent(arq.name || "conversa.txt") } })
+              new Response(arq, {
+                headers: {
+                  "Content-Type": arq.type || "application/octet-stream",
+                  "X-Nome": encodeURIComponent(arq.name || "conversa.txt")
+                }
+              })
             );
         } catch (_) {
           // sem o arquivo: o app abre mesmo assim

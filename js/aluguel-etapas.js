@@ -24,5 +24,5 @@ export function anteriorStatus(a) {
 // "Retirou a beca" do aluno só do Paspatur é a entrega do Paspatur
 // (24/11/2026) na tela "Pronto para retirada" aparece como "Pronto para entregar" (o valor gravado não muda)
 export const rotuloEtapa = s => (s === "Pronto para retirada" ? "Pronto para entregar" : s);
-export const nomeEtapa = (a, s) => (semBeca(a) && s === "Retirou a beca" ? (a.soPaspatur ? "Paspatur entregue" : "Kit entregue") : rotuloEtapa(s));
-
+export const nomeEtapa = (a, s) =>
+  semBeca(a) && s === "Retirou a beca" ? (a.soPaspatur ? "Paspatur entregue" : "Kit entregue") : rotuloEtapa(s);

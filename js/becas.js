@@ -14,7 +14,7 @@ import { botaoVoltar, ligarDatas } from "./becas-ajustes.js";
 import { ouvirMedidas, medidasDo, blocoMedidas } from "./medidas-recebidas.js";
 import { abrirJanela } from "./janela.js";
 import { contatoRel } from "./aluno-id.js";
-import { BECAS, TAMANHOS, FAIXAS, CAPELOS, nomeFaixa, nomeCapelo, abrirEstoqueBecas, somarUso, usoDosAlunos } from "./becas-estoque.js";
+import { BECAS, TAMANHOS, FAIXAS, CAPELOS, nomeFaixa, nomeCapelo, abrirEstoqueBecas } from "./becas-estoque.js";
 import { ouvirUso, espelhar, acertarBecas, usoNoDia } from "./becas-uso.js";
 export { BECAS, TAMANHOS, FAIXAS, CAPELOS };
 let C,
@@ -90,7 +90,6 @@ export function show() {
     ouvirUso(
       C,
       u => {
-        alunosAtivos = u.alunos;
         avulsosUso = u.avulsos;
         if (parte === "avulsos") render();
       },
@@ -185,8 +184,7 @@ const foraColegios = (hoje = U.todayStr()) =>
     .reduce((s, x) => s + totBecas(x), 0);
 // (23/11/2026) Quantas becas estão comprometidas NUM DIA: as becas valem por dia (no dia seguinte voltam ao estoque),
 // então só contam os agendamentos dos colégios e os avulsos daquele dia. A devolução não trava outro aluguel.
-let alunosAtivos = [], // alunos de aluguel com beca reservada ou fora (da cópia do estoque, de todos)
-  avulsosUso = []; // avulsos e agendamentos dos colégios (da cópia do estoque, de todos)
+let avulsosUso = []; // avulsos e agendamentos dos colégios (da cópia do estoque, de todos)
 function emUso(dia, ignora) {
   const { lista: _l, ...u } = usoNoDia(avulsosUso, dia, { ignora });
   return u;

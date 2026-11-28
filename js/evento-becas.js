@@ -166,9 +166,7 @@ export function blocoBecasEvento(C, it, kind, ev, campo, fechar) {
     const semEste = copias.filter(c => !(c.tipo === "aluno" && c.instId === it.id && String(c.ano) === ano));
     const { uso, outros } = usoNoPeriodo(semEste, ret.value, dev.value, idEvento(it.id, campo));
     const linhas = conferirPedido(E, uso, p);
-    topo.append(
-      el("small", null, `${U.fmtDate(ret.value)}${total ? ` · ${total} beca${total > 1 ? "s" : ""}` : ""}`)
-    );
+    topo.append(el("small", null, `${U.fmtDate(ret.value)}${total ? ` · ${total} beca${total > 1 ? "s" : ""}` : ""}`));
     if (!linhas.length) return aviso("", "Coloque as quantidades acima para conferir o estoque.");
     const faltam = linhas.filter(x => x.falta);
     topo.append(
