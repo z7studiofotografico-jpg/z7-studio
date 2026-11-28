@@ -8,6 +8,7 @@
 // só pelo site, sem perguntar ao Google Drive (previas-api/drive.php entrega essa lista à equipe logada).
 // SIMULAR=true só conta o que copiaria. LIMITE = máximo de fotos por vez (o resto vai na próxima noite).
 import { readFileSync } from "node:fs";
+import { createSign } from "node:crypto";
 import { Readable, Writable } from "node:stream";
 import { Client } from "basic-ftp";
 import admin from "firebase-admin";
@@ -30,16 +31,53 @@ Options -Indexes
 
 async function pastaDoDrive() {
   if (process.env.DRIVE_PASTA) return process.env.DRIVE_PASTA;
-  admin.initializeApp({ credential: admin.credential.cert(JSON.parse(process.env.FIREBASE_SERVICE_ACCOUNT)) });
+  admin.initializeApp({ credential: admin.credential.cert(SA) });
   const p = (await admin.firestore().doc("config/app").get()).data() || {};
   const link = p.drivePasta || p.drivePrevias || "";
   const id = (String(link).match(/folders\/([\w-]+)/) || [])[1] || link;
   if (!id) throw new Error("Pasta do Drive não configurada (Ajustes do app).");
   return id;
 }
+// (28/11/2026) a pasta das prévias vai deixar de ser "qualquer pessoa com o link" (fotos de menores): o robô entra
+// com a conta de serviço do Firebase (precisa ter a pasta compartilhada com ela, só leitura). Enquanto a pasta não
+// estiver compartilhada com a conta, usa a chave antiga (pasta aberta), para a cópia não parar no meio da troca.
+const SA = process.env.FIREBASE_SERVICE_ACCOUNT ? JSON.parse(process.env.FIREBASE_SERVICE_ACCOUNT) : null;
+let tokenDrive = "",
+  tokenAte = 0,
+  comConta = !!SA;
+async function tokenDoRobo() {
+  if (Date.now() < tokenAte) return tokenDrive;
+  const agora = Math.floor(Date.now() / 1000);
+  const b64 = o => Buffer.from(JSON.stringify(o)).toString("base64url");
+  const corpo =
+    b64({ alg: "RS256", typ: "JWT" }) +
+    "." +
+    b64({
+      iss: SA.client_email,
+      scope: "https://www.googleapis.com/auth/drive.readonly",
+      aud: "https://oauth2.googleapis.com/token",
+      iat: agora,
+      exp: agora + 3600
+    });
+  const assinatura = createSign("RSA-SHA256").update(corpo).sign(SA.private_key, "base64url");
+  const r = await fetch("https://oauth2.googleapis.com/token", {
+    method: "POST",
+    headers: { "Content-Type": "application/x-www-form-urlencoded" },
+    body: "grant_type=urn:ietf:params:oauth:grant-type:jwt-bearer&assertion=" + corpo + "." + assinatura
+  });
+  const j = await r.json();
+  if (!j.access_token) throw new Error("A conta do robô não conseguiu entrar no Google: " + JSON.stringify(j).slice(0, 200));
+  tokenDrive = j.access_token;
+  tokenAte = Date.now() + 50 * 60000;
+  return tokenDrive;
+}
+async function pedirDrive(url) {
+  if (comConta && url.startsWith(API)) return fetch(url, { headers: { Authorization: "Bearer " + (await tokenDoRobo()) } });
+  return fetch(url.startsWith(API) && !/[?&]key=/.test(url) ? url + (url.includes("?") ? "&" : "?") + "key=" + CHAVE : url);
+}
 async function drive(url, tentativas = 4) {
   for (let i = 0; ; i++) {
-    const r = await fetch(url);
+    const r = await pedirDrive(url);
     if (r.ok || i >= tentativas || ![403, 429, 500, 503].includes(r.status)) return r;
     await new Promise(res => setTimeout(res, 2000 * 2 ** i));
   }
@@ -60,7 +98,7 @@ async function listar(raiz) {
       const q = encodeURIComponent(`'${pai}' in parents and trashed = false`);
       const campos = "nextPageToken,files(id,name,mimeType,size,modifiedTime,thumbnailLink,imageMediaMetadata(width,height))";
       const r = await drive(
-        `${API}?q=${q}&fields=${campos}&pageSize=1000&supportsAllDrives=true&includeItemsFromAllDrives=true&key=${CHAVE}${token ? "&pageToken=" + token : ""}`
+        `${API}?q=${q}&fields=${campos}&pageSize=1000&supportsAllDrives=true&includeItemsFromAllDrives=true${token ? "&pageToken=" + token : ""}`
       );
       if (!r.ok) throw new Error(`Drive recusou a lista (${r.status}): ${(await r.text()).slice(0, 200)}`);
       const j = await r.json();
@@ -86,7 +124,7 @@ let diretoRecusado = false;
 async function baixar(f) {
   let status = 0;
   if (!diretoRecusado) {
-    const r = await drive(`${API}/${f.id}?alt=media&supportsAllDrives=true&key=${CHAVE}`, 0);
+    const r = await drive(`${API}/${f.id}?alt=media&supportsAllDrives=true`, 0);
     if (r.ok) return Buffer.from(await r.arrayBuffer());
     status = r.status;
     if (r.status === 403) diretoRecusado = true;
@@ -112,6 +150,14 @@ async function lerTexto(ftp, nome) {
 
 const raiz = await pastaDoDrive();
 console.log("Pasta do Drive:", raiz);
+if (SA) {
+  console.log("Conta do robô (compartilhar a pasta com ela, só leitura):", SA.client_email);
+  const t = await pedirDrive(`${API}/${raiz}?fields=id,name&supportsAllDrives=true`);
+  if (!t.ok) {
+    console.log(`A conta do robô ainda não vê a pasta (${t.status}): usando a chave antiga (pasta aberta com link).`);
+    comConta = false;
+  } else console.log('A conta do robô lê a pasta: pode tirar o "qualquer pessoa com o link".');
+}
 const fotos = await listar(raiz);
 const gb = n => (n / 1024 ** 3).toFixed(1) + " GB";
 console.log("Fotos no Drive:", fotos.length, "·", gb(fotos.reduce((t, f) => t + (Number(f.size) || 0), 0)));

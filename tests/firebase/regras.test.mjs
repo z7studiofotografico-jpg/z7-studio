@@ -159,11 +159,31 @@ test("carteira: vendedor vê os colégios livres e os seus, e só os próprios f
     setDoc(doc(db, "formandos", "f8"), { instId: "i1", nome: "W", pagas: 0, pagamentos: [], respEmail: ANA })
   );
 });
-test("PR: venda do vendedor fica a conferir; só o admin confere", async () => {
+test("PR: só o admin marca PAGO e muda valor ou data do pagamento (28/11/2026); a venda entra a conferir", async () => {
   // (19/11/2026) o aluno precisa estar com ele (o Adriano separa da fila)
   await semRegra(d => updateDoc(doc(d, "repasse", "r2"), { etapa: "SEPARADO", resp: "Pedro", respEmail: PEDRO }));
-  await assertSucceeds(
+  // (28/11/2026) antes o banco aceitava o vendedor marcar PAGO (só a tela escondia o botão)
+  await assertFails(
     updateDoc(doc(como(PEDRO), "repasse", "r2"), {
+      etapa: "PAGO",
+      valor: 350,
+      formaPag: "Pix",
+      conferido: false,
+      respEmail: PEDRO,
+      resp: "Pedro"
+    })
+  );
+  await assertFails(updateDoc(doc(como(PEDRO), "repasse", "r2"), { etapa: "PAGO", conferido: false }));
+  await assertFails(updateDoc(doc(como(PEDRO), "repasse", "r2"), { valor: 10 }));
+  await assertFails(updateDoc(doc(como(PEDRO), "repasse", "r2"), { pagoEm: "2099-01-01" }));
+  await assertSucceeds(updateDoc(doc(como(PEDRO), "repasse", "r2"), { obs: "liga depois do dia 5" }));
+  for (const col of ["paspatur", "formaturaAlunos"]) {
+    await semRegra(d => setDoc(doc(d, col, "x1"), { nome: "DUDA", ano: 2099, etapa: "SEPARADO", resp: "Pedro", respEmail: PEDRO }));
+    await assertFails(updateDoc(doc(como(PEDRO), col, "x1"), { etapa: "PAGO", valor: 350, conferido: false }));
+    await assertFails(updateDoc(doc(como(PEDRO), col, "x1"), { valor: 1 }));
+  }
+  await assertSucceeds(
+    updateDoc(doc(como(ADRIANO), "repasse", "r2"), {
       etapa: "PAGO",
       valor: 350,
       formaPag: "Pix",

@@ -30,6 +30,13 @@ service cloud.firestore {
     // Exclusão pela equipe (Regra 4): só PEDE (campo "excluido"); quem pediu não desfaz nem apaga, só o admin decide
     function exclusaoOk() { return !mudou(['excluido']) || (resource.data.get('excluido', null) == null && request.resource.data.excluido.porEmail == email()); }
     function mudou(campos) { return request.resource.data.diff(resource.data).affectedKeys().hasAny(campos); }
+    // (28/11/2026) marcar PAGO e mudar o valor ou a data do pagamento: só o admin (o robô dos pagamentos do site entra
+    // como admin). A tela já escondia "Pagou 💰" e "Registrar venda" da equipe; agora o banco também recusa.
+    // (de PAGO para ENTREGUE a equipe continua podendo: é ela quem entrega o kit)
+    function dinheiroOk() {
+      return !mudou(['valor', 'pagoEm', 'conferidoPor', 'conferidoEm'])
+        && !(request.resource.data.get('etapa', '') == 'PAGO' && resource.data.get('etapa', '') != 'PAGO');
+    }
     // Responsável: quem não é admin só pode assumir algo sem dono (para si) ou manter como está
     // Caído: marcar pede o motivo; tirar do Caído (resgatar) só o admin
     function caidoOk() {
@@ -300,7 +307,8 @@ service cloud.firestore {
         && minha() && respOk() && exclusaoOk() && caidoOk()
         // a venda entra "a conferir": só o admin marca como conferida (a comissão só conta depois)
         && (!mudou(['conferido']) || request.resource.data.conferido == false)
-        && !(resource.data.etapa in ['PAGO', 'ENTREGUE'] && mudou(['valor', 'formaPag', 'pagoEm', 'resp', 'respEmail'])));
+        && !(resource.data.etapa in ['PAGO', 'ENTREGUE'] && mudou(['valor', 'formaPag', 'pagoEm', 'resp', 'respEmail']))
+        && dinheiroOk());
       // a equipe inclui aluno à mão (sem planilha): entra na fila ou separado para si, nunca como venda
       allow create: if admin() || ((pode('rep') || (pode('lf') && anoAtual(request.resource.data)))
         && request.resource.data.get('etapa', '') in ['NA FILA', 'INCOMPLETO', 'SEPARADO']
@@ -317,7 +325,8 @@ service cloud.firestore {
         && minha() && respOk() && exclusaoOk() && caidoOk()
         // a venda entra "a conferir": só o admin marca como conferida (a comissão só conta depois)
         && (!mudou(['conferido']) || request.resource.data.conferido == false)
-        && !(resource.data.etapa in ['PAGO', 'ENTREGUE'] && mudou(['valor', 'formaPag', 'pagoEm', 'resp', 'respEmail'])));
+        && !(resource.data.etapa in ['PAGO', 'ENTREGUE'] && mudou(['valor', 'formaPag', 'pagoEm', 'resp', 'respEmail']))
+        && dinheiroOk());
       // a equipe inclui aluno à mão (sem planilha): entra na fila ou separado para si, nunca como venda
       allow create: if admin() || ((pode('rep') || (pode('lf') && anoAtual(request.resource.data)))
         && request.resource.data.get('etapa', '') in ['NA FILA', 'INCOMPLETO', 'SEPARADO']
@@ -351,7 +360,8 @@ service cloud.firestore {
              && request.resource.data.get('caidoMotivo', '').size() == 0)
         // a venda entra "a conferir": só o admin marca como conferida (a comissão só conta depois)
         && (!mudou(['conferido']) || request.resource.data.conferido == false)
-        && !(resource.data.etapa in ['PAGO', 'ENTREGUE'] && mudou(['valor', 'formaPag', 'pagoEm', 'resp', 'respEmail'])));
+        && !(resource.data.etapa in ['PAGO', 'ENTREGUE'] && mudou(['valor', 'formaPag', 'pagoEm', 'resp', 'respEmail']))
+        && dinheiroOk());
       // a equipe inclui aluno à mão (sem planilha): entra na fila ou separado para si, nunca como venda
       allow create: if admin() || (podeForm()
         && request.resource.data.get('etapa', '') in ['NA FILA', 'INCOMPLETO', 'SEPARADO']
