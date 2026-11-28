@@ -1823,6 +1823,12 @@ await cenario("Pedro (vendedor: Linha de Frente, Agendamento, Instituições)", 
     await sa.getByLabel("Responsável", { exact: true }).fill("João Diretor");
     await sa.locator("button[type=submit]").click();
     await calmo(pg);
+    // (28/11/2026) a janela da formatura abre depois de gravar o colégio: às vezes leva mais que o calmo() (falhava 1 em 3)
+    await pg
+      .locator(".sheet h2", { hasText: /Formatura do Colégio Delta Novo/i })
+      .last()
+      .waitFor({ timeout: 8000 })
+      .catch(() => {});
     sa = pg.locator(".sheet").last();
     ok(
       /Formatura do Colégio Delta Novo/i.test(await sa.locator("h2").textContent()),
@@ -3923,6 +3929,19 @@ await cenario("Aluguel de becas · alunos dos colégios (status, estoque e produ
       }
     }),
     "produtos/paspatur": { fisico: 3, reservado: 0 },
+    // (24/11/2026) as becas valem por dia: o estoque só trava com o dia das becas do colégio marcado na Agenda
+    "becasUso/evento_i1_diaBecas": {
+      tipo: "evento",
+      status: "reservado",
+      instId: "i1",
+      instNome: "COLEGIO ALFA",
+      campo: "diaBecas",
+      retirada: `${Y}-12-07`,
+      becasQtd: {},
+      tamanhosQtd: {},
+      faixasQtd: {},
+      capelosQtd: {}
+    },
     "alugueis/a1": {
       instId: "i1",
       instNome: "COLEGIO ALFA",
@@ -3950,9 +3969,10 @@ await cenario("Aluguel de becas · alunos dos colégios (status, estoque e produ
       produtos: [],
       historico: []
     },
+    // (o Caio é de outro colégio: os alunos de um colégio com dia de becas marcado entram no agendamento do colégio)
     "alugueis/a3": {
-      instId: "i1",
-      instNome: "COLEGIO ALFA",
+      instId: "i2",
+      instNome: "COLEGIO BETA",
       ano: Y,
       nome: "Caio Atrasado",
       status: "Retirou a beca",
@@ -3984,11 +4004,13 @@ await cenario("Aluguel de becas · alunos dos colégios (status, estoque e produ
   // P1 já está reservado para a Bia (só 1 menos longa): a Ana não consegue reservar
   const cAna = pg.locator("#alLista article", { hasText: "Ana Aluguel" });
   await cAna.getByRole("button", { name: "Avançar: Beca medida" }).click();
-  await pg.waitForFunction(() => /Não tem livre/.test(document.querySelector(".sheet:last-of-type")?.textContent || ""), null, {
+  await pg.waitForFunction(() => /não tem livre/i.test(document.querySelector(".sheet:last-of-type")?.textContent || ""), null, {
     timeout: 5000
   });
   ok(/P1 \(menos longa\)/.test(await pg.locator(".sheet").last().textContent()), "sem P1 livre: não reserva (estoque nunca negativo)");
-  await pg.locator(".sheet").last().getByRole("button", { name: "Fechar" }).click();
+  // o aviso de "Sem estoque nesse dia" (24/11/2026) sugere o tamanho livre mais perto: aqui não troca
+  ok(await pg.getByRole("button", { name: "🔁 Trocar para M" }).isVisible(), "sem estoque: sugere o tamanho livre mais perto (M)");
+  await pg.getByRole("button", { name: "Não trocar" }).click();
   // a Bia: produtos (reserva) → avança até retirar (baixa)
   const cBia = pg.locator("#alLista article", { hasText: "Bia Aluguel" });
   await cBia.getByRole("button", { name: "🛍️ Produtos" }).click();
@@ -4128,6 +4150,8 @@ await cenario("Contrato do colégio (pacote por aluno, quem recebeu, repasse e p
     await pg.getByRole("button", { name: "+ Criar contrato" }).click();
     const f = pg.locator(".sheet").last();
     await f.getByLabel("Quem fechou").selectOption(ANA);
+    // (24/11/2026) o preço de cada item fica dentro de "Preço de cada item e outros kits" (fechado no começo)
+    await f.getByText(/Preço de cada item e outros kits/).click();
     await f.getByLabel("Paspatur (R$)").fill("100");
     await f.getByLabel("Certificado (R$)").fill("30");
     await f.getByLabel("Canudo (R$)").fill("20");
@@ -5001,7 +5025,7 @@ await cenario("➕ Cadastrar aluno: colégio primeiro, ID obrigatório, um aluno
   ok((await f.locator(".cad-pref").textContent()) === String(Y).slice(2) + "CA-", "o começo do ID vem pronto (ano + sigla)");
   ok(
     (await f.getByLabel("Série", { exact: true }).evaluate(s => [...s.options].map(o => o.textContent).join("|"))).includes(
-      "Pré|5º ano|9º ano|Ensino Médio|Profissionalizante"
+      "Pré|5º ano|9º ano|Ensino Médio|EJA|Profissionalizante"
     ),
     "turmas prontas"
   );
@@ -5648,7 +5672,8 @@ await cenario("Agendamento de becas: quantidades, estoque no período e o colég
       instId: "i2",
       instNome: "COLEGIO BETA",
       campo: "diaBecas",
-      retirada: `${Y}-12-05`,
+      // (23/11/2026) as becas valem por dia: só o dia da entrega conta (o Beta entrega no mesmo dia que o Alfa)
+      retirada: `${Y}-12-07`,
       devolucao: `${Y}-12-12`,
       becasQtd: { tradPreta: 3 },
       tamanhosQtd: { tradPreta: { P: 3 } },
@@ -5669,7 +5694,7 @@ await cenario("Agendamento de becas: quantidades, estoque no período e o colég
   await sh.locator(".eb-num", { hasText: "alunos" }).first().waitFor({ timeout: 8000 });
   ok((await sh.locator(".eb-num").first().textContent()) === "3alunos", "mostra os 3 alunos do aluguel do colégio");
   ok(/Becas deste agendamento/.test(await sh.textContent()), "a janela do agendamento tem as becas");
-  ok((await sh.getByLabel("Devolução (recolher)").inputValue()) === `${Y}-12-11`, "devolução sugerida: o dia seguinte à formatura");
+  ok((await sh.getByLabel("Devolução (opcional)").inputValue()) === `${Y}-12-11`, "devolução sugerida: o dia seguinte à formatura");
   await sh.getByText(/Falta 1 item/).waitFor({ timeout: 8000 });
   const t = await sh.textContent();
   ok(

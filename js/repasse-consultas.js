@@ -17,7 +17,7 @@ export function consultaDaAba(k, todosEntregues = false) {
   if (seg === "lf") {
     // admin: lê os em andamento de todos e mostra só os dele e os sem responsável (aluno antigo pode não ter o
     // campo respEmail, então não dá para filtrar no Firebase); com a equipe toda trabalhando passa de 300
-    if (k === "hoje") q = FS.query(col, ...baseLF(), ...soMinha(), FS.where("etapa", "in", ABERTAS), FS.limit(C.isAdmin ? 3000 : 300));
+    if (k === "hoje") q = FS.query(col, ...baseLF(), ...soMinha(), FS.where("etapa", "in", ABERTAS), FS.limit(3000));
     if (k === "interessados") q = FS.query(col, ...baseLF(), ...soMinha(), FS.where("etapa", "==", "INTERESSADO"), FS.limit(200));
     if (k === "entregas") q = FS.query(col, ...baseLF(), ...soMinha(), FS.where("etapa", "==", "PAGO"), FS.limit(300));
   } else {

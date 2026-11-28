@@ -45,8 +45,8 @@ export async function refreshStats() {
     const [h, i, m] = await Promise.all(
       lf
         ? [
-            FS.getDocs(FS.query(col, ...baseLF(), ...soMinha(), FS.where("etapa", "in", ABERTAS), FS.limit(C.isAdmin ? 3000 : 300))),
-            FS.getDocs(FS.query(col, ...baseLF(), ...soMinha(), FS.where("etapa", "==", "INTERESSADO"), FS.limit(C.isAdmin ? 3000 : 300))),
+            FS.getDocs(FS.query(col, ...baseLF(), ...soMinha(), FS.where("etapa", "in", ABERTAS), FS.limit(3000))),
+            FS.getDocs(FS.query(col, ...baseLF(), ...soMinha(), FS.where("etapa", "==", "INTERESSADO"), FS.limit(3000))),
             FS.getDocs(FS.query(col, ...baseLF(), ...soMinha(), FS.where("etapa", "in", ["PAGO", "ENTREGUE"]), FS.limit(1000)))
           ]
         : C.isAdmin
@@ -57,7 +57,7 @@ export async function refreshStats() {
             ]
           : [
               FS.getDocs(FS.query(col, ...soMinha(), FS.where("etapa", "in", ABERTAS), FS.limit(500))),
-              FS.getDocs(FS.query(col, ...soMinha(), FS.where("etapa", "==", "INTERESSADO"), FS.limit(300))),
+              FS.getDocs(FS.query(col, ...soMinha(), FS.where("etapa", "==", "INTERESSADO"), FS.limit(3000))),
               FS.getDocs(FS.query(col, ...soMinha(), FS.where("etapa", "in", ["PAGO", "ENTREGUE"]), FS.limit(1000)))
             ]
     );
